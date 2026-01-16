@@ -7,6 +7,7 @@ import type { DatalogQuery, QueryResult } from "../datalog/datalog.js";
 import type {
   Attribute,
   AttributeDefinition,
+  ConnectionPoolConfig,
   Datom,
   DatomInput,
   DatabaseEvent,
@@ -356,7 +357,7 @@ export interface Transaction extends DatomReader, DatomWriter<void> {
  *
  * **Connection Pooling (SQL Implementations):**
  * - SQL database implementations should use connection pooling for production workloads
- * - Configure pools using `ConnectionPoolConfig` type with appropriate limits
+ * - Configure pools using `ConnectionPoolConfig` type (defined in `../types.js`) with appropriate limits
  * - Monitor pool health via `getPoolStats()` if implemented by your SQL adapter
  * - **Best Practices:**
  *   - Use connection pooling for multi-threaded/server applications
@@ -364,6 +365,13 @@ export interface Transaction extends DatomReader, DatomWriter<void> {
  *   - Set `maxConnections` based on your database server's connection limits
  *   - Monitor `waitingRequests` to detect connection pool exhaustion
  *   - Use `idleTimeout` and `maxLifetime` to prevent connection leaks
+ *
+ * **EntityId Types:**
+ * - `EntityId` supports `number`, `string`, and `symbol` types
+ * - **Symbol EntityIds:** Symbols are supported but require special serialization in SQL implementations
+ *   - Symbols are serialized as `__SYMBOL__${String(symbol)}` when persisting to SQL/JSON
+ *   - For persistent databases with sync/replication, prefer `number` or `string` EntityIds
+ *   - Symbol EntityIds work well for in-memory databases but may have limitations in distributed scenarios
  *
  * @example
  * // Example usage: Create, add and query
@@ -1330,7 +1338,8 @@ export abstract class DatomDatabase
         }
         break;
       case "ref":
-        // EntityId can be number, string, or symbol (symbol requires special serialization)
+        // EntityId can be number, string, or symbol
+        // Note: Symbols require special serialization in SQL implementations (see types.ts EntityId docs)
         if (
           typeof value !== "number" &&
           typeof value !== "string" &&
@@ -1339,7 +1348,7 @@ export abstract class DatomDatabase
           return new Error(
             `Attribute "${String(
               attribute
-            )}" expects type "ref" (EntityId), but got ${typeof value}`
+            )}" expects type "ref" (EntityId: number | string | symbol), but got ${typeof value}`
           );
         }
         break;
