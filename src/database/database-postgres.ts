@@ -43,10 +43,19 @@ export class PostgreSQLDatabase extends Database {
         )
       `;
 
+      // PostgreSQL-optimized indexes
+      // Note: INCLUDE clause not used for PGLite compatibility (requires PostgreSQL 11+)
       const indexes = [
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_entity ON ${this.tableName}(entity)`,
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_attribute ON ${this.tableName}(attribute)`,
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx)`,
+        // Composite index for entity+attribute queries (most common pattern)
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_entity_attr_tx ON ${this.tableName}(entity, attribute, tx DESC)`,
+        // Composite index for attribute+value queries
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_attr_value_tx ON ${this.tableName}(attribute, value, tx DESC)`,
+        // Partial index for added=true (most common case - only active datoms)
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(entity, attribute, tx DESC) WHERE added = true`,
+        // GIN index for JSONB value queries (containment, key existence, etc.)
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_value_gin ON ${this.tableName} USING GIN (value)`,
+        // Index on tx for transaction-based queries
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx DESC)`,
       ];
 
       await this.connection.execute(createTableSql);
@@ -135,6 +144,7 @@ export class PostgreSQLDatabase extends Database {
     const conditions: string[] = [];
     const params: any[] = [];
 
+    // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
       params.push(String(options.entity));
@@ -144,7 +154,6 @@ export class PostgreSQLDatabase extends Database {
       params.push(String(options.attribute));
     }
     if (options.value !== undefined) {
-      conditions.push("value = ?");
       let value = options.value;
       if (value === undefined) {
         value = "__UNDEFINED__";
@@ -152,6 +161,7 @@ export class PostgreSQLDatabase extends Database {
       if (typeof value === "symbol") {
         value = `__SYMBOL__${String(value)}`;
       }
+      conditions.push("value = ?::jsonb");
       params.push(JSON.stringify(value));
     }
     if (options.tx !== undefined) {
@@ -162,61 +172,55 @@ export class PostgreSQLDatabase extends Database {
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
+    // Use DISTINCT ON to get latest datom per (entity, attribute, value) in SQL
+    // This eliminates the need for JavaScript Map-based deduplication
+    // PostgreSQL-specific: DISTINCT ON with ORDER BY for efficient latest-row-per-group
+    const limitClause = options.limit ? "LIMIT ?" : "";
+    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+
+    // Handle added filter - default to added = true when undefined (matches original behavior)
+    // Apply filter after DISTINCT ON to get latest datom first, then filter by added status
+    let addedFilter = "";
+    if (options.added === true || options.added === undefined) {
+      addedFilter = "WHERE added = true";
+    } else if (options.added === false) {
+      addedFilter = "WHERE added = false";
+    }
+
     const sql = `
-      SELECT entity, attribute, value, tx, added
-      FROM ${this.tableName}
-      ${whereClause}
-      ORDER BY tx DESC
+      WITH latest_datoms AS (
+        SELECT DISTINCT ON (entity, attribute, value)
+          entity, attribute, value, tx, added
+        FROM ${this.tableName}
+        ${whereClause}
+        ORDER BY entity, attribute, value, tx DESC
+      )
+      SELECT 
+        entity,
+        attribute,
+        value,
+        tx,
+        added
+      FROM latest_datoms
+      ${addedFilter}
+      ORDER BY
+        CASE 
+          WHEN entity ~ '^-?[0-9]+$' THEN entity::BIGINT 
+          ELSE 0 
+        END,
+        attribute
+      ${limitClause}
+      ${offsetClause}
     `;
 
+    if (options.limit) {
+      params.push(options.limit);
+    }
+    if (options.offset !== undefined) {
+      params.push(options.offset);
+    }
+
     const rows = await this.connection.query(sql, params);
-
-    const latestDatoms = new Map<string, any>();
-    for (const row of rows) {
-      const key = `${row.entity}|${row.attribute}|${row.value}`;
-      const existing = latestDatoms.get(key);
-      if (!existing || row.tx > existing.tx) {
-        latestDatoms.set(key, row);
-      }
-    }
-
-    let results = Array.from(latestDatoms.values());
-
-    if (options.added === undefined || options.added === true) {
-      results = results.filter((r) => r.added);
-    } else if (options.added === false) {
-      results = results.filter((r) => !r.added);
-    }
-
-    // Sort by entity, then attribute for consistent ordering
-    results.sort((a, b) => {
-      // Convert entity to number for comparison
-      let entityA: number;
-      if (typeof a.entity === "number") {
-        entityA = a.entity;
-      } else {
-        const entityStr = String(a.entity);
-        entityA = /^-?\d+$/.test(entityStr) ? parseInt(entityStr, 10) : 0;
-      }
-
-      let entityB: number;
-      if (typeof b.entity === "number") {
-        entityB = b.entity;
-      } else {
-        const entityStr = String(b.entity);
-        entityB = /^-?\d+$/.test(entityStr) ? parseInt(entityStr, 10) : 0;
-      }
-
-      if (entityA !== entityB) {
-        return entityA - entityB;
-      }
-      return String(a.attribute).localeCompare(String(b.attribute));
-    });
-
-    const offset = options.offset ?? 0;
-    const paginated = options.limit
-      ? results.slice(offset, offset + options.limit)
-      : results.slice(offset);
 
     const reviveValue = (value: any): any => {
       if (typeof value === "string") {
@@ -250,7 +254,7 @@ export class PostgreSQLDatabase extends Database {
       return value;
     };
 
-    return paginated.map((row: any) => {
+    return rows.map((row: any) => {
       let entity: any = row.entity;
       if (typeof entity === "string") {
         if (/^-?\d+$/.test(entity)) {
@@ -258,7 +262,10 @@ export class PostgreSQLDatabase extends Database {
         }
       }
 
-      const parsedValue = JSON.parse(row.value);
+      // PostgreSQL JSONB returns as parsed object, but connection adapter stringifies it
+      // So we still need to parse
+      const parsedValue =
+        typeof row.value === "string" ? JSON.parse(row.value) : row.value;
       const revivedValue = reviveValue(parsedValue);
 
       return {
@@ -276,6 +283,12 @@ export class PostgreSQLDatabase extends Database {
     if (query.where.length === 0) {
       return [];
     }
+
+    // Note: Datalog queries use the optimized query() method which leverages
+    // PostgreSQL DISTINCT ON and SQL-level filtering/sorting for performance.
+    // Future optimization: For simple multi-clause queries, could use SQL JOINs
+    // directly instead of in-memory joins, but current approach handles complex
+    // datalog semantics correctly.
 
     const firstClause = query.where[0];
     const firstResults = await this.executeClause(firstClause);
@@ -377,24 +390,18 @@ export class PostgreSQLDatabase extends Database {
   }
 
   private async getNextTransactionId(): Promise<TransactionId> {
-    const initTxSql = `
+    // PostgreSQL-optimized: Use INSERT ... ON CONFLICT ... UPDATE ... RETURNING
+    // This combines initialization, update, and retrieval into a single atomic operation
+    // The ON CONFLICT ensures thread-safety, and RETURNING gets the new value in one query
+    const sql = `
       INSERT INTO ${this.tableName}_tx (id, last_tx)
-      SELECT 1, 0
-      WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
+      VALUES (1, 0)
+      ON CONFLICT (id) 
+      DO UPDATE SET last_tx = ${this.tableName}_tx.last_tx + 1
+      RETURNING last_tx
     `;
-    await this.connection.execute(initTxSql);
 
-    const updateSql = `
-      UPDATE ${this.tableName}_tx
-      SET last_tx = last_tx + 1
-      WHERE id = 1
-    `;
-    await this.connection.execute(updateSql);
-
-    const selectSql = `
-      SELECT last_tx FROM ${this.tableName}_tx WHERE id = 1
-    `;
-    const result = await this.connection.query(selectSql);
+    const result = await this.connection.query(sql);
     if (!result || result.length === 0) {
       throw new Error("Transaction counter row not found after update");
     }
