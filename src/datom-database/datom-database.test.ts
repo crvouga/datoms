@@ -51,6 +51,7 @@ const createPostgresFixture = async (): Promise<Fixture> => {
   return {
     db: db,
     beforeEach: async () => {
+      // @ts-expect-error - Accessing protected method for test cleanup
       await db.cleanUp();
     },
     afterEach: async () => {},
@@ -326,9 +327,9 @@ describe.each(fixtures)("DatomDatabase (%s)", (_name, createFixture) => {
         [3, "role", "engineer"],
         // Departments
         [10, "name", "Engineering"],
-        [10, "budget", 100000],
+        [10, "budget", 100_000],
         [11, "name", "Sales"],
-        [11, "budget", 50000],
+        [11, "budget", 50_000],
         // Employee-Department relationships
         [1, "department", 10],
         [2, "department", 10],
