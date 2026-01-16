@@ -1,0 +1,118 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+
+import { DatalogQuery } from "../../datalog/datalog.js";
+import { Fixture, FIXTURES } from "./fixtures.js";
+
+describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
+  let f: Fixture;
+
+  beforeEach(async () => {
+    f = await createFixture();
+    await f.beforeEach();
+  });
+
+  afterEach(async () => {
+    await f.afterEach();
+  });
+
+  describe("Database query (Datalog)", () => {
+    test("should execute simple query", async () => {
+      const { db } = f;
+      await db.add([
+        [1, "name", "Alice"],
+        [2, "name", "Bob"],
+      ]);
+
+      const query: DatalogQuery = {
+        find: ["?x"],
+        where: [["?x", "name", "?y"]],
+      };
+
+      expect(query.find).toContain("?x");
+      expect(query.where).toHaveLength(1);
+
+      const results = await db.queryDatalog(query);
+      expect(results).toHaveLength(2);
+      expect(results[0]["?x"]).toBe(1);
+      expect(results[1]["?x"]).toBe(2);
+
+      await db.close();
+    });
+
+    test("should return empty if where is empty", async () => {
+      const { db } = f;
+      const query: DatalogQuery = {
+        find: ["?x"],
+        where: [],
+      };
+
+      const results = await db.queryDatalog(query);
+      expect(Array.isArray(results)).toBe(true);
+      expect(results).toHaveLength(0);
+
+      await db.close();
+    });
+
+    test("should filter by constant in where clause", async () => {
+      const { db } = f;
+      await db.add([
+        [1, "type", "person"],
+        [2, "type", "car"],
+        [3, "type", "person"],
+      ]);
+
+      const query: DatalogQuery = {
+        find: ["?x"],
+        where: [["?x", "type", "person"]],
+      };
+
+      const results = await db.queryDatalog(query);
+      expect(results.map((r) => r["?x"]).sort()).toEqual([1, 3]);
+
+      await db.close();
+    });
+
+    test("should handle empty find clause", async () => {
+      const { db } = f;
+      await db.add([
+        [1, "name", "Alice"],
+        [2, "name", "Bob"],
+      ]);
+
+      const query: DatalogQuery = {
+        find: [],
+        where: [["?x", "name", "?y"]],
+      };
+
+      const results = await db.queryDatalog(query);
+      expect(results).toHaveLength(2);
+      // Empty find should return all variables from where clause
+      expect(Object.keys(results[0]).length).toBeGreaterThan(0);
+
+      await db.close();
+    });
+
+    test("should handle find variables not in where clause", async () => {
+      const { db } = f;
+      await db.add([
+        [1, "name", "Alice"],
+        [2, "name", "Bob"],
+      ]);
+
+      const query: DatalogQuery = {
+        find: ["?x", "?missing"],
+        where: [["?x", "name", "?y"]],
+      };
+
+      const results = await db.queryDatalog(query);
+      expect(results).toHaveLength(2);
+      // Missing variable should be undefined
+      expect(results[0]["?x"]).toBeDefined();
+      expect(results[0]["?missing"]).toBeUndefined();
+      expect(results[1]["?x"]).toBeDefined();
+      expect(results[1]["?missing"]).toBeUndefined();
+
+      await db.close();
+    });
+  });
+});
