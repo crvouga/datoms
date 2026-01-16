@@ -17,6 +17,8 @@ export type {
 export { Database } from "./database.js";
 export { InMemoryDatabase } from "./database-in-memory.js";
 export { SqlDatabase } from "./database-sql.js";
+// Note: SQLiteDatabase is test-only and not exported here
+// Users should create their own SqlDatabase implementations with their preferred SQL connection
 
 // SQL utilities
 export { mysqlDialect, postgresDialect, sqliteDialect } from "./sql-utils.js";

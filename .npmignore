@@ -1,0 +1,13 @@
+# Exclude test files and directories from npm package
+**/__tests__/**
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+
+# Source files (only dist should be published)
+src/
+
+# Development files
+*.log
+.DS_Store

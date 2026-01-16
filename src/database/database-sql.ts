@@ -152,19 +152,20 @@ export abstract class SqlDatabase extends Database {
     }
     if (options.value !== undefined) {
       conditions.push("value = ?");
-      params.push(JSON.stringify(options.value));
+      let value = options.value;
+      // Handle undefined - use special marker
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      // Handle symbols - use special marker
+      if (typeof value === "symbol") {
+        value = `__SYMBOL__${String(value)}`;
+      }
+      params.push(JSON.stringify(value));
     }
     if (options.tx !== undefined) {
       conditions.push("tx = ?");
       params.push(options.tx);
-    }
-    if (options.added !== undefined) {
-      conditions.push("added = ?");
-      params.push(options.added);
-    } else {
-      // Default to only added datoms
-      conditions.push("added = ?");
-      params.push(true);
     }
 
     const whereClause =
@@ -172,23 +173,104 @@ export abstract class SqlDatabase extends Database {
     const limitClause = options.limit ? `LIMIT ${options.limit}` : "";
     const offsetClause = options.offset ? `OFFSET ${options.offset}` : "";
 
+    // Get all matching rows ordered by transaction (most recent first)
     const sql = `
       SELECT entity, attribute, value, tx, added
       FROM ${this.tableName}
       ${whereClause}
       ORDER BY tx DESC
-      ${limitClause}
-      ${offsetClause}
     `;
 
     const rows = await this.connection.query(sql, params);
-    return rows.map((row: any) => ({
-      entity: row.entity,
-      attribute: row.attribute,
-      value: JSON.parse(row.value),
-      tx: row.tx,
-      added: row.added,
-    }));
+
+    // Handle retractions: for each unique (entity, attribute, value) combination,
+    // keep only the most recent transaction
+    // This ensures that retracted datoms are not returned when querying
+    const latestDatoms = new Map<string, any>();
+    for (const row of rows) {
+      const key = `${row.entity}|${row.attribute}|${row.value}`;
+      const existing = latestDatoms.get(key);
+      if (!existing || row.tx > existing.tx) {
+        latestDatoms.set(key, row);
+      }
+    }
+
+    let results = Array.from(latestDatoms.values());
+
+    // Filter by added flag
+    if (options.added === undefined || options.added === true) {
+      // Default to only added datoms
+      results = results.filter((r) => r.added);
+    } else if (options.added === false) {
+      results = results.filter((r) => !r.added);
+    }
+
+    // Apply pagination
+    const offset = options.offset ?? 0;
+    const paginated = options.limit
+      ? results.slice(offset, offset + options.limit)
+      : results.slice(offset);
+
+    // Helper function to revive JSON values (convert date strings back to Date objects, etc.)
+    const reviveValue = (value: any): any => {
+      if (typeof value === "string") {
+        // Check if it's our special undefined marker
+        if (value === "__UNDEFINED__") {
+          return undefined;
+        }
+        // Check if it's our special symbol marker
+        if (value.startsWith("__SYMBOL__")) {
+          // Extract the symbol description and create a new symbol
+          // Note: This creates a new symbol, not the original, but it's the best we can do
+          const symbolDesc = value.substring("__SYMBOL__".length);
+          return Symbol(symbolDesc);
+        }
+        // Check if it's an ISO date string
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+          return new Date(value);
+        }
+      }
+      if (value === null) {
+        return null;
+      }
+      if (value === undefined) {
+        return undefined;
+      }
+      if (Array.isArray(value)) {
+        return value.map(reviveValue);
+      }
+      if (typeof value === "object") {
+        const revived: any = {};
+        for (const key in value) {
+          revived[key] = reviveValue(value[key]);
+        }
+        return revived;
+      }
+      return value;
+    };
+
+    // Convert rows to Datom format, trying to preserve entity ID types
+    return paginated.map((row: any) => {
+      // Try to parse entity back to number if it looks like a number
+      let entity: any = row.entity;
+      if (typeof entity === "string") {
+        // Check if it's a numeric string
+        if (/^-?\d+$/.test(entity)) {
+          entity = parseInt(entity, 10);
+        }
+      }
+
+      const parsedValue = JSON.parse(row.value);
+      const revivedValue = reviveValue(parsedValue);
+
+      return {
+        entity,
+        attribute: row.attribute,
+        value: revivedValue,
+        tx: row.tx,
+        added: row.added,
+      };
+    });
   }
 
   async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
@@ -293,13 +375,27 @@ export abstract class SqlDatabase extends Database {
       ${dialect.onConflict || ""}
     `;
 
-    const params = datoms.flatMap((d) => [
-      String(d[0]), // entity
-      String(d[1]), // attribute
-      JSON.stringify(d[2]), // value
-      tx,
-      true,
-    ]);
+    const params = datoms.flatMap((d) => {
+      let value = d[2];
+      // Handle undefined - JSON.stringify(undefined) returns undefined, not a string
+      // Use a special marker that we can detect when parsing
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      // Handle symbols - JSON.stringify(Symbol()) throws, so convert to string with marker
+      if (typeof value === "symbol") {
+        value = `__SYMBOL__${String(value)}`;
+      }
+      // Handle Date objects - JSON.stringify converts to ISO string, which is fine
+      // but we'll detect and convert back in query
+      return [
+        String(d[0]), // entity
+        String(d[1]), // attribute
+        JSON.stringify(value), // value
+        tx,
+        true,
+      ];
+    });
 
     await this.connection.execute(sql, params);
   }
@@ -321,13 +417,25 @@ export abstract class SqlDatabase extends Database {
       ${dialect.onConflict || ""}
     `;
 
-    const params = datoms.flatMap((d) => [
-      String(d[0]), // entity
-      String(d[1]), // attribute
-      JSON.stringify(d[2]), // value
-      tx,
-      false,
-    ]);
+    const params = datoms.flatMap((d) => {
+      let value = d[2];
+      // Handle undefined - JSON.stringify(undefined) returns undefined, not a string
+      // Use a special marker that we can detect when parsing
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      // Handle symbols - JSON.stringify(Symbol()) throws, so convert to string with marker
+      if (typeof value === "symbol") {
+        value = `__SYMBOL__${String(value)}`;
+      }
+      return [
+        String(d[0]), // entity
+        String(d[1]), // attribute
+        JSON.stringify(value), // value
+        tx,
+        false,
+      ];
+    });
 
     await this.connection.execute(sql, params);
   }

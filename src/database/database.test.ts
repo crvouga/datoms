@@ -1,38 +1,75 @@
-import { describe, expect, test } from "bun:test";
-import type { DatalogQuery } from "../index";
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import type { Database, DatalogQuery } from "../index";
 import { InMemoryDatabase } from "../index";
+import { SQLiteDatabase } from "./__tests__/database-sqlite.js";
+import { unlinkSync } from "fs";
 
-describe("Database", () => {
-  test("should create a database with memory backend", async () => {
-    const db = new InMemoryDatabase();
-    await db.initialize();
+const createInMemoryDatabase = async (): Promise<Database> => {
+  const db = new InMemoryDatabase();
+  await db.initialize();
+  return db;
+};
+
+const createSQLiteDatabase = async (filename: string): Promise<Database> => {
+  // For file-based databases, delete the file first to ensure a clean state
+  if (filename !== ":memory:") {
+    try {
+      unlinkSync(filename);
+    } catch {
+      // File doesn't exist, which is fine
+    }
+  }
+  const db = new SQLiteDatabase(filename);
+  await db.initialize();
+  return db;
+};
+
+// Test implementations: [name, factory function]
+const implementations: [string, () => Promise<Database>][] = [
+  ["InMemoryDatabase", () => createInMemoryDatabase()],
+  ["SQLiteDatabase (memory)", () => createSQLiteDatabase(":memory:")],
+  ["SQLiteDatabase (file)", () => createSQLiteDatabase("test.db")],
+];
+
+describe.each(implementations)("Database (%s)", (name, createDb) => {
+  // Clean up file-based databases after each test
+  afterEach(async () => {
+    if (name === "SQLiteDatabase (file)") {
+      try {
+        unlinkSync("test.db");
+      } catch {
+        // Ignore errors - file may not exist
+      }
+    }
+  });
+  test("should create a database", async () => {
+    const db = await createDb();
 
     expect(db).toBeDefined();
     await db.close();
   });
 
   test("should add datoms", async () => {
-    const db = new InMemoryDatabase();
-    await db.initialize();
+    const db = await createDb();
 
     const tx = await db.add([
       [1, "name", "Alice"],
       [1, "age", 30],
     ]);
 
-    expect(tx).toBe(1);
+    expect(tx).toBeGreaterThanOrEqual(1);
 
     const entity = await db.getEntity(1);
     expect(entity).toHaveLength(2);
-    expect(entity[0].value).toBe("Alice");
-    expect(entity[1].value).toBe(30);
+    const values = entity.map((d) => d.value);
+    expect(values).toContain("Alice");
+    expect(values).toContain(30);
 
     await db.close();
   });
 
   test("should query datoms", async () => {
-    const db = new InMemoryDatabase();
-    await db.initialize();
+    const db = await createDb();
 
     await db.add([
       [1, "name", "Alice"],
@@ -46,8 +83,7 @@ describe("Database", () => {
   });
 
   test("should retract datoms", async () => {
-    const db = new InMemoryDatabase();
-    await db.initialize();
+    const db = await createDb();
 
     await db.add([[1, "name", "Alice"]]);
     await db.retract([[1, "name", "Alice"]]);
@@ -59,8 +95,7 @@ describe("Database", () => {
   });
 
   test("should get value for entity-attribute", async () => {
-    const db = new InMemoryDatabase();
-    await db.initialize();
+    const db = await createDb();
 
     await db.add([[1, "name", "Alice"]]);
 
@@ -72,8 +107,7 @@ describe("Database", () => {
 
   describe("Database query (Datalog)", () => {
     test("should execute simple query", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -97,8 +131,7 @@ describe("Database", () => {
     });
 
     test("should handle multiple where clauses (join)", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -125,8 +158,7 @@ describe("Database", () => {
     });
 
     test("should support ordering and limits", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "score", 100],
@@ -150,8 +182,7 @@ describe("Database", () => {
     });
 
     test("should return empty if where is empty", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       const query: DatalogQuery = {
         find: ["?x"],
@@ -166,8 +197,7 @@ describe("Database", () => {
     });
 
     test("should filter by constant in where clause", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "type", "person"],
@@ -187,8 +217,7 @@ describe("Database", () => {
     });
 
     test("should handle multi-entity relationships (friendships)", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       // Create people
       await db.add([
@@ -224,8 +253,7 @@ describe("Database", () => {
     });
 
     test("should handle transitive relationships (friends of friends)", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       // Create people and friendships
       await db.add([
@@ -262,8 +290,7 @@ describe("Database", () => {
     });
 
     test("should handle complex joins with multiple entities and attributes", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       // Create a company structure: employees, departments, and their relationships
       await db.add([
@@ -310,8 +337,7 @@ describe("Database", () => {
     });
 
     test("should handle parent-child relationships", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       // Create a family tree
       await db.add([
@@ -350,8 +376,7 @@ describe("Database", () => {
     });
 
     test("should handle many-to-many relationships", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       // Create students and courses with enrollments
       await db.add([
@@ -395,8 +420,7 @@ describe("Database", () => {
     });
 
     test("should handle queries with multiple constraints on same entity", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -428,8 +452,7 @@ describe("Database", () => {
     });
 
     test("should handle complex variable bindings across multiple clauses", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       // Create a network of connections
       await db.add([
@@ -463,8 +486,7 @@ describe("Database", () => {
     });
 
     test("should handle queries with ordering on multiple variables", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -504,8 +526,7 @@ describe("Database", () => {
     });
 
     test("should handle variable in entity position", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -529,8 +550,7 @@ describe("Database", () => {
     });
 
     test("should handle variable in attribute position", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -555,8 +575,7 @@ describe("Database", () => {
     });
 
     test("should handle all positions as variables", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -583,8 +602,7 @@ describe("Database", () => {
     });
 
     test("should handle empty find clause", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -605,8 +623,7 @@ describe("Database", () => {
     });
 
     test("should handle find variables not in where clause", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -630,8 +647,7 @@ describe("Database", () => {
     });
 
     test("should handle boolean values", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "active", true],
@@ -653,8 +669,7 @@ describe("Database", () => {
     });
 
     test("should handle Date values", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       const date1 = new Date("2023-01-01");
       const date2 = new Date("2023-02-01");
@@ -683,8 +698,7 @@ describe("Database", () => {
     });
 
     test("should handle null values", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "middleName", null],
@@ -706,8 +720,7 @@ describe("Database", () => {
     });
 
     test("should handle undefined values", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "optional", undefined],
@@ -735,8 +748,7 @@ describe("Database", () => {
     });
 
     test("should handle symbol values", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       const sym1 = Symbol("type1");
       const sym2 = Symbol("type2");
@@ -761,8 +773,7 @@ describe("Database", () => {
     });
 
     test("should handle mixed value types", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "data", "string"],
@@ -789,8 +800,7 @@ describe("Database", () => {
     });
 
     test("should handle string entity IDs", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         ["user-1", "name", "Alice"],
@@ -815,8 +825,7 @@ describe("Database", () => {
     });
 
     test("should handle symbol entity IDs", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       const e1 = Symbol("entity1");
       const e2 = Symbol("entity2");
@@ -840,8 +849,7 @@ describe("Database", () => {
     });
 
     test("should handle limit 0", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "score", 100],
@@ -865,8 +873,7 @@ describe("Database", () => {
     });
 
     test("should handle limit larger than results", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "score", 100],
@@ -886,8 +893,7 @@ describe("Database", () => {
     });
 
     test("should handle limit with ordering", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "score", 100],
@@ -912,8 +918,7 @@ describe("Database", () => {
     });
 
     test("should handle ordering on variable not in find", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -962,8 +967,7 @@ describe("Database", () => {
     });
 
     test("should handle ordering with null values", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "score", 100],
@@ -989,8 +993,7 @@ describe("Database", () => {
     });
 
     test("should handle ordering with mixed types", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "value", "zebra"],
@@ -1014,8 +1017,7 @@ describe("Database", () => {
     });
 
     test("should handle join with no matching results", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -1040,8 +1042,7 @@ describe("Database", () => {
     });
 
     test("should handle join with incompatible variable bindings", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -1070,8 +1071,7 @@ describe("Database", () => {
     });
 
     test("should handle join with multiple common variables", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -1102,8 +1102,7 @@ describe("Database", () => {
     });
 
     test("should exclude retracted datoms from query results", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
@@ -1128,8 +1127,7 @@ describe("Database", () => {
     });
 
     test("should handle multi-valued attributes", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "tag", "red"],
@@ -1155,8 +1153,7 @@ describe("Database", () => {
     });
 
     test("should handle self-joins", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       // Create a graph where nodes can connect to themselves
       await db.add([
@@ -1196,8 +1193,7 @@ describe("Database", () => {
     });
 
     test("should handle circular relationships", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       // Create a circular graph: 1 -> 2 -> 3 -> 1
       await db.add([
@@ -1223,8 +1219,7 @@ describe("Database", () => {
     });
 
     test("should handle variable binding across disconnected clauses", async () => {
-      const db = new InMemoryDatabase();
-      await db.initialize();
+      const db = await createDb();
 
       await db.add([
         [1, "name", "Alice"],
