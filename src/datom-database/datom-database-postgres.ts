@@ -596,8 +596,9 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     if (query.orderBy) {
       projected.sort((a, b) => {
         for (const [variable, direction] of query.orderBy!) {
-          const aVal = a[variable];
-          const bVal = b[variable];
+          const key = this.stripQuestionMark(variable);
+          const aVal = a[key];
+          const bVal = b[key];
 
           if (aVal == null && bVal == null) continue;
           if (aVal == null) return direction === "asc" ? -1 : 1;
@@ -816,14 +817,21 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     _clauses: QueryClause[]
   ): QueryResult {
     if (find.length === 0) {
-      return results;
+      // Strip ? from all keys when find is empty
+      return results.map((row) => {
+        const projected: Record<string, Value | Attribute> = {};
+        for (const key of Object.keys(row)) {
+          projected[this.stripQuestionMark(key)] = row[key];
+        }
+        return projected;
+      });
     }
 
     return results.map((row) => {
       const projected: Record<string, Value | Attribute> = {};
       for (const varName of find) {
         if (varName in row) {
-          projected[varName] = row[varName];
+          projected[this.stripQuestionMark(varName)] = row[varName];
         }
       }
       return projected;
@@ -832,6 +840,13 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
   private isVariable(value: unknown): boolean {
     return typeof value === "string" && value.startsWith("?");
+  }
+
+  /**
+   * Strip the question mark prefix from a variable name
+   */
+  private stripQuestionMark(key: string): string {
+    return key.startsWith("?") ? key.slice(1) : key;
   }
 
   /**
@@ -1341,8 +1356,9 @@ class PostgreSQLTransaction implements Transaction {
     if (query.orderBy) {
       projected.sort((a, b) => {
         for (const [variable, direction] of query.orderBy!) {
-          const aVal = a[variable];
-          const bVal = b[variable];
+          const key = this.stripQuestionMark(variable);
+          const aVal = a[key];
+          const bVal = b[key];
 
           if (aVal == null && bVal == null) continue;
           if (aVal == null) return direction === "asc" ? -1 : 1;
@@ -1432,14 +1448,21 @@ class PostgreSQLTransaction implements Transaction {
     _clauses: QueryClause[]
   ): QueryResult {
     if (find.length === 0) {
-      return results;
+      // Strip ? from all keys when find is empty
+      return results.map((row) => {
+        const projected: Record<string, Value | Attribute> = {};
+        for (const key of Object.keys(row)) {
+          projected[this.stripQuestionMark(key)] = row[key];
+        }
+        return projected;
+      });
     }
 
     return results.map((row) => {
       const projected: Record<string, Value | Attribute> = {};
       for (const varName of find) {
         if (varName in row) {
-          projected[varName] = row[varName];
+          projected[this.stripQuestionMark(varName)] = row[varName];
         }
       }
       return projected;
@@ -1448,5 +1471,12 @@ class PostgreSQLTransaction implements Transaction {
 
   private isVariable(value: unknown): boolean {
     return typeof value === "string" && value.startsWith("?");
+  }
+
+  /**
+   * Strip the question mark prefix from a variable name
+   */
+  private stripQuestionMark(key: string): string {
+    return key.startsWith("?") ? key.slice(1) : key;
   }
 }

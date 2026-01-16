@@ -33,8 +33,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.queryDatalog(query);
       expect(results).toHaveLength(2);
-      expect(results[0]["?x"]).toBe(1);
-      expect(results[1]["?x"]).toBe(2);
+      expect(results[0]["x"]).toBe(1);
+      expect(results[1]["x"]).toBe(2);
 
       await db.close();
     });
@@ -67,7 +67,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       };
 
       const results = await db.queryDatalog(query);
-      expect(results.map((r) => r["?x"]).sort()).toEqual([1, 3]);
+      expect(results.map((r) => r["x"]).sort()).toEqual([1, 3]);
 
       await db.close();
     });
@@ -107,10 +107,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.queryDatalog(query);
       expect(results).toHaveLength(2);
       // Missing variable should be undefined
-      expect(results[0]["?x"]).toBeDefined();
-      expect(results[0]["?missing"]).toBeUndefined();
-      expect(results[1]["?x"]).toBeDefined();
-      expect(results[1]["?missing"]).toBeUndefined();
+      expect(results[0]["x"]).toBeDefined();
+      expect(results[0]["missing"]).toBeUndefined();
+      expect(results[1]["x"]).toBeDefined();
+      expect(results[1]["missing"]).toBeUndefined();
 
       await db.close();
     });

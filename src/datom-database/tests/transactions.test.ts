@@ -137,7 +137,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         });
 
         expect(results).toHaveLength(3);
-        const entities = results.map((r) => r["?x"]).sort();
+        const entities = results.map((r) => r["x"]).sort();
         expect(entities).toEqual([1, 2, 3]);
       });
 
@@ -276,7 +276,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         });
 
         expect(results).toHaveLength(2);
-        const names = results.map((r) => r["?name"]).sort();
+        const names = results.map((r) => r["name"]).sort();
         expect(names).toEqual(["Alice", "Charlie"]);
       });
 

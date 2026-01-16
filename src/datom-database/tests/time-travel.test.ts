@@ -122,7 +122,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       };
       const resultsAtTx1 = await db.queryDatalog(queryAtTx1);
       expect(resultsAtTx1).toHaveLength(2);
-      const namesAtTx1 = resultsAtTx1.map((r) => r["?name"]).sort();
+      const namesAtTx1 = resultsAtTx1.map((r) => r["name"]).sort();
       expect(namesAtTx1).toEqual(["Alice", "Bob"]);
 
       // Query at tx2 - should see all three
@@ -133,7 +133,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       };
       const resultsAtTx2 = await db.queryDatalog(queryAtTx2);
       expect(resultsAtTx2).toHaveLength(3);
-      const namesAtTx2 = resultsAtTx2.map((r) => r["?name"]).sort();
+      const namesAtTx2 = resultsAtTx2.map((r) => r["name"]).sort();
       expect(namesAtTx2).toEqual(["Alice", "Bob", "Charlie"]);
 
       await db.close();

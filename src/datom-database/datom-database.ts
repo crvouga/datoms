@@ -1537,9 +1537,10 @@ export abstract class DatomDatabase
   /**
    * Execute a datalog query
    * @param query Datalog query to execute
-   * @returns Query results as an array of records
+   * @returns Query results as an array of records with keys that have the question mark prefix stripped
    * @example
-   * const result = await db.queryDatalog(["find", "?e", "where", ["?e", "name", "Alice"]]);
+   * const result = await db.queryDatalog({ find: ["?e"], where: [["?e", "name", "Alice"]] });
+   * // result will be [{"e": 123}] not [{"?e": 123}]
    */
   abstract queryDatalog(query: DatalogQuery): Promise<QueryResult>;
 
