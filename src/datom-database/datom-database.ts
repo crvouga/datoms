@@ -68,6 +68,9 @@ export interface DatomReader {
    * - For `cardinality: "one"` attributes: Returns the single value
    * - For `cardinality: "many"` attributes: Returns the value with the highest transaction ID (most recent)
    *
+   * **Note:** For multi-valued attributes, consider using `getLatestValue()` for clarity,
+   * or `getValues()` to get all values.
+   *
    * @param entity Entity ID
    * @param attribute Attribute name
    * @returns The value or undefined if not found. For multi-valued attributes, returns the most recent value.
@@ -77,6 +80,23 @@ export interface DatomReader {
    * const latestTag = await db.getValue(42, "tag"); // Returns most recent tag
    */
   getValue(entity: EntityId, attribute: string): Promise<Value | undefined>;
+
+  /**
+   * Get the most recent value for an entity-attribute pair
+   * Explicitly returns the value with the highest transaction ID (most recent).
+   * This is equivalent to `getValue()` but makes the intent clearer for multi-valued attributes.
+   *
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @returns The most recent value or undefined if not found
+   * @example
+   * // Get the latest tag added to an entity
+   * const latestTag = await db.getLatestValue(42, "tag");
+   */
+  getLatestValue(
+    entity: EntityId,
+    attribute: string
+  ): Promise<Value | undefined>;
 
   /**
    * Get all values for an entity-attribute pair
@@ -189,6 +209,35 @@ export interface DatomWriter<T = void> {
   retractEntity(entity: EntityId): Promise<T>;
 
   /**
+   * Retract all values for a specific entity-attribute pair
+   * Useful for clearing all values of a multi-valued attribute or resetting a single-valued attribute
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @returns The transaction ID (T)
+   * @example
+   * // Clear all tags for an entity
+   * await db.retractAttribute(123, "tag");
+   *
+   * // Reset a single-valued attribute
+   * await db.retractAttribute(123, "status");
+   */
+  retractAttribute(entity: EntityId, attribute: string): Promise<T>;
+
+  /**
+   * Upsert a value for an entity-attribute pair
+   * For `cardinality: "one"` attributes, this retracts any existing value and adds the new value atomically.
+   * For `cardinality: "many"` attributes, this simply adds the value (no retraction).
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @param value Value to upsert
+   * @returns The transaction ID (T)
+   * @example
+   * // Upsert a single-valued attribute (retracts old value, adds new)
+   * await db.upsert(123, "status", "active");
+   */
+  upsert(entity: EntityId, attribute: string, value: Value): Promise<T>;
+
+  /**
    * Execute bulk operations atomically
    * @param ops Object containing add and/or retract arrays
    * @param metadata Optional metadata to associate with this transaction
@@ -238,6 +287,17 @@ export interface Transaction extends DatomReader, DatomWriter<void> {
  * Abstract datom database class that provides a high-level interface
  * for working with datoms and datalog queries
  * Concrete implementations: InMemoryDatabase, SQLiteDatabase, PostgreSQLDatabase
+ *
+ * **Transaction Isolation:**
+ * - Transactions use READ COMMITTED isolation by default
+ * - Within a transaction, all reads see uncommitted changes from earlier operations in the same transaction
+ * - Concurrent transactions do not see each other's uncommitted changes
+ * - If a transaction throws an error, all changes are automatically rolled back
+ *
+ * **Schema Enforcement:**
+ * - Attributes can be used without schema definitions (schema is optional)
+ * - When an attribute is defined, validation is enforced (type, cardinality, uniqueness)
+ * - Use `defineAttribute()` to add schema constraints, or work without schema for flexibility
  *
  * @example
  * // Example usage: Create, add and query
@@ -295,6 +355,39 @@ export abstract class DatomDatabase
   abstract retractEntity(entity: EntityId): Promise<TransactionId>;
 
   /**
+   * Retract all values for a specific entity-attribute pair
+   * Useful for clearing all values of a multi-valued attribute or resetting a single-valued attribute
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @returns The transaction ID
+   * @example
+   * // Clear all tags for an entity
+   * await db.retractAttribute(123, "tag");
+   *
+   * // Reset a single-valued attribute
+   * await db.retractAttribute(123, "status");
+   */
+  async retractAttribute(
+    entity: EntityId,
+    attribute: string
+  ): Promise<TransactionId> {
+    await this.ensureInitialized();
+    // Get all current values for this entity-attribute pair
+    const datoms = await this.query({ entity, attribute });
+    if (datoms.length === 0) {
+      // No values to retract, but still return a transaction ID for consistency
+      return this.transact({});
+    }
+    // Retract all existing values
+    const toRetract: DatomInput[] = datoms.map((d) => [
+      d.entity,
+      d.attribute,
+      d.value,
+    ]);
+    return this.retract(toRetract);
+  }
+
+  /**
    * Execute bulk operations atomically
    * @param ops Object containing add and/or retract arrays
    * @param metadata Optional metadata to associate with this transaction (e.g., {userId: "alice", reason: "bulk_update"})
@@ -320,6 +413,52 @@ export abstract class DatomDatabase
   ): Promise<TransactionId> {
     const result = await this.transactWithResult(ops, metadata);
     return result.txId;
+  }
+
+  /**
+   * Upsert a value for an entity-attribute pair
+   * For `cardinality: "one"` attributes, this retracts any existing value and adds the new value atomically.
+   * For `cardinality: "many"` attributes, this simply adds the value (no retraction).
+   *
+   * **Note:** This method requires the attribute to be defined in the schema with `cardinality: "one"`
+   * to perform the retraction. If the attribute is not defined or has `cardinality: "many"`,
+   * it will only add the value without retracting existing ones.
+   *
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @param value Value to upsert
+   * @returns The transaction ID
+   * @example
+   * // Upsert a single-valued attribute (retracts old value, adds new)
+   * await db.upsert(123, "status", "active");
+   *
+   * // For multi-valued attributes, this just adds (use add() directly)
+   * await db.upsert(123, "tag", "new-tag"); // Adds without retracting
+   */
+  async upsert(
+    entity: EntityId,
+    attribute: string,
+    value: Value
+  ): Promise<TransactionId> {
+    await this.ensureInitialized();
+    const definition = this.getAttributeDefinition(attribute);
+
+    // If cardinality is "one", retract existing value first
+    if (definition?.cardinality === "one") {
+      const existingValues = await this.getValues(entity, attribute);
+      const toRetract: DatomInput[] = existingValues.map((v) => [
+        entity,
+        attribute,
+        v,
+      ]);
+      return this.transact({
+        retract: toRetract.length > 0 ? toRetract : undefined,
+        add: [[entity, attribute, value]],
+      });
+    }
+
+    // For "many" or undefined cardinality, just add
+    return this.add([[entity, attribute, value]]);
   }
 
   /**
@@ -678,6 +817,17 @@ export abstract class DatomDatabase
   ): Promise<Record<string, unknown> | undefined>;
 
   /**
+   * Get the latest transaction ID in the database
+   * Useful for synchronization, replication, and determining the current state
+   * @returns The most recent transaction ID, or 0 if no transactions have occurred
+   * @example
+   * const latestTx = await db.getLatestTransaction();
+   * // Use for sync: only fetch changes after this transaction
+   * const changes = await db.query({ tx: latestTx + 1 });
+   */
+  abstract getLatestTransaction(): Promise<TransactionId>;
+
+  /**
    * Query datoms from the database using query options
    * @param options Query options (must include at least one filter or limit to prevent full scans)
    * @returns Array of matching datoms
@@ -985,6 +1135,9 @@ export abstract class DatomDatabase
    * - For `cardinality: "one"` attributes: Returns the single value
    * - For `cardinality: "many"` attributes: Returns the value with the highest transaction ID (most recent)
    *
+   * **Note:** For multi-valued attributes, consider using `getLatestValue()` for clarity,
+   * or `getValues()` to get all values.
+   *
    * @param entity Entity ID
    * @param attribute Attribute name
    * @returns The value or undefined if not found. For multi-valued attributes, returns the most recent value.
@@ -1008,6 +1161,25 @@ export abstract class DatomDatabase
     // Sort by tx DESC to get the latest value first
     const sorted = datoms.sort((a, b) => b.tx - a.tx);
     return sorted[0].value;
+  }
+
+  /**
+   * Get the most recent value for an entity-attribute pair
+   * Explicitly returns the value with the highest transaction ID (most recent).
+   * This is equivalent to `getValue()` but makes the intent clearer for multi-valued attributes.
+   *
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @returns The most recent value or undefined if not found
+   * @example
+   * // Get the latest tag added to an entity
+   * const latestTag = await db.getLatestValue(42, "tag");
+   */
+  async getLatestValue(
+    entity: EntityId,
+    attribute: string
+  ): Promise<Value | undefined> {
+    return this.getValue(entity, attribute);
   }
 
   /**

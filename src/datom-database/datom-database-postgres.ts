@@ -694,6 +694,17 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return undefined;
   }
 
+  async getLatestTransaction(): Promise<TransactionId> {
+    await this.ensureInitialized();
+    const sql = `SELECT last_tx FROM ${this.tableName}_tx WHERE id = 1`;
+    const result = await this.connection.query(sql);
+    if (!result || result.length === 0) {
+      // No transactions yet
+      return 0;
+    }
+    return result[0].last_tx;
+  }
+
   /**
    * PostgreSQL transaction implementation
    * Tracks pending changes and merges them with queries
@@ -803,6 +814,52 @@ class PostgreSQLTransaction implements Transaction {
       d.value,
     ]);
     await this.retract(retractions);
+  }
+
+  async retractAttribute(entity: EntityId, attribute: string): Promise<void> {
+    // Get all current values for this entity-attribute pair
+    const datoms = await this.query({ entity, attribute });
+    if (datoms.length === 0) {
+      return;
+    }
+    // Retract all existing values
+    const toRetract: DatomInput[] = datoms.map((d) => [
+      d.entity,
+      d.attribute,
+      d.value,
+    ]);
+    await this.retract(toRetract);
+  }
+
+  async upsert(
+    entity: EntityId,
+    attribute: string,
+    value: Value
+  ): Promise<void> {
+    const definition = this.db.getAttributeDefinition(attribute);
+
+    // If cardinality is "one", retract existing value first
+    if (definition?.cardinality === "one") {
+      const existingValues = await this.getValues(entity, attribute);
+      const toRetract: DatomInput[] = existingValues.map((v) => [
+        entity,
+        attribute,
+        v,
+      ]);
+      if (toRetract.length > 0) {
+        await this.retract(toRetract);
+      }
+    }
+
+    // Add the new value
+    await this.add([[entity, attribute, value]]);
+  }
+
+  async getLatestValue(
+    entity: EntityId,
+    attribute: string
+  ): Promise<Value | undefined> {
+    return this.getValue(entity, attribute);
   }
 
   async transact(ops: {
