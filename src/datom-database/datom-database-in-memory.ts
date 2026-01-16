@@ -20,6 +20,21 @@ import type {
   QueryClause,
   QueryResult,
 } from "../datalog/datalog.js";
+import { isVariable, stripQuestionMark } from "./shared/datalog-helpers.js";
+import { joinResults, project } from "./shared/query-helpers.js";
+import {
+  getAllValuesBatchHelper,
+  findEntitiesHelper,
+  getLatestValueHelper,
+  getValueHelper,
+  getValuesBatchHelper,
+  getValuesHelper,
+  hasFactHelper,
+  retractAttributeHelper,
+  retractEntityHelper,
+  transactHelper,
+  upsertHelper,
+} from "./shared/transaction-helpers.js";
 
 /**
  * In-memory database implementation
@@ -304,7 +319,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
       const clauseResults = await this.executeClause(clause, query.asOf);
-      results = this.joinResults(
+      results = joinResults(
         results,
         clauseResults,
         query.where.slice(0, i + 1)
@@ -312,13 +327,13 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     }
 
     // Project to find variables
-    const projected = this.project(results, query.find, query.where);
+    const projected = project(results, query.find, query.where);
 
     // Apply ordering if specified
     if (query.orderBy) {
       projected.sort((a, b) => {
         for (const [variable, direction] of query.orderBy!) {
-          const key = this.stripQuestionMark(variable);
+          const key = stripQuestionMark(variable);
           const aVal = a[key];
           const bVal = b[key];
 
@@ -377,13 +392,11 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     asOf?: TransactionId
   ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
-    const entity = this.isVariable(entityVal)
-      ? undefined
-      : (entityVal as EntityId);
-    const attribute = this.isVariable(attributeVal)
+    const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+    const attribute = isVariable(attributeVal)
       ? undefined
       : (attributeVal as string);
-    const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
+    const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
     // Datalog queries manage their own limiting via joins, so bypass validation
     const datoms = await this.queryInternal({
@@ -396,93 +409,17 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     // Map datom fields to variable names from the clause
     return datoms.map((datom) => {
       const result: Record<string, Value | Attribute> = {};
-      if (this.isVariable(entityVal)) {
+      if (isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;
       }
-      if (this.isVariable(attributeVal)) {
+      if (isVariable(attributeVal)) {
         result[attributeVal as string] = datom.attribute;
       }
-      if (this.isVariable(valueVal)) {
+      if (isVariable(valueVal)) {
         result[valueVal as string] = datom.value;
       }
       return result;
     });
-  }
-
-  /**
-   * Join two result sets based on common variables
-   */
-  private joinResults(
-    left: Record<string, Value | Attribute>[],
-    right: Record<string, Value | Attribute>[],
-    _clauses: QueryClause[]
-  ): Record<string, Value | Attribute>[] {
-    const joined: Record<string, Value | Attribute>[] = [];
-
-    for (const leftRow of left) {
-      for (const rightRow of right) {
-        // Check if rows are compatible (same values for common variables)
-        let compatible = true;
-        for (const key of Object.keys(leftRow)) {
-          if (key in rightRow && leftRow[key] !== rightRow[key]) {
-            compatible = false;
-            break;
-          }
-        }
-
-        if (compatible) {
-          joined.push({ ...leftRow, ...rightRow });
-        }
-      }
-    }
-
-    return joined;
-  }
-
-  /**
-   * Project results to only include find variables
-   */
-  private project(
-    results: Record<string, Value | Attribute>[],
-    find: string[],
-    _clauses: QueryClause[]
-  ): QueryResult {
-    if (find.length === 0) {
-      // Strip ? from all keys when find is empty
-      return results.map((row) => {
-        const projected: Record<string, Value | Attribute> = {};
-        for (const key of Object.keys(row)) {
-          projected[this.stripQuestionMark(key)] = row[key];
-        }
-        return projected;
-      });
-    }
-
-    // Results already have variable names as keys, so just extract the find variables
-    // Strip ? from keys in the projected result
-    return results.map((row) => {
-      const projected: Record<string, Value | Attribute> = {};
-      for (const varName of find) {
-        if (varName in row) {
-          projected[this.stripQuestionMark(varName)] = row[varName];
-        }
-      }
-      return projected;
-    });
-  }
-
-  /**
-   * Check if a value is a variable (starts with ?)
-   */
-  private isVariable(value: unknown): boolean {
-    return typeof value === "string" && value.startsWith("?");
-  }
-
-  /**
-   * Strip the question mark prefix from a variable name
-   */
-  private stripQuestionMark(key: string): string {
-    return key.startsWith("?") ? key.slice(1) : key;
   }
 
   /**
@@ -666,6 +603,48 @@ class InMemoryTransaction implements Transaction {
     return this.db.explainQuery(options);
   }
 
+  async getValue(
+    entity: EntityId,
+    attribute: string
+  ): Promise<Value | undefined> {
+    return getValueHelper(this.datoms.bind(this), entity, attribute);
+  }
+
+  async getLatestValue(
+    entity: EntityId,
+    attribute: string
+  ): Promise<Value | undefined> {
+    return getLatestValueHelper(this.datoms.bind(this), entity, attribute);
+  }
+
+  async getValues(entity: EntityId, attribute: string): Promise<Value[]> {
+    return getValuesHelper(this.datoms.bind(this), entity, attribute);
+  }
+
+  async hasFact(
+    entity: EntityId,
+    attribute: string,
+    value: Value
+  ): Promise<boolean> {
+    return hasFactHelper(this.datoms.bind(this), entity, attribute, value);
+  }
+
+  async getValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<(Value | undefined)[]> {
+    return getValuesBatchHelper(this.datoms.bind(this), queries);
+  }
+
+  async getAllValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<Value[][]> {
+    return getAllValuesBatchHelper(this.datoms.bind(this), queries);
+  }
+
+  async findEntities(attribute: string, value: Value): Promise<EntityId[]> {
+    return findEntitiesHelper(this.datoms.bind(this), attribute, value);
+  }
+
   async add(datoms: DatomInput[]): Promise<void> {
     for (const datom of datoms) {
       this._datomsArray.push({
@@ -709,31 +688,20 @@ class InMemoryTransaction implements Transaction {
   }
 
   async retractEntity(entity: EntityId): Promise<void> {
-    // Get all datoms for this entity that are currently visible
-    const entityDatoms = await this.datoms({ entity, added: true });
-
-    // Retract all of them
-    const retractions: DatomInput[] = entityDatoms.map((d) => [
-      d.entity,
-      d.attribute,
-      d.value,
-    ]);
-    await this.retract(retractions);
+    return retractEntityHelper(
+      this.datoms.bind(this),
+      this.retract.bind(this),
+      entity
+    );
   }
 
   async retractAttribute(entity: EntityId, attribute: string): Promise<void> {
-    // Get all current values for this entity-attribute pair
-    const datoms = await this.datoms({ entity, attribute });
-    if (datoms.length === 0) {
-      return;
-    }
-    // Retract all existing values
-    const toRetract: DatomInput[] = datoms.map((d) => [
-      d.entity,
-      d.attribute,
-      d.value,
-    ]);
-    await this.retract(toRetract);
+    return retractAttributeHelper(
+      this.datoms.bind(this),
+      this.retract.bind(this),
+      entity,
+      attribute
+    );
   }
 
   async upsert(
@@ -741,42 +709,22 @@ class InMemoryTransaction implements Transaction {
     attribute: string,
     value: Value
   ): Promise<void> {
-    const definition = this.db.getAttributeDefinition(attribute);
-
-    // If cardinality is "one", retract existing value first
-    if (definition?.cardinality === "one") {
-      const existingValues = await this.getValues(entity, attribute);
-      const toRetract: DatomInput[] = existingValues.map((v) => [
-        entity,
-        attribute,
-        v,
-      ]);
-      if (toRetract.length > 0) {
-        await this.retract(toRetract);
-      }
-    }
-
-    // Add the new value
-    await this.add([[entity, attribute, value]]);
-  }
-
-  async getLatestValue(
-    entity: EntityId,
-    attribute: string
-  ): Promise<Value | undefined> {
-    return this.getValue(entity, attribute);
+    return upsertHelper(
+      this.datoms.bind(this),
+      (attr: string) => this.db.getAttributeDefinition(attr),
+      this.retract.bind(this),
+      this.add.bind(this),
+      entity,
+      attribute,
+      value
+    );
   }
 
   async transact(ops: {
     add?: DatomInput[];
     retract?: DatomInput[];
   }): Promise<void> {
-    if (ops.add && ops.add.length > 0) {
-      await this.add(ops.add);
-    }
-    if (ops.retract && ops.retract.length > 0) {
-      await this.retract(ops.retract);
-    }
+    return transactHelper(this.add.bind(this), this.retract.bind(this), ops);
   }
 
   async query(query: DatalogQuery): Promise<QueryResult> {
@@ -791,19 +739,19 @@ class InMemoryTransaction implements Transaction {
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
       const clauseResults = await this.executeClause(clause);
-      results = this.joinResults(
+      results = joinResults(
         results,
         clauseResults,
         query.where.slice(0, i + 1)
       );
     }
 
-    const projected = this.project(results, query.find, query.where);
+    const projected = project(results, query.find, query.where);
 
     if (query.orderBy) {
       projected.sort((a, b) => {
         for (const [variable, direction] of query.orderBy!) {
-          const key = this.stripQuestionMark(variable);
+          const key = stripQuestionMark(variable);
           const aVal = a[key];
           const bVal = b[key];
 
@@ -825,71 +773,15 @@ class InMemoryTransaction implements Transaction {
     return projected;
   }
 
-  async getValue(
-    entity: EntityId,
-    attribute: string
-  ): Promise<Value | undefined> {
-    const datoms = await this.datoms({ entity, attribute });
-    if (datoms.length === 0) {
-      return undefined;
-    }
-    // Return the value with the highest tx (latest value for this attribute)
-    const sorted = datoms.sort((a, b) => b.tx - a.tx);
-    return sorted[0].value;
-  }
-
-  async getValues(entity: EntityId, attribute: string): Promise<Value[]> {
-    const datoms = await this.datoms({ entity, attribute });
-    return datoms.map((d) => d.value);
-  }
-
-  async hasFact(
-    entity: EntityId,
-    attribute: string,
-    value: Value
-  ): Promise<boolean> {
-    const datoms = await this.datoms({ entity, attribute, value });
-    return datoms.length > 0;
-  }
-
-  async getValuesBatch(
-    queries: Array<{ entity: EntityId; attribute: string }>
-  ): Promise<(Value | undefined)[]> {
-    const results = await Promise.all(
-      queries.map((q) => this.getValue(q.entity, q.attribute))
-    );
-    return results;
-  }
-
-  async getAllValuesBatch(
-    queries: Array<{ entity: EntityId; attribute: string }>
-  ): Promise<Value[][]> {
-    const results = await Promise.all(
-      queries.map((q) => this.getValues(q.entity, q.attribute))
-    );
-    return results;
-  }
-
-  async findEntities(attribute: string, value: Value): Promise<EntityId[]> {
-    const datoms = await this.datoms({ attribute, value });
-    const entitySet = new Set<EntityId>();
-    for (const datom of datoms) {
-      entitySet.add(datom.entity);
-    }
-    return Array.from(entitySet);
-  }
-
   private async executeClause(
     clause: QueryClause
   ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
-    const entity = this.isVariable(entityVal)
-      ? undefined
-      : (entityVal as EntityId);
-    const attribute = this.isVariable(attributeVal)
+    const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+    const attribute = isVariable(attributeVal)
       ? undefined
       : (attributeVal as string);
-    const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
+    const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
     // Use transaction's query method to see uncommitted changes
     const queryOptions: QueryOptions = {
@@ -902,80 +794,16 @@ class InMemoryTransaction implements Transaction {
 
     return datoms.map((datom: Datom) => {
       const result: Record<string, Value | Attribute> = {};
-      if (this.isVariable(entityVal)) {
+      if (isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;
       }
-      if (this.isVariable(attributeVal)) {
+      if (isVariable(attributeVal)) {
         result[attributeVal as string] = datom.attribute;
       }
-      if (this.isVariable(valueVal)) {
+      if (isVariable(valueVal)) {
         result[valueVal as string] = datom.value;
       }
       return result;
     });
-  }
-
-  private joinResults(
-    left: Record<string, Value | Attribute>[],
-    right: Record<string, Value | Attribute>[],
-    _clauses: QueryClause[]
-  ): Record<string, Value | Attribute>[] {
-    const joined: Record<string, Value | Attribute>[] = [];
-
-    for (const leftRow of left) {
-      for (const rightRow of right) {
-        let compatible = true;
-        for (const key of Object.keys(leftRow)) {
-          if (key in rightRow && leftRow[key] !== rightRow[key]) {
-            compatible = false;
-            break;
-          }
-        }
-
-        if (compatible) {
-          joined.push({ ...leftRow, ...rightRow });
-        }
-      }
-    }
-
-    return joined;
-  }
-
-  private project(
-    results: Record<string, Value | Attribute>[],
-    find: string[],
-    _clauses: QueryClause[]
-  ): QueryResult {
-    if (find.length === 0) {
-      // Strip ? from all keys when find is empty
-      return results.map((row) => {
-        const projected: Record<string, Value | Attribute> = {};
-        for (const key of Object.keys(row)) {
-          projected[this.stripQuestionMark(key)] = row[key];
-        }
-        return projected;
-      });
-    }
-
-    return results.map((row) => {
-      const projected: Record<string, Value | Attribute> = {};
-      for (const varName of find) {
-        if (varName in row) {
-          projected[this.stripQuestionMark(varName)] = row[varName];
-        }
-      }
-      return projected;
-    });
-  }
-
-  private isVariable(value: unknown): boolean {
-    return typeof value === "string" && value.startsWith("?");
-  }
-
-  /**
-   * Strip the question mark prefix from a variable name
-   */
-  private stripQuestionMark(key: string): string {
-    return key.startsWith("?") ? key.slice(1) : key;
   }
 }
