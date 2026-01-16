@@ -1,88 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { unlinkSync } from "fs";
-import { PGLiteSQLDatabase } from "../sql-database/__tests__/sql-database-pglite.js";
-import { PgSQLDatabase } from "../sql-database/__tests__/sql-database-pg.js";
-import { SQLiteSQLDatabase } from "../sql-database/__tests__/sql-database-sqlite.js";
-import { InMemoryDatomDatabase } from "./datom-database-in-memory.js";
-import { PostgreSQLDatomDatabase } from "./datom-database-postgres.js";
-import { SQLiteDatomDatabase } from "./datom-database-sqlite.js";
-import { DatalogQuery } from "../datalog/datalog.js";
-import { DatomDatabase } from "./datom-database.js";
+import { DatalogQuery } from "../../datalog/datalog.js";
+import { Fixture, FIXTURES } from "./fixtures.js";
 
-type Fixture = {
-  db: DatomDatabase;
-  beforeEach: () => Promise<void>;
-  afterEach: () => Promise<void>;
-};
-
-const createInMemoryFixture = async (): Promise<Fixture> => {
-  const db = new InMemoryDatomDatabase();
-  await db.initialize();
-  return {
-    db: db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
-  };
-};
-
-const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
-  if (filename !== ":memory:") {
-    try {
-      unlinkSync(filename);
-    } catch {}
-  }
-  const connection = new SQLiteSQLDatabase(filename);
-  const db = new SQLiteDatomDatabase(connection);
-  await db.initialize();
-  return {
-    db: db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
-  };
-};
-
-const createPostgresFixture = async (): Promise<Fixture> => {
-  const connectionString =
-    "postgresql://datoms:datoms@localhost:5432/datoms_test";
-  const connection = new PgSQLDatabase(connectionString);
-  const db = new PostgreSQLDatomDatabase(connection);
-  await db.initialize();
-  return {
-    db: db,
-    beforeEach: async () => {
-      // @ts-expect-error - Accessing protected method for test cleanup
-      await db.cleanUp();
-    },
-    afterEach: async () => {},
-  };
-};
-
-const createPGLiteFixture = async (): Promise<Fixture> => {
-  const connection = new PGLiteSQLDatabase("memory://");
-  const db = new PostgreSQLDatomDatabase(connection);
-  await db.initialize();
-  return {
-    db: db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
-  };
-};
-
-const fixtures: [string, () => Promise<Fixture>][] = [
-  ["InMemory", () => createInMemoryFixture()],
-  ["SQLite (memory)", () => createSQLiteFixture(":memory:")],
-  ["SQLite (file)", () => createSQLiteFixture("test.db")],
-  ["PostgreSQL", () => createPostgresFixture()],
-  ["PostgreSQL (PGLite)", () => createPGLiteFixture()],
-];
-
-describe.each(fixtures)("DatomDatabase (%s)", (_name, createFixture) => {
+describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
+
   beforeEach(async () => {
     f = await createFixture();
     await f.beforeEach();
   });
+
   afterEach(async () => {
     await f.afterEach();
   });
