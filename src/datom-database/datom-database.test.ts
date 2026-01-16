@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { unlinkSync } from "fs";
-import { PGLiteConnection } from "../sql-database/__tests__/sql-database-pglite.js";
-import { PostgresConnection } from "../sql-database/__tests__/sql-database-postgres.js";
-import { SQLiteConnection } from "../sql-database/__tests__/sql-database-sqlite.js";
+import { PGLiteSQLDatabase } from "../sql-database/__tests__/sql-database-pglite.js";
+import { PgSQLDatabase } from "../sql-database/__tests__/sql-database-pg.js";
+import { SQLiteSQLDatabase } from "../sql-database/__tests__/sql-database-sqlite.js";
 import { InMemoryDatomDatabase } from "./datom-database-in-memory.js";
 import { PostgreSQLDatomDatabase } from "./datom-database-postgres.js";
 import { SQLiteDatomDatabase } from "./datom-database-sqlite.js";
@@ -27,7 +27,7 @@ const createSQLiteDatabase = async (filename: string): Promise<Fixture> => {
       // File doesn't exist, which is fine
     }
   }
-  const connection = new SQLiteConnection(filename);
+  const connection = new SQLiteSQLDatabase(filename);
   const db = new SQLiteDatomDatabase(connection);
   await db.initialize();
   return { database: db, cleanup: async () => {} };
@@ -38,7 +38,7 @@ const createPostgreSQLDatabase = async (): Promise<Fixture> => {
     const connectionString =
       process.env.POSTGRES_URL ||
       "postgresql://datoms:datoms@localhost:5432/datoms_test";
-    const connection = new PostgresConnection(connectionString);
+    const connection = new PgSQLDatabase(connectionString);
     const db = new PostgreSQLDatomDatabase(connection);
     await db.initialize();
 
@@ -59,7 +59,7 @@ const createPostgreSQLDatabase = async (): Promise<Fixture> => {
 };
 
 const createPGLiteDatabase = async (): Promise<Fixture> => {
-  const connection = new PGLiteConnection("memory://");
+  const connection = new PGLiteSQLDatabase("memory://");
   const db = new PostgreSQLDatomDatabase(connection);
   await db.initialize();
 
@@ -1658,6 +1658,148 @@ describe.each(implementations)("DatomDatabase (%s)", (name, createFixture) => {
       // Current state should also be failed
       const current = await db.getValue(1, "status");
       expect(current).toBe("failed");
+
+      await db.close();
+    });
+
+    test("should retract all datoms for an entity", async () => {
+      await db.add([
+        [1, "name", "Alice"],
+        [1, "age", 30],
+        [1, "email", "alice@example.com"],
+      ]);
+
+      const before = await db.getEntity(1);
+      expect(before).toHaveLength(3);
+
+      const tx = await db.retractEntity(1);
+
+      const after = await db.getEntity(1);
+      expect(after).toHaveLength(0);
+
+      // Verify transaction ID was returned
+      expect(typeof tx).toBe("number");
+      expect(tx).toBeGreaterThan(0);
+
+      await db.close();
+    });
+
+    test("should retract entity within transaction", async () => {
+      await db.add([
+        [1, "name", "Alice"],
+        [1, "age", 30],
+      ]);
+
+      await db.transaction(async (tx) => {
+        await tx.retractEntity(1);
+        const during = await tx.getEntity(1);
+        expect(during).toHaveLength(0);
+      });
+
+      const after = await db.getEntity(1);
+      expect(after).toHaveLength(0);
+
+      await db.close();
+    });
+
+    test("should execute bulk operations atomically with transact", async () => {
+      const tx = await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [2, "name", "Bob"],
+        ],
+        retract: [[3, "name", "Charlie"]],
+      });
+
+      expect(typeof tx).toBe("number");
+      expect(tx).toBeGreaterThan(0);
+
+      const alice = await db.getEntity(1);
+      expect(alice).toHaveLength(1);
+      expect(alice[0].value).toBe("Alice");
+
+      const bob = await db.getEntity(2);
+      expect(bob).toHaveLength(1);
+      expect(bob[0].value).toBe("Bob");
+
+      // Charlie should not exist (or was retracted if existed)
+      const charlie = await db.getEntity(3);
+      expect(charlie).toHaveLength(0);
+
+      await db.close();
+    });
+
+    test("should execute bulk operations within transaction", async () => {
+      await db.transaction(async (tx) => {
+        await tx.transact({
+          add: [
+            [1, "name", "Alice"],
+            [1, "age", 30],
+          ],
+        });
+
+        const entity = await tx.getEntity(1);
+        expect(entity).toHaveLength(2);
+      });
+
+      const entity = await db.getEntity(1);
+      expect(entity).toHaveLength(2);
+
+      await db.close();
+    });
+
+    test("should define attribute schema", async () => {
+      await db.defineAttribute({
+        name: "email",
+        cardinality: "one",
+        unique: true,
+        indexed: true,
+      });
+
+      const def = db.getAttributeDefinition("email");
+      expect(def).toBeDefined();
+      expect(def?.name).toBe("email");
+      expect(def?.cardinality).toBe("one");
+      expect(def?.unique).toBe(true);
+      expect(def?.indexed).toBe(true);
+
+      await db.close();
+    });
+
+    test("should query history with history flag", async () => {
+      await db.add([[1, "name", "Alice"]]);
+      const tx2 = await db.add([[1, "name", "Bob"]]);
+      await db.retract([[1, "name", "Bob"]]);
+      const tx4 = await db.add([[1, "name", "Charlie"]]);
+
+      const history = await db.queryHistory({ entity: 1, attribute: "name" });
+      expect(history.length).toBeGreaterThanOrEqual(3);
+
+      // History should include all changes, ordered by transaction
+      const txs = history.map((d) => d.tx);
+      expect(txs).toEqual([...txs].sort((a, b) => a - b));
+
+      // Should include retractions
+      const retractions = history.filter((d) => !d.added);
+      expect(retractions.length).toBeGreaterThan(0);
+
+      await db.close();
+    });
+
+    test("should require at least one filter or limit for query", async () => {
+      await expect(db.query({})).rejects.toThrow("full table scans");
+
+      // These should work
+      await db.query({ entity: 1 });
+      await db.query({ limit: 10 });
+      await db.query({ history: true });
+
+      await db.close();
+    });
+
+    test("should handle empty transact operations", async () => {
+      const tx = await db.transact({});
+      expect(typeof tx).toBe("number");
 
       await db.close();
     });

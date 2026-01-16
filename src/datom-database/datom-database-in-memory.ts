@@ -75,8 +75,52 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return tx;
   }
 
-  async query(options: QueryOptions = {}): Promise<Datom[]> {
+  async retractEntity(entity: EntityId): Promise<TransactionId> {
     await this.ensureInitialized();
+    const tx = this.nextTx++;
+
+    // Get all datoms for this entity
+    const entityDatoms = this.datoms.filter((d) => d.entity === entity);
+
+    // Retract all of them
+    for (const datom of entityDatoms) {
+      // Only retract if it's currently added (not already retracted)
+      const isCurrentlyAdded = this.isCurrentlyAdded(datom);
+      if (isCurrentlyAdded) {
+        this.datoms.push({
+          entity: datom.entity,
+          attribute: datom.attribute,
+          value: datom.value,
+          tx,
+          added: false,
+        });
+      }
+    }
+
+    return tx;
+  }
+
+  /**
+   * Check if a datom is currently added (not retracted)
+   */
+  private isCurrentlyAdded(datom: Datom): boolean {
+    // Find the latest transaction for this (entity, attribute, value)
+    let latest: Datom | null = null;
+    for (const d of this.datoms) {
+      if (
+        d.entity === datom.entity &&
+        d.attribute === datom.attribute &&
+        d.value === datom.value
+      ) {
+        if (!latest || d.tx > latest.tx) {
+          latest = d;
+        }
+      }
+    }
+    return latest !== null && latest.added;
+  }
+
+  protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
     let results = this.datoms;
 
     // Apply time-travel filter: if asOf is specified, only consider datoms up to that transaction
@@ -104,13 +148,8 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     // and supports multi-valued attributes (multiple values per attribute)
     // Always deduplicate first, then apply added filter
 
-    // Check if this is a history query (added === undefined with no filters means history)
-    const isHistoryQuery =
-      options.added === undefined &&
-      options.asOf === undefined &&
-      options.entity === undefined &&
-      options.attribute === undefined &&
-      options.value === undefined;
+    // Check if this is a history query
+    const isHistoryQuery = options.history === true;
 
     if (isHistoryQuery) {
       // History query: return all datoms ordered by transaction (no deduplication, include retracted)
@@ -238,7 +277,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
   async getEntity(entity: EntityId): Promise<Datom[]> {
     await this.ensureInitialized();
-    return this.query({ entity, added: true });
+    return this.executeQuery({ entity, added: true });
   }
 
   async transaction<T>(callback: (tx: Transaction) => Promise<T>): Promise<T> {
@@ -279,7 +318,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       : (attributeVal as string);
     const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    const datoms = await this.query({
+    const datoms = await this.executeQuery({
       entity,
       attribute,
       value,
@@ -379,7 +418,7 @@ class InMemoryTransaction implements Transaction {
     this.db = db;
   }
 
-  async query(options: QueryOptions = {}): Promise<Datom[]> {
+  async query(options: QueryOptions): Promise<Datom[]> {
     // Query directly from the datoms array (which includes uncommitted changes)
     let results = this.datoms;
 
@@ -406,29 +445,49 @@ class InMemoryTransaction implements Transaction {
       results = results.filter((d) => d.tx === options.tx);
     }
 
-    // Handle retractions: for each unique (entity, attribute, value) combination,
-    // keep only the most recent transaction
-    // This supports multi-valued attributes (multiple values per attribute)
-    // Always deduplicate first, then apply added filter
-    const latestDatoms = new Map<string, Datom>();
-    for (const datom of results) {
-      const key = `${String(datom.entity)}|${String(datom.attribute)}|${String(
-        datom.value
-      )}`;
-      const existing = latestDatoms.get(key);
-      if (!existing || datom.tx > existing.tx) {
-        latestDatoms.set(key, datom);
-      }
-    }
-    results = Array.from(latestDatoms.values());
+    // Check if this is a history query
+    const isHistoryQuery = options.history === true;
 
-    // Apply added filter after deduplication
-    if (options.added === undefined || options.added === true) {
-      // Filter to only added datoms (exclude retractions)
-      results = results.filter((d) => d.added);
-    } else if (options.added === false) {
-      // For retractions, filter by added: false
-      results = results.filter((d) => !d.added);
+    if (isHistoryQuery) {
+      // History query: return all datoms ordered by transaction (no deduplication, include retracted)
+      results.sort((a, b) => {
+        if (a.tx !== b.tx) {
+          return a.tx - b.tx;
+        }
+        // Secondary sort by entity, then attribute for consistency
+        const entityA = String(a.entity);
+        const entityB = String(b.entity);
+        if (entityA !== entityB) {
+          return entityA.localeCompare(entityB);
+        }
+        return String(a.attribute).localeCompare(String(b.attribute));
+      });
+    } else {
+      // Normal query: deduplicate and filter
+      // Handle retractions: for each unique (entity, attribute, value) combination,
+      // keep only the most recent transaction
+      // This supports multi-valued attributes (multiple values per attribute)
+      // Always deduplicate first, then apply added filter
+      const latestDatoms = new Map<string, Datom>();
+      for (const datom of results) {
+        const key = `${String(datom.entity)}|${String(
+          datom.attribute
+        )}|${String(datom.value)}`;
+        const existing = latestDatoms.get(key);
+        if (!existing || datom.tx > existing.tx) {
+          latestDatoms.set(key, datom);
+        }
+      }
+      results = Array.from(latestDatoms.values());
+
+      // Apply added filter after deduplication
+      if (options.added === undefined || options.added === true) {
+        // Filter to only added datoms (exclude retractions)
+        results = results.filter((d) => d.added);
+      } else if (options.added === false) {
+        // For retractions, filter by added: false
+        results = results.filter((d) => !d.added);
+      }
     }
 
     // Apply pagination
@@ -444,7 +503,7 @@ class InMemoryTransaction implements Transaction {
     return this.db.query({ ...options, asOf: tx });
   }
 
-  async add(datoms: DatomInput[]): Promise<TransactionId> {
+  async add(datoms: DatomInput[]): Promise<void> {
     for (const datom of datoms) {
       this.datoms.push({
         entity: datom[0],
@@ -454,10 +513,9 @@ class InMemoryTransaction implements Transaction {
         added: true,
       });
     }
-    return this.txId;
   }
 
-  async retract(datoms: DatomInput[]): Promise<TransactionId> {
+  async retract(datoms: DatomInput[]): Promise<void> {
     for (const datom of datoms) {
       // Remove any pending adds for this exact datom (same entity, attribute, value)
       // that were added in this transaction
@@ -485,7 +543,31 @@ class InMemoryTransaction implements Transaction {
         added: false,
       });
     }
-    return this.txId;
+  }
+
+  async retractEntity(entity: EntityId): Promise<void> {
+    // Get all datoms for this entity that are currently visible
+    const entityDatoms = await this.query({ entity, added: true });
+
+    // Retract all of them
+    const retractions: DatomInput[] = entityDatoms.map((d) => [
+      d.entity,
+      d.attribute,
+      d.value,
+    ]);
+    await this.retract(retractions);
+  }
+
+  async transact(ops: {
+    add?: DatomInput[];
+    retract?: DatomInput[];
+  }): Promise<void> {
+    if (ops.add && ops.add.length > 0) {
+      await this.add(ops.add);
+    }
+    if (ops.retract && ops.retract.length > 0) {
+      await this.retract(ops.retract);
+    }
   }
 
   async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
@@ -578,11 +660,17 @@ class InMemoryTransaction implements Transaction {
       : (attributeVal as string);
     const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    const datoms = await this.query({
-      entity,
-      attribute,
-      value,
-    });
+    // If all positions are variables, we need to query all datoms
+    // Use history: true to satisfy query validation (datalog queries are inherently limited by joins)
+    const allVariables = !entity && !attribute && !value;
+    const queryOptions: QueryOptions = {
+      ...(entity !== undefined && { entity }),
+      ...(attribute !== undefined && { attribute }),
+      ...(value !== undefined && { value }),
+      ...(allVariables && { history: true }), // Use history flag for all-variable queries
+    };
+
+    const datoms = await this.query(queryOptions);
 
     return datoms.map((datom) => {
       const result: Record<string, Value> = {};

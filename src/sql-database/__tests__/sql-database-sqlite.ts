@@ -6,12 +6,12 @@
  */
 
 import { Database as BunDatabase } from "bun:sqlite";
-import type { SqlDatabase } from "../sql-database.js";
+import type { SQLDatabase } from "../sql-database.js";
 
 /**
  * SQLite connection wrapper that implements SqlConnection interface
  */
-export class SQLiteConnection implements SqlDatabase {
+export class SQLiteSQLDatabase implements SQLDatabase {
   private db: BunDatabase;
   private inTransaction: boolean = false;
 

@@ -80,4 +80,28 @@ export interface QueryOptions {
   offset?: number;
   /** Query database state as it existed at this transaction ID (time-travel query) */
   asOf?: TransactionId;
+  /** Query full history of changes (all datoms matching filters, not just latest) */
+  history?: boolean;
+}
+
+/**
+ * Definition for an attribute schema
+ */
+export interface AttributeDefinition {
+  /** Attribute name */
+  name: string;
+  /** Whether the attribute can have one or many values */
+  cardinality: "one" | "many";
+  /** Whether the attribute value must be unique across all entities */
+  unique?: boolean;
+  /** Whether to create an index for this attribute */
+  indexed?: boolean;
+}
+
+/**
+ * Schema for the database
+ */
+export interface Schema {
+  /** Map of attribute names to their definitions */
+  attributes: Map<string, AttributeDefinition>;
 }

@@ -17,18 +17,18 @@ import type {
   QueryClause,
   QueryResult,
 } from "../datalog/datalog.js";
-import type { SqlDatabase } from "../sql-database/sql-database.js";
+import type { SQLDatabase } from "../sql-database/sql-database.js";
 
 /**
  * SQLite database implementation
  * Accepts a SqlDatabase that implements SQLite-compatible SQL
  */
 export class SQLiteDatomDatabase extends DatomDatabase {
-  private connection: SqlDatabase;
+  private connection: SQLDatabase;
   private tableName: string;
   protected initialized = false;
 
-  constructor(connection: SqlDatabase, tableName: string = "datoms") {
+  constructor(connection: SQLDatabase, tableName: string = "datoms") {
     super();
     this.connection = connection;
     this.tableName = tableName;
@@ -107,7 +107,26 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     return tx;
   }
 
-  async query(options: QueryOptions = {}): Promise<Datom[]> {
+  async retractEntity(entity: EntityId): Promise<TransactionId> {
+    await this.ensureInitialized();
+    // Get all datoms for this entity
+    const entityDatoms = await this.executeQuery({ entity, added: true });
+
+    // Retract all of them
+    if (entityDatoms.length > 0) {
+      const retractions: DatomInput[] = entityDatoms.map((d) => [
+        d.entity,
+        d.attribute,
+        d.value,
+      ]);
+      return this.retract(retractions);
+    }
+
+    // Return current transaction ID even if nothing to retract
+    return await this.getNextTransactionId();
+  }
+
+  protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
     const conditions: string[] = [];
     const params: any[] = [];
@@ -145,15 +164,8 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    // Check if this is a history query (added === undefined with no filters means history)
-    // History queries return all datoms ordered by transaction (no deduplication, include retracted)
-    const isHistoryQuery =
-      options.added === undefined &&
-      options.asOf === undefined &&
-      options.entity === undefined &&
-      options.attribute === undefined &&
-      options.value === undefined &&
-      options.tx === undefined;
+    // Check if this is a history query
+    const isHistoryQuery = options.history === true;
 
     // For history queries, return all datoms ordered by tx
     if (isHistoryQuery) {
@@ -364,7 +376,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         : (attributeVal as string);
       const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const datoms = await this.query({
+      const datoms = await this.executeQuery({
         entity,
         attribute,
         value,
@@ -883,12 +895,18 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       : (attributeVal as string);
     const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    const datoms = await this.query({
-      entity,
-      attribute,
-      value,
-      asOf,
-    });
+    // If all positions are variables, we need to query all datoms
+    // Use history: true to satisfy query validation (datalog queries are inherently limited by joins)
+    const allVariables = !entity && !attribute && !value;
+    const queryOptions: QueryOptions = {
+      ...(entity !== undefined && { entity }),
+      ...(attribute !== undefined && { attribute }),
+      ...(value !== undefined && { value }),
+      ...(asOf !== undefined && { asOf }),
+      ...(allVariables && { history: true }), // Use history flag for all-variable queries
+    };
+
+    const datoms = await this.query(queryOptions);
 
     return datoms.map((datom) => {
       const result: Record<string, Value> = {};
@@ -961,7 +979,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
  * Tracks pending changes and merges them with queries
  */
 class SQLiteTransaction implements Transaction {
-  private connection: SqlDatabase;
+  private connection: SQLDatabase;
   private tableName: string;
   private txId: TransactionId;
   private db: SQLiteDatomDatabase;
@@ -969,7 +987,7 @@ class SQLiteTransaction implements Transaction {
   private pendingRetracts: Datom[] = [];
 
   constructor(
-    connection: SqlDatabase,
+    connection: SQLDatabase,
     tableName: string,
     txId: TransactionId,
     db: SQLiteDatomDatabase
@@ -980,7 +998,7 @@ class SQLiteTransaction implements Transaction {
     this.db = db;
   }
 
-  async query(options: QueryOptions = {}): Promise<Datom[]> {
+  async query(options: QueryOptions): Promise<Datom[]> {
     // For asOf queries, only query committed state (ignore pending changes)
     if (options.asOf !== undefined) {
       return this.db.query(options);
@@ -999,7 +1017,7 @@ class SQLiteTransaction implements Transaction {
     return this.db.query({ ...options, asOf: tx });
   }
 
-  async add(datoms: DatomInput[]): Promise<TransactionId> {
+  async add(datoms: DatomInput[]): Promise<void> {
     for (const datom of datoms) {
       const d: Datom = {
         entity: datom[0],
@@ -1010,10 +1028,9 @@ class SQLiteTransaction implements Transaction {
       };
       this.pendingAdds.push(d);
     }
-    return this.txId;
   }
 
-  async retract(datoms: DatomInput[]): Promise<TransactionId> {
+  async retract(datoms: DatomInput[]): Promise<void> {
     for (const datom of datoms) {
       const key = `${String(datom[0])}|${String(datom[1])}|${String(datom[2])}`;
 
@@ -1035,7 +1052,31 @@ class SQLiteTransaction implements Transaction {
       };
       this.pendingRetracts.push(d);
     }
-    return this.txId;
+  }
+
+  async retractEntity(entity: EntityId): Promise<void> {
+    // Get all datoms for this entity that are currently visible
+    const entityDatoms = await this.query({ entity, added: true });
+
+    // Retract all of them
+    const retractions: DatomInput[] = entityDatoms.map((d) => [
+      d.entity,
+      d.attribute,
+      d.value,
+    ]);
+    await this.retract(retractions);
+  }
+
+  async transact(ops: {
+    add?: DatomInput[];
+    retract?: DatomInput[];
+  }): Promise<void> {
+    if (ops.add && ops.add.length > 0) {
+      await this.add(ops.add);
+    }
+    if (ops.retract && ops.retract.length > 0) {
+      await this.retract(ops.retract);
+    }
   }
 
   async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
@@ -1288,12 +1329,18 @@ class SQLiteTransaction implements Transaction {
       : (attributeVal as string);
     const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    const datoms = await this.query({
-      entity,
-      attribute,
-      value,
-      asOf,
-    });
+    // If all positions are variables, we need to query all datoms
+    // Use history: true to satisfy query validation (datalog queries are inherently limited by joins)
+    const allVariables = !entity && !attribute && !value;
+    const queryOptions: QueryOptions = {
+      ...(entity !== undefined && { entity }),
+      ...(attribute !== undefined && { attribute }),
+      ...(value !== undefined && { value }),
+      ...(asOf !== undefined && { asOf }),
+      ...(allVariables && { history: true }), // Use history flag for all-variable queries
+    };
+
+    const datoms = await this.query(queryOptions);
 
     return datoms.map((datom) => {
       const result: Record<string, Value> = {};

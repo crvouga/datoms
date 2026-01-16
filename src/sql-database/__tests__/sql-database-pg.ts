@@ -6,12 +6,12 @@
  */
 
 import { Pool, PoolClient } from "pg";
-import type { SqlDatabase } from "../sql-database.js";
+import type { SQLDatabase } from "../sql-database.js";
 
 /**
  * PostgreSQL connection wrapper that implements SqlConnection interface
  */
-export class PostgresConnection implements SqlDatabase {
+export class PgSQLDatabase implements SQLDatabase {
   private pool: Pool;
   private client?: PoolClient;
   private inTransaction: boolean = false;
