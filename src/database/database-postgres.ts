@@ -178,9 +178,18 @@ export class PostgreSQLDatabase extends Database {
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    // For history queries (when added is undefined and asOf is not set),
-    // return all datoms ordered by tx
-    if (options.added === undefined && options.asOf === undefined) {
+    // Check if this is a history query (added === undefined with no filters means history)
+    // History queries return all datoms ordered by transaction (no deduplication, include retracted)
+    const isHistoryQuery =
+      options.added === undefined &&
+      options.asOf === undefined &&
+      options.entity === undefined &&
+      options.attribute === undefined &&
+      options.value === undefined &&
+      options.tx === undefined;
+
+    // For history queries, return all datoms ordered by tx
+    if (isHistoryQuery) {
       const limitClause = options.limit ? "LIMIT ?" : "";
       const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
@@ -262,28 +271,31 @@ export class PostgreSQLDatabase extends Database {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // Handle added filter - default to added = true when undefined (matches original behavior)
-    // Apply filter in WHERE clause before DISTINCT ON to only consider relevant datoms
-    const addedConditions: string[] = [];
-    if (options.added === true || options.added === undefined) {
-      addedConditions.push("added = true");
-    } else if (options.added === false) {
-      addedConditions.push("added = false");
-    }
-
-    // Combine all conditions
-    const allConditions = [...conditions, ...addedConditions];
+    // For both regular and time-travel queries, we need to include retractions in DISTINCT ON
+    // to correctly determine the latest state. We filter by added AFTER DISTINCT ON.
+    // This ensures that if a datom was added then retracted, the retraction wins.
     const combinedWhereClause =
-      allConditions.length > 0 ? `WHERE ${allConditions.join(" AND ")}` : "";
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     // For time-travel queries (asOf), use DISTINCT ON (entity, attribute) to get latest value per attribute
     // For regular queries, use DISTINCT ON (entity, attribute, value) to support multi-valued attributes
-    const distinctOnColumns = options.asOf !== undefined
-      ? "entity, attribute"
-      : "entity, attribute, value";
-    const orderByColumns = options.asOf !== undefined
-      ? "entity, attribute, tx DESC"
-      : "entity, attribute, value, tx DESC";
+    const distinctOnColumns =
+      options.asOf !== undefined
+        ? "entity, attribute"
+        : "entity, attribute, value";
+    const orderByColumns =
+      options.asOf !== undefined
+        ? "entity, attribute, tx DESC"
+        : "entity, attribute, value, tx DESC";
+
+    // Build the added filter for after DISTINCT ON
+    // Default behavior: filter to only added datoms (exclude retracted)
+    let addedFilterAfter = "";
+    if (options.added === true || options.added === undefined) {
+      addedFilterAfter = "WHERE added = true";
+    } else if (options.added === false) {
+      addedFilterAfter = "WHERE added = false";
+    }
 
     const sql = `
       WITH latest_datoms AS (
@@ -300,6 +312,7 @@ export class PostgreSQLDatabase extends Database {
         tx,
         added
       FROM latest_datoms
+      ${addedFilterAfter}
       ORDER BY
         CASE 
           WHEN entity ~ '^-?[0-9]+$' THEN entity::BIGINT 

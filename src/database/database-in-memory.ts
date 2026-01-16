@@ -140,11 +140,12 @@ export class InMemoryDatabase extends Database {
     for (const datom of results) {
       // Use (entity, attribute) key for time-travel queries to get latest value per attribute
       // Use (entity, attribute, value) key for regular queries to support multi-valued attributes
-      const key = options.asOf !== undefined
-        ? `${String(datom.entity)}|${String(datom.attribute)}`
-        : `${String(datom.entity)}|${String(
-            datom.attribute
-          )}|${JSON.stringify(datom.value)}`;
+      const key =
+        options.asOf !== undefined
+          ? `${String(datom.entity)}|${String(datom.attribute)}`
+          : `${String(datom.entity)}|${String(
+              datom.attribute
+            )}|${JSON.stringify(datom.value)}`;
       const existing = latestDatoms.get(key);
       if (!existing || datom.tx > existing.tx) {
         latestDatoms.set(key, datom);

@@ -39,11 +39,12 @@ const createPostgreSQLDatabase = async (): Promise<Fixture> => {
     const connection = new PostgresConnection(connectionString);
     const db = new PostgreSQLDatabase(connection);
     await db.initialize();
-    // Clean up before each test for isolation
 
     return {
       database: db,
-      cleanup: async () => {},
+      cleanup: async () => {
+        await db.cleanup();
+      },
     };
   } catch (error) {
     // PostgreSQL not available, skip tests
@@ -59,10 +60,12 @@ const createPGLiteDatabase = async (): Promise<Fixture> => {
   const connection = new PGLiteConnection("memory://");
   const db = new PostgreSQLDatabase(connection);
   await db.initialize();
-  // Clean up before each test for isolation
+
   return {
     database: db,
-    cleanup: async () => {},
+    cleanup: async () => {
+      await db.cleanup();
+    },
   };
 };
 
@@ -82,7 +85,6 @@ describe.each(implementations)("Database (%s)", (name, createFixture) => {
   beforeEach(async () => {
     const fixture = await createFixture();
     db = fixture.database;
-    // For PostgreSQL, clean up before each test for isolation
     cleanup = fixture.cleanup;
   });
 

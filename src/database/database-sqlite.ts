@@ -134,9 +134,18 @@ export class SQLiteDatabase extends Database {
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    // For history queries (when added is undefined and asOf is not set),
-    // return all datoms ordered by tx
-    if (options.added === undefined && options.asOf === undefined) {
+    // Check if this is a history query (added === undefined with no filters means history)
+    // History queries return all datoms ordered by transaction (no deduplication, include retracted)
+    const isHistoryQuery =
+      options.added === undefined &&
+      options.asOf === undefined &&
+      options.entity === undefined &&
+      options.attribute === undefined &&
+      options.value === undefined &&
+      options.tx === undefined;
+
+    // For history queries, return all datoms ordered by tx
+    if (isHistoryQuery) {
       const sql = `
         SELECT entity, attribute, value, tx, added
         FROM ${this.tableName}
@@ -220,9 +229,10 @@ export class SQLiteDatabase extends Database {
     for (const row of rows) {
       // Use (entity, attribute) key for time-travel queries to get latest value per attribute
       // Use (entity, attribute, value) key for regular queries to support multi-valued attributes
-      const key = options.asOf !== undefined
-        ? `${row.entity}|${row.attribute}`
-        : `${row.entity}|${row.attribute}|${row.value}`;
+      const key =
+        options.asOf !== undefined
+          ? `${row.entity}|${row.attribute}`
+          : `${row.entity}|${row.attribute}|${row.value}`;
       const existing = latestDatoms.get(key);
       if (!existing || row.tx > existing.tx) {
         latestDatoms.set(key, row);
