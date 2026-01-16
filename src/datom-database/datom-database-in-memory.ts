@@ -4,7 +4,7 @@
  * Useful for testing and small datasets
  */
 
-import { Database, type Transaction } from "./database.js";
+import { DatomDatabase, type Transaction } from "./datom-database.js";
 import type {
   Datom,
   DatomInput,
@@ -13,13 +13,17 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
-import type { DatalogQuery, QueryClause, QueryResult } from "./datalog.js";
+import type {
+  DatalogQuery,
+  QueryClause,
+  QueryResult,
+} from "../datalog/datalog.js";
 
 /**
  * In-memory database implementation
  * Stores datoms in memory using an array-based structure
  */
-export class InMemoryDatabase extends Database {
+export class InMemoryDatomDatabase extends DatomDatabase {
   private datoms: Datom[] = [];
   private nextTx: TransactionId = 1;
 
@@ -367,9 +371,9 @@ export class InMemoryDatabase extends Database {
 class InMemoryTransaction implements Transaction {
   private datoms: Datom[];
   private txId: TransactionId;
-  private db: InMemoryDatabase;
+  private db: InMemoryDatomDatabase;
 
-  constructor(datoms: Datom[], txId: TransactionId, db: InMemoryDatabase) {
+  constructor(datoms: Datom[], txId: TransactionId, db: InMemoryDatomDatabase) {
     this.datoms = datoms;
     this.txId = txId;
     this.db = db;

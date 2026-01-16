@@ -5,7 +5,7 @@
 /**
  * SQL connection interface that abstracts different SQL libraries
  */
-export interface SqlConnection {
+export interface SqlDatabase {
   query(sql: string, params?: any[]): Promise<any[]>;
   execute(sql: string, params?: any[]): Promise<void>;
   beginTransaction?(): Promise<void>;

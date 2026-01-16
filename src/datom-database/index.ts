@@ -13,23 +13,23 @@ export type {
   Value,
 } from "../types.js";
 
-// Database classes
-export { Database } from "./database.js";
-export { InMemoryDatabase } from "./database-in-memory.js";
-export { SQLiteDatabase } from "./database-sqlite.js";
-export { PostgreSQLDatabase } from "./database-postgres.js";
+// DatomDatabase classes
+export { InMemoryDatomDatabase } from "./datom-database-in-memory.js";
+export { PostgreSQLDatomDatabase } from "./datom-database-postgres.js";
+export { SQLiteDatomDatabase } from "./datom-database-sqlite.js";
+export { DatomDatabase } from "./datom-database.js";
 // Note: SQL connection implementations (SQLiteConnection, PostgresConnection) are test-only
 // Users should create their own SqlConnection implementations with their preferred SQL libraries
 
 // SQL connection adapter
-export type { SqlConnection } from "./sql-connection-adapter.js";
+export type { SqlDatabase as SqlConnection } from "../sql-database/sql-database.js";
 
 // Datalog query types
 export {
   type DatalogQuery,
   type QueryClause,
   type QueryResult,
-} from "./datalog.js";
+} from "../datalog/datalog.js";
 
 // Transaction type
-export type { Transaction } from "./database.js";
+export type { Transaction } from "./datom-database.js";

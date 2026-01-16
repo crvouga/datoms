@@ -1,9 +1,9 @@
 /**
- * PostgreSQL database implementation
- * Accepts a SqlConnection interface for PostgreSQL-compatible databases
+ * SQLite database implementation
+ * Accepts a SqlConnection interface for SQLite-compatible databases
  */
 
-import { Database, type Transaction } from "./database.js";
+import { DatomDatabase, type Transaction } from "./datom-database.js";
 import type {
   Datom,
   DatomInput,
@@ -12,19 +12,23 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
-import type { DatalogQuery, QueryClause, QueryResult } from "./datalog.js";
-import type { SqlConnection } from "./sql-connection-adapter.js";
+import type {
+  DatalogQuery,
+  QueryClause,
+  QueryResult,
+} from "../datalog/datalog.js";
+import type { SqlDatabase } from "../sql-database/sql-database.js";
 
 /**
- * PostgreSQL database implementation
- * Accepts a SqlConnection that implements PostgreSQL-compatible SQL
+ * SQLite database implementation
+ * Accepts a SqlConnection that implements SQLite-compatible SQL
  */
-export class PostgreSQLDatabase extends Database {
-  private connection: SqlConnection;
+export class SQLiteDatomDatabase extends DatomDatabase {
+  private connection: SqlDatabase;
   private tableName: string;
   protected initialized = false;
 
-  constructor(connection: SqlConnection, tableName: string = "datoms") {
+  constructor(connection: SqlDatabase, tableName: string = "datoms") {
     super();
     this.connection = connection;
     this.tableName = tableName;
@@ -36,26 +40,24 @@ export class PostgreSQLDatabase extends Database {
         CREATE TABLE IF NOT EXISTS ${this.tableName} (
           entity TEXT NOT NULL,
           attribute TEXT NOT NULL,
-          value JSONB NOT NULL,
-          tx BIGINT NOT NULL,
-          added BOOLEAN NOT NULL,
+          value TEXT NOT NULL,
+          tx INTEGER NOT NULL,
+          added INTEGER NOT NULL,
           PRIMARY KEY (entity, attribute, value, tx, added)
         )
       `;
 
-      // PostgreSQL-optimized indexes
-      // Note: INCLUDE clause not used for PGLite compatibility (requires PostgreSQL 11+)
+      // Optimized composite indexes for common query patterns
       const indexes = [
         // Composite index for entity+attribute queries (most common pattern)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_entity_attr_tx ON ${this.tableName}(entity, attribute, tx DESC)`,
+        // SQLite doesn't support DESC in index definition, but this helps with filtering
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_entity_attr_tx ON ${this.tableName}(entity, attribute, tx)`,
         // Composite index for attribute+value queries
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_attr_value_tx ON ${this.tableName}(attribute, value, tx DESC)`,
-        // Partial index for added=true (most common case - only active datoms)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(entity, attribute, tx DESC) WHERE added = true`,
-        // GIN index for JSONB value queries (containment, key existence, etc.)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_value_gin ON ${this.tableName} USING GIN (value)`,
-        // Index on tx for transaction-based queries
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_attr_value_tx ON ${this.tableName}(attribute, value, tx)`,
+        // Index on tx for transaction-based queries (DESC ordering handled in query)
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx)`,
+        // Covering index for entity lookups
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_entity ON ${this.tableName}(entity)`,
       ];
 
       await this.connection.execute(createTableSql);
@@ -66,8 +68,8 @@ export class PostgreSQLDatabase extends Database {
       // Create transaction counter table
       const txTableSql = `
         CREATE TABLE IF NOT EXISTS ${this.tableName}_tx (
-          id BIGINT PRIMARY KEY,
-          last_tx BIGINT NOT NULL DEFAULT 0
+          id INTEGER PRIMARY KEY,
+          last_tx INTEGER NOT NULL DEFAULT 0
         )
       `;
       await this.connection.execute(txTableSql);
@@ -94,48 +96,14 @@ export class PostgreSQLDatabase extends Database {
   async add(datoms: DatomInput[]): Promise<TransactionId> {
     await this.ensureInitialized();
     const tx = await this.getNextTransactionId();
-
-    if (
-      this.connection.beginTransaction &&
-      this.connection.commitTransaction &&
-      this.connection.rollbackTransaction
-    ) {
-      await this.connection.beginTransaction();
-      try {
-        await this.addDatoms(datoms, tx);
-        await this.connection.commitTransaction();
-      } catch (error) {
-        await this.connection.rollbackTransaction();
-        throw error;
-      }
-    } else {
-      await this.addDatoms(datoms, tx);
-    }
-
+    await this.addDatoms(datoms, tx);
     return tx;
   }
 
   async retract(datoms: DatomInput[]): Promise<TransactionId> {
     await this.ensureInitialized();
     const tx = await this.getNextTransactionId();
-
-    if (
-      this.connection.beginTransaction &&
-      this.connection.commitTransaction &&
-      this.connection.rollbackTransaction
-    ) {
-      await this.connection.beginTransaction();
-      try {
-        await this.retractDatoms(datoms, tx);
-        await this.connection.commitTransaction();
-      } catch (error) {
-        await this.connection.rollbackTransaction();
-        throw error;
-      }
-    } else {
-      await this.retractDatoms(datoms, tx);
-    }
-
+    await this.retractDatoms(datoms, tx);
     return tx;
   }
 
@@ -150,7 +118,6 @@ export class PostgreSQLDatabase extends Database {
       params.push(options.asOf);
     }
 
-    // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
       params.push(String(options.entity));
@@ -160,6 +127,7 @@ export class PostgreSQLDatabase extends Database {
       params.push(String(options.attribute));
     }
     if (options.value !== undefined) {
+      conditions.push("value = ?");
       let value = options.value;
       if (value === undefined) {
         value = "__UNDEFINED__";
@@ -167,7 +135,6 @@ export class PostgreSQLDatabase extends Database {
       if (typeof value === "symbol") {
         value = `__SYMBOL__${String(value)}`;
       }
-      conditions.push("value = ?::jsonb");
       params.push(JSON.stringify(value));
     }
     if (options.tx !== undefined) {
@@ -251,8 +218,7 @@ export class PostgreSQLDatabase extends Database {
           }
         }
 
-        const parsedValue =
-          typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+        const parsedValue = JSON.parse(row.value);
         const revivedValue = reviveValue(parsedValue);
 
         return {
@@ -260,50 +226,44 @@ export class PostgreSQLDatabase extends Database {
           attribute: row.attribute,
           value: revivedValue,
           tx: row.tx,
-          added: row.added,
+          added: Boolean(row.added),
         };
       });
     }
 
-    // Use DISTINCT ON to get latest datom per (entity, attribute, value) in SQL
-    // This supports multi-valued attributes (multiple values per attribute)
-    // PostgreSQL-specific: DISTINCT ON with ORDER BY for efficient latest-row-per-group
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
-
-    // For both regular and time-travel queries, we need to include retractions in DISTINCT ON
-    // to correctly determine the latest state. We filter by added AFTER DISTINCT ON.
-    // This ensures that if a datom was added then retracted, the retraction wins.
-    const combinedWhereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-    // For time-travel queries (asOf), use DISTINCT ON (entity, attribute) to get latest value per attribute
-    // For regular queries, use DISTINCT ON (entity, attribute, value) to support multi-valued attributes
-    const distinctOnColumns =
+    // Use SQL-level deduplication with ROW_NUMBER() window function
+    // For time-travel queries (asOf), deduplicate by (entity, attribute) to get latest value per attribute
+    // For regular queries, deduplicate by (entity, attribute, value) to support multi-valued attributes
+    const partitionByColumns =
       options.asOf !== undefined
         ? "entity, attribute"
         : "entity, attribute, value";
-    const orderByColumns =
-      options.asOf !== undefined
-        ? "entity, attribute, tx DESC"
-        : "entity, attribute, value, tx DESC";
 
-    // Build the added filter for after DISTINCT ON
-    // Default behavior: filter to only added datoms (exclude retracted)
-    let addedFilterAfter = "";
+    // Build the added filter
+    let addedFilter = "";
     if (options.added === true || options.added === undefined) {
-      addedFilterAfter = "WHERE added = true";
+      addedFilter = "AND added = 1";
     } else if (options.added === false) {
-      addedFilterAfter = "WHERE added = false";
+      addedFilter = "AND added = 0";
     }
 
+    const limitClause = options.limit ? "LIMIT ?" : "";
+    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+
     const sql = `
-      WITH latest_datoms AS (
-        SELECT DISTINCT ON (${distinctOnColumns})
-          entity, attribute, value, tx, added
+      WITH ranked_datoms AS (
+        SELECT 
+          entity,
+          attribute,
+          value,
+          tx,
+          added,
+          ROW_NUMBER() OVER (
+            PARTITION BY ${partitionByColumns}
+            ORDER BY tx DESC
+          ) AS rn
         FROM ${this.tableName}
-        ${combinedWhereClause}
-        ORDER BY ${orderByColumns}
+        ${whereClause}
       )
       SELECT 
         entity,
@@ -311,12 +271,13 @@ export class PostgreSQLDatabase extends Database {
         value,
         tx,
         added
-      FROM latest_datoms
-      ${addedFilterAfter}
+      FROM ranked_datoms
+      WHERE rn = 1
+      ${addedFilter}
       ORDER BY
         CASE 
-          WHEN entity ~ '^-?[0-9]+$' THEN entity::BIGINT 
-          ELSE 0 
+          WHEN entity GLOB '-[0-9]*' OR entity GLOB '[0-9]*' THEN CAST(entity AS INTEGER)
+          ELSE 0
         END,
         attribute
       ${limitClause}
@@ -372,10 +333,7 @@ export class PostgreSQLDatabase extends Database {
         }
       }
 
-      // PostgreSQL JSONB returns as parsed object, but connection adapter stringifies it
-      // So we still need to parse
-      const parsedValue =
-        typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+      const parsedValue = JSON.parse(row.value);
       const revivedValue = reviveValue(parsedValue);
 
       return {
@@ -383,7 +341,7 @@ export class PostgreSQLDatabase extends Database {
         attribute: row.attribute,
         value: revivedValue,
         tx: row.tx,
-        added: row.added,
+        added: Boolean(row.added),
       };
     });
   }
@@ -394,30 +352,378 @@ export class PostgreSQLDatabase extends Database {
       return [];
     }
 
-    // Note: Datalog queries use the optimized query() method which leverages
-    // PostgreSQL DISTINCT ON and SQL-level filtering/sorting for performance.
-    // Future optimization: For simple multi-clause queries, could use SQL JOINs
-    // directly instead of in-memory joins, but current approach handles complex
-    // datalog semantics correctly.
+    // For single clause queries, use the optimized query method
+    if (query.where.length === 1) {
+      const clause = query.where[0];
+      const [entityVal, attributeVal, valueVal] = clause;
+      const entity = this.isVariable(entityVal)
+        ? undefined
+        : (entityVal as EntityId);
+      const attribute = this.isVariable(attributeVal)
+        ? undefined
+        : (attributeVal as string);
+      const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    const firstClause = query.where[0];
-    const firstResults = await this.executeClause(firstClause, query.asOf);
+      const datoms = await this.query({
+        entity,
+        attribute,
+        value,
+        asOf: query.asOf,
+        added: true,
+      });
 
-    let results = firstResults;
-    for (let i = 1; i < query.where.length; i++) {
-      const clause = query.where[i];
-      const clauseResults = await this.executeClause(clause, query.asOf);
-      results = this.joinResults(
-        results,
-        clauseResults,
-        query.where.slice(0, i + 1)
-      );
+      const results = datoms.map((datom) => {
+        const result: Record<string, Value> = {};
+        if (this.isVariable(entityVal)) {
+          result[entityVal as string] = datom.entity;
+        }
+        if (this.isVariable(attributeVal)) {
+          result[attributeVal as string] = datom.attribute;
+        }
+        if (this.isVariable(valueVal)) {
+          result[valueVal as string] = datom.value;
+        }
+        return result;
+      });
+
+      const projected = this.project(results, query.find, query.where);
+      return this.applyOrderAndLimit(projected, query);
     }
 
-    const projected = this.project(results, query.find, query.where);
+    // For multi-clause queries, build a single SQL query with JOINs
+    return this.executeDatalogWithSQL(query);
+  }
 
+  private async executeDatalogWithSQL(
+    query: DatalogQuery
+  ): Promise<QueryResult> {
+    const clauses = query.where;
+    const params: any[] = [];
+    const ctes: string[] = [];
+    const joins: string[] = [];
+    const selectColumns: string[] = [];
+    const joinConditions: string[] = [];
+
+    // Build CTEs for each clause with deduplication
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      const [entityVal, attributeVal, valueVal] = clause;
+      const alias = `d${i}`;
+
+      const conditions: string[] = [];
+      if (query.asOf !== undefined) {
+        conditions.push(`tx <= ?`);
+        params.push(query.asOf);
+      }
+
+      // Add filters for bound values
+      if (!this.isVariable(entityVal)) {
+        conditions.push(`entity = ?`);
+        params.push(String(entityVal));
+      }
+      if (!this.isVariable(attributeVal)) {
+        conditions.push(`attribute = ?`);
+        params.push(String(attributeVal));
+      }
+      if (!this.isVariable(valueVal)) {
+        let value = valueVal as Value;
+        if (value === undefined) {
+          value = "__UNDEFINED__";
+        }
+        if (typeof value === "symbol") {
+          value = `__SYMBOL__${String(value)}`;
+        }
+        conditions.push(`value = ?`);
+        params.push(JSON.stringify(value));
+      }
+
+      const whereClause =
+        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      // Use ROW_NUMBER for deduplication
+      const partitionBy =
+        query.asOf !== undefined
+          ? "entity, attribute"
+          : "entity, attribute, value";
+
+      const rankedCte = `
+        ${alias}_ranked AS (
+          SELECT 
+            entity,
+            attribute,
+            value,
+            tx,
+            added,
+            ROW_NUMBER() OVER (
+              PARTITION BY ${partitionBy}
+              ORDER BY tx DESC
+            ) AS rn
+          FROM ${this.tableName}
+          ${whereClause}
+        )`;
+
+      const cte = `
+        ${alias} AS (
+          SELECT entity, attribute, value, tx
+          FROM ${alias}_ranked
+          WHERE rn = 1 AND added = 1
+        )`;
+
+      // Store ranked CTE separately, then the final CTE
+      ctes.push(rankedCte);
+      ctes.push(cte);
+
+      // Build SELECT columns for variables
+      if (this.isVariable(entityVal)) {
+        selectColumns.push(
+          `${alias}.entity AS ${this.escapeColumnName(entityVal as string)}`
+        );
+      }
+      if (this.isVariable(attributeVal)) {
+        selectColumns.push(
+          `${alias}.attribute AS ${this.escapeColumnName(
+            attributeVal as string
+          )}`
+        );
+      }
+      if (this.isVariable(valueVal)) {
+        selectColumns.push(
+          `${alias}.value AS ${this.escapeColumnName(valueVal as string)}`
+        );
+      }
+    }
+
+    // Build JOIN conditions based on shared variables
+    const variableToClause: Map<
+      string,
+      { clauseIndex: number; field: string }[]
+    > = new Map();
+
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      const [entityVal, attributeVal, valueVal] = clause;
+
+      if (this.isVariable(entityVal)) {
+        const varName = entityVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause
+          .get(varName)!
+          .push({ clauseIndex: i, field: "entity" });
+      }
+      if (this.isVariable(attributeVal)) {
+        const varName = attributeVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause
+          .get(varName)!
+          .push({ clauseIndex: i, field: "attribute" });
+      }
+      if (this.isVariable(valueVal)) {
+        const varName = valueVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause.get(varName)!.push({ clauseIndex: i, field: "value" });
+      }
+    }
+
+    // Build JOIN conditions for shared variables
+    for (const [varName, occurrences] of variableToClause.entries()) {
+      if (occurrences.length > 1) {
+        // This variable appears in multiple clauses, need to join on it
+        for (let i = 1; i < occurrences.length; i++) {
+          const prev = occurrences[i - 1];
+          const curr = occurrences[i];
+          const prevAlias = `d${prev.clauseIndex}`;
+          const currAlias = `d${curr.clauseIndex}`;
+          joinConditions.push(
+            `${prevAlias}.${prev.field} = ${currAlias}.${curr.field}`
+          );
+        }
+      }
+    }
+
+    // Build the final SQL query
+    const cteClause = ctes.length > 0 ? `WITH ${ctes.join(", ")}` : "";
+    const fromClause = `FROM d0`;
+
+    // Build JOIN clauses properly - each table needs its own JOIN with conditions
+    const joinClauses: string[] = [];
+    for (let i = 1; i < clauses.length; i++) {
+      const alias = `d${i}`;
+      const conditions: string[] = [];
+
+      // Find all join conditions involving this alias
+      for (const joinCond of joinConditions) {
+        if (joinCond.includes(`${alias}.`)) {
+          // Extract the condition that connects this alias to a previous one
+          const parts = joinCond.split(" = ");
+          if (parts.length === 2) {
+            if (parts[1].startsWith(`${alias}.`)) {
+              conditions.push(joinCond);
+            } else if (parts[0].startsWith(`${alias}.`)) {
+              // Reverse the condition
+              conditions.push(`${parts[1]} = ${parts[0]}`);
+            }
+          }
+        }
+      }
+
+      if (conditions.length > 0) {
+        // Find the first alias this joins to
+        const firstCond = conditions[0];
+        const otherAlias = firstCond.includes("d0.")
+          ? "d0"
+          : firstCond.match(/d\d+/)?.find((a) => a !== alias) || "d0";
+        joinClauses.push(`JOIN ${alias} ON ${conditions.join(" AND ")}`);
+      } else {
+        // Cross join if no conditions (shouldn't happen in practice)
+        joinClauses.push(`CROSS JOIN ${alias}`);
+      }
+    }
+
+    const joinClause = joinClauses.join(" ");
+
+    // Build ORDER BY clause
+    let orderByClause = "";
+    if (query.orderBy && query.orderBy.length > 0) {
+      const orderParts = query.orderBy
+        .map(([variable, direction]) => {
+          // Find which clause/alias has this variable
+          for (let i = 0; i < clauses.length; i++) {
+            const clause = clauses[i];
+            const [entityVal, attributeVal, valueVal] = clause;
+            if (entityVal === variable) {
+              return `d${i}.entity ${direction.toUpperCase()}`;
+            }
+            if (attributeVal === variable) {
+              return `d${i}.attribute ${direction.toUpperCase()}`;
+            }
+            if (valueVal === variable) {
+              return `d${i}.value ${direction.toUpperCase()}`;
+            }
+          }
+          return "";
+        })
+        .filter(Boolean);
+      if (orderParts.length > 0) {
+        orderByClause = `ORDER BY ${orderParts.join(", ")}`;
+      }
+    }
+
+    const limitClause = query.limit ? `LIMIT ?` : "";
+    if (query.limit) {
+      params.push(query.limit);
+    }
+
+    const sql = `
+      ${cteClause}
+      SELECT ${selectColumns.join(", ")}
+      ${fromClause}
+      ${joinClause}
+      ${orderByClause}
+      ${limitClause}
+    `;
+
+    const rows = await this.connection.query(sql, params);
+
+    // Convert SQL results back to QueryResult format
+    const results: QueryResult = rows.map((row: any) => {
+      const result: Record<string, Value> = {};
+      for (const key of Object.keys(row)) {
+        let value = row[key];
+        // Parse JSON values - values are stored as JSON strings in SQLite
+        if (typeof value === "string") {
+          try {
+            // Try parsing as JSON first (handles numbers, booleans, objects, arrays, etc.)
+            value = JSON.parse(value);
+          } catch {
+            // Not valid JSON, keep as string
+          }
+        }
+        result[key] = this.reviveValue(value);
+      }
+      return result;
+    });
+
+    // Apply projection if needed
+    if (query.find.length > 0) {
+      return results.map((row) => {
+        const projected: Record<string, Value> = {};
+        for (const varName of query.find) {
+          if (varName in row) {
+            projected[varName] = row[varName];
+          }
+        }
+        return projected;
+      });
+    }
+
+    return results;
+  }
+
+  private escapeColumnName(name: string): string {
+    // SQLite column aliases can be quoted or unquoted
+    // For safety, quote them if they contain special characters
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+      return name;
+    }
+    return `"${name.replace(/"/g, '""')}"`;
+  }
+
+  private reviveValue(value: any): any {
+    if (typeof value === "string") {
+      if (value === "__UNDEFINED__") {
+        return undefined;
+      }
+      if (value.startsWith("__SYMBOL__")) {
+        const symbolDesc = value.substring("__SYMBOL__".length);
+        return Symbol(symbolDesc);
+      }
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+        return new Date(value);
+      }
+      // Try parsing as JSON if it looks like JSON
+      if (
+        (value.startsWith("{") || value.startsWith("[")) &&
+        value.length > 1
+      ) {
+        try {
+          const parsed = JSON.parse(value);
+          return this.reviveValue(parsed);
+        } catch {
+          // Not valid JSON, return as string
+        }
+      }
+    }
+    if (value === null) {
+      return null;
+    }
+    if (value === undefined) {
+      return undefined;
+    }
+    if (Array.isArray(value)) {
+      return value.map((v) => this.reviveValue(v));
+    }
+    if (typeof value === "object") {
+      const revived: any = {};
+      for (const key in value) {
+        revived[key] = this.reviveValue(value[key]);
+      }
+      return revived;
+    }
+    return value;
+  }
+
+  private applyOrderAndLimit(
+    results: QueryResult,
+    query: DatalogQuery
+  ): QueryResult {
     if (query.orderBy) {
-      projected.sort((a, b) => {
+      results.sort((a, b) => {
         for (const [variable, direction] of query.orderBy!) {
           const aVal = a[variable];
           const bVal = b[variable];
@@ -441,10 +747,10 @@ export class PostgreSQLDatabase extends Database {
     }
 
     if (query.limit) {
-      return projected.slice(0, query.limit);
+      return results.slice(0, query.limit);
     }
 
-    return projected;
+    return results;
   }
 
   async getEntity(entity: EntityId): Promise<Datom[]> {
@@ -482,43 +788,35 @@ export class PostgreSQLDatabase extends Database {
   }
 
   /**
-   * Clean up tables for test isolation
-   * This method can be called before each test to ensure a clean state
+   * SQLite transaction implementation
+   * Tracks pending changes and merges them with queries
    */
-  async cleanup(): Promise<void> {
-    await this.ensureInitialized();
-    await this.connection.execute(
-      `TRUNCATE TABLE ${this.tableName}, ${this.tableName}_tx RESTART IDENTITY CASCADE`
-    );
-    // Re-initialize transaction counter after truncate
-    const initTxSql = `
-      INSERT INTO ${this.tableName}_tx (id, last_tx)
-      SELECT 1, 0
-      WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
-    `;
-    await this.connection.execute(initTxSql);
+  private createTransaction(txId: TransactionId): Transaction {
+    return new SQLiteTransaction(this.connection, this.tableName, txId, this);
   }
 
   private async getNextTransactionId(): Promise<TransactionId> {
-    // PostgreSQL-optimized: Use INSERT ... ON CONFLICT ... UPDATE ... RETURNING
-    // This combines initialization, update, and retrieval into a single atomic operation
-    // The ON CONFLICT ensures thread-safety, and RETURNING gets the new value in one query
-    const sql = `
+    // Optimized: Use INSERT ... ON CONFLICT to atomically initialize and update
+    // This reduces from 3 queries to 2 queries (init+update combined, then select)
+    const upsertSql = `
       INSERT INTO ${this.tableName}_tx (id, last_tx)
       VALUES (1, 0)
-      ON CONFLICT (id) 
-      DO UPDATE SET last_tx = ${this.tableName}_tx.last_tx + 1
-      RETURNING last_tx
+      ON CONFLICT(id) DO UPDATE SET last_tx = last_tx + 1
     `;
+    await this.connection.execute(upsertSql);
 
-    const result = await this.connection.query(sql);
+    // Retrieve the updated value
+    const selectSql = `
+      SELECT last_tx FROM ${this.tableName}_tx WHERE id = 1
+    `;
+    const result = await this.connection.query(selectSql);
     if (!result || result.length === 0) {
       throw new Error("Transaction counter row not found after update");
     }
     return result[0].last_tx;
   }
 
-  protected async addDatoms(
+  private async addDatoms(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -545,7 +843,7 @@ export class PostgreSQLDatabase extends Database {
     await this.connection.execute(sql, params);
   }
 
-  protected async retractDatoms(
+  private async retractDatoms(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -656,38 +954,25 @@ export class PostgreSQLDatabase extends Database {
   private isVariable(value: any): boolean {
     return typeof value === "string" && value.startsWith("?");
   }
-
-  /**
-   * PostgreSQL transaction implementation
-   * Tracks pending changes and merges them with queries
-   */
-  private createTransaction(txId: TransactionId): Transaction {
-    return new PostgreSQLTransaction(
-      this.connection,
-      this.tableName,
-      txId,
-      this
-    );
-  }
 }
 
 /**
- * PostgreSQL transaction implementation
+ * SQLite transaction implementation
  * Tracks pending changes and merges them with queries
  */
-class PostgreSQLTransaction implements Transaction {
-  private connection: SqlConnection;
+class SQLiteTransaction implements Transaction {
+  private connection: SqlDatabase;
   private tableName: string;
   private txId: TransactionId;
-  private db: PostgreSQLDatabase;
+  private db: SQLiteDatomDatabase;
   private pendingAdds: Datom[] = [];
   private pendingRetracts: Datom[] = [];
 
   constructor(
-    connection: SqlConnection,
+    connection: SqlDatabase,
     tableName: string,
     txId: TransactionId,
-    db: PostgreSQLDatabase
+    db: SQLiteDatomDatabase
   ) {
     this.connection = connection;
     this.tableName = tableName;
@@ -754,8 +1039,6 @@ class PostgreSQLTransaction implements Transaction {
   }
 
   async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
-    // Use the database's queryDatalog but with transaction-aware query
-    // We need to override executeClause to use transaction-aware query
     return this.executeDatalogWithTransaction(query);
   }
 
@@ -787,7 +1070,6 @@ class PostgreSQLTransaction implements Transaction {
 
   async commit(): Promise<void> {
     // Apply all pending changes to the database
-    // We'll apply these directly via SQL since we're already in a transaction
     if (this.pendingAdds.length > 0) {
       const placeholders = this.pendingAdds
         .map(() => "(?, ?, ?, ?, ?)")
@@ -853,6 +1135,7 @@ class PostgreSQLTransaction implements Transaction {
     options: QueryOptions
   ): Datom[] {
     // Create a map of committed datoms by (entity, attribute, value)
+    // This supports multi-valued attributes (multiple values per attribute)
     const committedMap = new Map<string, Datom>();
     for (const datom of committed) {
       const key = `${String(datom.entity)}|${String(datom.attribute)}|${String(
@@ -865,6 +1148,7 @@ class PostgreSQLTransaction implements Transaction {
     }
 
     // Apply pending retracts (remove matching datoms)
+    // Retracts match by (entity, attribute, value) to remove specific values
     for (const retract of this.pendingRetracts) {
       const key = `${String(retract.entity)}|${String(
         retract.attribute
@@ -873,6 +1157,7 @@ class PostgreSQLTransaction implements Transaction {
     }
 
     // Apply pending adds (add or update datoms)
+    // Adds update the state of (entity, attribute, value) combinations
     for (const add of this.pendingAdds) {
       const key = `${String(add.entity)}|${String(add.attribute)}|${String(
         add.value

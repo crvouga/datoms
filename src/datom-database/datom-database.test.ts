@@ -1,17 +1,19 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import type { Database, DatalogQuery } from "../index";
-import { InMemoryDatabase } from "../index";
-import { SQLiteDatabase } from "./database-sqlite.js";
-import { PostgreSQLDatabase } from "./database-postgres.js";
-import { SQLiteConnection } from "./__tests__/sqlite-connection.js";
-import { PostgresConnection } from "./__tests__/postgres-connection.js";
-import { PGLiteConnection } from "./__tests__/pglite-connection.js";
-import { unlinkSync } from "fs";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-type Fixture = { database: Database; cleanup: () => Promise<void> };
+import { unlinkSync } from "fs";
+import { PGLiteConnection } from "../sql-database/__tests__/sql-database-pglite.js";
+import { PostgresConnection } from "../sql-database/__tests__/sql-database-postgres.js";
+import { SQLiteConnection } from "../sql-database/__tests__/sql-database-sqlite.js";
+import { InMemoryDatomDatabase } from "./datom-database-in-memory.js";
+import { PostgreSQLDatomDatabase } from "./datom-database-postgres.js";
+import { SQLiteDatomDatabase } from "./datom-database-sqlite.js";
+import { DatalogQuery } from "../datalog/datalog.js";
+import { DatomDatabase } from "./datom-database.js";
+
+type Fixture = { database: DatomDatabase; cleanup: () => Promise<void> };
 
 const createInMemoryDatabase = async (): Promise<Fixture> => {
-  const db = new InMemoryDatabase();
+  const db = new InMemoryDatomDatabase();
   await db.initialize();
   return { database: db, cleanup: async () => {} };
 };
@@ -26,7 +28,7 @@ const createSQLiteDatabase = async (filename: string): Promise<Fixture> => {
     }
   }
   const connection = new SQLiteConnection(filename);
-  const db = new SQLiteDatabase(connection);
+  const db = new SQLiteDatomDatabase(connection);
   await db.initialize();
   return { database: db, cleanup: async () => {} };
 };
@@ -37,7 +39,7 @@ const createPostgreSQLDatabase = async (): Promise<Fixture> => {
       process.env.POSTGRES_URL ||
       "postgresql://datoms:datoms@localhost:5432/datoms_test";
     const connection = new PostgresConnection(connectionString);
-    const db = new PostgreSQLDatabase(connection);
+    const db = new PostgreSQLDatomDatabase(connection);
     await db.initialize();
 
     return {
@@ -58,7 +60,7 @@ const createPostgreSQLDatabase = async (): Promise<Fixture> => {
 
 const createPGLiteDatabase = async (): Promise<Fixture> => {
   const connection = new PGLiteConnection("memory://");
-  const db = new PostgreSQLDatabase(connection);
+  const db = new PostgreSQLDatomDatabase(connection);
   await db.initialize();
 
   return {
@@ -79,8 +81,8 @@ const implementations: [string, () => Promise<Fixture>][] = [
   ["PostgreSQLDatabase (PGLite)", () => createPGLiteDatabase()],
 ];
 
-describe.each(implementations)("Database (%s)", (name, createFixture) => {
-  let db: Database;
+describe.each(implementations)("DatomDatabase (%s)", (name, createFixture) => {
+  let db: DatomDatabase;
   let cleanup: () => Promise<void> = async () => {};
 
   beforeEach(async () => {

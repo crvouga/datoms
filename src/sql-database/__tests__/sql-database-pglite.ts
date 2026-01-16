@@ -6,12 +6,12 @@
  */
 
 import { PGlite } from "@electric-sql/pglite";
-import type { SqlConnection } from "../sql-connection-adapter.js";
+import type { SqlDatabase } from "../sql-database.js";
 
 /**
  * PGLite connection wrapper that implements SqlConnection interface
  */
-export class PGLiteConnection implements SqlConnection {
+export class PGLiteConnection implements SqlDatabase {
   private db: PGlite;
   private inTransaction: boolean = false;
   private closed: boolean = false;

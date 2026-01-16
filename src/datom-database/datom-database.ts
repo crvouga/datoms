@@ -1,9 +1,9 @@
 /**
- * Abstract database class for working with datoms
+ * Abstract datom database class for working with datoms
  * Provides a high-level interface for working with datoms and datalog queries
  */
 
-import type { DatalogQuery, QueryResult } from "./datalog.js";
+import type { DatalogQuery, QueryResult } from "../datalog/datalog.js";
 import type {
   Datom,
   DatomInput,
@@ -90,11 +90,11 @@ export interface Transaction {
 }
 
 /**
- * Abstract database class that provides a high-level interface
+ * Abstract datom database class that provides a high-level interface
  * for working with datoms and datalog queries
- * Concrete implementations: InMemoryDatabase, SqlDatabase
+ * Concrete implementations: InMemoryDatabase, SQLiteDatabase, PostgreSQLDatabase
  */
-export abstract class Database {
+export abstract class DatomDatabase {
   protected initialized = false;
 
   /**
