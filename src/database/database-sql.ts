@@ -344,6 +344,16 @@ export abstract class SqlDatabase extends Database {
    */
   private async getNextTransactionId(): Promise<TransactionId> {
     const dialect = this.getDialect();
+
+    // First, ensure the row exists (in case it was deleted)
+    // Use a dialect-agnostic approach: try to insert, ignore if exists
+    const initTxSql = `
+      INSERT INTO ${this.tableName}_tx (id, last_tx)
+      SELECT 1, 0
+      WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
+    `;
+    await this.connection.execute(initTxSql);
+
     const updateSql = `
       UPDATE ${this.tableName}_tx
       SET last_tx = last_tx + 1
@@ -355,6 +365,9 @@ export abstract class SqlDatabase extends Database {
       SELECT last_tx FROM ${this.tableName}_tx WHERE id = 1
     `;
     const result = await this.connection.query(selectSql);
+    if (!result || result.length === 0) {
+      throw new Error("Transaction counter row not found after update");
+    }
     return result[0].last_tx;
   }
 

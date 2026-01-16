@@ -7,9 +7,9 @@
  */
 
 import { Database as BunDatabase } from "bun:sqlite";
-import { SqlDatabase } from "../database-sql.js";
-import type { SqlConnection, SqlDialect } from "../sql-utils.js";
-import { sqliteDialect } from "../sql-utils.js";
+import { SqlDatabase } from "./database-sql.js";
+import type { SqlConnection, SqlDialect } from "./sql-utils.js";
+import { sqliteDialect } from "./sql-utils.js";
 
 /**
  * SQLite connection wrapper that implements SqlConnection interface

@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: datoms-postgres
+    environment:
+      POSTGRES_USER: datoms
+      POSTGRES_PASSWORD: datoms
+      POSTGRES_DB: datoms_test
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U datoms"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - datoms-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: datoms-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: datoms_root
+      MYSQL_DATABASE: datoms_test
+      MYSQL_USER: datoms
+      MYSQL_PASSWORD: datoms
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pdatoms_root"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - datoms-network
+
+  mariadb:
+    image: mariadb:11.3
+    container_name: datoms-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: datoms_root
+      MYSQL_DATABASE: datoms_test
+      MYSQL_USER: datoms
+      MYSQL_PASSWORD: datoms
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pdatoms_root"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - datoms-network
+
+volumes:
+  postgres_data:
+    driver: local
+  mysql_data:
+    driver: local
+  mariadb_data:
+    driver: local
+
+networks:
+  datoms-network:
+    driver: bridge

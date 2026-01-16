@@ -1,7 +1,8 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import type { Database, DatalogQuery } from "../index";
 import { InMemoryDatabase } from "../index";
-import { SQLiteDatabase } from "./__tests__/database-sqlite.js";
+import { SQLiteDatabase } from "./database-sqlite.js";
+import { PostgreSQLDatabase } from "./database-postgres.js";
 import { unlinkSync } from "fs";
 
 const createInMemoryDatabase = async (): Promise<Database> => {
@@ -24,16 +25,56 @@ const createSQLiteDatabase = async (filename: string): Promise<Database> => {
   return db;
 };
 
+const createPostgreSQLDatabase = async (): Promise<Database | null> => {
+  try {
+    const connectionString =
+      process.env.POSTGRES_URL ||
+      "postgresql://datoms:datoms@localhost:5432/datoms_test";
+    const db = new PostgreSQLDatabase(connectionString);
+    await db.initialize();
+    // Clean up before each test for isolation
+    if (typeof (db as any).cleanup === "function") {
+      await (db as any).cleanup();
+    }
+    return db;
+  } catch (error) {
+    // PostgreSQL not available, skip tests
+    console.warn(
+      "PostgreSQL not available, skipping PostgreSQL tests:",
+      error instanceof Error ? error.message : String(error)
+    );
+    return null;
+  }
+};
+
 // Test implementations: [name, factory function]
-const implementations: [string, () => Promise<Database>][] = [
+const implementations: [string, () => Promise<Database | null>][] = [
   ["InMemoryDatabase", () => createInMemoryDatabase()],
   ["SQLiteDatabase (memory)", () => createSQLiteDatabase(":memory:")],
   ["SQLiteDatabase (file)", () => createSQLiteDatabase("test.db")],
+  ["PostgreSQLDatabase", () => createPostgreSQLDatabase()],
 ];
 
 describe.each(implementations)("Database (%s)", (name, createDb) => {
-  // Clean up file-based databases after each test
+  let db: Database | null = null;
+
+  beforeEach(async () => {
+    db = await createDb();
+    // For PostgreSQL, clean up before each test for isolation
+    if (
+      db &&
+      name === "PostgreSQLDatabase" &&
+      typeof (db as any).cleanup === "function"
+    ) {
+      await (db as any).cleanup();
+    }
+  });
+
   afterEach(async () => {
+    if (db) {
+      await db.close();
+    }
+    // Clean up file-based databases after each test
     if (name === "SQLiteDatabase (file)") {
       try {
         unlinkSync("test.db");
@@ -42,15 +83,26 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
       }
     }
   });
-  test("should create a database", async () => {
-    const db = await createDb();
 
-    expect(db).toBeDefined();
-    await db.close();
+  // Helper to ensure db is available and return non-null db
+  const getDb = (): Database => {
+    if (!db) {
+      throw new Error("Database not available");
+    }
+    return db;
+  };
+
+  test("should create a database", async () => {
+    if (!db) {
+      return; // Skip test if database not available
+    }
+    const database = db; // TypeScript now knows db is non-null
+
+    expect(database).toBeDefined();
   });
 
   test("should add datoms", async () => {
-    const db = await createDb();
+    if (!db) return; // Skip test if database not available
 
     const tx = await db.add([
       [1, "name", "Alice"],
@@ -64,12 +116,10 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     const values = entity.map((d) => d.value);
     expect(values).toContain("Alice");
     expect(values).toContain(30);
-
-    await db.close();
   });
 
   test("should query datoms", async () => {
-    const db = await createDb();
+    if (!db) return; // Skip test if database not available
 
     await db.add([
       [1, "name", "Alice"],
@@ -78,36 +128,30 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
 
     const results = await db.query({ attribute: "name" });
     expect(results).toHaveLength(2);
-
-    await db.close();
   });
 
   test("should retract datoms", async () => {
-    const db = await createDb();
+    if (!db) return; // Skip test if database not available
 
     await db.add([[1, "name", "Alice"]]);
     await db.retract([[1, "name", "Alice"]]);
 
     const entity = await db.getEntity(1);
     expect(entity).toHaveLength(0);
-
-    await db.close();
   });
 
   test("should get value for entity-attribute", async () => {
-    const db = await createDb();
+    if (!db) return; // Skip test if database not available
 
     await db.add([[1, "name", "Alice"]]);
 
     const name = await db.getValue(1, "name");
     expect(name).toBe("Alice");
-
-    await db.close();
   });
 
   describe("Database query (Datalog)", () => {
     test("should execute simple query", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -131,7 +175,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle multiple where clauses (join)", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -158,7 +202,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should support ordering and limits", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "score", 100],
@@ -182,7 +226,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should return empty if where is empty", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       const query: DatalogQuery = {
         find: ["?x"],
@@ -197,7 +241,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should filter by constant in where clause", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "type", "person"],
@@ -217,7 +261,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle multi-entity relationships (friendships)", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       // Create people
       await db.add([
@@ -253,7 +297,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle transitive relationships (friends of friends)", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       // Create people and friendships
       await db.add([
@@ -290,7 +334,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle complex joins with multiple entities and attributes", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       // Create a company structure: employees, departments, and their relationships
       await db.add([
@@ -337,7 +381,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle parent-child relationships", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       // Create a family tree
       await db.add([
@@ -376,7 +420,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle many-to-many relationships", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       // Create students and courses with enrollments
       await db.add([
@@ -420,7 +464,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle queries with multiple constraints on same entity", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -452,7 +496,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle complex variable bindings across multiple clauses", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       // Create a network of connections
       await db.add([
@@ -486,7 +530,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle queries with ordering on multiple variables", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -526,7 +570,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle variable in entity position", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -550,7 +594,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle variable in attribute position", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -575,7 +619,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle all positions as variables", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -602,7 +646,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle empty find clause", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -623,7 +667,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle find variables not in where clause", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -647,7 +691,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle boolean values", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "active", true],
@@ -669,7 +713,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle Date values", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       const date1 = new Date("2023-01-01");
       const date2 = new Date("2023-02-01");
@@ -698,7 +742,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle null values", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "middleName", null],
@@ -720,7 +764,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle undefined values", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "optional", undefined],
@@ -748,7 +792,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle symbol values", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       const sym1 = Symbol("type1");
       const sym2 = Symbol("type2");
@@ -773,7 +817,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle mixed value types", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "data", "string"],
@@ -800,7 +844,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle string entity IDs", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         ["user-1", "name", "Alice"],
@@ -825,7 +869,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle symbol entity IDs", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       const e1 = Symbol("entity1");
       const e2 = Symbol("entity2");
@@ -849,7 +893,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle limit 0", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "score", 100],
@@ -873,7 +917,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle limit larger than results", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "score", 100],
@@ -893,7 +937,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle limit with ordering", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "score", 100],
@@ -918,7 +962,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle ordering on variable not in find", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -967,7 +1011,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle ordering with null values", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "score", 100],
@@ -993,7 +1037,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle ordering with mixed types", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "value", "zebra"],
@@ -1017,7 +1061,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle join with no matching results", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -1042,7 +1086,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle join with incompatible variable bindings", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -1071,7 +1115,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle join with multiple common variables", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -1102,7 +1146,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should exclude retracted datoms from query results", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
@@ -1127,7 +1171,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle multi-valued attributes", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "tag", "red"],
@@ -1153,7 +1197,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle self-joins", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       // Create a graph where nodes can connect to themselves
       await db.add([
@@ -1193,7 +1237,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle circular relationships", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       // Create a circular graph: 1 -> 2 -> 3 -> 1
       await db.add([
@@ -1219,7 +1263,7 @@ describe.each(implementations)("Database (%s)", (name, createDb) => {
     });
 
     test("should handle variable binding across disconnected clauses", async () => {
-      const db = await createDb();
+      if (!db) return; // Skip test if database not available
 
       await db.add([
         [1, "name", "Alice"],
