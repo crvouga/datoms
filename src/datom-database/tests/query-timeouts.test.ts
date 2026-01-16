@@ -20,7 +20,7 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.add([[1, "name", "Alice"]]);
 
-      const results = await db.query({
+      const results = await db.datoms({
         entity: 1,
         timeoutMs: 5000,
       });
@@ -34,7 +34,7 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
 
       // Use a very short timeout - may or may not trigger depending on query speed
       try {
-        await db.query({ entity: 1, timeoutMs: 1 });
+        await db.datoms({ entity: 1, timeoutMs: 1 });
         // If query completes quickly, that's fine - timeout is best-effort
       } catch (error) {
         if (error instanceof QueryTimeoutError) {
@@ -54,7 +54,7 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
         [1, "age", 30],
       ]);
 
-      const results = await db.query({
+      const results = await db.datoms({
         entity: 1,
         attribute: "name",
         timeoutMs: 1000,
@@ -69,7 +69,7 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
         await db.add([[i, "tag", `tag-${i}`]]);
       }
 
-      const results = await db.query({
+      const results = await db.datoms({
         attribute: "tag",
         limit: 3,
         timeoutMs: 1000,

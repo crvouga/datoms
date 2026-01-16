@@ -46,12 +46,12 @@ export interface DatomReader {
    * @returns Array of matching datoms
    * @example
    * // Query for all datoms with a specific entity ID
-   * const datoms = await db.query({ entity: 123 });
+   * const datoms = await db.datoms({ entity: 123 });
    *
    * // Query with a filter and limit
-   * const recent = await db.query({ attribute: "age", limit: 5 });
+   * const recent = await db.datoms({ attribute: "age", limit: 5 });
    */
-  query(options: QueryOptions): Promise<Datom[]>;
+  datoms(options: QueryOptions): Promise<Datom[]>;
 
   /**
    * Query database state as it existed at a specific transaction ID (time-travel query)
@@ -60,9 +60,9 @@ export interface DatomReader {
    * @returns Array of matching datoms at that point in time
    * @example
    * // Get what entity 42 looked like as of transaction 87
-   * const atOldTx = await db.queryAsOf(87, { entity: 42 });
+   * const atOldTx = await db.datomsAsOf(87, { entity: 42 });
    */
-  queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]>;
+  datomsAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]>;
 
   /**
    * Execute a datalog query
@@ -70,6 +70,7 @@ export interface DatomReader {
    * @returns Query results as an array of records
    * @example
    * const results = await db.queryDatalog(["find", "?e", "where", ["?e", "name", "alice"]]);
+   * //=> [{"e": 1}, {"e": 2}]
    */
   queryDatalog(query: DatalogQuery): Promise<QueryResult>;
 
@@ -569,7 +570,7 @@ export abstract class DatomDatabase
   ): Promise<TransactionId> {
     await this.ensureInitialized();
     // Get all current values for this entity-attribute pair
-    const datoms = await this.query({ entity, attribute });
+    const datoms = await this.datoms({ entity, attribute });
     if (datoms.length === 0) {
       // No values to retract, but still return a transaction ID for consistency
       return this.transact({});
@@ -1122,7 +1123,7 @@ export abstract class DatomDatabase
    * @example
    * const latestTx = await db.getLatestTransaction();
    * // Use for sync: only fetch changes after this transaction
-   * const changes = await db.query({ tx: latestTx + 1 });
+   * const changes = await db.datoms({ tx: latestTx + 1 });
    */
   abstract getLatestTransaction(): Promise<TransactionId>;
 
@@ -1132,13 +1133,13 @@ export abstract class DatomDatabase
    * @returns Array of matching datoms
    * @example
    * // Query by filters to prevent accidental full table scan:
-   * const datoms = await db.query({ attribute: "name", value: "Alice" });
+   * const datoms = await db.datoms({ attribute: "name", value: "Alice" });
    *
    * // Pagination example:
-   * const page1 = await db.query({ attribute: "status", limit: 10, offset: 0 });
-   * const page2 = await db.query({ attribute: "status", limit: 10, offset: 10 });
+   * const page1 = await db.datoms({ attribute: "status", limit: 10, offset: 0 });
+   * const page2 = await db.datoms({ attribute: "status", limit: 10, offset: 10 });
    */
-  async query(options: QueryOptions): Promise<Datom[]> {
+  async datoms(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
     const startTime = Date.now();
     try {
@@ -1361,7 +1362,7 @@ export abstract class DatomDatabase
         // Batch query for existing datoms with same attribute-value
         for (const [valueKey, valueDatoms] of valueGroups) {
           const value = JSON.parse(valueKey) as Value;
-          const existingDatoms = await this.query({
+          const existingDatoms = await this.datoms({
             attribute: attrKey,
             value,
           });
@@ -1578,7 +1579,7 @@ export abstract class DatomDatabase
     // Don't use limit here - we need all matching datoms to find the latest one
     // For single-valued attributes, there should only be one after deduplication
     // But we still need to sort to get the latest transaction
-    const datoms = await this.query({ entity, attribute });
+    const datoms = await this.datoms({ entity, attribute });
     if (datoms.length === 0) {
       return undefined;
     }
@@ -1616,7 +1617,7 @@ export abstract class DatomDatabase
    * const values = await db.getValues(10, "tag"); // ["foo", "bar"]
    */
   async getValues(entity: EntityId, attribute: string): Promise<Value[]> {
-    const datoms = await this.query({ entity, attribute });
+    const datoms = await this.datoms({ entity, attribute });
     return datoms.map((d) => d.value);
   }
 
@@ -1634,7 +1635,7 @@ export abstract class DatomDatabase
     attribute: string,
     value: Value
   ): Promise<boolean> {
-    const datoms = await this.query({ entity, attribute, value });
+    const datoms = await this.datoms({ entity, attribute, value });
     return datoms.length > 0;
   }
 
@@ -1759,7 +1760,7 @@ export abstract class DatomDatabase
    */
   async findEntities(attribute: string, value: Value): Promise<EntityId[]> {
     await this.ensureInitialized();
-    const datoms = await this.query({ attribute, value });
+    const datoms = await this.datoms({ attribute, value });
     // Extract unique entity IDs
     const entitySet = new Set<EntityId>();
     for (const datom of datoms) {
@@ -1775,13 +1776,16 @@ export abstract class DatomDatabase
    * @returns Array of matching datoms at that point in time
    * @example
    * // Basic time-travel query
-   * const old = await db.queryAsOf(55, { entity: 1 });
+   * const old = await db.datomsAsOf(55, { entity: 1 });
    *
    * // Paginated time-travel query
-   * const page1 = await db.queryAsOf(100, { attribute: "status", limit: 10, offset: 0 });
+   * const page1 = await db.datomsAsOf(100, { attribute: "status", limit: 10, offset: 0 });
    */
-  async queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]> {
-    return this.query({ ...options, asOf: tx });
+  async datomsAsOf(
+    tx: TransactionId,
+    options?: QueryOptions
+  ): Promise<Datom[]> {
+    return this.datoms({ ...options, asOf: tx });
   }
 
   /**
@@ -1802,9 +1806,9 @@ export abstract class DatomDatabase
       const { asOf, ...historyOptions } = options;
       // asOf is intentionally ignored for history queries
       void asOf;
-      return this.query({ ...historyOptions, history: true });
+      return this.datoms({ ...historyOptions, history: true });
     }
-    return this.query({ history: true });
+    return this.datoms({ history: true });
   }
 
   /**
@@ -1816,7 +1820,7 @@ export abstract class DatomDatabase
    * const snapshot = await db.getEntityAsOf(999, 50);
    */
   async getEntityAsOf(entity: EntityId, tx: TransactionId): Promise<Datom[]> {
-    return this.query({ entity, asOf: tx, added: true });
+    return this.datoms({ entity, asOf: tx, added: true });
   }
 
   /**
@@ -1833,7 +1837,7 @@ export abstract class DatomDatabase
     attribute: string,
     tx: TransactionId
   ): Promise<Value | undefined> {
-    const datoms = await this.query({ entity, attribute, asOf: tx });
+    const datoms = await this.datoms({ entity, attribute, asOf: tx });
     if (datoms.length === 0) {
       return undefined;
     }
@@ -2964,7 +2968,7 @@ export abstract class DatomDatabase
    */
   async exists(entity: EntityId): Promise<boolean> {
     await this.ensureInitialized();
-    const datoms = await this.query({ entity, limit: 1 });
+    const datoms = await this.datoms({ entity, limit: 1 });
     return datoms.length > 0;
   }
 

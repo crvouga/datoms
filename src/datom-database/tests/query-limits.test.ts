@@ -24,7 +24,7 @@ describe.each(FIXTURES)(
           await db.add([[i, "tag", `tag-${i}`]]);
         }
 
-        const results = await db.query({
+        const results = await db.datoms({
           attribute: "tag",
           maxResultSize: 10,
         });
@@ -39,7 +39,7 @@ describe.each(FIXTURES)(
         }
 
         try {
-          await db.query({ attribute: "tag", maxResultSize: 5 });
+          await db.datoms({ attribute: "tag", maxResultSize: 5 });
           throw new Error("Should have thrown QueryResultSizeError");
         } catch (error) {
           expect(error).toBeInstanceOf(QueryResultSizeError);
@@ -57,7 +57,7 @@ describe.each(FIXTURES)(
         }
 
         // limit should be applied first, then maxResultSize check
-        const results = await db.query({
+        const results = await db.datoms({
           attribute: "tag",
           limit: 3,
           maxResultSize: 5,
@@ -69,7 +69,7 @@ describe.each(FIXTURES)(
         const { db } = f;
         await db.add([[1, "name", "Alice"]]);
 
-        const results = await db.query({
+        const results = await db.datoms({
           entity: 1,
           maxResultSize: 10,
         });

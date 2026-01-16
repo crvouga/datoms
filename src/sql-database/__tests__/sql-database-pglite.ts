@@ -41,7 +41,7 @@ export class PGLiteSQLDatabase implements SQLDatabase {
     await this.readyPromise;
     const [convertedSql, convertedParams] = this.convertParams(sql, params);
 
-    const result = await this.db.query(convertedSql, convertedParams);
+    const result = await this.db.datoms(convertedSql, convertedParams);
 
     // PGLite returns JSONB values as JavaScript primitives/objects
     // We need to convert ALL values to JSON strings for consistency with SQLite
@@ -77,7 +77,7 @@ export class PGLiteSQLDatabase implements SQLDatabase {
   async execute(sql: string, params?: any[]): Promise<void> {
     await this.readyPromise;
     const [convertedSql, convertedParams] = this.convertParams(sql, params);
-    await this.db.query(convertedSql, convertedParams);
+    await this.db.datoms(convertedSql, convertedParams);
   }
 
   async beginTransaction(): Promise<void> {

@@ -26,7 +26,7 @@ import type {
  * Stores datoms in memory using an array-based structure
  */
 export class InMemoryDatomDatabase extends DatomDatabase {
-  private datoms: Datom[] = [];
+  private _datomsArray: Datom[] = [];
   private nextTx: TransactionId = 1;
   private queryCount: number = 0;
   private transactionCount: number = 0;
@@ -35,14 +35,14 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
   async initialize(): Promise<void> {
     if (!this.initialized) {
-      this.datoms = [];
+      this._datomsArray = [];
       this.nextTx = 1;
       this.initialized = true;
     }
   }
 
   async close(): Promise<void> {
-    this.datoms = [];
+    this._datomsArray = [];
     this.initialized = false;
   }
 
@@ -50,7 +50,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     const tx = this.nextTx++;
 
     for (const datom of datoms) {
-      this.datoms.push({
+      this._datomsArray.push({
         entity: datom[0],
         attribute: datom[1],
         value: datom[2],
@@ -67,7 +67,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     for (const datom of datoms) {
       // Add retraction datom
-      this.datoms.push({
+      this._datomsArray.push({
         entity: datom[0],
         attribute: datom[1],
         value: datom[2],
@@ -84,14 +84,14 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     const tx = this.nextTx++;
 
     // Get all datoms for this entity
-    const entityDatoms = this.datoms.filter((d) => d.entity === entity);
+    const entityDatoms = this._datomsArray.filter((d) => d.entity === entity);
 
     // Retract all of them
     for (const datom of entityDatoms) {
       // Only retract if it's currently added (not already retracted)
       const isCurrentlyAdded = this.isCurrentlyAdded(datom);
       if (isCurrentlyAdded) {
-        this.datoms.push({
+        this._datomsArray.push({
           entity: datom.entity,
           attribute: datom.attribute,
           value: datom.value,
@@ -110,7 +110,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   private isCurrentlyAdded(datom: Datom): boolean {
     // Find the latest transaction for this (entity, attribute, value)
     let latest: Datom | null = null;
-    for (const d of this.datoms) {
+    for (const d of this._datomsArray) {
       if (
         d.entity === datom.entity &&
         d.attribute === datom.attribute &&
@@ -124,8 +124,13 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return latest !== null && latest.added;
   }
 
+  async datoms(options: QueryOptions): Promise<Datom[]> {
+    await this.ensureInitialized();
+    return super.datoms(options);
+  }
+
   protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
-    let results = this.datoms;
+    let results = this._datomsArray;
 
     // Apply time-travel filter: if asOf is specified, only consider datoms up to that transaction
     if (options.asOf !== undefined) {
@@ -222,33 +227,37 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     const result = await super.explainQuery(options);
 
     // Estimate result size based on filters and current data
-    let estimatedRows = this.datoms.length;
+    let estimatedRows = this._datomsArray.length;
 
     // Apply filters to estimate result size
     if (options.entity !== undefined) {
-      const entityCount = this.datoms.filter(
+      const entityCount = this._datomsArray.filter(
         (d) => d.entity === options.entity
       ).length;
       estimatedRows = Math.min(estimatedRows, entityCount);
     }
     if (options.attribute !== undefined) {
-      const attributeCount = this.datoms.filter(
+      const attributeCount = this._datomsArray.filter(
         (d) => d.attribute === options.attribute
       ).length;
       estimatedRows = Math.min(estimatedRows, attributeCount);
     }
     if (options.value !== undefined) {
-      const valueCount = this.datoms.filter(
+      const valueCount = this._datomsArray.filter(
         (d) => d.value === options.value
       ).length;
       estimatedRows = Math.min(estimatedRows, valueCount);
     }
     if (options.tx !== undefined) {
-      const txCount = this.datoms.filter((d) => d.tx === options.tx).length;
+      const txCount = this._datomsArray.filter(
+        (d) => d.tx === options.tx
+      ).length;
       estimatedRows = Math.min(estimatedRows, txCount);
     }
     if (options.asOf !== undefined) {
-      const asOfCount = this.datoms.filter((d) => d.tx <= options.asOf!).length;
+      const asOfCount = this._datomsArray.filter(
+        (d) => d.tx <= options.asOf!
+      ).length;
       estimatedRows = Math.min(estimatedRows, asOfCount);
     }
 
@@ -271,7 +280,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     if (result.scanType === "full-table") {
       result.warnings = result.warnings || [];
       result.warnings.push(
-        `In-memory database will scan all ${this.datoms.length} datoms. Consider adding filters.`
+        `In-memory database will scan all ${this._datomsArray.length} datoms. Consider adding filters.`
       );
     }
 
@@ -347,11 +356,11 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     await this.ensureInitialized();
 
     // Create snapshot of current state
-    const snapshot = [...this.datoms];
+    const snapshot = [...this._datomsArray];
     const snapshotNextTx = this.nextTx;
 
     const txId = this.nextTx++;
-    const transaction = new InMemoryTransaction(this.datoms, txId, this);
+    const transaction = new InMemoryTransaction(this._datomsArray, txId, this);
 
     try {
       const result = await callback(transaction);
@@ -359,7 +368,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       return result;
     } catch (error) {
       // Rollback: restore snapshot
-      this.datoms = snapshot;
+      this._datomsArray = snapshot;
       this.nextTx = snapshotNextTx;
       throw error;
     }
@@ -520,9 +529,9 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     const stats: Partial<import("../types.js").DatabaseStats> = {};
 
     // Count total datoms (only added ones)
-    const addedDatoms = this.datoms.filter((d) => {
+    const addedDatoms = this._datomsArray.filter((d) => {
       // Check if this is the latest version (not retracted)
-      const latestVersion = this.datoms
+      const latestVersion = this._datomsArray
         .filter(
           (other) =>
             other.entity === d.entity &&
@@ -563,12 +572,12 @@ export class InMemoryDatomDatabase extends DatomDatabase {
  * Directly modifies the database's datoms array (changes are rolled back on error)
  */
 class InMemoryTransaction implements Transaction {
-  private datoms: Datom[];
+  private _datomsArray: Datom[];
   private txId: TransactionId;
   private db: InMemoryDatomDatabase;
 
   constructor(datoms: Datom[], txId: TransactionId, db: InMemoryDatomDatabase) {
-    this.datoms = datoms;
+    this._datomsArray = datoms;
     this.txId = txId;
     this.db = db;
   }
@@ -577,9 +586,9 @@ class InMemoryTransaction implements Transaction {
     return this.txId;
   }
 
-  async query(options: QueryOptions): Promise<Datom[]> {
+  async datoms(options: QueryOptions): Promise<Datom[]> {
     // Query directly from the datoms array (which includes uncommitted changes)
-    let results = this.datoms;
+    let results = this._datomsArray;
 
     // Apply time-travel filter: if asOf is specified, only consider datoms up to that transaction
     // Note: For transactions, asOf queries only committed state (datoms with tx < this.txId)
@@ -662,14 +671,17 @@ class InMemoryTransaction implements Transaction {
     return this.db.explainQuery(options);
   }
 
-  async queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]> {
+  async datomsAsOf(
+    tx: TransactionId,
+    options?: QueryOptions
+  ): Promise<Datom[]> {
     // Query committed state at that transaction, ignoring pending changes
-    return this.db.query({ ...options, asOf: tx });
+    return this.db.datoms({ ...options, asOf: tx });
   }
 
   async add(datoms: DatomInput[]): Promise<void> {
     for (const datom of datoms) {
-      this.datoms.push({
+      this._datomsArray.push({
         entity: datom[0],
         attribute: datom[1],
         value: datom[2],
@@ -686,20 +698,20 @@ class InMemoryTransaction implements Transaction {
       const key = `${String(datom[0])}|${String(datom[1])}|${String(datom[2])}`;
 
       // Find and remove matching pending adds (modify array in place)
-      for (let i = this.datoms.length - 1; i >= 0; i--) {
-        const d = this.datoms[i];
+      for (let i = this._datomsArray.length - 1; i >= 0; i--) {
+        const d = this._datomsArray[i];
         if (d.tx === this.txId && d.added) {
           const dKey = `${String(d.entity)}|${String(d.attribute)}|${String(
             d.value
           )}`;
           if (dKey === key) {
-            this.datoms.splice(i, 1);
+            this._datomsArray.splice(i, 1);
           }
         }
       }
 
       // Add retraction datom
-      this.datoms.push({
+      this._datomsArray.push({
         entity: datom[0],
         attribute: datom[1],
         value: datom[2],
@@ -711,7 +723,7 @@ class InMemoryTransaction implements Transaction {
 
   async retractEntity(entity: EntityId): Promise<void> {
     // Get all datoms for this entity that are currently visible
-    const entityDatoms = await this.query({ entity, added: true });
+    const entityDatoms = await this.datoms({ entity, added: true });
 
     // Retract all of them
     const retractions: DatomInput[] = entityDatoms.map((d) => [
@@ -724,7 +736,7 @@ class InMemoryTransaction implements Transaction {
 
   async retractAttribute(entity: EntityId, attribute: string): Promise<void> {
     // Get all current values for this entity-attribute pair
-    const datoms = await this.query({ entity, attribute });
+    const datoms = await this.datoms({ entity, attribute });
     if (datoms.length === 0) {
       return;
     }
@@ -827,14 +839,14 @@ class InMemoryTransaction implements Transaction {
   }
 
   async getEntity(entity: EntityId): Promise<Datom[]> {
-    return this.query({ entity, added: true });
+    return this.datoms({ entity, added: true });
   }
 
   async getValue(
     entity: EntityId,
     attribute: string
   ): Promise<Value | undefined> {
-    const datoms = await this.query({ entity, attribute });
+    const datoms = await this.datoms({ entity, attribute });
     if (datoms.length === 0) {
       return undefined;
     }
@@ -844,7 +856,7 @@ class InMemoryTransaction implements Transaction {
   }
 
   async getValues(entity: EntityId, attribute: string): Promise<Value[]> {
-    const datoms = await this.query({ entity, attribute });
+    const datoms = await this.datoms({ entity, attribute });
     return datoms.map((d) => d.value);
   }
 
@@ -853,7 +865,7 @@ class InMemoryTransaction implements Transaction {
     attribute: string,
     value: Value
   ): Promise<boolean> {
-    const datoms = await this.query({ entity, attribute, value });
+    const datoms = await this.datoms({ entity, attribute, value });
     return datoms.length > 0;
   }
 
@@ -876,7 +888,7 @@ class InMemoryTransaction implements Transaction {
   }
 
   async findEntities(attribute: string, value: Value): Promise<EntityId[]> {
-    const datoms = await this.query({ attribute, value });
+    const datoms = await this.datoms({ attribute, value });
     const entitySet = new Set<EntityId>();
     for (const datom of datoms) {
       entitySet.add(datom.entity);
@@ -903,7 +915,7 @@ class InMemoryTransaction implements Transaction {
       ...(value !== undefined && { value }),
     };
 
-    const datoms = await this.query(queryOptions);
+    const datoms = await this.datoms(queryOptions);
 
     return datoms.map((datom: Datom) => {
       const result: Record<string, Value | Attribute> = {};

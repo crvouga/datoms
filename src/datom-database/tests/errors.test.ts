@@ -262,7 +262,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       await db.add([[1, "name", "Alice"]]);
 
       try {
-        await db.query({});
+        await db.datoms({});
         throw new Error("Should have thrown QuerySafetyError");
       } catch (error) {
         expect(error).toBeInstanceOf(QuerySafetyError);
@@ -348,11 +348,11 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
 
       try {
         // Use a very short timeout that will definitely be exceeded
-        await db.query({ entity: 1, timeoutMs: 1 });
+        await db.datoms({ entity: 1, timeoutMs: 1 });
         // If query completes too fast, add a delay to ensure timeout
         await new Promise((resolve) => setTimeout(resolve, 10));
         // Re-query with timeout
-        await db.query({ entity: 1, timeoutMs: 1 });
+        await db.datoms({ entity: 1, timeoutMs: 1 });
         // If we get here, the timeout didn't trigger (query was too fast)
         // This is acceptable - timeout is best-effort
       } catch (error) {
@@ -377,7 +377,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       }
 
       try {
-        await db.query({ attribute: "tag", maxResultSize: 5 });
+        await db.datoms({ attribute: "tag", maxResultSize: 5 });
         throw new Error("Should have thrown QueryResultSizeError");
       } catch (error) {
         expect(error).toBeInstanceOf(QueryResultSizeError);
@@ -394,7 +394,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.add([[1, "name", "Alice"]]);
 
-      const results = await db.query({
+      const results = await db.datoms({
         entity: 1,
         maxResultSize: 10,
       });
@@ -417,11 +417,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
   describe("MigrationRollbackError", () => {
     test("should have correct error properties", () => {
       const cause = new Error("Test error");
-      const error = new MigrationRollbackError(
-        "Rollback failed",
-        2,
-        cause
-      );
+      const error = new MigrationRollbackError("Rollback failed", 2, cause);
       expect(error).toBeInstanceOf(MigrationRollbackError);
       expect(error.code).toBe("MIGRATION_ROLLBACK_ERROR");
       expect(error.name).toBe("MigrationRollbackError");

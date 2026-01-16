@@ -38,8 +38,8 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
       const { db } = f;
       // Run some queries to generate metrics
       await db.add([[1, "name", "Alice"]]);
-      await db.query({ entity: 1 });
-      await db.query({ attribute: "name" });
+      await db.datoms({ entity: 1 });
+      await db.datoms({ attribute: "name" });
 
       const health = await db.healthCheck();
       // Query performance may or may not be included depending on implementation
@@ -72,7 +72,9 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
       if (health.connectionPool) {
         expect(health.connectionPool.healthy).toBeDefined();
         expect(typeof health.connectionPool.healthy).toBe("boolean");
-        expect(health.connectionPool.activeConnections).toBeGreaterThanOrEqual(0);
+        expect(health.connectionPool.activeConnections).toBeGreaterThanOrEqual(
+          0
+        );
         expect(health.connectionPool.idleConnections).toBeGreaterThanOrEqual(0);
         expect(health.connectionPool.waitingRequests).toBeGreaterThanOrEqual(0);
       }

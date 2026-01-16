@@ -907,7 +907,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
   async getEntity(entity: EntityId): Promise<Datom[]> {
     await this.ensureInitialized();
-    return this.query({ entity, added: true });
+    return this.datoms({ entity, added: true });
   }
 
   protected async executeTransaction<T>(
@@ -1246,7 +1246,7 @@ class SQLiteTransaction implements Transaction {
     return this.txId;
   }
 
-  async query(options: QueryOptions): Promise<Datom[]> {
+  async datoms(options: QueryOptions): Promise<Datom[]> {
     // For asOf queries, only query committed state (ignore pending changes)
     if (options.asOf !== undefined) {
       return this.db._queryInternalForTransaction(options);
@@ -1265,7 +1265,10 @@ class SQLiteTransaction implements Transaction {
     return this.db.explainQuery(options);
   }
 
-  async queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]> {
+  async datomsAsOf(
+    tx: TransactionId,
+    options?: QueryOptions
+  ): Promise<Datom[]> {
     // Query committed state at that transaction, ignoring pending changes
     return this.db._queryInternalForTransaction({ ...options, asOf: tx });
   }
@@ -1309,7 +1312,7 @@ class SQLiteTransaction implements Transaction {
 
   async retractEntity(entity: EntityId): Promise<void> {
     // Get all datoms for this entity that are currently visible
-    const entityDatoms = await this.query({ entity, added: true });
+    const entityDatoms = await this.datoms({ entity, added: true });
 
     // Retract all of them
     const retractions: DatomInput[] = entityDatoms.map((d) => [
@@ -1322,7 +1325,7 @@ class SQLiteTransaction implements Transaction {
 
   async retractAttribute(entity: EntityId, attribute: string): Promise<void> {
     // Get all current values for this entity-attribute pair
-    const datoms = await this.query({ entity, attribute });
+    const datoms = await this.datoms({ entity, attribute });
     if (datoms.length === 0) {
       return;
     }
@@ -1383,14 +1386,14 @@ class SQLiteTransaction implements Transaction {
   }
 
   async getEntity(entity: EntityId): Promise<Datom[]> {
-    return this.query({ entity, added: true });
+    return this.datoms({ entity, added: true });
   }
 
   async getValue(
     entity: EntityId,
     attribute: string
   ): Promise<Value | undefined> {
-    const datoms = await this.query({ entity, attribute });
+    const datoms = await this.datoms({ entity, attribute });
     if (datoms.length === 0) {
       return undefined;
     }
@@ -1400,7 +1403,7 @@ class SQLiteTransaction implements Transaction {
   }
 
   async getValues(entity: EntityId, attribute: string): Promise<Value[]> {
-    const datoms = await this.query({ entity, attribute });
+    const datoms = await this.datoms({ entity, attribute });
     return datoms.map((d) => d.value);
   }
 
@@ -1409,7 +1412,7 @@ class SQLiteTransaction implements Transaction {
     attribute: string,
     value: Value
   ): Promise<boolean> {
-    const datoms = await this.query({ entity, attribute, value });
+    const datoms = await this.datoms({ entity, attribute, value });
     return datoms.length > 0;
   }
 
@@ -1432,7 +1435,7 @@ class SQLiteTransaction implements Transaction {
   }
 
   async findEntities(attribute: string, value: Value): Promise<EntityId[]> {
-    const datoms = await this.query({ attribute, value });
+    const datoms = await this.datoms({ attribute, value });
     const entitySet = new Set<EntityId>();
     for (const datom of datoms) {
       entitySet.add(datom.entity);
@@ -1655,7 +1658,7 @@ class SQLiteTransaction implements Transaction {
       ...(asOf !== undefined && { asOf }),
     };
 
-    const datoms = await this.query(queryOptions);
+    const datoms = await this.datoms(queryOptions);
 
     return datoms.map((datom: Datom) => {
       const result: Record<string, Value | Attribute> = {};

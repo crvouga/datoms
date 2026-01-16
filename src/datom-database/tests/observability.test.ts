@@ -86,7 +86,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
         events.push(event);
       });
 
-      await db.query({ entity: 1 });
+      await db.datoms({ entity: 1 });
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("query");
@@ -106,7 +106,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       });
 
       try {
-        await db.query({}); // Should throw QuerySafetyError
+        await db.datoms({}); // Should throw QuerySafetyError
       } catch (error) {
         // Expected
       }
@@ -293,9 +293,9 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       ]);
 
       // Perform some queries
-      await db.query({ entity: 1 });
-      await db.query({ entity: 2 });
-      await db.query({ attribute: "name" });
+      await db.datoms({ entity: 1 });
+      await db.datoms({ entity: 2 });
+      await db.datoms({ attribute: "name" });
 
       const stats = await db.getStats();
 
@@ -360,7 +360,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       db.setLogger(logger);
 
       await db.transact({ add: [[1, "name", "Alice"]] });
-      await db.query({ entity: 1 });
+      await db.datoms({ entity: 1 });
 
       // Should have logged transaction and query events
       expect(logMessages.length).toBeGreaterThan(0);
@@ -390,7 +390,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       db.setLogger(logger);
 
       try {
-        await db.query({}); // Should throw QuerySafetyError
+        await db.datoms({}); // Should throw QuerySafetyError
       } catch {
         // Expected
       }
@@ -419,7 +419,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       db.setLogger(logger);
       await db.add([[1, "name", "Alice"]]);
-      await db.query({ entity: 1 });
+      await db.datoms({ entity: 1 });
 
       // Should have logged query event at debug level
       const queryLog = debugLogs.find((m) => m.message.includes("query"));
@@ -433,7 +433,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       const { db } = f;
       // Should not throw when no logger is set
       await db.transact({ add: [[1, "name", "Alice"]] });
-      await db.query({ entity: 1 });
+      await db.datoms({ entity: 1 });
     });
   });
 });

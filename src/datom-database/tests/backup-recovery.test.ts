@@ -154,7 +154,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       expect(count).toBe(exported.length);
 
       // Verify imported data
-      const alice = await db2.query({ entity: 1 });
+      const alice = await db2.datoms({ entity: 1 });
       expect(alice.length).toBeGreaterThan(0);
       expect(alice.some((d) => d.value === "Alice")).toBe(true);
 
@@ -167,7 +167,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       const datoms: Datom[] = [];
       for (let i = 1; i <= 50; i++) {
         await db.add([[i, "name", `Entity${i}`]]);
-        const entityDatoms = await db.query({ entity: i });
+        const entityDatoms = await db.datoms({ entity: i });
         datoms.push(...entityDatoms);
       }
 
@@ -193,7 +193,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       expect(count).toBe(exported.length);
 
       // Verify some entities
-      const entity1 = await db2.query({ entity: 1 });
+      const entity1 = await db2.datoms({ entity: 1 });
       expect(entity1.length).toBeGreaterThan(0);
 
       await db2.close();

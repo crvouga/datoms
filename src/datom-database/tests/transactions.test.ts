@@ -22,11 +22,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.add([[1, "name", "Alice"]]);
 
       const result = await db.transaction(async (tx) => {
-        const initial = await tx.query({ entity: 1 });
+        const initial = await tx.datoms({ entity: 1 });
         expect(initial).toHaveLength(1);
 
         await tx.add([[1, "status", "pending"]]);
-        const updated = await tx.query({ entity: 1 });
+        const updated = await tx.datoms({ entity: 1 });
         expect(updated).toHaveLength(2);
 
         return "ok";
@@ -35,7 +35,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(result).toBe("ok");
 
       // Verify changes are committed
-      const final = await db.query({ entity: 1 });
+      const final = await db.datoms({ entity: 1 });
       expect(final).toHaveLength(2);
       const values = final.map((d) => d.value);
       expect(values).toContain("Alice");
@@ -61,7 +61,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       }
 
       // Verify changes were rolled back
-      const final = await db.query({ entity: 1 });
+      const final = await db.datoms({ entity: 1 });
       expect(final).toHaveLength(1);
       expect(final[0].value).toBe("Alice");
 
@@ -75,14 +75,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.transaction(async (tx) => {
         // Query before adding
-        const before = await tx.query({ entity: 1 });
+        const before = await tx.datoms({ entity: 1 });
         expect(before).toHaveLength(1);
 
         // Add new datom
         await tx.add([[1, "age", 30]]);
 
         // Query after adding - should see uncommitted change
-        const after = await tx.query({ entity: 1 });
+        const after = await tx.datoms({ entity: 1 });
         expect(after).toHaveLength(2);
         const values = after.map((d) => d.value);
         expect(values).toContain("Alice");
@@ -105,13 +105,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         await tx.retract([[1, "age", 30]]);
 
         // Query should not see retracted datom
-        const result = await tx.query({ entity: 1 });
+        const result = await tx.datoms({ entity: 1 });
         expect(result).toHaveLength(1);
         expect(result[0].value).toBe("Alice");
       });
 
       // Verify retraction is committed
-      const final = await db.query({ entity: 1 });
+      const final = await db.datoms({ entity: 1 });
       expect(final).toHaveLength(1);
       expect(final[0].value).toBe("Alice");
 
@@ -156,14 +156,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       });
 
       // Verify all operations were applied
-      const alice = await db.query({ entity: 1 });
+      const alice = await db.datoms({ entity: 1 });
       expect(alice).toHaveLength(2);
       const aliceValues = alice.map((d) => d.value);
       expect(aliceValues).toContain("Alice");
       expect(aliceValues).toContain(31);
       expect(aliceValues).not.toContain(30);
 
-      const bob = await db.query({ entity: 2 });
+      const bob = await db.datoms({ entity: 2 });
       expect(bob).toHaveLength(1);
       expect(bob[0].value).toBe("Bob");
 
@@ -188,11 +188,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       }
 
       // Verify nothing changed
-      const result = await db.query({ entity: 1 });
+      const result = await db.datoms({ entity: 1 });
       expect(result).toHaveLength(1);
       expect(result[0].value).toBe("Initial");
 
-      const entity2 = await db.query({ entity: 2 });
+      const entity2 = await db.datoms({ entity: 2 });
       expect(entity2).toHaveLength(0);
 
       await db.close();
@@ -360,7 +360,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       );
 
       // Should succeed
-      const bob = await db.query({ entity: 2 });
+      const bob = await db.datoms({ entity: 2 });
       expect(bob.length).toBeGreaterThan(0);
     });
 
@@ -463,7 +463,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       });
 
       // Should succeed normally
-      const bob = await db.query({ entity: 2 });
+      const bob = await db.datoms({ entity: 2 });
       expect(bob.length).toBeGreaterThan(0);
     });
   });
@@ -510,6 +510,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should rollback transaction on timeout", async () => {
       const { db } = f;
+      let timeoutError: QueryTimeoutError | null = null;
       try {
         await db.transaction(
           async (tx) => {
@@ -524,11 +525,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         expect(entity.length).toBeGreaterThanOrEqual(0);
       } catch (error) {
         if (error instanceof QueryTimeoutError) {
+          timeoutError = error;
           // Verify rollback occurred
           const entity = await db.getEntity(1);
           expect(entity).toHaveLength(0);
+        } else {
+          throw error;
         }
       }
+      // Ensure timeout error was thrown
+      expect(timeoutError).toBeInstanceOf(QueryTimeoutError);
     });
 
     test("should work with isolation level option", async () => {

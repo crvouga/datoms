@@ -134,7 +134,7 @@ export class TransactionConflictError extends DatomDatabaseError {
  * Error thrown when a query would perform a full table scan without filters
  * @example
  * try {
- *   await db.query({}); // Throws QuerySafetyError
+ *   await db.datoms({}); // Throws QuerySafetyError
  * } catch (error) {
  *   if (error instanceof QuerySafetyError) {
  *     // Add filters or limit to the query
@@ -176,7 +176,7 @@ export class MigrationError extends DatomDatabaseError {
  * Error thrown when a query exceeds its timeout
  * @example
  * try {
- *   await db.query({ entity: 1, timeoutMs: 100 });
+ *   await db.datoms({ entity: 1, timeoutMs: 100 });
  * } catch (error) {
  *   if (error instanceof QueryTimeoutError) {
  *     // Query took too long
@@ -198,7 +198,7 @@ export class QueryTimeoutError extends DatomDatabaseError {
  * Error thrown when a query result exceeds the maximum allowed size
  * @example
  * try {
- *   await db.query({ attribute: "tag", maxResultSize: 1000 });
+ *   await db.datoms({ attribute: "tag", maxResultSize: 1000 });
  * } catch (error) {
  *   if (error instanceof QueryResultSizeError) {
  *     // Result set too large
@@ -224,7 +224,7 @@ export class QueryResultSizeError extends DatomDatabaseError {
  * Error thrown when connection pool is exhausted
  * @example
  * try {
- *   await db.query({ entity: 1 });
+ *   await db.datoms({ entity: 1 });
  * } catch (error) {
  *   if (error instanceof ConnectionPoolExhaustedError) {
  *     // No connections available

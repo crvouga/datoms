@@ -24,20 +24,20 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const tx3 = await db.add([[1, "name", "Alice Updated"]]);
 
       // Query at tx1 - should only see name
-      const atTx1 = await db.queryAsOf(tx1, { entity: 1 });
+      const atTx1 = await db.datomsAsOf(tx1, { entity: 1 });
       expect(atTx1).toHaveLength(1);
       expect(atTx1[0].attribute).toBe("name");
       expect(atTx1[0].value).toBe("Alice");
 
       // Query at tx2 - should see name and age
-      const atTx2 = await db.queryAsOf(tx2, { entity: 1 });
+      const atTx2 = await db.datomsAsOf(tx2, { entity: 1 });
       expect(atTx2).toHaveLength(2);
       const valuesAtTx2 = atTx2.map((d) => d.value).sort();
       expect(valuesAtTx2).toContain("Alice");
       expect(valuesAtTx2).toContain(30);
 
       // Query at tx3 - should see updated name and age
-      const atTx3 = await db.queryAsOf(tx3, { entity: 1 });
+      const atTx3 = await db.datomsAsOf(tx3, { entity: 1 });
       expect(atTx3).toHaveLength(2);
       const nameAtTx3 = atTx3.find((d) => d.attribute === "name");
       expect(nameAtTx3?.value).toBe("Alice Updated");
@@ -52,11 +52,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const tx3 = await db.retract([[1, "age", 30]]);
 
       // Query at tx2 - should see both name and age
-      const atTx2 = await db.queryAsOf(tx2, { entity: 1 });
+      const atTx2 = await db.datomsAsOf(tx2, { entity: 1 });
       expect(atTx2).toHaveLength(2);
 
       // Query at tx3 - should only see name (age was retracted)
-      const atTx3 = await db.queryAsOf(tx3, { entity: 1 });
+      const atTx3 = await db.datomsAsOf(tx3, { entity: 1 });
       expect(atTx3).toHaveLength(1);
       expect(atTx3[0].attribute).toBe("name");
 
@@ -148,11 +148,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         await tx.add([[1, "age", 30]]);
 
         // Query current state - should see uncommitted age
-        const current = await tx.query({ entity: 1 });
+        const current = await tx.datoms({ entity: 1 });
         expect(current).toHaveLength(2);
 
         // Query at tx1 - should only see committed name (not uncommitted age)
-        const atTx1 = await tx.queryAsOf(tx1, { entity: 1 });
+        const atTx1 = await tx.datomsAsOf(tx1, { entity: 1 });
         expect(atTx1).toHaveLength(1);
         expect(atTx1[0].attribute).toBe("name");
       });
@@ -326,18 +326,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should require at least one filter or limit for query", async () => {
       const { db } = f;
-      expect(db.query({})).rejects.toThrow("full table scans");
+      expect(db.datoms({})).rejects.toThrow("full table scans");
 
       // History queries without filters should also require a limit
-      expect(db.query({ history: true })).rejects.toThrow(
+      expect(db.datoms({ history: true })).rejects.toThrow(
         "History query must include at least one filter or a limit"
       );
 
       // These should work
-      await db.query({ entity: 1 });
-      await db.query({ limit: 10 });
-      await db.query({ history: true, limit: 100 });
-      await db.query({ history: true, entity: 1 });
+      await db.datoms({ entity: 1 });
+      await db.datoms({ limit: 10 });
+      await db.datoms({ history: true, limit: 100 });
+      await db.datoms({ history: true, entity: 1 });
 
       await db.close();
     });

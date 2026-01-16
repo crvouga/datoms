@@ -43,7 +43,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       [2, "name", "Bob"],
     ]);
 
-    const results = await db.query({ attribute: "name" });
+    const results = await db.datoms({ attribute: "name" });
     expect(results).toHaveLength(2);
   });
 
