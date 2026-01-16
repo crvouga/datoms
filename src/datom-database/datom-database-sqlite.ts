@@ -142,7 +142,16 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      // Serialize entity properly (handles symbols)
+      let entityStr: string;
+      if (typeof options.entity === "symbol") {
+        const desc =
+          options.entity.description ?? String(options.entity).slice(7, -1);
+        entityStr = `__SYMBOL__${desc}`;
+      } else {
+        entityStr = String(options.entity);
+      }
+      params.push(entityStr);
     }
     if (options.attribute !== undefined) {
       conditions.push("attribute = ?");
@@ -155,7 +164,8 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         value = "__UNDEFINED__";
       }
       if (typeof value === "symbol") {
-        value = `__SYMBOL__${String(value)}`;
+        const desc = value.description ?? String(value).slice(7, -1);
+        value = `__SYMBOL__${desc}`;
       }
       params.push(JSON.stringify(value));
     }
@@ -228,7 +238,10 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       return rows.map((row: any) => {
         let entity: any = row.entity;
         if (typeof entity === "string") {
-          if (/^-?\d+$/.test(entity)) {
+          if (entity.startsWith("__SYMBOL__")) {
+            const symbolDesc = entity.substring("__SYMBOL__".length);
+            entity = Symbol(symbolDesc);
+          } else if (/^-?\d+$/.test(entity)) {
             entity = parseInt(entity, 10);
           }
         }
@@ -343,7 +356,10 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     return rows.map((row: any) => {
       let entity: any = row.entity;
       if (typeof entity === "string") {
-        if (/^-?\d+$/.test(entity)) {
+        if (entity.startsWith("__SYMBOL__")) {
+          const symbolDesc = entity.substring("__SYMBOL__".length);
+          entity = Symbol(symbolDesc);
+        } else if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
       }
@@ -375,7 +391,16 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     }
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      // Serialize entity properly (handles symbols)
+      let entityStr: string;
+      if (typeof options.entity === "symbol") {
+        const desc =
+          options.entity.description ?? String(options.entity).slice(7, -1);
+        entityStr = `__SYMBOL__${desc}`;
+      } else {
+        entityStr = String(options.entity);
+      }
+      params.push(entityStr);
     }
     if (options.attribute !== undefined) {
       conditions.push("attribute = ?");
@@ -388,7 +413,8 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         value = "__UNDEFINED__";
       }
       if (typeof value === "symbol") {
-        value = `__SYMBOL__${String(value)}`;
+        const desc = value.description ?? String(value).slice(7, -1);
+        value = `__SYMBOL__${desc}`;
       }
       params.push(JSON.stringify(value));
     }
@@ -420,8 +446,8 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         options.added === true || options.added === undefined
           ? "AND added = 1"
           : options.added === false
-            ? "AND added = 0"
-            : "";
+          ? "AND added = 0"
+          : "";
 
       explainSql = `
         EXPLAIN QUERY PLAN
@@ -511,7 +537,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       // If EXPLAIN fails, return base result with warning
       result.warnings = result.warnings || [];
       result.warnings.push(
-        `Failed to get query plan: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to get query plan: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
     }
 
@@ -591,7 +619,15 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       // Add filters for bound values
       if (!this.isVariable(entityVal)) {
         conditions.push(`entity = ?`);
-        params.push(String(entityVal));
+        // Serialize entity properly (handles symbols)
+        let entityStr: string;
+        if (typeof entityVal === "symbol") {
+          const desc = entityVal.description ?? String(entityVal).slice(7, -1);
+          entityStr = `__SYMBOL__${desc}`;
+        } else {
+          entityStr = String(entityVal);
+        }
+        params.push(entityStr);
       }
       if (!this.isVariable(attributeVal)) {
         conditions.push(`attribute = ?`);
@@ -603,7 +639,8 @@ export class SQLiteDatomDatabase extends DatomDatabase {
           value = "__UNDEFINED__";
         }
         if (typeof value === "symbol") {
-          value = `__SYMBOL__${String(value)}`;
+          const desc = value.description ?? String(value).slice(7, -1);
+          value = `__SYMBOL__${desc}`;
         }
         conditions.push(`value = ?`);
         params.push(JSON.stringify(value));
@@ -931,8 +968,11 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   }
 
   protected async executeTransaction<T>(
-    callback: (tx: Transaction) => Promise<T>
+    callback: (tx: Transaction) => Promise<T>,
+    isolationLevel?: import("../types.js").TransactionIsolationLevel
   ): Promise<T> {
+    // Note: SQLite isolation level support would require PRAGMA isolation_level
+    // For now, we use the database default (SERIALIZABLE in SQLite)
     await this.ensureInitialized();
 
     if (
@@ -1009,9 +1049,18 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         value = "__UNDEFINED__";
       }
       if (typeof value === "symbol") {
-        value = `__SYMBOL__${String(value)}`;
+        const desc = value.description ?? String(value).slice(7, -1);
+        value = `__SYMBOL__${desc}`;
       }
-      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, true];
+      // Serialize entity properly (handles symbols)
+      let entityStr: string;
+      if (typeof d[0] === "symbol") {
+        const desc = d[0].description ?? String(d[0]).slice(7, -1);
+        entityStr = `__SYMBOL__${desc}`;
+      } else {
+        entityStr = String(d[0]);
+      }
+      return [entityStr, String(d[1]), JSON.stringify(value), tx, true];
     });
 
     await this.connection.execute(sql, params);
@@ -1036,9 +1085,18 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         value = "__UNDEFINED__";
       }
       if (typeof value === "symbol") {
-        value = `__SYMBOL__${String(value)}`;
+        const desc = value.description ?? String(value).slice(7, -1);
+        value = `__SYMBOL__${desc}`;
       }
-      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, false];
+      // Serialize entity properly (handles symbols)
+      let entityStr: string;
+      if (typeof d[0] === "symbol") {
+        const desc = d[0].description ?? String(d[0]).slice(7, -1);
+        entityStr = `__SYMBOL__${desc}`;
+      } else {
+        entityStr = String(d[0]);
+      }
+      return [entityStr, String(d[1]), JSON.stringify(value), tx, false];
     });
 
     await this.connection.execute(sql, params);
@@ -1166,7 +1224,12 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   }
 
   protected async getDetailedStats(): Promise<
-    Partial<Pick<import("../types.js").DatabaseStats, "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics">>
+    Partial<
+      Pick<
+        import("../types.js").DatabaseStats,
+        "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics"
+      >
+    >
   > {
     const stats: any = {};
 
@@ -1453,10 +1516,19 @@ class SQLiteTransaction implements Transaction {
           value = "__UNDEFINED__";
         }
         if (typeof value === "symbol") {
-          value = `__SYMBOL__${String(value)}`;
+          const desc = value.description ?? String(value).slice(7, -1);
+          value = `__SYMBOL__${desc}`;
+        }
+        // Serialize entity properly (handles symbols)
+        let entityStr: string;
+        if (typeof d.entity === "symbol") {
+          const desc = d.entity.description ?? String(d.entity).slice(7, -1);
+          entityStr = `__SYMBOL__${desc}`;
+        } else {
+          entityStr = String(d.entity);
         }
         return [
-          String(d.entity),
+          entityStr,
           String(d.attribute),
           JSON.stringify(value),
           this.txId,
@@ -1482,10 +1554,19 @@ class SQLiteTransaction implements Transaction {
           value = "__UNDEFINED__";
         }
         if (typeof value === "symbol") {
-          value = `__SYMBOL__${String(value)}`;
+          const desc = value.description ?? String(value).slice(7, -1);
+          value = `__SYMBOL__${desc}`;
+        }
+        // Serialize entity properly (handles symbols)
+        let entityStr: string;
+        if (typeof d.entity === "symbol") {
+          const desc = d.entity.description ?? String(d.entity).slice(7, -1);
+          entityStr = `__SYMBOL__${desc}`;
+        } else {
+          entityStr = String(d.entity);
         }
         return [
-          String(d.entity),
+          entityStr,
           String(d.attribute),
           JSON.stringify(value),
           this.txId,

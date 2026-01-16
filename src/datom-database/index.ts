@@ -6,16 +6,25 @@
 export type {
   Attribute,
   AttributeDefinition,
+  BatchQueryKey,
   ConnectionPoolConfig,
   ConnectionPoolStats,
   Datom,
   DatomInput,
+  DatabaseHealth,
+  DatabaseHealthStatus,
   EntityId,
+  Logger,
+  Migration,
+  MigrationDatabase,
+  MigrationState,
   OptimisticLockOptions,
   QueryExplainResult,
   QueryOptions,
   SchemaExport,
   TransactionId,
+  TransactionIsolationLevel,
+  TransactionOptions,
   Value,
 } from "../types.js";
 
@@ -38,13 +47,20 @@ export {
 // Transaction type
 export type { Transaction } from "./datom-database.js";
 
+// Migration registry
+export { MigrationRegistry } from "./migrations/migration-registry.js";
+
 // Error classes
 export {
   CardinalityError,
+  ConnectionPoolExhaustedError,
   DatomDatabaseError,
   DatomTypeError,
   MigrationError,
+  MigrationRollbackError,
+  QueryResultSizeError,
   QuerySafetyError,
+  QueryTimeoutError,
   TransactionConflictError,
   UniqueConstraintError,
 } from "./errors.js";

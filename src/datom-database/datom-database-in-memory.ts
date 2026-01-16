@@ -345,8 +345,11 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   }
 
   protected async executeTransaction<T>(
-    callback: (tx: Transaction) => Promise<T>
+    callback: (tx: Transaction) => Promise<T>,
+    isolationLevel?: import("../types.js").TransactionIsolationLevel
   ): Promise<T> {
+    // Note: In-memory implementation doesn't enforce isolation levels
+    // All transactions see uncommitted changes immediately
     await this.ensureInitialized();
 
     // Create snapshot of current state

@@ -182,7 +182,16 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      // Serialize entity properly (handles symbols)
+      let entityStr: string;
+      if (typeof options.entity === "symbol") {
+        const desc =
+          options.entity.description ?? String(options.entity).slice(7, -1);
+        entityStr = `__SYMBOL__${desc}`;
+      } else {
+        entityStr = String(options.entity);
+      }
+      params.push(entityStr);
     }
     if (options.attribute !== undefined) {
       conditions.push("attribute = ?");
@@ -194,7 +203,8 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         value = "__UNDEFINED__";
       }
       if (typeof value === "symbol") {
-        value = `__SYMBOL__${String(value)}`;
+        const desc = value.description ?? String(value).slice(7, -1);
+        value = `__SYMBOL__${desc}`;
       }
       conditions.push("value = ?::jsonb");
       params.push(JSON.stringify(value));
@@ -268,7 +278,10 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       return rows.map((row: any) => {
         let entity: any = row.entity;
         if (typeof entity === "string") {
-          if (/^-?\d+$/.test(entity)) {
+          if (entity.startsWith("__SYMBOL__")) {
+            const symbolDesc = entity.substring("__SYMBOL__".length);
+            entity = Symbol(symbolDesc);
+          } else if (/^-?\d+$/.test(entity)) {
             entity = parseInt(entity, 10);
           }
         }
@@ -389,7 +402,10 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return rows.map((row: any) => {
       let entity: any = row.entity;
       if (typeof entity === "string") {
-        if (/^-?\d+$/.test(entity)) {
+        if (entity.startsWith("__SYMBOL__")) {
+          const symbolDesc = entity.substring("__SYMBOL__".length);
+          entity = Symbol(symbolDesc);
+        } else if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
       }
@@ -424,7 +440,16 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     }
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      // Serialize entity properly (handles symbols)
+      let entityStr: string;
+      if (typeof options.entity === "symbol") {
+        const desc =
+          options.entity.description ?? String(options.entity).slice(7, -1);
+        entityStr = `__SYMBOL__${desc}`;
+      } else {
+        entityStr = String(options.entity);
+      }
+      params.push(entityStr);
     }
     if (options.attribute !== undefined) {
       conditions.push("attribute = ?");
@@ -436,7 +461,8 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         value = "__UNDEFINED__";
       }
       if (typeof value === "symbol") {
-        value = `__SYMBOL__${String(value)}`;
+        const desc = value.description ?? String(value).slice(7, -1);
+        value = `__SYMBOL__${desc}`;
       }
       conditions.push("value = ?::jsonb");
       params.push(JSON.stringify(value));
@@ -637,8 +663,11 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   }
 
   protected async executeTransaction<T>(
-    callback: (tx: Transaction) => Promise<T>
+    callback: (tx: Transaction) => Promise<T>,
+    isolationLevel?: import("../types.js").TransactionIsolationLevel
   ): Promise<T> {
+    // Note: PostgreSQL isolation level support would require SET TRANSACTION ISOLATION LEVEL
+    // For now, we use the database default (READ COMMITTED)
     await this.ensureInitialized();
 
     if (
@@ -724,9 +753,18 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         value = "__UNDEFINED__";
       }
       if (typeof value === "symbol") {
-        value = `__SYMBOL__${String(value)}`;
+        const desc = value.description ?? String(value).slice(7, -1);
+        value = `__SYMBOL__${desc}`;
       }
-      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, true];
+      // Serialize entity properly (handles symbols)
+      let entityStr: string;
+      if (typeof d[0] === "symbol") {
+        const desc = d[0].description ?? String(d[0]).slice(7, -1);
+        entityStr = `__SYMBOL__${desc}`;
+      } else {
+        entityStr = String(d[0]);
+      }
+      return [entityStr, String(d[1]), JSON.stringify(value), tx, true];
     });
 
     await this.connection.execute(sql, params);
@@ -751,9 +789,18 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         value = "__UNDEFINED__";
       }
       if (typeof value === "symbol") {
-        value = `__SYMBOL__${String(value)}`;
+        const desc = value.description ?? String(value).slice(7, -1);
+        value = `__SYMBOL__${desc}`;
       }
-      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, false];
+      // Serialize entity properly (handles symbols)
+      let entityStr: string;
+      if (typeof d[0] === "symbol") {
+        const desc = d[0].description ?? String(d[0]).slice(7, -1);
+        entityStr = `__SYMBOL__${desc}`;
+      } else {
+        entityStr = String(d[0]);
+      }
+      return [entityStr, String(d[1]), JSON.stringify(value), tx, false];
     });
 
     await this.connection.execute(sql, params);
@@ -881,7 +928,12 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   }
 
   protected async getDetailedStats(): Promise<
-    Partial<Pick<import("../types.js").DatabaseStats, "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics">>
+    Partial<
+      Pick<
+        import("../types.js").DatabaseStats,
+        "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics"
+      >
+    >
   > {
     const stats: any = {};
 
@@ -900,7 +952,10 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     `;
     const countResult = await this.connection.query(countSql);
     const countValue = countResult[0]?.count ?? 0;
-    stats.totalDatoms = typeof countValue === "string" ? parseInt(countValue, 10) : Number(countValue);
+    stats.totalDatoms =
+      typeof countValue === "string"
+        ? parseInt(countValue, 10)
+        : Number(countValue);
 
     // Count unique entities
     const entitySql = `
@@ -910,7 +965,10 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     `;
     const entityResult = await this.connection.query(entitySql);
     const entityCountValue = entityResult[0]?.count ?? 0;
-    stats.totalEntities = typeof entityCountValue === "string" ? parseInt(entityCountValue, 10) : Number(entityCountValue);
+    stats.totalEntities =
+      typeof entityCountValue === "string"
+        ? parseInt(entityCountValue, 10)
+        : Number(entityCountValue);
 
     // Add query metrics if available
     if (this.queryCount > 0) {
@@ -1188,10 +1246,19 @@ class PostgreSQLTransaction implements Transaction {
           value = "__UNDEFINED__";
         }
         if (typeof value === "symbol") {
-          value = `__SYMBOL__${String(value)}`;
+          const desc = value.description ?? String(value).slice(7, -1);
+          value = `__SYMBOL__${desc}`;
+        }
+        // Serialize entity properly (handles symbols)
+        let entityStr: string;
+        if (typeof d.entity === "symbol") {
+          const desc = d.entity.description ?? String(d.entity).slice(7, -1);
+          entityStr = `__SYMBOL__${desc}`;
+        } else {
+          entityStr = String(d.entity);
         }
         return [
-          String(d.entity),
+          entityStr,
           String(d.attribute),
           JSON.stringify(value),
           this.txId,
@@ -1217,10 +1284,19 @@ class PostgreSQLTransaction implements Transaction {
           value = "__UNDEFINED__";
         }
         if (typeof value === "symbol") {
-          value = `__SYMBOL__${String(value)}`;
+          const desc = value.description ?? String(value).slice(7, -1);
+          value = `__SYMBOL__${desc}`;
+        }
+        // Serialize entity properly (handles symbols)
+        let entityStr: string;
+        if (typeof d.entity === "symbol") {
+          const desc = d.entity.description ?? String(d.entity).slice(7, -1);
+          entityStr = `__SYMBOL__${desc}`;
+        } else {
+          entityStr = String(d.entity);
         }
         return [
-          String(d.entity),
+          entityStr,
           String(d.attribute),
           JSON.stringify(value),
           this.txId,

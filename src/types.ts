@@ -113,6 +113,10 @@ export interface QueryOptions {
   history?: boolean;
   /** Hint for which index to use (backend-specific, may be ignored) */
   indexHint?: string | string[];
+  /** Maximum query execution time in milliseconds */
+  timeoutMs?: number;
+  /** Maximum number of results allowed (throws QueryResultSizeError if exceeded) */
+  maxResultSize?: number;
 }
 
 /**
@@ -244,6 +248,16 @@ export type DatabaseEventListener = (
 ) => void | Promise<void>;
 
 /**
+ * Transaction isolation levels following SQL standard
+ * Controls how concurrent transactions interact with each other
+ */
+export type TransactionIsolationLevel =
+  | "READ_UNCOMMITTED" // Lowest isolation, allows dirty reads
+  | "READ_COMMITTED" // Default: prevents dirty reads, allows non-repeatable reads
+  | "REPEATABLE_READ" // Prevents non-repeatable reads, allows phantom reads
+  | "SERIALIZABLE"; // Highest isolation, prevents all anomalies
+
+/**
  * Options for optimistic locking
  */
 export interface OptimisticLockOptions {
@@ -256,6 +270,17 @@ export interface OptimisticLockOptions {
     /** Delay between retries in milliseconds */
     delayMs?: number;
   };
+}
+
+/**
+ * Options for transaction execution
+ * Extends optimistic locking options with additional transaction controls
+ */
+export interface TransactionOptions extends OptimisticLockOptions {
+  /** Transaction isolation level (default: READ_COMMITTED) */
+  isolationLevel?: TransactionIsolationLevel;
+  /** Per-transaction timeout in milliseconds */
+  timeoutMs?: number;
 }
 
 /**
@@ -322,3 +347,115 @@ export interface SchemaExport {
   /** Array of attribute definitions */
   attributes: AttributeDefinition[];
 }
+
+/**
+ * Database health status
+ * Used for monitoring and operational health checks
+ */
+export type DatabaseHealthStatus = "healthy" | "degraded" | "unhealthy";
+
+/**
+ * Database health check result
+ * Provides detailed information about database operational status
+ */
+export interface DatabaseHealth {
+  /** Overall health status */
+  status: DatabaseHealthStatus;
+  /** Timestamp when health check was performed */
+  timestamp: string;
+  /** Connection pool health (if applicable) */
+  connectionPool?: {
+    healthy: boolean;
+    activeConnections: number;
+    idleConnections: number;
+    waitingRequests: number;
+    details?: string;
+  };
+  /** Query performance health */
+  queryPerformance?: {
+    healthy: boolean;
+    averageQueryTime?: number;
+    slowQueries?: number;
+    details?: string;
+  };
+  /** Transaction health */
+  transactionHealth?: {
+    healthy: boolean;
+    averageTransactionTime?: number;
+    failedTransactions?: number;
+    details?: string;
+  };
+  /** Additional health details */
+  details?: string;
+  /** Health check errors or warnings */
+  errors?: string[];
+  warnings?: string[];
+}
+
+/**
+ * Minimal database interface for migrations
+ * Provides the operations that migrations typically need
+ */
+export interface MigrationDatabase {
+  /** Define an attribute schema */
+  defineAttribute(definition: AttributeDefinition): Promise<void>;
+  /** Remove an attribute definition */
+  removeAttribute(name: string): Promise<void>;
+  /** Modify an existing attribute definition */
+  modifyAttribute(
+    name: string,
+    updates: Partial<Omit<AttributeDefinition, "name">>
+  ): Promise<void>;
+  /** Get the current schema version */
+  getSchemaVersion(): Promise<number>;
+  /** Migrate to a specific schema version */
+  migrate(targetVersion: number): Promise<void>;
+}
+
+/**
+ * Migration interface for up/down migrations
+ * Migrations are versioned and can be rolled back
+ */
+export interface Migration {
+  /** Migration version number (must be unique and sequential) */
+  version: number;
+  /** Migration name/description */
+  name: string;
+  /** Up migration: applies the migration */
+  up(db: MigrationDatabase): Promise<void>;
+  /** Down migration: rolls back the migration */
+  down(db: MigrationDatabase): Promise<void>;
+}
+
+/**
+ * Migration state stored in database
+ */
+export interface MigrationState {
+  /** Migration version */
+  version: number;
+  /** Migration name */
+  name: string;
+  /** When migration was applied */
+  appliedAt: string;
+  /** Whether migration was rolled back */
+  rolledBack: boolean;
+  /** When migration was rolled back (if applicable) */
+  rolledBackAt?: string;
+}
+
+/**
+ * Logger interface for structured logging
+ * Compatible with common logging libraries (Pino, Winston, etc.)
+ */
+export interface Logger {
+  debug(message: string, meta?: Record<string, unknown>): void;
+  info(message: string, meta?: Record<string, unknown>): void;
+  warn(message: string, meta?: Record<string, unknown>): void;
+  error(message: string, meta?: Record<string, unknown>): void;
+}
+
+/**
+ * Batch query key for type-safe entity-attribute pair access
+ * Used internally for batch query result mapping
+ */
+export type BatchQueryKey = string;

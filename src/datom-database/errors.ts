@@ -171,3 +171,99 @@ export class MigrationError extends DatomDatabaseError {
     Object.setPrototypeOf(this, MigrationError.prototype);
   }
 }
+
+/**
+ * Error thrown when a query exceeds its timeout
+ * @example
+ * try {
+ *   await db.query({ entity: 1, timeoutMs: 100 });
+ * } catch (error) {
+ *   if (error instanceof QueryTimeoutError) {
+ *     // Query took too long
+ *   }
+ * }
+ */
+export class QueryTimeoutError extends DatomDatabaseError {
+  constructor(
+    public readonly timeoutMs: number,
+    public readonly queryOptions?: unknown
+  ) {
+    super(`Query exceeded timeout of ${timeoutMs}ms`, "QUERY_TIMEOUT");
+    this.name = "QueryTimeoutError";
+    Object.setPrototypeOf(this, QueryTimeoutError.prototype);
+  }
+}
+
+/**
+ * Error thrown when a query result exceeds the maximum allowed size
+ * @example
+ * try {
+ *   await db.query({ attribute: "tag", maxResultSize: 1000 });
+ * } catch (error) {
+ *   if (error instanceof QueryResultSizeError) {
+ *     // Result set too large
+ *   }
+ * }
+ */
+export class QueryResultSizeError extends DatomDatabaseError {
+  constructor(
+    public readonly resultSize: number,
+    public readonly maxResultSize: number,
+    public readonly queryOptions?: unknown
+  ) {
+    super(
+      `Query result size ${resultSize} exceeds maximum allowed size ${maxResultSize}`,
+      "QUERY_RESULT_SIZE_EXCEEDED"
+    );
+    this.name = "QueryResultSizeError";
+    Object.setPrototypeOf(this, QueryResultSizeError.prototype);
+  }
+}
+
+/**
+ * Error thrown when connection pool is exhausted
+ * @example
+ * try {
+ *   await db.query({ entity: 1 });
+ * } catch (error) {
+ *   if (error instanceof ConnectionPoolExhaustedError) {
+ *     // No connections available
+ *   }
+ * }
+ */
+export class ConnectionPoolExhaustedError extends DatomDatabaseError {
+  constructor(
+    public readonly waitingRequests: number,
+    public readonly maxConnections: number
+  ) {
+    super(
+      `Connection pool exhausted: ${waitingRequests} requests waiting, max connections: ${maxConnections}`,
+      "CONNECTION_POOL_EXHAUSTED"
+    );
+    this.name = "ConnectionPoolExhaustedError";
+    Object.setPrototypeOf(this, ConnectionPoolExhaustedError.prototype);
+  }
+}
+
+/**
+ * Error thrown when a migration rollback fails
+ * @example
+ * try {
+ *   await db.rollbackTo(1);
+ * } catch (error) {
+ *   if (error instanceof MigrationRollbackError) {
+ *     // Rollback failed
+ *   }
+ * }
+ */
+export class MigrationRollbackError extends DatomDatabaseError {
+  constructor(
+    message: string,
+    public readonly version?: number,
+    public readonly cause?: Error
+  ) {
+    super(message, "MIGRATION_ROLLBACK_ERROR");
+    this.name = "MigrationRollbackError";
+    Object.setPrototypeOf(this, MigrationRollbackError.prototype);
+  }
+}

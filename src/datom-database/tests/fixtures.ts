@@ -51,7 +51,10 @@ const createPostgresFixture = async (): Promise<Fixture> => {
       // @ts-expect-error - Accessing protected method for test cleanup
       await db.cleanUp();
     },
-    afterEach: async () => {},
+    afterEach: async () => {
+      // Ensure connection is properly closed/released after each test
+      await db.close();
+    },
   };
 };
 

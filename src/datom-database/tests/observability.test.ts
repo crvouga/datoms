@@ -316,4 +316,104 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       expect(stats.totalTransactions).toBe(tx2);
     });
   });
+
+  describe("Logging Integration", () => {
+    test("should log events when logger is set", async () => {
+      const { db } = f;
+      const logMessages: Array<{ level: string; message: string; meta?: unknown }> = [];
+
+      const logger = {
+        debug: (message: string, meta?: unknown) => {
+          logMessages.push({ level: "debug", message, meta });
+        },
+        info: (message: string, meta?: unknown) => {
+          logMessages.push({ level: "info", message, meta });
+        },
+        warn: (message: string, meta?: unknown) => {
+          logMessages.push({ level: "warn", message, meta });
+        },
+        error: (message: string, meta?: unknown) => {
+          logMessages.push({ level: "error", message, meta });
+        },
+      };
+
+      db.setLogger(logger);
+
+      await db.transact({ add: [[1, "name", "Alice"]] });
+      await db.query({ entity: 1 });
+
+      // Should have logged transaction and query events
+      expect(logMessages.length).toBeGreaterThan(0);
+      const transactionLog = logMessages.find(
+        (m) => m.message.includes("transaction")
+      );
+      expect(transactionLog).toBeDefined();
+      if (transactionLog) {
+        expect(transactionLog.level).toBe("info");
+        expect(transactionLog.meta).toBeDefined();
+      }
+    });
+
+    test("should log error events at error level", async () => {
+      const { db } = f;
+      const errorLogs: Array<{ level: string; message: string }> = [];
+
+      const logger = {
+        debug: () => {},
+        info: () => {},
+        warn: () => {},
+        error: (message: string) => {
+          errorLogs.push({ level: "error", message });
+        },
+      };
+
+      db.setLogger(logger);
+
+      try {
+        await db.query({}); // Should throw QuerySafetyError
+      } catch {
+        // Expected
+      }
+
+      // Should have logged error event
+      expect(errorLogs.length).toBeGreaterThan(0);
+      const errorLog = errorLogs.find((m) => m.message.includes("error"));
+      expect(errorLog).toBeDefined();
+      if (errorLog) {
+        expect(errorLog.level).toBe("error");
+      }
+    });
+
+    test("should log query events at debug level", async () => {
+      const { db } = f;
+      const debugLogs: Array<{ level: string; message: string }> = [];
+
+      const logger = {
+        debug: (message: string) => {
+          debugLogs.push({ level: "debug", message });
+        },
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+
+      db.setLogger(logger);
+      await db.add([[1, "name", "Alice"]]);
+      await db.query({ entity: 1 });
+
+      // Should have logged query event at debug level
+      const queryLog = debugLogs.find((m) => m.message.includes("query"));
+      expect(queryLog).toBeDefined();
+      if (queryLog) {
+        expect(queryLog.level).toBe("debug");
+      }
+    });
+
+    test("should work without logger", async () => {
+      const { db } = f;
+      // Should not throw when no logger is set
+      await db.transact({ add: [[1, "name", "Alice"]] });
+      await db.query({ entity: 1 });
+    });
+  });
 });

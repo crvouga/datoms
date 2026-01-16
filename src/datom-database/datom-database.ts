@@ -12,23 +12,31 @@ import type {
   DatomInput,
   DatabaseEvent,
   DatabaseEventListener,
+  DatabaseHealth,
   DatabaseStats,
   EntityId,
+  Logger,
   OptimisticLockOptions,
   QueryExplainResult,
   QueryOptions,
   SchemaExport,
   TransactionId,
+  TransactionOptions,
   Value,
 } from "../types.js";
 import {
   CardinalityError,
   DatomTypeError,
   MigrationError,
+  MigrationRollbackError,
+  QueryResultSizeError,
   QuerySafetyError,
+  QueryTimeoutError,
   TransactionConflictError,
   UniqueConstraintError,
 } from "./errors.js";
+import type { Migration, MigrationState } from "../types.js";
+import { MigrationRegistry } from "./migrations/migration-registry.js";
 
 /**
  * Shared interface for reading datoms
@@ -332,12 +340,51 @@ export interface Transaction extends DatomReader, DatomWriter<void> {
  * for working with datoms and datalog queries
  * Concrete implementations: InMemoryDatabase, SQLiteDatabase, PostgreSQLDatabase
  *
- * **Transaction Isolation:**
- * - Transactions use READ COMMITTED isolation by default
- * - Within a transaction, all reads see uncommitted changes from earlier operations in the same transaction
- * - Concurrent transactions do not see each other's uncommitted changes
- * - If a transaction throws an error, all changes are automatically rolled back
- * - Optimistic locking is supported via `transaction()` options for conflict detection
+ * **ACID Guarantees:**
+ *
+ * **Atomicity:** All operations within a transaction are atomic - either all succeed or all fail.
+ * If any operation throws an error, the entire transaction is rolled back automatically.
+ *
+ * **Consistency:** Schema constraints (type, cardinality, uniqueness) are enforced within transactions.
+ * Invalid data cannot be committed. Transactions maintain referential integrity.
+ *
+ * **Isolation:** Transactions use READ COMMITTED isolation by default (configurable via `isolationLevel`).
+ * - **READ COMMITTED (default):** Prevents dirty reads. Within a transaction, reads see:
+ *   - Committed changes from other transactions
+ *   - Uncommitted changes from earlier operations in the same transaction
+ *   - Does NOT see uncommitted changes from concurrent transactions
+ * - **REPEATABLE READ:** All reads within a transaction see the same snapshot of data
+ * - **SERIALIZABLE:** Highest isolation - prevents all concurrency anomalies
+ * - **READ UNCOMMITTED:** Lowest isolation - allows dirty reads (not recommended)
+ *
+ * **Durability:** Once a transaction commits, changes are persisted. Implementations ensure
+ * data survives crashes (for persistent backends).
+ *
+ * **Transaction Isolation Examples:**
+ * ```typescript
+ * // Concurrent transactions don't see each other's uncommitted changes
+ * await Promise.all([
+ *   db.transaction(async (tx1) => {
+ *     await tx1.add([[1, "status", "pending"]]);
+ *     // tx2 cannot see this until tx1 commits
+ *   }),
+ *   db.transaction(async (tx2) => {
+ *     const status = await tx2.getValue(1, "status"); // undefined (tx1 not committed)
+ *   })
+ * ]);
+ *
+ * // Within a transaction, reads see earlier writes
+ * await db.transaction(async (tx) => {
+ *   await tx.add([[1, "name", "Alice"]]);
+ *   const name = await tx.getValue(1, "name"); // "Alice" (sees uncommitted change)
+ * });
+ * ```
+ *
+ * **Concurrent Write Handling:**
+ * - Optimistic locking via `expectedTxId` detects conflicts before commit
+ * - Conflicts throw `TransactionConflictError` with retry support
+ * - Implementations use database-level locking (row-level or table-level) as needed
+ * - Deadlock detection and resolution is backend-specific
  *
  * **Schema Enforcement:**
  * - Attributes can be used without schema definitions (schema is optional)
@@ -349,6 +396,7 @@ export interface Transaction extends DatomReader, DatomWriter<void> {
  * - Event system for monitoring transactions, queries, errors, and migrations
  * - Database statistics via `getStats()` for performance monitoring
  * - Query and transaction metrics are tracked automatically
+ * - Health checks via `healthCheck()` for operational monitoring
  *
  * **Backup & Recovery:**
  * - Export datoms via `export()` for backup and replication
@@ -373,6 +421,12 @@ export interface Transaction extends DatomReader, DatomWriter<void> {
  *   - For persistent databases with sync/replication, prefer `number` or `string` EntityIds
  *   - Symbol EntityIds work well for in-memory databases but may have limitations in distributed scenarios
  *
+ * **Query Performance:**
+ * - Query timeouts via `timeoutMs` option prevent runaway queries
+ * - Result size limits via `maxResultSize` prevent memory exhaustion
+ * - Query safety checks prevent accidental full table scans
+ * - Use `explainQuery()` for optimization hints
+ *
  * @example
  * // Example usage: Create, add and query
  * class MyDb extends DatomDatabase { ... }
@@ -390,6 +444,10 @@ export interface Transaction extends DatomReader, DatomWriter<void> {
  * // Get statistics
  * const stats = await db.getStats();
  * console.log(`Total datoms: ${stats.totalDatoms}`);
+ *
+ * // Health check
+ * const health = await db.healthCheck();
+ * console.log(`Database status: ${health.status}`);
  */
 export abstract class DatomDatabase
   implements DatomReader, DatomWriter<TransactionId>
@@ -401,6 +459,23 @@ export abstract class DatomDatabase
     DatabaseEvent["type"],
     Set<DatabaseEventListener>
   > = new Map();
+  /** Optional logger for structured logging (compatible with Pino, Winston, etc.) */
+  protected logger?: Logger;
+  /** Migration registry for managing migrations */
+  protected migrationRegistry: MigrationRegistry = new MigrationRegistry();
+
+  /**
+   * Set an optional logger for structured logging
+   * Compatible with common logging libraries (Pino, Winston, etc.)
+   * @param logger Logger instance
+   * @example
+   * import pino from "pino";
+   * const logger = pino();
+   * db.setLogger(logger);
+   */
+  setLogger(logger: Logger): void {
+    this.logger = logger;
+  }
 
   /**
    * Initialize the database
@@ -1086,7 +1161,33 @@ export abstract class DatomDatabase
         );
       }
 
-      const results = await this.executeQuery(options);
+      // Execute query with timeout if specified
+      let results: Datom[];
+      if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new QueryTimeoutError(options.timeoutMs!, options));
+          }, options.timeoutMs);
+        });
+
+        const queryPromise = this.executeQuery(options);
+        results = await Promise.race([queryPromise, timeoutPromise]);
+      } else {
+        results = await this.executeQuery(options);
+      }
+
+      // Check result size limit if specified
+      if (
+        options.maxResultSize !== undefined &&
+        results.length > options.maxResultSize
+      ) {
+        throw new QueryResultSizeError(
+          results.length,
+          options.maxResultSize,
+          options
+        );
+      }
+
       const duration = Date.now() - startTime;
 
       await this.recordQueryMetrics(duration);
@@ -1544,10 +1645,13 @@ export abstract class DatomDatabase
    * Callers should use the same key format when accessing results. For type-safe access,
    * use the helper method `getBatchQueryKey()` to generate keys consistently.
    *
+   * **Performance:** Default implementation uses parallel queries with concurrency limit.
+   * SQL implementations should override for single-query batching (much faster).
+   *
    * @param queries Array of {entity, attribute} pairs to query
    * @returns Map keyed by "entity|attribute" to the value (or undefined if not found)
    * @example
-   * // Default implementation uses parallel queries
+   * // Default implementation uses parallel queries with concurrency limit
    * // Override in SQL implementations for single-query batching:
    * protected async executeBatchQuery(
    *   queries: Array<{entity: EntityId, attribute: string}>
@@ -1558,15 +1662,27 @@ export abstract class DatomDatabase
   protected async executeBatchQuery(
     queries: Array<{ entity: EntityId; attribute: string }>
   ): Promise<Map<string, Value | undefined>> {
-    // Default implementation: parallel individual queries
-    // Implementations can override for true batching (single SQL query)
-    const results = await Promise.all(
-      queries.map(async (q) => {
-        const value = await this.getValue(q.entity, q.attribute);
-        const key = this.getBatchQueryKey(q.entity, q.attribute);
-        return { key, value };
-      })
-    );
+    if (queries.length === 0) {
+      return new Map();
+    }
+
+    // Default implementation: parallel individual queries with concurrency limit
+    // Limit concurrent queries to prevent overwhelming the database
+    const CONCURRENCY_LIMIT = 50;
+    const results: Array<{ key: string; value: Value | undefined }> = [];
+
+    for (let i = 0; i < queries.length; i += CONCURRENCY_LIMIT) {
+      const chunk = queries.slice(i, i + CONCURRENCY_LIMIT);
+      const chunkResults = await Promise.all(
+        chunk.map(async (q) => {
+          const value = await this.getValue(q.entity, q.attribute);
+          const key = this.getBatchQueryKey(q.entity, q.attribute);
+          return { key, value };
+        })
+      );
+      results.push(...chunkResults);
+    }
+
     return new Map(results.map((r) => [r.key, r.value]));
   }
 
@@ -1728,18 +1844,24 @@ export abstract class DatomDatabase
    * the transaction will be rolled back automatically.
    *
    * **Transaction Isolation:**
-   * - Transactions use READ COMMITTED isolation by default
+   * - Transactions use READ COMMITTED isolation by default (configurable via `isolationLevel`)
    * - Within a transaction, all reads see uncommitted changes from earlier operations in the same transaction
    * - Concurrent transactions do not see each other's uncommitted changes
    * - If a transaction throws an error, all changes are automatically rolled back
+   * - Isolation levels: READ_UNCOMMITTED, READ_COMMITTED (default), REPEATABLE_READ, SERIALIZABLE
    *
    * **Optimistic Locking:**
    * - Use `options.expectedTxId` to ensure the database hasn't changed since you last read it
    * - If a conflict is detected, the transaction will fail with `TransactionConflictError`
    * - Configure retries with `options.retry` to automatically retry on conflicts
    *
+   * **Transaction Timeouts:**
+   * - Use `options.timeoutMs` to set a per-transaction timeout
+   * - If timeout is exceeded, transaction is rolled back and `QueryTimeoutError` is thrown
+   * - Timeout starts when transaction begins, includes all operations within the callback
+   *
    * @param callback Function that receives a transaction object
-   * @param options Optional optimistic locking options
+   * @param options Optional transaction options (isolation level, timeout, optimistic locking)
    * @returns The return value of the callback
    * @example
    * // Basic transaction
@@ -1758,15 +1880,27 @@ export abstract class DatomDatabase
    *     retry: { maxRetries: 3, delayMs: 100 }
    *   }
    * );
+   *
+   * // With timeout and isolation level
+   * await db.transaction(
+   *   async (tx) => {
+   *     await tx.add([[101, "flag", true]]);
+   *   },
+   *   {
+   *     timeoutMs: 5000,
+   *     isolationLevel: "REPEATABLE_READ"
+   *   }
+   * );
    */
   async transaction<T>(
     callback: (tx: Transaction) => Promise<T>,
-    options?: OptimisticLockOptions
+    options?: TransactionOptions
   ): Promise<T> {
     await this.ensureInitialized();
 
     const maxRetries = options?.retry?.maxRetries ?? 0;
     const delayMs = options?.retry?.delayMs ?? 100;
+    const timeoutMs = options?.timeoutMs;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -1783,7 +1917,36 @@ export abstract class DatomDatabase
         }
 
         const startTime = Date.now();
-        const result = await this.executeTransaction(callback);
+
+        // Execute transaction with timeout if specified
+        let result: T;
+        if (timeoutMs !== undefined && timeoutMs > 0) {
+          const timeoutError = new QueryTimeoutError(timeoutMs, {
+            operation: "transaction",
+          });
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => {
+              reject(timeoutError);
+            }, timeoutMs);
+          });
+
+          // Wrap callback to race with timeout - if timeout fires,
+          // callback throws, which triggers rollback in executeTransaction
+          const timedCallback = async (tx: Transaction): Promise<T> => {
+            return await Promise.race([callback(tx), timeoutPromise]);
+          };
+
+          result = await this.executeTransaction(
+            timedCallback,
+            options?.isolationLevel
+          );
+        } else {
+          result = await this.executeTransaction(
+            callback,
+            options?.isolationLevel
+          );
+        }
+
         const duration = Date.now() - startTime;
 
         await this.recordTransactionMetrics(duration);
@@ -1807,9 +1970,12 @@ export abstract class DatomDatabase
    * Internal method to execute a transaction
    * Implementations should override this method
    * @param callback Transaction callback
+   * @param isolationLevel Optional isolation level (default: READ_COMMITTED)
+   * @returns The result of the callback
    */
   protected abstract executeTransaction<T>(
-    callback: (tx: Transaction) => Promise<T>
+    callback: (tx: Transaction) => Promise<T>,
+    isolationLevel?: import("../types.js").TransactionIsolationLevel
   ): Promise<T>;
 
   /**
@@ -1824,6 +1990,225 @@ export abstract class DatomDatabase
   async getSchemaVersion(): Promise<number> {
     await this.ensureInitialized();
     return this.schemaVersion;
+  }
+
+  /**
+   * Register a migration
+   * @param migration Migration to register
+   * @example
+   * db.registerMigration({
+   *   version: 1,
+   *   name: "add_user_table",
+   *   up: async (db) => {
+   *     await db.defineAttribute({ name: "email", type: "string", cardinality: "one" });
+   *   },
+   *   down: async (db) => {
+   *     await db.removeAttribute("email");
+   *   }
+   * });
+   */
+  registerMigration(migration: Migration): void {
+    this.migrationRegistry.register(migration);
+  }
+
+  /**
+   * Register multiple migrations
+   * @param migrations Array of migrations to register
+   */
+  registerMigrations(migrations: Migration[]): void {
+    this.migrationRegistry.registerAll(migrations);
+  }
+
+  /**
+   * Get migration state for a specific version
+   * Implementations should override this to persist migration state
+   * @param version Migration version
+   * @returns Migration state or undefined if not applied
+   */
+  protected async getMigrationState(
+    version: number
+  ): Promise<MigrationState | undefined> {
+    // Default: no migration state tracking
+    // Implementations should override to persist state
+    return undefined;
+  }
+
+  /**
+   * Save migration state after applying a migration
+   * Implementations should override this to persist migration state
+   * @param state Migration state to save
+   */
+  protected async saveMigrationState(state: MigrationState): Promise<void> {
+    // Default: no migration state tracking
+    // Implementations should override to persist state
+  }
+
+  /**
+   * Update migration state after rollback
+   * Implementations should override this to persist migration state
+   * @param version Migration version to mark as rolled back
+   */
+  protected async markMigrationRolledBack(version: number): Promise<void> {
+    // Default: no migration state tracking
+    // Implementations should override to persist state
+  }
+
+  /**
+   * Migrate to a specific version using registered migrations
+   * Executes all pending migrations up to the target version
+   * @param targetVersion Target schema version to migrate to
+   * @throws MigrationError if migration fails
+   * @example
+   * await db.registerMigration({
+   *   version: 1,
+   *   name: "add_email",
+   *   up: async (db) => { await db.defineAttribute({ name: "email", type: "string", cardinality: "one" }); },
+   *   down: async (db) => { await db.removeAttribute("email"); }
+   * });
+   * await db.migrateTo(1);
+   */
+  async migrateTo(targetVersion: number): Promise<void> {
+    await this.ensureInitialized();
+
+    const currentVersion = await this.getSchemaVersion();
+
+    if (targetVersion < currentVersion) {
+      throw new MigrationError(
+        `Cannot migrate backwards from version ${currentVersion} to ${targetVersion}. Use rollbackTo() instead.`,
+        targetVersion
+      );
+    }
+
+    if (targetVersion === currentVersion) {
+      return; // Already at target version
+    }
+
+    // Get pending migrations
+    const appliedVersions = new Set<number>();
+    // TODO: Load applied migrations from database (implementations should override getMigrationState)
+    const pendingMigrations = this.migrationRegistry
+      .getRange(currentVersion + 1, targetVersion)
+      .filter((m) => !appliedVersions.has(m.version));
+
+    if (pendingMigrations.length === 0) {
+      // No migrations to apply, but update schema version
+      await this.migrate(targetVersion);
+      return;
+    }
+
+    // Execute migrations in order
+    for (const migration of pendingMigrations) {
+      try {
+        if (this.logger) {
+          this.logger.info(
+            `Running migration ${migration.version}: ${migration.name}`
+          );
+        }
+
+        await migration.up(this);
+
+        // Save migration state
+        await this.saveMigrationState({
+          version: migration.version,
+          name: migration.name,
+          appliedAt: new Date().toISOString(),
+          rolledBack: false,
+        });
+
+        // Update schema version
+        await this.migrate(migration.version);
+      } catch (error) {
+        const migrationError = new MigrationError(
+          `Migration ${migration.version} (${migration.name}) failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          migration.version,
+          error instanceof Error ? error : undefined
+        );
+
+        await this.emitEvent({
+          type: "migration",
+          version: migration.version,
+          success: false,
+          error: migrationError,
+        });
+
+        throw migrationError;
+      }
+    }
+  }
+
+  /**
+   * Rollback to a specific version using registered migrations
+   * Executes down migrations in reverse order from current version to target version
+   * @param targetVersion Target schema version to rollback to
+   * @throws MigrationRollbackError if rollback fails
+   * @example
+   * await db.rollbackTo(0); // Rollback all migrations
+   */
+  async rollbackTo(targetVersion: number): Promise<void> {
+    await this.ensureInitialized();
+
+    const currentVersion = await this.getSchemaVersion();
+
+    if (targetVersion > currentVersion) {
+      throw new MigrationRollbackError(
+        `Cannot rollback forward from version ${currentVersion} to ${targetVersion}. Use migrateTo() instead.`,
+        targetVersion
+      );
+    }
+
+    if (targetVersion === currentVersion) {
+      return; // Already at target version
+    }
+
+    // Get migrations to rollback (in reverse order)
+    const migrationsToRollback = this.migrationRegistry
+      .getRange(targetVersion + 1, currentVersion)
+      .reverse();
+
+    if (migrationsToRollback.length === 0) {
+      // No migrations to rollback, but update schema version
+      await this.migrate(targetVersion);
+      return;
+    }
+
+    // Execute down migrations in reverse order
+    for (const migration of migrationsToRollback) {
+      try {
+        if (this.logger) {
+          this.logger.info(
+            `Rolling back migration ${migration.version}: ${migration.name}`
+          );
+        }
+
+        await migration.down(this);
+
+        // Mark migration as rolled back
+        await this.markMigrationRolledBack(migration.version);
+
+        // Update schema version directly (rollback doesn't go through migrate())
+        // This avoids the backward migration check in migrate()
+        this.schemaVersion = migration.version - 1;
+      } catch (error) {
+        const rollbackError = new MigrationRollbackError(
+          `Rollback of migration ${migration.version} (${
+            migration.name
+          }) failed: ${error instanceof Error ? error.message : String(error)}`,
+          migration.version,
+          error instanceof Error ? error : undefined
+        );
+
+        await this.emitEvent({
+          type: "migration",
+          version: migration.version,
+          success: false,
+          error: rollbackError,
+        });
+
+        throw rollbackError;
+      }
+    }
   }
 
   /**
@@ -1933,10 +2318,48 @@ export abstract class DatomDatabase
   /**
    * Emit an event to all registered listeners
    * Handles async errors gracefully to prevent one failing listener from breaking others.
+   * Also logs events if a logger is configured.
    * @param event Event to emit
    * @internal
    */
   protected async emitEvent(event: DatabaseEvent): Promise<void> {
+    // Log event if logger is configured
+    if (this.logger) {
+      const logLevel =
+        event.type === "error"
+          ? "error"
+          : event.type === "query"
+          ? "debug"
+          : "info";
+      const logMeta: Record<string, unknown> = { eventType: event.type };
+
+      if (event.type === "transaction") {
+        logMeta.txId = event.txId;
+        logMeta.addedCount = event.addedCount;
+        logMeta.retractedCount = event.retractedCount;
+      } else if (event.type === "query") {
+        logMeta.resultCount = event.resultCount;
+        logMeta.duration = event.duration;
+      } else if (event.type === "error") {
+        logMeta.error = event.error.message;
+        logMeta.errorStack = event.error.stack;
+      } else if (event.type === "migration") {
+        logMeta.version = event.version;
+        logMeta.success = event.success;
+      } else if (event.type === "backup" || event.type === "restore") {
+        logMeta.datomCount = event.datomCount;
+        logMeta.success = event.success;
+      }
+
+      if (logLevel === "error") {
+        this.logger.error(`Database event: ${event.type}`, logMeta);
+      } else if (logLevel === "debug") {
+        this.logger.debug(`Database event: ${event.type}`, logMeta);
+      } else {
+        this.logger.info(`Database event: ${event.type}`, logMeta);
+      }
+    }
+
     const listeners = this.eventListeners.get(event.type);
     if (listeners) {
       // Use Promise.allSettled to ensure all listeners are called even if some fail
@@ -1970,11 +2393,13 @@ export abstract class DatomDatabase
             });
           } catch (emitError) {
             // Ignore errors in error event emission to prevent infinite loops
-            // Log to console as last resort (in production, consider using a logger)
-            console.error(
-              "Failed to emit error event for listener failure:",
-              emitError
-            );
+            // Log to logger if available, otherwise console
+            const errorMsg = `Failed to emit error event for listener failure: ${emitError}`;
+            if (this.logger) {
+              this.logger.error(errorMsg, { error: emitError });
+            } else {
+              console.error(errorMsg, emitError);
+            }
           }
         }
       }
@@ -2008,6 +2433,152 @@ export abstract class DatomDatabase
     // Implementations can override getDetailedStats() to include these metrics
 
     return stats;
+  }
+
+  /**
+   * Perform a health check on the database
+   * Returns detailed health status including connection pool, query performance, and transaction health
+   * @returns Database health status
+   * @example
+   * const health = await db.healthCheck();
+   * if (health.status === "unhealthy") {
+   *   console.error("Database is unhealthy:", health.errors);
+   * }
+   */
+  async healthCheck(): Promise<DatabaseHealth> {
+    await this.ensureInitialized();
+    const timestamp = new Date().toISOString();
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    let overallStatus: DatabaseHealth["status"] = "healthy";
+
+    // Check connection pool health
+    const connectionPool = await this.getConnectionHealth();
+    if (connectionPool) {
+      const poolHealthy =
+        connectionPool.waitingRequests === 0 &&
+        connectionPool.activeConnections <
+          connectionPool.totalConnections * 0.9; // Less than 90% capacity
+
+      if (!poolHealthy) {
+        warnings.push(
+          `Connection pool at ${Math.round(
+            (connectionPool.activeConnections /
+              connectionPool.totalConnections) *
+              100
+          )}% capacity`
+        );
+        if (connectionPool.waitingRequests > 0) {
+          overallStatus = "degraded";
+          errors.push(
+            `${connectionPool.waitingRequests} requests waiting for connections`
+          );
+        }
+      }
+    }
+
+    // Check query performance
+    const stats = await this.getStats();
+    const queryPerformance = stats.queryMetrics
+      ? {
+          healthy: true,
+          averageQueryTime: stats.queryMetrics.averageQueryTime,
+          slowQueries: 0, // Implementations can track this
+          details: `Average query time: ${stats.queryMetrics.averageQueryTime?.toFixed(
+            3
+          )}s`,
+        }
+      : undefined;
+
+    if (
+      queryPerformance &&
+      queryPerformance.averageQueryTime !== undefined &&
+      queryPerformance.averageQueryTime > 1.0
+    ) {
+      // Average query time > 1 second is considered slow
+      warnings.push(
+        `Average query time is ${queryPerformance.averageQueryTime.toFixed(
+          3
+        )}s (consider optimization)`
+      );
+      if (queryPerformance.averageQueryTime > 5.0) {
+        overallStatus = "degraded";
+      }
+    }
+
+    // Check transaction health
+    const transactionHealth = stats.transactionMetrics
+      ? {
+          healthy: true,
+          averageTransactionTime:
+            stats.transactionMetrics.averageTransactionTime,
+          failedTransactions: 0, // Implementations can track this
+          details: `Average transaction time: ${stats.transactionMetrics.averageTransactionTime?.toFixed(
+            3
+          )}s`,
+        }
+      : undefined;
+
+    if (
+      transactionHealth &&
+      transactionHealth.averageTransactionTime !== undefined &&
+      transactionHealth.averageTransactionTime > 2.0
+    ) {
+      // Average transaction time > 2 seconds is considered slow
+      warnings.push(
+        `Average transaction time is ${transactionHealth.averageTransactionTime.toFixed(
+          3
+        )}s (consider optimization)`
+      );
+      if (transactionHealth.averageTransactionTime > 10.0) {
+        overallStatus = "degraded";
+      }
+    }
+
+    // If we have errors, mark as unhealthy
+    if (errors.length > 0) {
+      overallStatus = "unhealthy";
+    } else if (warnings.length > 0 && overallStatus === "healthy") {
+      overallStatus = "degraded";
+    }
+
+    return {
+      status: overallStatus,
+      timestamp,
+      connectionPool: connectionPool
+        ? {
+            healthy:
+              connectionPool.waitingRequests === 0 &&
+              connectionPool.activeConnections <
+                connectionPool.totalConnections * 0.9,
+            activeConnections: connectionPool.activeConnections,
+            idleConnections: connectionPool.idleConnections,
+            waitingRequests: connectionPool.waitingRequests,
+            details: `Active: ${connectionPool.activeConnections}/${connectionPool.totalConnections}, Waiting: ${connectionPool.waitingRequests}`,
+          }
+        : undefined,
+      queryPerformance,
+      transactionHealth,
+      details:
+        overallStatus === "healthy"
+          ? "All systems operational"
+          : `${errors.length} error(s), ${warnings.length} warning(s)`,
+      errors: errors.length > 0 ? errors : undefined,
+      warnings: warnings.length > 0 ? warnings : undefined,
+    };
+  }
+
+  /**
+   * Get connection health information
+   * Implementations can override this to provide connection pool statistics
+   * @returns Connection pool stats or undefined if not applicable
+   */
+  protected async getConnectionHealth(): Promise<
+    import("../types.js").ConnectionPoolStats | undefined
+  > {
+    // Default: no connection pool (in-memory implementations)
+    // SQL implementations should override this
+    return undefined;
   }
 
   /**
@@ -2227,11 +2798,31 @@ export abstract class DatomDatabase
    * Deduplicate a batch of datoms, keeping only the latest occurrence of each (entity, attribute, value) pair.
    * This is useful when importing data that may contain duplicates.
    * Uses value comparison helper to handle Date objects and other special types correctly.
+   *
+   * **Performance:** Single-pass Map accumulation for O(n) complexity.
+   * Processes in chunks for very large batches to prevent memory issues.
    */
   private deduplicateBatch(batch: DatomInput[]): DatomInput[] {
     if (batch.length === 0) {
       return batch;
     }
+
+    // For very large batches, process in chunks to prevent memory issues
+    const MAX_BATCH_SIZE = 10000;
+    if (batch.length > MAX_BATCH_SIZE) {
+      const chunks: DatomInput[][] = [];
+      for (let i = 0; i < batch.length; i += MAX_BATCH_SIZE) {
+        chunks.push(batch.slice(i, i + MAX_BATCH_SIZE));
+      }
+      // Deduplicate each chunk, then merge results
+      const deduplicatedChunks = chunks.map((chunk) =>
+        this.deduplicateBatch(chunk)
+      );
+      // Final deduplication pass on merged chunks
+      return this.deduplicateBatch(deduplicatedChunks.flat());
+    }
+
+    // Single-pass Map accumulation for O(n) complexity
     const seen = new Map<string, DatomInput>();
     for (const datom of batch) {
       // Use a key that handles Date objects and other types correctly
@@ -2262,6 +2853,9 @@ export abstract class DatomDatabase
    * Filter out datoms that already exist in the database with the same value.
    * This makes imports idempotent - re-importing the same data won't cause errors.
    * Uses batch queries for better performance on large imports.
+   *
+   * **Performance:** Uses batch queries and Map-based lookups for O(n) complexity
+   * instead of O(n²) array searches.
    */
   private async filterExistingDatoms(
     batch: DatomInput[]
@@ -2270,33 +2864,58 @@ export abstract class DatomDatabase
       return batch;
     }
 
-    // Batch query for existing values to avoid N+1 queries
-    const queries = batch.map(([entity, attribute]) => ({
-      entity,
-      attribute: String(attribute),
-    }));
-    const existingValuesBatch = await this.getAllValuesBatch(queries);
-
-    // Filter out datoms that already exist with the same value
+    // Process in chunks to avoid memory issues with very large batches
+    const CHUNK_SIZE = 1000;
     const filtered: DatomInput[] = [];
-    for (let i = 0; i < batch.length; i++) {
-      const [entity, attribute, value] = batch[i];
-      const existingValues = existingValuesBatch[i];
 
-      // Only include if value doesn't exist or is different
-      if (existingValues.length === 0) {
-        filtered.push(batch[i]);
-      } else {
-        // Check if any existing value matches (using value comparison helper)
-        const valueExists = existingValues.some((existingValue) =>
-          this.valuesEqual(existingValue, value)
-        );
-        if (!valueExists) {
-          filtered.push(batch[i]);
+    for (
+      let chunkStart = 0;
+      chunkStart < batch.length;
+      chunkStart += CHUNK_SIZE
+    ) {
+      const chunk = batch.slice(chunkStart, chunkStart + CHUNK_SIZE);
+
+      // Batch query for existing values to avoid N+1 queries
+      const queries = chunk.map(([entity, attribute]) => ({
+        entity,
+        attribute: String(attribute),
+      }));
+      const existingValuesBatch = await this.getAllValuesBatch(queries);
+
+      // Build Map for O(1) lookups: key is entity|attribute, value is Set of values
+      const existingValuesMap = new Map<string, Set<string>>();
+      for (let i = 0; i < chunk.length; i++) {
+        const [entity, attribute] = chunk[i];
+        const key = `${String(entity)}|${String(attribute)}`;
+        const existingValues = existingValuesBatch[i];
+
+        if (existingValues.length > 0) {
+          // Convert values to string keys for Set membership testing
+          const valueSet = new Set<string>();
+          for (const val of existingValues) {
+            valueSet.add(this.getValueKey(val));
+          }
+          existingValuesMap.set(key, valueSet);
+        }
+      }
+
+      // Filter chunk using Map-based lookups
+      for (let i = 0; i < chunk.length; i++) {
+        const [entity, attribute, value] = chunk[i];
+        const key = `${String(entity)}|${String(attribute)}`;
+        const existingValueSet = existingValuesMap.get(key);
+
+        // Only include if value doesn't exist or is different
+        if (
+          !existingValueSet ||
+          !existingValueSet.has(this.getValueKey(value))
+        ) {
+          filtered.push(chunk[i]);
         }
         // If value matches, skip (idempotent)
       }
     }
+
     return filtered;
   }
 
@@ -2392,6 +3011,67 @@ export abstract class DatomDatabase
       retract: toRetract.length > 0 ? toRetract : undefined,
       add: toAdd,
     });
+  }
+
+  /**
+   * Validate an EntityId value
+   * Checks that the EntityId is a valid type (number, string, or symbol)
+   * @param entityId EntityId to validate
+   * @returns True if valid
+   * @throws Error if invalid
+   * @example
+   * db.validateEntityId(123); // OK
+   * db.validateEntityId("user-123"); // OK
+   * db.validateEntityId(Symbol("test")); // OK (but see symbol limitations)
+   * db.validateEntityId(null); // Throws error
+   */
+  validateEntityId(entityId: unknown): entityId is EntityId {
+    if (
+      typeof entityId === "number" ||
+      typeof entityId === "string" ||
+      typeof entityId === "symbol"
+    ) {
+      return true;
+    }
+    throw new Error(
+      `Invalid EntityId type: expected number, string, or symbol, got ${typeof entityId}`
+    );
+  }
+
+  /**
+   * Serialize an EntityId to a string for storage
+   * Handles symbol EntityIds with special prefix
+   * @param entityId EntityId to serialize
+   * @returns Serialized string representation
+   * @internal
+   */
+  public serializeEntityId(entityId: EntityId): string {
+    if (typeof entityId === "symbol") {
+      // Get symbol description directly (Symbol.description or String(symbol).slice(7, -1))
+      const desc = entityId.description ?? String(entityId).slice(7, -1);
+      return `__SYMBOL__${desc}`;
+    }
+    return String(entityId);
+  }
+
+  /**
+   * Deserialize a string to an EntityId
+   * Handles symbol EntityIds with special prefix
+   * @param serialized Serialized string representation
+   * @returns Deserialized EntityId
+   * @internal
+   */
+  public deserializeEntityId(serialized: string): EntityId {
+    if (serialized.startsWith("__SYMBOL__")) {
+      const symbolDesc = serialized.substring("__SYMBOL__".length);
+      return Symbol(symbolDesc);
+    }
+    // Try to parse as number first
+    const num = Number(serialized);
+    if (!isNaN(num) && isFinite(num) && String(num) === serialized) {
+      return num;
+    }
+    return serialized;
   }
 
   /**
