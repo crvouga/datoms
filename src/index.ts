@@ -1,7 +1,6 @@
 /**
  * Main entry point for the datoms library
+ * A datalog database with datoms abstraction
  */
 
-export function hello(name: string): string {
-  return `Hello, ${name}!`;
-}
+export * from "./database/index.js";
