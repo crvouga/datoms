@@ -21,7 +21,7 @@ import type { SqlDatabase } from "../sql-database/sql-database.js";
 
 /**
  * SQLite database implementation
- * Accepts a SqlConnection that implements SQLite-compatible SQL
+ * Accepts a SqlDatabase that implements SQLite-compatible SQL
  */
 export class SQLiteDatomDatabase extends DatomDatabase {
   private connection: SqlDatabase;

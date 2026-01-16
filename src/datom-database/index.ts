@@ -22,7 +22,7 @@ export { DatomDatabase } from "./datom-database.js";
 // Users should create their own SqlConnection implementations with their preferred SQL libraries
 
 // SQL connection adapter
-export type { SqlDatabase as SqlConnection } from "../sql-database/sql-database.js";
+export type { SqlDatabase } from "../sql-database/sql-database.js";
 
 // Datalog query types
 export {

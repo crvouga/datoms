@@ -21,7 +21,7 @@ import type { SqlDatabase } from "../sql-database/sql-database.js";
 
 /**
  * PostgreSQL database implementation
- * Accepts a SqlConnection that implements PostgreSQL-compatible SQL
+ * Accepts a SqlDatabase that implements PostgreSQL-compatible SQL
  */
 export class PostgreSQLDatomDatabase extends DatomDatabase {
   private connection: SqlDatabase;
