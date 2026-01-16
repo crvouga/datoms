@@ -182,19 +182,11 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return await this.getNextTransactionId();
   }
 
-  protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
+  public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
 
-    // Note: Validation is handled by the base class query() method
-    // This method is also called by queryInternal() which bypasses validation
     const conditions: string[] = [];
     const params: unknown[] = [];
-
-    // Apply time-travel filter: if asOf is specified, only consider datoms up to that transaction
-    if (options.asOf !== undefined) {
-      conditions.push("tx <= ?");
-      params.push(options.asOf);
-    }
 
     // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
     if (options.entity !== undefined) {
@@ -221,80 +213,100 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    // Check if this is a history query
-    const isHistoryQuery = options.history === true;
+    // Query without deduplication - return all matching datoms
+    const sql = `
+      SELECT 
+        entity,
+        attribute,
+        value,
+        tx,
+        added
+      FROM ${this.tableName}
+      ${whereClause}
+      ORDER BY tx ASC, entity ASC, attribute ASC
+    `;
 
-    // For history queries, return all datoms ordered by tx
-    if (isHistoryQuery) {
-      const limitClause = options.limit ? "LIMIT ?" : "";
-      const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const rows = await this.connection.query(sql, params);
 
-      const sql = `
-        SELECT entity, attribute, value, tx, added
-        FROM ${this.tableName}
-        ${whereClause}
-        ORDER BY tx ASC, entity ASC, attribute ASC
-        ${limitClause}
-        ${offsetClause}
-      `;
-
-      if (options.limit) {
-        params.push(options.limit);
-      }
-      if (options.offset !== undefined) {
-        params.push(options.offset);
-      }
-
-      const rows = await this.connection.query(sql, params);
-
-      const reviveValue = (value: unknown): unknown => {
-        if (typeof value === "string") {
-          if (value === "__UNDEFINED__") {
-            return undefined;
-          }
-          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
-            return new Date(value);
-          }
-        }
-        if (value === null) {
-          return null;
-        }
-        if (value === undefined) {
+    const reviveValue = (value: unknown): unknown => {
+      if (typeof value === "string") {
+        if (value === "__UNDEFINED__") {
           return undefined;
         }
-        if (Array.isArray(value)) {
-          return value.map(reviveValue);
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+          return new Date(value);
         }
-        if (typeof value === "object" && value !== null) {
-          const revived: Record<string, unknown> = {};
-          for (const key in value) {
-            revived[key] = reviveValue((value as Record<string, unknown>)[key]);
-          }
-          return revived;
+      }
+      if (value === null) {
+        return null;
+      }
+      if (value === undefined) {
+        return undefined;
+      }
+      if (Array.isArray(value)) {
+        return value.map(reviveValue);
+      }
+      if (typeof value === "object" && value !== null) {
+        const revived: Record<string, unknown> = {};
+        const valueObj = value as Record<string, unknown>;
+        for (const key in valueObj) {
+          revived[key] = reviveValue(valueObj[key]);
         }
-        return value;
+        return revived;
+      }
+      return value;
+    };
+
+    return rows.map((row: DatabaseRow) => {
+      let entity: EntityId = row.entity as EntityId;
+      if (typeof entity === "string") {
+        if (/^-?\d+$/.test(entity)) {
+          entity = parseInt(entity, 10);
+        }
+      }
+
+      const parsedValue: unknown =
+        typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+      const revivedValue = reviveValue(parsedValue) as Value;
+
+      return {
+        entity,
+        attribute: String(row.attribute),
+        value: revivedValue,
+        tx: Number(row.tx),
+        added: Boolean(row.added),
       };
+    });
+  }
 
-      return rows.map((row: DatabaseRow) => {
-        let entity: EntityId = row.entity as EntityId;
-        if (typeof entity === "string") {
-          if (/^-?\d+$/.test(entity)) {
-            entity = parseInt(entity, 10);
-          }
-        }
+  protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
+    await this.ensureInitialized();
 
-        const parsedValue: unknown =
-          typeof row.value === "string" ? JSON.parse(row.value) : row.value;
-        const revivedValue = reviveValue(parsedValue) as Value;
+    // Note: Validation is handled by the base class query() method
+    // This method is also called by queryInternal() which bypasses validation
+    const conditions: string[] = [];
+    const params: unknown[] = [];
 
-        return {
-          entity,
-          attribute: String(row.attribute),
-          value: revivedValue,
-          tx: Number(row.tx),
-          added: Boolean(row.added),
-        };
-      });
+    // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
+    if (options.entity !== undefined) {
+      conditions.push("entity = ?");
+      params.push(String(options.entity));
+    }
+    if (options.attribute !== undefined) {
+      conditions.push("attribute = ?");
+      params.push(String(options.attribute));
+    }
+    if (options.value !== undefined) {
+      let value = options.value;
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      conditions.push("value = ?::jsonb");
+      params.push(JSON.stringify(value));
+    }
+    if (options.tx !== undefined) {
+      conditions.push("tx = ?");
+      params.push(options.tx);
     }
 
     // Use DISTINCT ON to get latest datom per (entity, attribute, value) in SQL
@@ -303,22 +315,14 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // For both regular and time-travel queries, we need to include retractions in DISTINCT ON
-    // to correctly determine the latest state. We filter by added AFTER DISTINCT ON.
-    // This ensures that if a datom was added then retracted, the retraction wins.
+    // We need to include retractions in DISTINCT ON to correctly determine the latest state.
+    // We filter by added AFTER DISTINCT ON. This ensures that if a datom was added then retracted, the retraction wins.
     const combinedWhereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    // For time-travel queries (asOf), use DISTINCT ON (entity, attribute) to get latest value per attribute
-    // For regular queries, use DISTINCT ON (entity, attribute, value) to support multi-valued attributes
-    const distinctOnColumns =
-      options.asOf !== undefined
-        ? "entity, attribute"
-        : "entity, attribute, value";
-    const orderByColumns =
-      options.asOf !== undefined
-        ? "entity, attribute, tx DESC"
-        : "entity, attribute, value, tx DESC";
+    // Use DISTINCT ON (entity, attribute, value) to support multi-valued attributes
+    const distinctOnColumns = "entity, attribute, value";
+    const orderByColumns = "entity, attribute, value, tx DESC";
 
     // Build the added filter for after DISTINCT ON
     // Default behavior: filter to only added datoms (exclude retracted)
@@ -425,10 +429,6 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const conditions: string[] = [];
     const params: unknown[] = [];
 
-    if (options.asOf !== undefined) {
-      conditions.push("tx <= ?");
-      params.push(options.asOf);
-    }
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
       params.push(String(options.entity));
@@ -453,52 +453,33 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const isHistoryQuery = options.history === true;
-    let explainSql: string;
+    const distinctOnColumns = "entity, attribute, value";
+    const orderByColumns = "entity, attribute, value, tx DESC";
+    const addedFilterAfter =
+      options.added === true || options.added === undefined
+        ? "WHERE added = true"
+        : options.added === false
+        ? "WHERE added = false"
+        : "";
 
-    if (isHistoryQuery) {
-      explainSql = `
-        EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
-        SELECT entity, attribute, value, tx, added
+    const explainSql = `
+      EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+      WITH latest_datoms AS (
+        SELECT DISTINCT ON (${distinctOnColumns})
+          entity, attribute, value, tx, added
         FROM ${this.tableName}
         ${whereClause}
-        ORDER BY tx ASC, entity ASC, attribute ASC
-      `;
-    } else {
-      const distinctOnColumns =
-        options.asOf !== undefined
-          ? "entity, attribute"
-          : "entity, attribute, value";
-      const orderByColumns =
-        options.asOf !== undefined
-          ? "entity, attribute, tx DESC"
-          : "entity, attribute, value, tx DESC";
-      const addedFilterAfter =
-        options.added === true || options.added === undefined
-          ? "WHERE added = true"
-          : options.added === false
-          ? "WHERE added = false"
-          : "";
-
-      explainSql = `
-        EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
-        WITH latest_datoms AS (
-          SELECT DISTINCT ON (${distinctOnColumns})
-            entity, attribute, value, tx, added
-          FROM ${this.tableName}
-          ${whereClause}
-          ORDER BY ${orderByColumns}
-        )
-        SELECT 
-          entity,
-          attribute,
-          value,
-          tx,
-          added
-        FROM latest_datoms
-        ${addedFilterAfter}
-      `;
-    }
+        ORDER BY ${orderByColumns}
+      )
+      SELECT 
+        entity,
+        attribute,
+        value,
+        tx,
+        added
+      FROM latest_datoms
+      ${addedFilterAfter}
+    `;
 
     try {
       const explainRows = await this.connection.query(explainSql, params);
@@ -593,12 +574,12 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     // datalog semantics correctly.
 
     const firstClause = query.where[0];
-    const firstResults = await this.executeClause(firstClause, query.asOf);
+    const firstResults = await this.executeClause(firstClause);
 
     let results = firstResults;
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
-      const clauseResults = await this.executeClause(clause, query.asOf);
+      const clauseResults = await this.executeClause(clause);
       results = joinResults(
         results,
         clauseResults,
@@ -758,8 +739,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   }
 
   private async executeClause(
-    clause: QueryClause,
-    asOf?: TransactionId
+    clause: QueryClause
   ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
@@ -773,7 +753,6 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       ...(entity !== undefined && { entity }),
       ...(attribute !== undefined && { attribute }),
       ...(value !== undefined && { value }),
-      ...(asOf !== undefined && { asOf }),
     };
 
     const datoms = await this.queryInternal(queryOptions);
@@ -934,11 +913,6 @@ class PostgreSQLTransaction implements Transaction {
   }
 
   async datoms(options: QueryOptions): Promise<Datom[]> {
-    // For asOf queries, only query committed state (ignore pending changes)
-    if (options.asOf !== undefined) {
-      return this.db._queryInternalForTransaction(options);
-    }
-
     // Query committed data (bypass validation since transactions manage their own constraints)
     const committed = await this.db._queryInternalForTransaction(options);
 
@@ -1230,12 +1204,12 @@ class PostgreSQLTransaction implements Transaction {
     }
 
     const firstClause = query.where[0];
-    const firstResults = await this.executeClause(firstClause, query.asOf);
+    const firstResults = await this.executeClause(firstClause);
 
     let results = firstResults;
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
-      const clauseResults = await this.executeClause(clause, query.asOf);
+      const clauseResults = await this.executeClause(clause);
       results = joinResults(
         results,
         clauseResults,
@@ -1271,8 +1245,7 @@ class PostgreSQLTransaction implements Transaction {
   }
 
   private async executeClause(
-    clause: QueryClause,
-    asOf?: TransactionId
+    clause: QueryClause
   ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
@@ -1286,7 +1259,6 @@ class PostgreSQLTransaction implements Transaction {
       ...(entity !== undefined && { entity }),
       ...(attribute !== undefined && { attribute }),
       ...(value !== undefined && { value }),
-      ...(asOf !== undefined && { asOf }),
     };
 
     const datoms = await this.datoms(queryOptions);

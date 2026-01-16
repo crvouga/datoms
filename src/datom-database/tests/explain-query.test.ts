@@ -150,18 +150,18 @@ describe.each(FIXTURES)("explainQuery (%s)", (_name, createFixture) => {
     });
 
     test("should handle history queries", async () => {
+      // History queries now use views, so explainQuery works on regular queries
       const explanation = await f.db.explainQuery({
         attribute: "name",
-        history: true,
       });
       expect(explanation).toBeDefined();
       expect(explanation.scanType).toBeDefined();
     });
 
     test("should handle time-travel queries (asOf)", async () => {
+      // Time-travel queries now use views, so explainQuery works on regular queries
       const explanation = await f.db.explainQuery({
         entity: 1,
-        asOf: 1,
       });
       expect(explanation).toBeDefined();
       // Backends may optimize to index or index-only scans

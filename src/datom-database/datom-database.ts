@@ -7,14 +7,15 @@ import type { DatalogQuery, QueryResult } from "../datalog/datalog.js";
 import type {
   Attribute,
   AttributeDefinition,
-  Datom,
-  DatomInput,
   DatabaseEvent,
   DatabaseEventListener,
   DatabaseHealth,
   DatabaseStats,
+  Datom,
+  DatomInput,
   EntityId,
   Logger,
+  Migration, MigrationState,
   QueryExplainResult,
   QueryOptions,
   SchemaExport,
@@ -33,8 +34,8 @@ import {
   TransactionConflictError,
   UniqueConstraintError,
 } from "./errors.js";
-import type { Migration, MigrationState } from "../types.js";
 import { MigrationRegistry } from "./migrations/migration-registry.js";
+import { stripQuestionMark } from "./shared/datalog-helpers.js";
 
 /**
  * Shared interface for reading datoms
@@ -51,8 +52,9 @@ export interface DatomReader {
    * // Query with a filter and limit
    * const recent = await db.datoms({ attribute: "age", limit: 5 });
    *
-   * // Time-travel query: query database state at a specific transaction ID
-   * const atOldTx = await db.datoms({ asOf: 87, entity: 42 });
+   * // Time-travel query: use database views
+   * const dbPast = db.asOf(87);
+   * const atOldTx = await dbPast.datoms({ entity: 42 });
    */
   datoms(options: QueryOptions): Promise<Datom[]>;
 
@@ -175,6 +177,95 @@ export interface DatomReader {
    * console.log(`Estimated rows: ${explanation.estimatedRows}`);
    */
   explainQuery(options: QueryOptions): Promise<QueryExplainResult>;
+}
+
+/**
+ * Read-only database view for time-travel queries
+ * Provides a subset of DatomReader methods for querying historical or filtered database states
+ * Views are immutable and cannot modify the database
+ */
+export interface DatabaseView {
+  /**
+   * Query datoms from the database view using query options
+   * @param options Query options (must include at least one filter or limit to prevent full scans)
+   * @returns Array of matching datoms
+   * @example
+   * const dbPast = db.asOf(100);
+   * const datoms = await dbPast.datoms({ entity: 123 });
+   */
+  datoms(options: QueryOptions): Promise<Datom[]>;
+
+  /**
+   * Execute a datalog query against this database view
+   * @param query Datalog query to execute
+   * @returns Query results as an array of records
+   * @example
+   * const dbPast = db.asOf(100);
+   * const results = await dbPast.query({ find: ["?e"], where: [["?e", "name", "Alice"]] });
+   */
+  query(query: DatalogQuery): Promise<QueryResult>;
+
+  /**
+   * Get a single value for an entity-attribute pair
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @returns The value or undefined if not found
+   */
+  getValue(entity: EntityId, attribute: string): Promise<Value | undefined>;
+
+  /**
+   * Get the most recent value for an entity-attribute pair
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @returns The most recent value or undefined if not found
+   */
+  getLatestValue(
+    entity: EntityId,
+    attribute: string
+  ): Promise<Value | undefined>;
+
+  /**
+   * Get all values for an entity-attribute pair
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @returns Array of values
+   */
+  getValues(entity: EntityId, attribute: string): Promise<Value[]>;
+
+  /**
+   * Check if a fact exists
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @param value Value to check
+   * @returns True if the fact exists
+   */
+  hasFact(entity: EntityId, attribute: string, value: Value): Promise<boolean>;
+
+  /**
+   * Batch get values for multiple entity-attribute pairs
+   * @param queries Array of {entity, attribute} pairs to query
+   * @returns Array of values in the same order as queries (undefined if not found)
+   */
+  getValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<(Value | undefined)[]>;
+
+  /**
+   * Batch get all values for multiple entity-attribute pairs (for multi-valued attributes)
+   * @param queries Array of {entity, attribute} pairs to query
+   * @returns Array of value arrays in the same order as queries
+   */
+  getAllValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<Value[][]>;
+
+  /**
+   * Find all entities that have a specific attribute-value pair
+   * @param attribute Attribute name
+   * @param value Value to search for
+   * @returns Array of entity IDs that have this attribute-value pair
+   */
+  findEntities(attribute: string, value: Value): Promise<EntityId[]>;
 }
 
 /**
@@ -315,6 +406,312 @@ export interface Transaction extends DatomReader, DatomWriter<void> {
    * });
    */
   getTransactionId(): TransactionId;
+}
+
+/**
+ * Base class for database views that filter queries by transaction ID
+ * Provides common functionality for AsOf, History, and Since views
+ */
+abstract class BaseDatabaseView implements DatabaseView {
+  constructor(protected db: DatomDatabase) {}
+
+  abstract datoms(options: QueryOptions): Promise<Datom[]>;
+  
+  async query(query: DatalogQuery): Promise<QueryResult> {
+    // Views need to execute queries using their filtered datoms() method
+    // We'll execute the query manually using the view's datoms() method
+    return this.executeQueryWithView(query);
+  }
+
+  /**
+   * Execute a datalog query using the view's filtered datoms() method
+   * This ensures time-travel filters are applied correctly
+   */
+  private async executeQueryWithView(query: DatalogQuery): Promise<QueryResult> {
+    if (query.where.length === 0) {
+      return [];
+    }
+
+    // Import helpers dynamically to avoid circular dependencies
+    const { isVariable } = await import("./shared/datalog-helpers.js");
+    const { joinResults, project } = await import("./shared/query-helpers.js");
+
+    // Execute first clause using view's datoms() method
+    const firstClause = query.where[0];
+    const [entityVal, attributeVal, valueVal] = firstClause;
+    const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+    const attribute = isVariable(attributeVal)
+      ? undefined
+      : (attributeVal as string);
+    const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+    const firstDatoms = await this.datoms({
+      entity,
+      attribute,
+      value,
+    });
+
+    // Map datom fields to variable names from the clause
+    const firstResults = firstDatoms.map((datom) => {
+      const result: Record<string, Value | Attribute> = {};
+      if (isVariable(entityVal)) {
+        result[entityVal as string] = datom.entity;
+      }
+      if (isVariable(attributeVal)) {
+        result[attributeVal as string] = datom.attribute;
+      }
+      if (isVariable(valueVal)) {
+        result[valueVal as string] = datom.value;
+      }
+      return result;
+    });
+
+    // Join with remaining clauses
+    let results = firstResults;
+    for (let i = 1; i < query.where.length; i++) {
+      const clause = query.where[i];
+      const [entityVal, attributeVal, valueVal] = clause;
+      const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal)
+        ? undefined
+        : (attributeVal as string);
+      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+      const clauseDatoms = await this.datoms({
+        entity,
+        attribute,
+        value,
+      });
+
+      const clauseResults = clauseDatoms.map((datom) => {
+        const result: Record<string, Value | Attribute> = {};
+        if (isVariable(entityVal)) {
+          result[entityVal as string] = datom.entity;
+        }
+        if (isVariable(attributeVal)) {
+          result[attributeVal as string] = datom.attribute;
+        }
+        if (isVariable(valueVal)) {
+          result[valueVal as string] = datom.value;
+        }
+        return result;
+      });
+
+      results = joinResults(results, clauseResults, query.where.slice(0, i + 1));
+    }
+
+    // Project to find variables
+    const projected = project(results, query.find, query.where);
+
+    // Apply ordering if specified
+    if (query.orderBy) {
+      
+      projected.sort((a, b) => {
+        for (const [variable, direction] of query.orderBy!) {
+          const key = stripQuestionMark(variable);
+          const aVal = a[key];
+          const bVal = b[key];
+          if (aVal === undefined && bVal === undefined) return 0;
+          if (aVal === undefined || aVal === null) return direction === "asc" ? 1 : -1;
+          if (bVal === undefined || bVal === null) return direction === "asc" ? -1 : 1;
+          if (aVal < bVal) return direction === "asc" ? -1 : 1;
+          if (aVal > bVal) return direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    // Apply limit if specified
+    if (query.limit !== undefined) {
+      return projected.slice(0, query.limit);
+    }
+
+    return projected;
+  }
+
+  async getValue(entity: EntityId, attribute: string): Promise<Value | undefined> {
+    const datoms = await this.datoms({ entity, attribute });
+    if (datoms.length === 0) {
+      return undefined;
+    }
+    // Return the value with the highest tx (latest value for this attribute)
+    const sorted = datoms.sort((a, b) => b.tx - a.tx);
+    return sorted[0].value;
+  }
+
+  async getLatestValue(
+    entity: EntityId,
+    attribute: string
+  ): Promise<Value | undefined> {
+    return this.getValue(entity, attribute);
+  }
+
+  async getValues(entity: EntityId, attribute: string): Promise<Value[]> {
+    const datoms = await this.datoms({ entity, attribute });
+    return datoms.map((d) => d.value);
+  }
+
+  async hasFact(entity: EntityId, attribute: string, value: Value): Promise<boolean> {
+    const datoms = await this.datoms({ entity, attribute, value });
+    return datoms.length > 0;
+  }
+
+  async getValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<(Value | undefined)[]> {
+    const results = await Promise.all(
+      queries.map((q) => this.getValue(q.entity, q.attribute))
+    );
+    return results;
+  }
+
+  async getAllValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<Value[][]> {
+    const results = await Promise.all(
+      queries.map((q) => this.getValues(q.entity, q.attribute))
+    );
+    return results;
+  }
+
+  async findEntities(attribute: string, value: Value): Promise<EntityId[]> {
+    const datoms = await this.datoms({ attribute, value });
+    const entitySet = new Set<EntityId>();
+    for (const datom of datoms) {
+      entitySet.add(datom.entity);
+    }
+    return Array.from(entitySet);
+  }
+}
+
+/**
+ * Database view showing state at a specific transaction ID (as-of query)
+ * Filters queries to only include datoms with tx <= txId and deduplicates by (entity, attribute)
+ */
+class AsOfDatabaseView extends BaseDatabaseView {
+  constructor(db: DatomDatabase, private txId: TransactionId) {
+    super(db);
+  }
+
+  async datoms(options: QueryOptions): Promise<Datom[]> {
+    // Validate that query has at least one filter or limit to prevent accidental full scans
+    const hasFilter =
+      options.entity !== undefined ||
+      options.attribute !== undefined ||
+      options.value !== undefined ||
+      options.tx !== undefined;
+    const hasLimit = options.limit !== undefined;
+
+    if (!hasFilter && !hasLimit) {
+      throw new QuerySafetyError(
+        "Query must include at least one filter (entity, attribute, value, tx) or a limit to prevent full table scans"
+      );
+    }
+
+    // Get all matching datoms without tx filter and without deduplication
+    // We need raw datoms to properly deduplicate by (entity, attribute) for asOf queries
+    const allDatoms = await this.db.getRawDatoms({
+      ...options,
+      tx: undefined, // Remove tx filter, we'll apply our own
+    });
+    
+    // Filter to only datoms with tx <= this.txId
+    // If options.tx is specified, use the minimum of both
+    const maxTx = options.tx !== undefined ? Math.min(options.tx, this.txId) : this.txId;
+    const filtered = allDatoms.filter((d) => d.tx <= maxTx);
+    
+    // Deduplicate by (entity, attribute) keeping the latest tx
+    const deduplicated = new Map<string, Datom>();
+    for (const datom of filtered) {
+      const key = `${String(datom.entity)}|${String(datom.attribute)}`;
+      const existing = deduplicated.get(key);
+      if (!existing || datom.tx > existing.tx) {
+        deduplicated.set(key, datom);
+      }
+    }
+    
+    // Filter out retracted datoms (keep only added: true)
+    return Array.from(deduplicated.values()).filter((d) => d.added);
+  }
+}
+
+/**
+ * Database view showing full history (all datoms, including retracted)
+ * No deduplication, includes all historical changes
+ */
+class HistoryDatabaseView extends BaseDatabaseView {
+  async datoms(options: QueryOptions): Promise<Datom[]> {
+    // Validate that query has at least one filter or limit to prevent accidental full scans
+    const hasFilter =
+      options.entity !== undefined ||
+      options.attribute !== undefined ||
+      options.value !== undefined ||
+      options.tx !== undefined;
+    const hasLimit = options.limit !== undefined;
+
+    if (!hasFilter && !hasLimit) {
+      throw new QuerySafetyError(
+        "Query must include at least one filter (entity, attribute, value, tx) or a limit to prevent full table scans"
+      );
+    }
+
+    // History view: no deduplication, include retracted datoms
+    // Get all datoms matching the filters, including retracted ones
+    return this.db.getRawDatoms({
+      ...options,
+      added: undefined, // Don't filter by added/retracted
+    });
+  }
+}
+
+/**
+ * Database view showing only changes after a specific transaction ID (since query)
+ * Filters queries to only include datoms with tx > txId
+ */
+class SinceDatabaseView extends BaseDatabaseView {
+  constructor(db: DatomDatabase, private txId: TransactionId) {
+    super(db);
+  }
+
+  async datoms(options: QueryOptions): Promise<Datom[]> {
+    // Validate that query has at least one filter or limit to prevent accidental full scans
+    const hasFilter =
+      options.entity !== undefined ||
+      options.attribute !== undefined ||
+      options.value !== undefined ||
+      options.tx !== undefined;
+    const hasLimit = options.limit !== undefined;
+
+    if (!hasFilter && !hasLimit) {
+      throw new QuerySafetyError(
+        "Query must include at least one filter (entity, attribute, value, tx) or a limit to prevent full table scans"
+      );
+    }
+
+    // Get all matching datoms without deduplication
+    const allDatoms = await this.db.getRawDatoms({
+      ...options,
+      tx: undefined, // Remove tx filter if present
+    });
+    
+    // Filter to only datoms with tx > this.txId
+    const filtered = allDatoms.filter((d) => d.tx > this.txId);
+    
+    // Deduplicate by (entity, attribute, value) keeping the latest tx
+    // This is normal deduplication (not like asOf which keeps latest per entity-attribute)
+    const deduplicated = new Map<string, Datom>();
+    for (const datom of filtered) {
+      const valueKey = JSON.stringify(datom.value);
+      const key = `${String(datom.entity)}|${String(datom.attribute)}|${valueKey}`;
+      const existing = deduplicated.get(key);
+      if (!existing || datom.tx > existing.tx) {
+        deduplicated.set(key, datom);
+      }
+    }
+    
+    // Filter out retracted datoms (keep only added: true)
+    return Array.from(deduplicated.values()).filter((d) => d.added);
+  }
 }
 
 /**
@@ -1131,19 +1528,12 @@ export abstract class DatomDatabase
         options.entity !== undefined ||
         options.attribute !== undefined ||
         options.value !== undefined ||
-        options.tx !== undefined ||
-        options.asOf !== undefined;
+        options.tx !== undefined;
       const hasLimit = options.limit !== undefined;
-      const isHistory = options.history === true;
 
       if (!hasFilter && !hasLimit) {
-        if (isHistory) {
-          throw new QuerySafetyError(
-            "History query must include at least one filter or a limit to prevent full table scans"
-          );
-        }
         throw new QuerySafetyError(
-          "Query must include at least one filter (entity, attribute, value, tx, asOf) or a limit to prevent full table scans"
+          "Query must include at least one filter (entity, attribute, value, tx) or a limit to prevent full table scans"
         );
       }
 
@@ -1218,6 +1608,23 @@ export abstract class DatomDatabase
    */
   public _queryInternalForTransaction(options: QueryOptions): Promise<Datom[]> {
     return this.queryInternal(options);
+  }
+
+  /**
+   * Get raw datoms without deduplication for time-travel queries.
+   * This method is used by database views to get all datoms matching filters
+   * before applying time-travel specific deduplication logic.
+   * Implementations should override this to provide undeduplicated results.
+   * @internal
+   */
+  public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
+    // Default implementation: use executeQuery but implementations can override
+    // to provide undeduplicated results. For now, we'll use executeQuery with added: undefined
+    // to get all datoms including retracted ones, then the view will handle deduplication.
+    return this.executeQuery({
+      ...options,
+      added: undefined, // Get all datoms including retracted
+    });
   }
 
   /**
@@ -1478,7 +1885,6 @@ export abstract class DatomDatabase
     const hasAttributeFilter = options.attribute !== undefined;
     const hasValueFilter = options.value !== undefined;
     const hasTxFilter = options.tx !== undefined;
-    const hasAsOfFilter = options.asOf !== undefined;
     const hasLimit = options.limit !== undefined;
 
     // Determine scan type
@@ -1491,12 +1897,12 @@ export abstract class DatomDatabase
       if (hasAttributeFilter) {
         result.indexesUsed.push("attribute_index");
       }
-    } else if (hasValueFilter || hasTxFilter || hasAsOfFilter) {
+    } else if (hasValueFilter || hasTxFilter) {
       result.scanType = "index";
       if (hasValueFilter) {
         result.indexesUsed = ["value_index"];
       }
-      if (hasTxFilter || hasAsOfFilter) {
+      if (hasTxFilter) {
         result.indexesUsed = result.indexesUsed || [];
         result.indexesUsed.push("tx_index");
       }
@@ -1750,9 +2156,10 @@ export abstract class DatomDatabase
    * @returns Array of datoms for the entity at that point in time
    * @example
    * const snapshot = await db.getEntityAsOf(999, 50);
+   * // Equivalent to: await db.asOf(50).datoms({ entity: 999 });
    */
   async getEntityAsOf(entity: EntityId, tx: TransactionId): Promise<Datom[]> {
-    return this.datoms({ entity, asOf: tx, added: true });
+    return this.asOf(tx).datoms({ entity });
   }
 
   /**
@@ -1763,20 +2170,56 @@ export abstract class DatomDatabase
    * @returns The value or undefined if not found at that point in time
    * @example
    * const oldName = await db.getValueAsOf(1, "name", 55);
+   * // Equivalent to: await db.asOf(55).getValue(1, "name");
    */
   async getValueAsOf(
     entity: EntityId,
     attribute: string,
     tx: TransactionId
   ): Promise<Value | undefined> {
-    const datoms = await this.datoms({ entity, attribute, asOf: tx });
-    if (datoms.length === 0) {
-      return undefined;
-    }
-    // Return the value with the highest tx (latest value for this attribute at that point in time)
-    // Sort by tx DESC to get the latest value first
-    const sorted = datoms.sort((a, b) => b.tx - a.tx);
-    return sorted[0].value;
+    return this.asOf(tx).getValue(entity, attribute);
+  }
+
+  /**
+   * Create a database view showing the state at a specific transaction ID
+   * Returns a read-only view that filters all queries to only include datoms
+   * with transaction ID <= txId
+   * @param txId Transaction ID to query as-of
+   * @returns Read-only database view
+   * @example
+   * const dbPast = db.asOf(100);
+   * const datoms = await dbPast.datoms({ entity: 42 });
+   * const value = await dbPast.getValue(42, "name");
+   */
+  asOf(txId: TransactionId): DatabaseView {
+    return new AsOfDatabaseView(this, txId);
+  }
+
+  /**
+   * Create a database view showing full history (all datoms, including retracted)
+   * Returns a read-only view that includes all historical changes without deduplication
+   * @returns Read-only database view showing full history
+   * @example
+   * const dbHistory = db.history();
+   * const allChanges = await dbHistory.datoms({ entity: 42 });
+   * // Includes both added and retracted datoms
+   */
+  history(): DatabaseView {
+    return new HistoryDatabaseView(this);
+  }
+
+  /**
+   * Create a database view showing only changes after a specific transaction ID
+   * Returns a read-only view that filters all queries to only include datoms
+   * with transaction ID > txId
+   * @param txId Transaction ID - only changes after this will be included
+   * @returns Read-only database view
+   * @example
+   * const dbSince = db.since(100);
+   * const recentChanges = await dbSince.datoms({ entity: 42 });
+   */
+  since(txId: TransactionId): DatabaseView {
+    return new SinceDatabaseView(this, txId);
   }
 
   /**

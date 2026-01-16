@@ -145,16 +145,10 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     return await this.getNextTransactionId();
   }
 
-  protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
+  public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
     const conditions: string[] = [];
     const params: unknown[] = [];
-
-    // Apply time-travel filter: if asOf is specified, only consider datoms up to that transaction
-    if (options.asOf !== undefined) {
-      conditions.push("tx <= ?");
-      params.push(options.asOf);
-    }
 
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
@@ -180,89 +174,103 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    // Check if this is a history query
-    const isHistoryQuery = options.history === true;
+    // Query without deduplication - return all matching datoms
+    const sql = `
+      SELECT 
+        entity,
+        attribute,
+        value,
+        tx,
+        added
+      FROM ${this.tableName}
+      ${whereClause}
+      ORDER BY tx ASC, entity ASC, attribute ASC
+    `;
 
-    // For history queries, return all datoms ordered by tx
-    if (isHistoryQuery) {
-      const limitClause = options.limit ? "LIMIT ?" : "";
-      const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const rows = await this.connection.query(sql, params);
 
-      const sql = `
-        SELECT entity, attribute, value, tx, added
-        FROM ${this.tableName}
-        ${whereClause}
-        ORDER BY tx ASC, entity ASC, attribute ASC
-        ${limitClause}
-        ${offsetClause}
-      `;
-
-      if (options.limit) {
-        params.push(options.limit);
-      }
-      if (options.offset !== undefined) {
-        params.push(options.offset);
-      }
-
-      const rows = await this.connection.query(sql, params);
-
-      const reviveValue = (value: unknown): unknown => {
-        if (typeof value === "string") {
-          if (value === "__UNDEFINED__") {
-            return undefined;
-          }
-          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
-            return new Date(value);
-          }
-        }
-        if (value === null) {
-          return null;
-        }
-        if (value === undefined) {
+    const reviveValue = (value: unknown): unknown => {
+      if (typeof value === "string") {
+        if (value === "__UNDEFINED__") {
           return undefined;
         }
-        if (Array.isArray(value)) {
-          return value.map(reviveValue);
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+          return new Date(value);
         }
-        if (typeof value === "object" && value !== null) {
-          const revived: Record<string, unknown> = {};
-          const valueObj = value as Record<string, unknown>;
-          for (const key in valueObj) {
-            revived[key] = reviveValue(valueObj[key]);
-          }
-          return revived;
+      }
+      if (value === null) {
+        return null;
+      }
+      if (value === undefined) {
+        return undefined;
+      }
+      if (Array.isArray(value)) {
+        return value.map(reviveValue);
+      }
+      if (typeof value === "object" && value !== null) {
+        const revived: Record<string, unknown> = {};
+        const valueObj = value as Record<string, unknown>;
+        for (const key in valueObj) {
+          revived[key] = reviveValue(valueObj[key]);
         }
-        return value;
+        return revived;
+      }
+      return value;
+    };
+
+    return rows.map((row: Record<string, unknown>) => {
+      let entity: EntityId = row.entity as EntityId;
+      if (typeof entity === "string") {
+        if (/^-?\d+$/.test(entity)) {
+          entity = parseInt(entity, 10);
+        }
+      }
+
+      const parsedValue: unknown = JSON.parse(String(row.value));
+      const revivedValue = reviveValue(parsedValue) as Value;
+
+      return {
+        entity,
+        attribute: String(row.attribute),
+        value: revivedValue,
+        tx: Number(row.tx),
+        added: Boolean(row.added),
       };
+    });
+  }
 
-      return rows.map((row: Record<string, unknown>) => {
-        let entity: EntityId = row.entity as EntityId;
-        if (typeof entity === "string") {
-          if (/^-?\d+$/.test(entity)) {
-            entity = parseInt(entity, 10);
-          }
-        }
+  protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
+    await this.ensureInitialized();
+    const conditions: string[] = [];
+    const params: unknown[] = [];
 
-        const parsedValue: unknown = JSON.parse(String(row.value));
-        const revivedValue = reviveValue(parsedValue) as Value;
-
-        return {
-          entity,
-          attribute: String(row.attribute),
-          value: revivedValue,
-          tx: Number(row.tx),
-          added: Boolean(row.added),
-        };
-      });
+    if (options.entity !== undefined) {
+      conditions.push("entity = ?");
+      params.push(String(options.entity));
+    }
+    if (options.attribute !== undefined) {
+      conditions.push("attribute = ?");
+      params.push(String(options.attribute));
+    }
+    if (options.value !== undefined) {
+      conditions.push("value = ?");
+      let value = options.value;
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      params.push(JSON.stringify(value));
+    }
+    if (options.tx !== undefined) {
+      conditions.push("tx = ?");
+      params.push(options.tx);
     }
 
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
     // Use SQL-level deduplication with ROW_NUMBER() window function
-    // For time-travel queries (asOf), deduplicate by (entity, attribute) to get latest value per attribute
-    // For regular queries, deduplicate by (entity, attribute, value) to support multi-valued attributes
-    const partitionByColumns =
-      options.asOf !== undefined
-        ? "entity, attribute"
-        : "entity, attribute, value";
+    // Deduplicate by (entity, attribute, value) to support multi-valued attributes
+    const partitionByColumns = "entity, attribute, value";
 
     // Build the added filter
     let addedFilter = "";
@@ -376,10 +384,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const conditions: string[] = [];
     const params: unknown[] = [];
 
-    if (options.asOf !== undefined) {
-      conditions.push("tx <= ?");
-      params.push(options.asOf);
-    }
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
       params.push(String(options.entity));
@@ -404,55 +408,46 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const isHistoryQuery = options.history === true;
-    let explainSql: string;
+    const partitionByColumns = "entity, attribute, value";
+    const addedFilter =
+      options.added === true || options.added === undefined
+        ? "AND added = 1"
+        : options.added === false
+        ? "AND added = 0"
+        : "";
 
-    if (isHistoryQuery) {
-      explainSql = `
-        EXPLAIN QUERY PLAN
-        SELECT entity, attribute, value, tx, added
-        FROM ${this.tableName}
-        ${whereClause}
-        ORDER BY tx ASC, entity ASC, attribute ASC
-      `;
-    } else {
-      const partitionByColumns =
-        options.asOf !== undefined
-          ? "entity, attribute"
-          : "entity, attribute, value";
-      const addedFilter =
-        options.added === true || options.added === undefined
-          ? "AND added = 1"
-          : options.added === false
-          ? "AND added = 0"
-          : "";
-
-      explainSql = `
-        EXPLAIN QUERY PLAN
-        WITH ranked_datoms AS (
-          SELECT 
-            entity,
-            attribute,
-            value,
-            tx,
-            added,
-            ROW_NUMBER() OVER (
-              PARTITION BY ${partitionByColumns}
-              ORDER BY tx DESC
-            ) AS rn
-          FROM ${this.tableName}
-          ${whereClause}
-        )
+    const explainSql = `
+      EXPLAIN QUERY PLAN
+      WITH ranked_datoms AS (
         SELECT 
           entity,
           attribute,
           value,
           tx,
-          added
-        FROM ranked_datoms
-        WHERE rn = 1
-        ${addedFilter}
-      `;
+          added,
+          ROW_NUMBER() OVER (
+            PARTITION BY ${partitionByColumns}
+            ORDER BY tx DESC
+          ) AS rn
+        FROM ${this.tableName}
+        ${whereClause}
+      )
+      SELECT 
+        entity,
+        attribute,
+        value,
+        tx,
+        added
+      FROM ranked_datoms
+      WHERE rn = 1
+      ${addedFilter}
+    `;
+
+    if (options.limit) {
+      params.push(options.limit);
+    }
+    if (options.offset !== undefined) {
+      params.push(options.offset);
     }
 
     try {
@@ -546,7 +541,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         entity,
         attribute,
         value,
-        asOf: query.asOf,
         added: true,
       });
 
@@ -588,10 +582,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       const alias = `d${i}`;
 
       const conditions: string[] = [];
-      if (query.asOf !== undefined) {
-        conditions.push(`tx <= ?`);
-        params.push(query.asOf);
-      }
 
       // Add filters for bound values
       if (!isVariable(entityVal)) {
@@ -615,10 +605,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
       // Use ROW_NUMBER for deduplication
-      const partitionBy =
-        query.asOf !== undefined
-          ? "entity, attribute"
-          : "entity, attribute, value";
+      const partitionBy = "entity, attribute, value";
 
       const rankedCte = `
         ${alias}_ranked AS (
@@ -1036,8 +1023,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   }
 
   private async executeClause(
-    clause: QueryClause,
-    asOf?: TransactionId
+    clause: QueryClause
   ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
@@ -1051,7 +1037,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       ...(entity !== undefined && { entity }),
       ...(attribute !== undefined && { attribute }),
       ...(value !== undefined && { value }),
-      ...(asOf !== undefined && { asOf }),
     };
 
     const datoms = await this.queryInternal(queryOptions);
@@ -1191,11 +1176,6 @@ class SQLiteTransaction implements Transaction {
   }
 
   async datoms(options: QueryOptions): Promise<Datom[]> {
-    // For asOf queries, only query committed state (ignore pending changes)
-    if (options.asOf !== undefined) {
-      return this.db._queryInternalForTransaction(options);
-    }
-
     // Query committed data (bypass validation since transactions manage their own constraints)
     const committed = await this.db._queryInternalForTransaction(options);
 
@@ -1487,12 +1467,12 @@ class SQLiteTransaction implements Transaction {
     }
 
     const firstClause = query.where[0];
-    const firstResults = await this.executeClause(firstClause, query.asOf);
+    const firstResults = await this.executeClause(firstClause);
 
     let results = firstResults;
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
-      const clauseResults = await this.executeClause(clause, query.asOf);
+      const clauseResults = await this.executeClause(clause);
       results = joinResults(
         results,
         clauseResults,
@@ -1528,8 +1508,7 @@ class SQLiteTransaction implements Transaction {
   }
 
   private async executeClause(
-    clause: QueryClause,
-    asOf?: TransactionId
+    clause: QueryClause
   ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
@@ -1543,7 +1522,6 @@ class SQLiteTransaction implements Transaction {
       ...(entity !== undefined && { entity }),
       ...(attribute !== undefined && { attribute }),
       ...(value !== undefined && { value }),
-      ...(asOf !== undefined && { asOf }),
     };
 
     const datoms = await this.datoms(queryOptions);

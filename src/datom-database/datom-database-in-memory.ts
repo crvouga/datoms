@@ -144,13 +144,32 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return super.datoms(options);
   }
 
-  protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
+  public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
+    // Get all datoms matching filters without deduplication
     let results = this._datomsArray;
 
-    // Apply time-travel filter: if asOf is specified, only consider datoms up to that transaction
-    if (options.asOf !== undefined) {
-      results = results.filter((d) => d.tx <= options.asOf!);
+    // Apply filters
+    if (options.entity !== undefined) {
+      results = results.filter((d) => d.entity === options.entity);
     }
+    if (options.attribute !== undefined) {
+      results = results.filter((d) => d.attribute === options.attribute);
+    }
+    if (options.value !== undefined) {
+      results = results.filter((d) => d.value === options.value);
+    }
+    if (options.tx !== undefined) {
+      results = results.filter((d) => d.tx === options.tx);
+    }
+
+    // Don't filter by added - return all datoms including retracted
+    // The view will handle filtering and deduplication
+
+    return results;
+  }
+
+  protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
+    let results = this._datomsArray;
 
     // Apply filters
     if (options.entity !== undefined) {
@@ -172,47 +191,14 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     // and supports multi-valued attributes (multiple values per attribute)
     // Always deduplicate first, then apply added filter
 
-    // Check if this is a history query
-    const isHistoryQuery = options.history === true;
-
-    if (isHistoryQuery) {
-      // History query: return all datoms ordered by transaction (no deduplication, include retracted)
-      results.sort((a, b) => {
-        if (a.tx !== b.tx) {
-          return a.tx - b.tx;
-        }
-        // Secondary sort by entity, then attribute for consistency
-        const entityA = String(a.entity);
-        const entityB = String(b.entity);
-        if (entityA !== entityB) {
-          return entityA.localeCompare(entityB);
-        }
-        return String(a.attribute).localeCompare(String(b.attribute));
-      });
-
-      // Apply pagination
-      const offset = options.offset ?? 0;
-      const limit = options.limit;
-      const paginated = results.slice(
-        offset,
-        limit ? offset + limit : undefined
-      );
-      return paginated;
-    }
-
     // Normal query: deduplicate and filter
-    // For time-travel queries (asOf), deduplicate by (entity, attribute) to get latest value per attribute
-    // For regular queries, deduplicate by (entity, attribute, value) to support multi-valued attributes
+    // Deduplicate by (entity, attribute, value) to support multi-valued attributes
     const latestDatoms = new Map<string, Datom>();
     for (const datom of results) {
-      // Use (entity, attribute) key for time-travel queries to get latest value per attribute
       // Use (entity, attribute, value) key for regular queries to support multi-valued attributes
-      const key =
-        options.asOf !== undefined
-          ? `${String(datom.entity)}|${String(datom.attribute)}`
-          : `${String(datom.entity)}|${String(
-              datom.attribute
-            )}|${JSON.stringify(datom.value)}`;
+      const key = `${String(datom.entity)}|${String(
+        datom.attribute
+      )}|${JSON.stringify(datom.value)}`;
       const existing = latestDatoms.get(key);
       if (!existing || datom.tx > existing.tx) {
         latestDatoms.set(key, datom);
@@ -269,27 +255,15 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       ).length;
       estimatedRows = Math.min(estimatedRows, txCount);
     }
-    if (options.asOf !== undefined) {
-      const asOfCount = this._datomsArray.filter(
-        (d) => d.tx <= options.asOf!
-      ).length;
-      estimatedRows = Math.min(estimatedRows, asOfCount);
-    }
 
     // Apply limit if present
     if (options.limit !== undefined) {
       estimatedRows = Math.min(estimatedRows, options.limit);
     }
 
-    // For history queries, don't deduplicate, so estimate is higher
-    if (options.history === true) {
-      // History queries return all matching datoms, not deduplicated
-      result.estimatedRows = estimatedRows;
-    } else {
-      // Normal queries deduplicate, so estimate is lower
-      // Rough estimate: assume 50% reduction from deduplication
-      result.estimatedRows = Math.floor(estimatedRows * 0.5);
-    }
+    // Normal queries deduplicate, so estimate is lower
+    // Rough estimate: assume 50% reduction from deduplication
+    result.estimatedRows = Math.floor(estimatedRows * 0.5);
 
     // Set scan type based on filters
     if (result.scanType === "full-table") {
@@ -312,13 +286,13 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Start with the first clause
     const firstClause = query.where[0];
-    const firstResults = await this.executeClause(firstClause, query.asOf);
+    const firstResults = await this.executeClause(firstClause);
 
     // Join with remaining clauses
     let results = firstResults;
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
-      const clauseResults = await this.executeClause(clause, query.asOf);
+      const clauseResults = await this.executeClause(clause);
       results = joinResults(
         results,
         clauseResults,
@@ -388,8 +362,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
    * Execute a single query clause
    */
   private async executeClause(
-    clause: QueryClause,
-    asOf?: TransactionId
+    clause: QueryClause
   ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
@@ -403,7 +376,6 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       entity,
       attribute,
       value,
-      asOf,
     });
 
     // Map datom fields to variable names from the clause
@@ -522,15 +494,6 @@ class InMemoryTransaction implements Transaction {
     // Query directly from the datoms array (which includes uncommitted changes)
     let results = this._datomsArray;
 
-    // Apply time-travel filter: if asOf is specified, only consider datoms up to that transaction
-    // Note: For transactions, asOf queries only committed state (datoms with tx < this.txId)
-    // Uncommitted changes (tx === this.txId) are not included in asOf queries
-    if (options.asOf !== undefined) {
-      results = results.filter(
-        (d) => d.tx <= options.asOf! && d.tx < this.txId
-      );
-    }
-
     // Apply filters
     if (options.entity !== undefined) {
       results = results.filter((d) => d.entity === options.entity);
@@ -545,49 +508,30 @@ class InMemoryTransaction implements Transaction {
       results = results.filter((d) => d.tx === options.tx);
     }
 
-    // Check if this is a history query
-    const isHistoryQuery = options.history === true;
-
-    if (isHistoryQuery) {
-      // History query: return all datoms ordered by transaction (no deduplication, include retracted)
-      results.sort((a, b) => {
-        if (a.tx !== b.tx) {
-          return a.tx - b.tx;
-        }
-        // Secondary sort by entity, then attribute for consistency
-        const entityA = String(a.entity);
-        const entityB = String(b.entity);
-        if (entityA !== entityB) {
-          return entityA.localeCompare(entityB);
-        }
-        return String(a.attribute).localeCompare(String(b.attribute));
-      });
-    } else {
-      // Normal query: deduplicate and filter
-      // Handle retractions: for each unique (entity, attribute, value) combination,
-      // keep only the most recent transaction
-      // This supports multi-valued attributes (multiple values per attribute)
-      // Always deduplicate first, then apply added filter
-      const latestDatoms = new Map<string, Datom>();
-      for (const datom of results) {
-        const key = `${String(datom.entity)}|${String(
-          datom.attribute
-        )}|${String(datom.value)}`;
-        const existing = latestDatoms.get(key);
-        if (!existing || datom.tx > existing.tx) {
-          latestDatoms.set(key, datom);
-        }
+    // Normal query: deduplicate and filter
+    // Handle retractions: for each unique (entity, attribute, value) combination,
+    // keep only the most recent transaction
+    // This supports multi-valued attributes (multiple values per attribute)
+    // Always deduplicate first, then apply added filter
+    const latestDatoms = new Map<string, Datom>();
+    for (const datom of results) {
+      const key = `${String(datom.entity)}|${String(
+        datom.attribute
+      )}|${String(datom.value)}`;
+      const existing = latestDatoms.get(key);
+      if (!existing || datom.tx > existing.tx) {
+        latestDatoms.set(key, datom);
       }
-      results = Array.from(latestDatoms.values());
+    }
+    results = Array.from(latestDatoms.values());
 
-      // Apply added filter after deduplication
-      if (options.added === undefined || options.added === true) {
-        // Filter to only added datoms (exclude retractions)
-        results = results.filter((d) => d.added);
-      } else if (options.added === false) {
-        // For retractions, filter by added: false
-        results = results.filter((d) => !d.added);
-      }
+    // Apply added filter after deduplication
+    if (options.added === undefined || options.added === true) {
+      // Filter to only added datoms (exclude retractions)
+      results = results.filter((d) => d.added);
+    } else if (options.added === false) {
+      // For retractions, filter by added: false
+      results = results.filter((d) => !d.added);
     }
 
     // Apply pagination

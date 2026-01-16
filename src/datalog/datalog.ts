@@ -2,7 +2,7 @@
  * Datalog query interface and parser
  */
 
-import type { Attribute, EntityId, TransactionId, Value } from "../types.js";
+import type { Attribute, EntityId, Value } from "../types.js";
 
 /**
  * A datalog query clause
@@ -26,8 +26,6 @@ export interface DatalogQuery {
   orderBy?: [variable: string, direction: "asc" | "desc"][];
   /** Optional limit */
   limit?: number;
-  /** Query database state as it existed at this transaction ID (time-travel query) */
-  asOf?: TransactionId;
 }
 
 /**

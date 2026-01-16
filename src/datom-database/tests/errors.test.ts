@@ -278,13 +278,13 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       await db.add([[1, "name", "Alice"]]);
 
       try {
-        await db.datoms({ history: true });
+        await db.history().datoms({});
         throw new Error("Should have thrown QuerySafetyError");
       } catch (error) {
         expect(error).toBeInstanceOf(QuerySafetyError);
         const safetyError = error as QuerySafetyError;
         expect(safetyError.code).toBe("QUERY_SAFETY_VIOLATION");
-        expect(safetyError.message).toContain("History query");
+        expect(safetyError.message).toContain("Query must include");
       }
     });
   });
