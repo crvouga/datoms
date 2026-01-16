@@ -5,6 +5,7 @@ import { SQLiteDatabase } from "./database-sqlite.js";
 import { PostgreSQLDatabase } from "./database-postgres.js";
 import { SQLiteConnection } from "./__tests__/sqlite-connection.js";
 import { PostgresConnection } from "./__tests__/postgres-connection.js";
+import { PGLiteConnection } from "./__tests__/pglite-connection.js";
 import { unlinkSync } from "fs";
 
 type Fixture = { database: Database; cleanup: () => Promise<void> };
@@ -53,12 +54,29 @@ const createPostgreSQLDatabase = async (): Promise<Fixture> => {
   }
 };
 
+const createPGLiteDatabase = async (): Promise<Fixture> => {
+  const connection = new PGLiteConnection("memory://");
+  const db = new PostgreSQLDatabase(connection);
+  await db.initialize();
+  // Clean up before each test for isolation
+  if (typeof (db as any).cleanup === "function") {
+    await (db as any).cleanup();
+  }
+  return {
+    database: db,
+    cleanup: async () => {
+      await db.close();
+    },
+  };
+};
+
 // Test implementations: [name, factory function]
 const implementations: [string, () => Promise<Fixture>][] = [
   ["InMemoryDatabase", () => createInMemoryDatabase()],
   ["SQLiteDatabase (memory)", () => createSQLiteDatabase(":memory:")],
   ["SQLiteDatabase (file)", () => createSQLiteDatabase("test.db")],
   ["PostgreSQLDatabase", () => createPostgreSQLDatabase()],
+  ["PostgreSQLDatabase (PGLite)", () => createPGLiteDatabase()],
 ];
 
 describe.each(implementations)("Database (%s)", (name, createFixture) => {
