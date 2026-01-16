@@ -27,13 +27,10 @@ const createInMemoryFixture = async (): Promise<Fixture> => {
 };
 
 const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
-  // For file-based databases, delete the file first to ensure a clean state
   if (filename !== ":memory:") {
     try {
       unlinkSync(filename);
-    } catch {
-      // File doesn't exist, which is fine
-    }
+    } catch {}
   }
   const connection = new SQLiteSQLDatabase(filename);
   const db = new SQLiteDatomDatabase(connection);
@@ -51,7 +48,6 @@ const createPostgresFixture = async (): Promise<Fixture> => {
   const connection = new PgSQLDatabase(connectionString);
   const db = new PostgreSQLDatomDatabase(connection);
   await db.initialize();
-
   return {
     db: db,
     beforeEach: async () => {
@@ -65,18 +61,13 @@ const createPGLiteFixture = async (): Promise<Fixture> => {
   const connection = new PGLiteSQLDatabase("memory://");
   const db = new PostgreSQLDatomDatabase(connection);
   await db.initialize();
-
   return {
     db: db,
-    beforeEach: async () => {
-      // PGLite creates a fresh instance each time, so no cleanup needed
-      // Calling cleanup() would close the connection, causing errors
-    },
+    beforeEach: async () => {},
     afterEach: async () => {},
   };
 };
 
-// Test implementations: [name, factory function]
 const fixtures: [string, () => Promise<Fixture>][] = [
   ["InMemory", () => createInMemoryFixture()],
   ["SQLite (memory)", () => createSQLiteFixture(":memory:")],
@@ -85,29 +76,24 @@ const fixtures: [string, () => Promise<Fixture>][] = [
   ["PostgreSQL (PGLite)", () => createPGLiteFixture()],
 ];
 
-describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
+describe.each(fixtures)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
-  let db: DatomDatabase;
-  let cleanUp: () => Promise<void> = async () => {};
-
   beforeEach(async () => {
     f = await createFixture();
-    db = f.db;
-    cleanUp = f.beforeEach;
     await f.beforeEach();
   });
-
   afterEach(async () => {
     await f.afterEach();
   });
 
   test("should create a database", async () => {
-    const database = db; // TypeScript now knows db is non-null
-
+    const { db } = f;
+    const database = db;
     expect(database).toBeDefined();
   });
 
   test("should add datoms", async () => {
+    const { db } = f;
     const tx = await db.add([
       [1, "name", "Alice"],
       [1, "age", 30],
@@ -123,6 +109,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
   });
 
   test("should query datoms", async () => {
+    const { db } = f;
     await db.add([
       [1, "name", "Alice"],
       [2, "name", "Bob"],
@@ -133,6 +120,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
   });
 
   test("should retract datoms", async () => {
+    const { db } = f;
     await db.add([[1, "name", "Alice"]]);
     await db.retract([[1, "name", "Alice"]]);
 
@@ -141,6 +129,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
   });
 
   test("should get value for entity-attribute", async () => {
+    const { db } = f;
     await db.add([[1, "name", "Alice"]]);
 
     const name = await db.getValue(1, "name");
@@ -149,6 +138,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
 
   describe("Database query (Datalog)", () => {
     test("should execute simple query", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [2, "name", "Bob"],
@@ -171,6 +161,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle multiple where clauses (join)", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [1, "age", 30],
@@ -196,6 +187,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should support ordering and limits", async () => {
+      const { db } = f;
       await db.add([
         [1, "score", 100],
         [2, "score", 400],
@@ -218,6 +210,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should return empty if where is empty", async () => {
+      const { db } = f;
       const query: DatalogQuery = {
         find: ["?x"],
         where: [],
@@ -231,6 +224,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should filter by constant in where clause", async () => {
+      const { db } = f;
       await db.add([
         [1, "type", "person"],
         [2, "type", "car"],
@@ -249,6 +243,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle multi-entity relationships (friendships)", async () => {
+      const { db } = f;
       // Create people
       await db.add([
         [1, "name", "Alice"],
@@ -283,6 +278,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle transitive relationships (friends of friends)", async () => {
+      const { db } = f;
       // Create people and friendships
       await db.add([
         [1, "name", "Alice"],
@@ -318,6 +314,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle complex joins with multiple entities and attributes", async () => {
+      const { db } = f;
       // Create a company structure: employees, departments, and their relationships
       await db.add([
         // Employees
@@ -363,6 +360,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle parent-child relationships", async () => {
+      const { db } = f;
       // Create a family tree
       await db.add([
         [1, "name", "Alice"],
@@ -400,6 +398,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle many-to-many relationships", async () => {
+      const { db } = f;
       // Create students and courses with enrollments
       await db.add([
         // Students
@@ -442,6 +441,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle queries with multiple constraints on same entity", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [1, "age", 30],
@@ -472,6 +472,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle complex variable bindings across multiple clauses", async () => {
+      const { db } = f;
       // Create a network of connections
       await db.add([
         [1, "name", "Node1"],
@@ -504,6 +505,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle queries with ordering on multiple variables", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [1, "score", 100],
@@ -542,6 +544,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle variable in entity position", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [2, "name", "Bob"],
@@ -564,6 +567,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle variable in attribute position", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [1, "age", 30],
@@ -587,6 +591,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle all positions as variables", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [1, "age", 30],
@@ -612,6 +617,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle empty find clause", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [2, "name", "Bob"],
@@ -631,6 +637,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle find variables not in where clause", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [2, "name", "Bob"],
@@ -653,6 +660,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle boolean values", async () => {
+      const { db } = f;
       await db.add([
         [1, "active", true],
         [2, "active", false],
@@ -673,6 +681,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle Date values", async () => {
+      const { db } = f;
       const date1 = new Date("2023-01-01");
       const date2 = new Date("2023-02-01");
       const date3 = new Date("2023-01-01");
@@ -700,6 +709,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle null values", async () => {
+      const { db } = f;
       await db.add([
         [1, "middleName", null],
         [2, "middleName", "Smith"],
@@ -720,6 +730,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle undefined values", async () => {
+      const { db } = f;
       await db.add([
         [1, "optional", undefined],
         [2, "optional", "value"],
@@ -746,6 +757,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle symbol values", async () => {
+      const { db } = f;
       const sym1 = Symbol("type1");
       const sym2 = Symbol("type2");
 
@@ -769,6 +781,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle mixed value types", async () => {
+      const { db } = f;
       await db.add([
         [1, "data", "string"],
         [1, "data", 42],
@@ -794,6 +807,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle string entity IDs", async () => {
+      const { db } = f;
       await db.add([
         ["user-1", "name", "Alice"],
         ["user-2", "name", "Bob"],
@@ -817,6 +831,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle symbol entity IDs", async () => {
+      const { db } = f;
       const e1 = Symbol("entity1");
       const e2 = Symbol("entity2");
 
@@ -839,6 +854,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle limit 0", async () => {
+      const { db } = f;
       await db.add([
         [1, "score", 100],
         [2, "score", 200],
@@ -861,6 +877,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle limit larger than results", async () => {
+      const { db } = f;
       await db.add([
         [1, "score", 100],
         [2, "score", 200],
@@ -879,6 +896,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle limit with ordering", async () => {
+      const { db } = f;
       await db.add([
         [1, "score", 100],
         [2, "score", 400],
@@ -902,6 +920,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle ordering on variable not in find", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [1, "score", 100],
@@ -949,6 +968,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle ordering with null values", async () => {
+      const { db } = f;
       await db.add([
         [1, "score", 100],
         [2, "score", null],
@@ -973,6 +993,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle ordering with mixed types", async () => {
+      const { db } = f;
       await db.add([
         [1, "value", "zebra"],
         [2, "value", 100],
@@ -995,6 +1016,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle join with no matching results", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [2, "name", "Bob"],
@@ -1018,6 +1040,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle join with incompatible variable bindings", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [1, "age", 30],
@@ -1045,6 +1068,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle join with multiple common variables", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [1, "age", 30],
@@ -1074,6 +1098,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should exclude retracted datoms from query results", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [2, "name", "Bob"],
@@ -1097,6 +1122,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle multi-valued attributes", async () => {
+      const { db } = f;
       await db.add([
         [1, "tag", "red"],
         [1, "tag", "blue"],
@@ -1121,6 +1147,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle self-joins", async () => {
+      const { db } = f;
       // Create a graph where nodes can connect to themselves
       await db.add([
         [1, "connects", 2],
@@ -1159,6 +1186,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle circular relationships", async () => {
+      const { db } = f;
       // Create a circular graph: 1 -> 2 -> 3 -> 1
       await db.add([
         [1, "next", 2],
@@ -1183,6 +1211,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle variable binding across disconnected clauses", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [1, "age", 30],
@@ -1216,7 +1245,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
 
   describe("Transaction API", () => {
     test("should execute successful transaction", async () => {
-      if (!db) return;
+      const { db } = f;
 
       await db.add([[1, "name", "Alice"]]);
 
@@ -1244,7 +1273,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should rollback transaction on error", async () => {
-      if (!db) return;
+      const { db } = f;
 
       await db.add([[1, "name", "Alice"]]);
 
@@ -1268,7 +1297,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should see uncommitted changes within transaction", async () => {
-      if (!db) return;
+      const { db } = f;
 
       await db.add([[1, "name", "Alice"]]);
 
@@ -1292,7 +1321,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle retract within transaction", async () => {
-      if (!db) return;
+      const { db } = f;
 
       await db.add([
         [1, "name", "Alice"],
@@ -1318,7 +1347,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle queryDatalog within transaction", async () => {
-      if (!db) return;
+      const { db } = f;
 
       await db.add([
         [1, "name", "Alice"],
@@ -1344,7 +1373,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle multiple operations in transaction", async () => {
-      if (!db) return;
+      const { db } = f;
 
       await db.transaction(async (tx) => {
         await tx.add([[1, "name", "Alice"]]);
@@ -1370,7 +1399,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should rollback all changes on error", async () => {
-      if (!db) return;
+      const { db } = f;
 
       await db.add([[1, "name", "Initial"]]);
 
@@ -1398,7 +1427,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle getValue within transaction", async () => {
-      if (!db) return;
+      const { db } = f;
 
       await db.add([[1, "name", "Alice"]]);
 
@@ -1415,7 +1444,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle getEntity within transaction", async () => {
-      if (!db) return;
+      const { db } = f;
 
       await db.add([[1, "name", "Alice"]]);
 
@@ -1432,7 +1461,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle hasFact within transaction", async () => {
-      if (!db) return;
+      const { db } = f;
 
       await db.add([[1, "name", "Alice"]]);
 
@@ -1449,7 +1478,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle complex query within transaction", async () => {
-      if (!db) return;
+      const { db } = f;
 
       await db.add([
         [1, "name", "Alice"],
@@ -1485,6 +1514,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
 
   describe("Time-Traveling Queries", () => {
     test("should query database state at specific transaction ID", async () => {
+      const { db } = f;
       // Add datoms in sequence
       const tx1 = await db.add([[1, "name", "Alice"]]);
       const tx2 = await db.add([[1, "age", 30]]);
@@ -1513,6 +1543,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle retractions in time-travel queries", async () => {
+      const { db } = f;
       const tx1 = await db.add([[1, "name", "Alice"]]);
       const tx2 = await db.add([[1, "age", 30]]);
       const tx3 = await db.retract([[1, "age", 30]]);
@@ -1530,6 +1561,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should query full history of changes", async () => {
+      const { db } = f;
       await db.add([[1, "name", "Alice"]]);
       await db.add([[1, "name", "Alice Updated"]]);
       await db.add([[1, "age", 30]]);
@@ -1546,6 +1578,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should get entity at specific transaction", async () => {
+      const { db } = f;
       const tx1 = await db.add([[1, "name", "Alice"]]);
       const tx2 = await db.add([[1, "age", 30]]);
 
@@ -1560,6 +1593,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should get value at specific transaction", async () => {
+      const { db } = f;
       const tx1 = await db.add([[1, "name", "Alice"]]);
       await db.add([[1, "name", "Bob"]]);
 
@@ -1570,6 +1604,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should support time-travel in datalog queries", async () => {
+      const { db } = f;
       const tx1 = await db.add([
         [1, "name", "Alice"],
         [2, "name", "Bob"],
@@ -1602,6 +1637,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle time-travel queries within transactions", async () => {
+      const { db } = f;
       const tx1 = await db.add([[1, "name", "Alice"]]);
 
       await db.transaction(async (tx) => {
@@ -1622,6 +1658,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle complex time-travel scenario", async () => {
+      const { db } = f;
       // Create a timeline of changes
       const tx1 = await db.add([[1, "status", "pending"]]);
       const tx2 = await db.add([[1, "status", "processing"]]);
@@ -1655,6 +1692,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should retract all datoms for an entity", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [1, "age", 30],
@@ -1677,6 +1715,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should retract entity within transaction", async () => {
+      const { db } = f;
       await db.add([
         [1, "name", "Alice"],
         [1, "age", 30],
@@ -1695,6 +1734,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should execute bulk operations atomically with transact", async () => {
+      const { db } = f;
       const tx = await db.transact({
         add: [
           [1, "name", "Alice"],
@@ -1722,6 +1762,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should execute bulk operations within transaction", async () => {
+      const { db } = f;
       await db.transaction(async (tx) => {
         await tx.transact({
           add: [
@@ -1741,6 +1782,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should define attribute schema", async () => {
+      const { db } = f;
       await db.defineAttribute({
         name: "email",
         cardinality: "one",
@@ -1759,6 +1801,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should query history with history flag", async () => {
+      const { db } = f;
       await db.add([[1, "name", "Alice"]]);
       const tx2 = await db.add([[1, "name", "Bob"]]);
       await db.retract([[1, "name", "Bob"]]);
@@ -1779,6 +1822,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should require at least one filter or limit for query", async () => {
+      const { db } = f;
       expect(db.query({})).rejects.toThrow("full table scans");
 
       // History queries without filters should also require a limit
@@ -1796,6 +1840,7 @@ describe.each(fixtures)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should handle empty transact operations", async () => {
+      const { db } = f;
       const tx = await db.transact({});
       expect(typeof tx).toBe("number");
 
