@@ -43,10 +43,17 @@ export class SQLiteDatabase extends Database {
         )
       `;
 
+      // Optimized composite indexes for common query patterns
       const indexes = [
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_entity ON ${this.tableName}(entity)`,
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_attribute ON ${this.tableName}(attribute)`,
+        // Composite index for entity+attribute queries (most common pattern)
+        // SQLite doesn't support DESC in index definition, but this helps with filtering
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_entity_attr_tx ON ${this.tableName}(entity, attribute, tx)`,
+        // Composite index for attribute+value queries
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_attr_value_tx ON ${this.tableName}(attribute, value, tx)`,
+        // Index on tx for transaction-based queries (DESC ordering handled in query)
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx)`,
+        // Covering index for entity lookups
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_entity ON ${this.tableName}(entity)`,
       ];
 
       await this.connection.execute(createTableSql);
@@ -146,18 +153,26 @@ export class SQLiteDatabase extends Database {
 
     // For history queries, return all datoms ordered by tx
     if (isHistoryQuery) {
+      const limitClause = options.limit ? "LIMIT ?" : "";
+      const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+
       const sql = `
         SELECT entity, attribute, value, tx, added
         FROM ${this.tableName}
         ${whereClause}
         ORDER BY tx ASC, entity ASC, attribute ASC
+        ${limitClause}
+        ${offsetClause}
       `;
 
+      if (options.limit) {
+        params.push(options.limit);
+      }
+      if (options.offset !== undefined) {
+        params.push(options.offset);
+      }
+
       const rows = await this.connection.query(sql, params);
-      const offset = options.offset ?? 0;
-      const paginated = options.limit
-        ? rows.slice(offset, offset + options.limit)
-        : rows.slice(offset);
 
       const reviveValue = (value: any): any => {
         if (typeof value === "string") {
@@ -191,7 +206,7 @@ export class SQLiteDatabase extends Database {
         return value;
       };
 
-      return paginated.map((row: any) => {
+      return rows.map((row: any) => {
         let entity: any = row.entity;
         if (typeof entity === "string") {
           if (/^-?\d+$/.test(entity)) {
@@ -207,82 +222,72 @@ export class SQLiteDatabase extends Database {
           attribute: row.attribute,
           value: revivedValue,
           tx: row.tx,
-          added: row.added,
+          added: Boolean(row.added),
         };
       });
     }
 
-    const sql = `
-      SELECT entity, attribute, value, tx, added
-      FROM ${this.tableName}
-      ${whereClause}
-      ORDER BY tx DESC
-    `;
-
-    const rows = await this.connection.query(sql, params);
-
-    // Group by (entity, attribute, value) or (entity, attribute) depending on query type
+    // Use SQL-level deduplication with ROW_NUMBER() window function
     // For time-travel queries (asOf), deduplicate by (entity, attribute) to get latest value per attribute
     // For regular queries, deduplicate by (entity, attribute, value) to support multi-valued attributes
-    // Note: row.value is already a JSON string from the database, use it directly
-    const latestDatoms = new Map<string, any>();
-    for (const row of rows) {
-      // Use (entity, attribute) key for time-travel queries to get latest value per attribute
-      // Use (entity, attribute, value) key for regular queries to support multi-valued attributes
-      const key =
-        options.asOf !== undefined
-          ? `${row.entity}|${row.attribute}`
-          : `${row.entity}|${row.attribute}|${row.value}`;
-      const existing = latestDatoms.get(key);
-      if (!existing || row.tx > existing.tx) {
-        latestDatoms.set(key, row);
-      }
-    }
+    const partitionByColumns =
+      options.asOf !== undefined
+        ? "entity, attribute"
+        : "entity, attribute, value";
 
-    let results = Array.from(latestDatoms.values());
-
-    // Convert added from integer (0/1) to boolean for consistent filtering
-    // SQLite stores added as INTEGER, so we need to convert it
-    results = results.map((r) => ({
-      ...r,
-      added: Boolean(r.added),
-    }));
-
-    if (options.added === undefined || options.added === true) {
-      results = results.filter((r) => r.added === true);
+    // Build the added filter
+    let addedFilter = "";
+    if (options.added === true || options.added === undefined) {
+      addedFilter = "AND added = 1";
     } else if (options.added === false) {
-      results = results.filter((r) => r.added === false);
+      addedFilter = "AND added = 0";
     }
 
-    // Sort by entity, then attribute for consistent ordering
-    results.sort((a, b) => {
-      // Convert entity to number for comparison
-      let entityA: number;
-      if (typeof a.entity === "number") {
-        entityA = a.entity;
-      } else {
-        const entityStr = String(a.entity);
-        entityA = /^-?\d+$/.test(entityStr) ? parseInt(entityStr, 10) : 0;
-      }
+    const limitClause = options.limit ? "LIMIT ?" : "";
+    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-      let entityB: number;
-      if (typeof b.entity === "number") {
-        entityB = b.entity;
-      } else {
-        const entityStr = String(b.entity);
-        entityB = /^-?\d+$/.test(entityStr) ? parseInt(entityStr, 10) : 0;
-      }
+    const sql = `
+      WITH ranked_datoms AS (
+        SELECT 
+          entity,
+          attribute,
+          value,
+          tx,
+          added,
+          ROW_NUMBER() OVER (
+            PARTITION BY ${partitionByColumns}
+            ORDER BY tx DESC
+          ) AS rn
+        FROM ${this.tableName}
+        ${whereClause}
+      )
+      SELECT 
+        entity,
+        attribute,
+        value,
+        tx,
+        added
+      FROM ranked_datoms
+      WHERE rn = 1
+      ${addedFilter}
+      ORDER BY
+        CASE 
+          WHEN entity GLOB '-[0-9]*' OR entity GLOB '[0-9]*' THEN CAST(entity AS INTEGER)
+          ELSE 0
+        END,
+        attribute
+      ${limitClause}
+      ${offsetClause}
+    `;
 
-      if (entityA !== entityB) {
-        return entityA - entityB;
-      }
-      return String(a.attribute).localeCompare(String(b.attribute));
-    });
+    if (options.limit) {
+      params.push(options.limit);
+    }
+    if (options.offset !== undefined) {
+      params.push(options.offset);
+    }
 
-    const offset = options.offset ?? 0;
-    const paginated = options.limit
-      ? results.slice(offset, offset + options.limit)
-      : results.slice(offset);
+    const rows = await this.connection.query(sql, params);
 
     const reviveValue = (value: any): any => {
       if (typeof value === "string") {
@@ -316,7 +321,7 @@ export class SQLiteDatabase extends Database {
       return value;
     };
 
-    return paginated.map((row: any) => {
+    return rows.map((row: any) => {
       let entity: any = row.entity;
       if (typeof entity === "string") {
         if (/^-?\d+$/.test(entity)) {
@@ -332,7 +337,7 @@ export class SQLiteDatabase extends Database {
         attribute: row.attribute,
         value: revivedValue,
         tx: row.tx,
-        added: Boolean(row.added), // Ensure boolean conversion
+        added: Boolean(row.added),
       };
     });
   }
@@ -343,24 +348,378 @@ export class SQLiteDatabase extends Database {
       return [];
     }
 
-    const firstClause = query.where[0];
-    const firstResults = await this.executeClause(firstClause, query.asOf);
+    // For single clause queries, use the optimized query method
+    if (query.where.length === 1) {
+      const clause = query.where[0];
+      const [entityVal, attributeVal, valueVal] = clause;
+      const entity = this.isVariable(entityVal)
+        ? undefined
+        : (entityVal as EntityId);
+      const attribute = this.isVariable(attributeVal)
+        ? undefined
+        : (attributeVal as string);
+      const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    let results = firstResults;
-    for (let i = 1; i < query.where.length; i++) {
-      const clause = query.where[i];
-      const clauseResults = await this.executeClause(clause, query.asOf);
-      results = this.joinResults(
-        results,
-        clauseResults,
-        query.where.slice(0, i + 1)
-      );
+      const datoms = await this.query({
+        entity,
+        attribute,
+        value,
+        asOf: query.asOf,
+        added: true,
+      });
+
+      const results = datoms.map((datom) => {
+        const result: Record<string, Value> = {};
+        if (this.isVariable(entityVal)) {
+          result[entityVal as string] = datom.entity;
+        }
+        if (this.isVariable(attributeVal)) {
+          result[attributeVal as string] = datom.attribute;
+        }
+        if (this.isVariable(valueVal)) {
+          result[valueVal as string] = datom.value;
+        }
+        return result;
+      });
+
+      const projected = this.project(results, query.find, query.where);
+      return this.applyOrderAndLimit(projected, query);
     }
 
-    const projected = this.project(results, query.find, query.where);
+    // For multi-clause queries, build a single SQL query with JOINs
+    return this.executeDatalogWithSQL(query);
+  }
 
+  private async executeDatalogWithSQL(
+    query: DatalogQuery
+  ): Promise<QueryResult> {
+    const clauses = query.where;
+    const params: any[] = [];
+    const ctes: string[] = [];
+    const joins: string[] = [];
+    const selectColumns: string[] = [];
+    const joinConditions: string[] = [];
+
+    // Build CTEs for each clause with deduplication
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      const [entityVal, attributeVal, valueVal] = clause;
+      const alias = `d${i}`;
+
+      const conditions: string[] = [];
+      if (query.asOf !== undefined) {
+        conditions.push(`tx <= ?`);
+        params.push(query.asOf);
+      }
+
+      // Add filters for bound values
+      if (!this.isVariable(entityVal)) {
+        conditions.push(`entity = ?`);
+        params.push(String(entityVal));
+      }
+      if (!this.isVariable(attributeVal)) {
+        conditions.push(`attribute = ?`);
+        params.push(String(attributeVal));
+      }
+      if (!this.isVariable(valueVal)) {
+        let value = valueVal as Value;
+        if (value === undefined) {
+          value = "__UNDEFINED__";
+        }
+        if (typeof value === "symbol") {
+          value = `__SYMBOL__${String(value)}`;
+        }
+        conditions.push(`value = ?`);
+        params.push(JSON.stringify(value));
+      }
+
+      const whereClause =
+        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      // Use ROW_NUMBER for deduplication
+      const partitionBy =
+        query.asOf !== undefined
+          ? "entity, attribute"
+          : "entity, attribute, value";
+
+      const rankedCte = `
+        ${alias}_ranked AS (
+          SELECT 
+            entity,
+            attribute,
+            value,
+            tx,
+            added,
+            ROW_NUMBER() OVER (
+              PARTITION BY ${partitionBy}
+              ORDER BY tx DESC
+            ) AS rn
+          FROM ${this.tableName}
+          ${whereClause}
+        )`;
+
+      const cte = `
+        ${alias} AS (
+          SELECT entity, attribute, value, tx
+          FROM ${alias}_ranked
+          WHERE rn = 1 AND added = 1
+        )`;
+
+      // Store ranked CTE separately, then the final CTE
+      ctes.push(rankedCte);
+      ctes.push(cte);
+
+      // Build SELECT columns for variables
+      if (this.isVariable(entityVal)) {
+        selectColumns.push(
+          `${alias}.entity AS ${this.escapeColumnName(entityVal as string)}`
+        );
+      }
+      if (this.isVariable(attributeVal)) {
+        selectColumns.push(
+          `${alias}.attribute AS ${this.escapeColumnName(
+            attributeVal as string
+          )}`
+        );
+      }
+      if (this.isVariable(valueVal)) {
+        selectColumns.push(
+          `${alias}.value AS ${this.escapeColumnName(valueVal as string)}`
+        );
+      }
+    }
+
+    // Build JOIN conditions based on shared variables
+    const variableToClause: Map<
+      string,
+      { clauseIndex: number; field: string }[]
+    > = new Map();
+
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      const [entityVal, attributeVal, valueVal] = clause;
+
+      if (this.isVariable(entityVal)) {
+        const varName = entityVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause
+          .get(varName)!
+          .push({ clauseIndex: i, field: "entity" });
+      }
+      if (this.isVariable(attributeVal)) {
+        const varName = attributeVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause
+          .get(varName)!
+          .push({ clauseIndex: i, field: "attribute" });
+      }
+      if (this.isVariable(valueVal)) {
+        const varName = valueVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause.get(varName)!.push({ clauseIndex: i, field: "value" });
+      }
+    }
+
+    // Build JOIN conditions for shared variables
+    for (const [varName, occurrences] of variableToClause.entries()) {
+      if (occurrences.length > 1) {
+        // This variable appears in multiple clauses, need to join on it
+        for (let i = 1; i < occurrences.length; i++) {
+          const prev = occurrences[i - 1];
+          const curr = occurrences[i];
+          const prevAlias = `d${prev.clauseIndex}`;
+          const currAlias = `d${curr.clauseIndex}`;
+          joinConditions.push(
+            `${prevAlias}.${prev.field} = ${currAlias}.${curr.field}`
+          );
+        }
+      }
+    }
+
+    // Build the final SQL query
+    const cteClause = ctes.length > 0 ? `WITH ${ctes.join(", ")}` : "";
+    const fromClause = `FROM d0`;
+
+    // Build JOIN clauses properly - each table needs its own JOIN with conditions
+    const joinClauses: string[] = [];
+    for (let i = 1; i < clauses.length; i++) {
+      const alias = `d${i}`;
+      const conditions: string[] = [];
+
+      // Find all join conditions involving this alias
+      for (const joinCond of joinConditions) {
+        if (joinCond.includes(`${alias}.`)) {
+          // Extract the condition that connects this alias to a previous one
+          const parts = joinCond.split(" = ");
+          if (parts.length === 2) {
+            if (parts[1].startsWith(`${alias}.`)) {
+              conditions.push(joinCond);
+            } else if (parts[0].startsWith(`${alias}.`)) {
+              // Reverse the condition
+              conditions.push(`${parts[1]} = ${parts[0]}`);
+            }
+          }
+        }
+      }
+
+      if (conditions.length > 0) {
+        // Find the first alias this joins to
+        const firstCond = conditions[0];
+        const otherAlias = firstCond.includes("d0.")
+          ? "d0"
+          : firstCond.match(/d\d+/)?.find((a) => a !== alias) || "d0";
+        joinClauses.push(`JOIN ${alias} ON ${conditions.join(" AND ")}`);
+      } else {
+        // Cross join if no conditions (shouldn't happen in practice)
+        joinClauses.push(`CROSS JOIN ${alias}`);
+      }
+    }
+
+    const joinClause = joinClauses.join(" ");
+
+    // Build ORDER BY clause
+    let orderByClause = "";
+    if (query.orderBy && query.orderBy.length > 0) {
+      const orderParts = query.orderBy
+        .map(([variable, direction]) => {
+          // Find which clause/alias has this variable
+          for (let i = 0; i < clauses.length; i++) {
+            const clause = clauses[i];
+            const [entityVal, attributeVal, valueVal] = clause;
+            if (entityVal === variable) {
+              return `d${i}.entity ${direction.toUpperCase()}`;
+            }
+            if (attributeVal === variable) {
+              return `d${i}.attribute ${direction.toUpperCase()}`;
+            }
+            if (valueVal === variable) {
+              return `d${i}.value ${direction.toUpperCase()}`;
+            }
+          }
+          return "";
+        })
+        .filter(Boolean);
+      if (orderParts.length > 0) {
+        orderByClause = `ORDER BY ${orderParts.join(", ")}`;
+      }
+    }
+
+    const limitClause = query.limit ? `LIMIT ?` : "";
+    if (query.limit) {
+      params.push(query.limit);
+    }
+
+    const sql = `
+      ${cteClause}
+      SELECT ${selectColumns.join(", ")}
+      ${fromClause}
+      ${joinClause}
+      ${orderByClause}
+      ${limitClause}
+    `;
+
+    const rows = await this.connection.query(sql, params);
+
+    // Convert SQL results back to QueryResult format
+    const results: QueryResult = rows.map((row: any) => {
+      const result: Record<string, Value> = {};
+      for (const key of Object.keys(row)) {
+        let value = row[key];
+        // Parse JSON values - values are stored as JSON strings in SQLite
+        if (typeof value === "string") {
+          try {
+            // Try parsing as JSON first (handles numbers, booleans, objects, arrays, etc.)
+            value = JSON.parse(value);
+          } catch {
+            // Not valid JSON, keep as string
+          }
+        }
+        result[key] = this.reviveValue(value);
+      }
+      return result;
+    });
+
+    // Apply projection if needed
+    if (query.find.length > 0) {
+      return results.map((row) => {
+        const projected: Record<string, Value> = {};
+        for (const varName of query.find) {
+          if (varName in row) {
+            projected[varName] = row[varName];
+          }
+        }
+        return projected;
+      });
+    }
+
+    return results;
+  }
+
+  private escapeColumnName(name: string): string {
+    // SQLite column aliases can be quoted or unquoted
+    // For safety, quote them if they contain special characters
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+      return name;
+    }
+    return `"${name.replace(/"/g, '""')}"`;
+  }
+
+  private reviveValue(value: any): any {
+    if (typeof value === "string") {
+      if (value === "__UNDEFINED__") {
+        return undefined;
+      }
+      if (value.startsWith("__SYMBOL__")) {
+        const symbolDesc = value.substring("__SYMBOL__".length);
+        return Symbol(symbolDesc);
+      }
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+        return new Date(value);
+      }
+      // Try parsing as JSON if it looks like JSON
+      if (
+        (value.startsWith("{") || value.startsWith("[")) &&
+        value.length > 1
+      ) {
+        try {
+          const parsed = JSON.parse(value);
+          return this.reviveValue(parsed);
+        } catch {
+          // Not valid JSON, return as string
+        }
+      }
+    }
+    if (value === null) {
+      return null;
+    }
+    if (value === undefined) {
+      return undefined;
+    }
+    if (Array.isArray(value)) {
+      return value.map((v) => this.reviveValue(v));
+    }
+    if (typeof value === "object") {
+      const revived: any = {};
+      for (const key in value) {
+        revived[key] = this.reviveValue(value[key]);
+      }
+      return revived;
+    }
+    return value;
+  }
+
+  private applyOrderAndLimit(
+    results: QueryResult,
+    query: DatalogQuery
+  ): QueryResult {
     if (query.orderBy) {
-      projected.sort((a, b) => {
+      results.sort((a, b) => {
         for (const [variable, direction] of query.orderBy!) {
           const aVal = a[variable];
           const bVal = b[variable];
@@ -384,10 +743,10 @@ export class SQLiteDatabase extends Database {
     }
 
     if (query.limit) {
-      return projected.slice(0, query.limit);
+      return results.slice(0, query.limit);
     }
 
-    return projected;
+    return results;
   }
 
   async getEntity(entity: EntityId): Promise<Datom[]> {
@@ -433,20 +792,16 @@ export class SQLiteDatabase extends Database {
   }
 
   private async getNextTransactionId(): Promise<TransactionId> {
-    const initTxSql = `
+    // Optimized: Use INSERT ... ON CONFLICT to atomically initialize and update
+    // This reduces from 3 queries to 2 queries (init+update combined, then select)
+    const upsertSql = `
       INSERT INTO ${this.tableName}_tx (id, last_tx)
-      SELECT 1, 0
-      WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
+      VALUES (1, 0)
+      ON CONFLICT(id) DO UPDATE SET last_tx = last_tx + 1
     `;
-    await this.connection.execute(initTxSql);
+    await this.connection.execute(upsertSql);
 
-    const updateSql = `
-      UPDATE ${this.tableName}_tx
-      SET last_tx = last_tx + 1
-      WHERE id = 1
-    `;
-    await this.connection.execute(updateSql);
-
+    // Retrieve the updated value
     const selectSql = `
       SELECT last_tx FROM ${this.tableName}_tx WHERE id = 1
     `;
