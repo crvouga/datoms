@@ -6,7 +6,7 @@
  */
 
 import { Database as BunDatabase } from "bun:sqlite";
-import type { SqlConnection } from "../sql-utils.js";
+import type { SqlConnection } from "../sql-connection-adapter.js";
 
 /**
  * SQLite connection wrapper that implements SqlConnection interface

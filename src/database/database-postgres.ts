@@ -13,8 +13,7 @@ import type {
   Value,
 } from "../types.js";
 import type { DatalogQuery, QueryClause, QueryResult } from "./datalog.js";
-import type { SqlConnection, SqlDialect } from "./sql-utils.js";
-import { postgresDialect } from "./sql-utils.js";
+import type { SqlConnection } from "./sql-connection-adapter.js";
 
 /**
  * PostgreSQL database implementation
@@ -31,20 +30,15 @@ export class PostgreSQLDatabase extends Database {
     this.tableName = tableName;
   }
 
-  protected getDialect(): SqlDialect {
-    return postgresDialect;
-  }
-
   async initialize(): Promise<void> {
     if (!this.initialized) {
-      const dialect = this.getDialect();
       const createTableSql = `
         CREATE TABLE IF NOT EXISTS ${this.tableName} (
-          entity ${dialect.textType} NOT NULL,
-          attribute ${dialect.textType} NOT NULL,
-          value ${dialect.jsonType} NOT NULL,
-          tx ${dialect.integerType} NOT NULL,
-          added ${dialect.booleanType} NOT NULL,
+          entity TEXT NOT NULL,
+          attribute TEXT NOT NULL,
+          value JSONB NOT NULL,
+          tx BIGINT NOT NULL,
+          added BOOLEAN NOT NULL,
           PRIMARY KEY (entity, attribute, value, tx, added)
         )
       `;
@@ -63,8 +57,8 @@ export class PostgreSQLDatabase extends Database {
       // Create transaction counter table
       const txTableSql = `
         CREATE TABLE IF NOT EXISTS ${this.tableName}_tx (
-          id ${dialect.integerType} PRIMARY KEY,
-          last_tx ${dialect.integerType} NOT NULL DEFAULT 0
+          id BIGINT PRIMARY KEY,
+          last_tx BIGINT NOT NULL DEFAULT 0
         )
       `;
       await this.connection.execute(txTableSql);
@@ -193,6 +187,31 @@ export class PostgreSQLDatabase extends Database {
     } else if (options.added === false) {
       results = results.filter((r) => !r.added);
     }
+
+    // Sort by entity, then attribute for consistent ordering
+    results.sort((a, b) => {
+      // Convert entity to number for comparison
+      let entityA: number;
+      if (typeof a.entity === "number") {
+        entityA = a.entity;
+      } else {
+        const entityStr = String(a.entity);
+        entityA = /^-?\d+$/.test(entityStr) ? parseInt(entityStr, 10) : 0;
+      }
+
+      let entityB: number;
+      if (typeof b.entity === "number") {
+        entityB = b.entity;
+      } else {
+        const entityStr = String(b.entity);
+        entityB = /^-?\d+$/.test(entityStr) ? parseInt(entityStr, 10) : 0;
+      }
+
+      if (entityA !== entityB) {
+        return entityA - entityB;
+      }
+      return String(a.attribute).localeCompare(String(b.attribute));
+    });
 
     const offset = options.offset ?? 0;
     const paginated = options.limit
@@ -329,8 +348,6 @@ export class PostgreSQLDatabase extends Database {
   }
 
   private async getNextTransactionId(): Promise<TransactionId> {
-    const dialect = this.getDialect();
-
     const initTxSql = `
       INSERT INTO ${this.tableName}_tx (id, last_tx)
       SELECT 1, 0
@@ -361,12 +378,11 @@ export class PostgreSQLDatabase extends Database {
   ): Promise<void> {
     if (datoms.length === 0) return;
 
-    const dialect = this.getDialect();
     const placeholders = datoms.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const sql = `
       INSERT INTO ${this.tableName} (entity, attribute, value, tx, added)
       VALUES ${placeholders}
-      ${dialect.onConflict || ""}
+      ON CONFLICT DO NOTHING
     `;
 
     const params = datoms.flatMap((d) => {
@@ -389,12 +405,11 @@ export class PostgreSQLDatabase extends Database {
   ): Promise<void> {
     if (datoms.length === 0) return;
 
-    const dialect = this.getDialect();
     const placeholders = datoms.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const sql = `
       INSERT INTO ${this.tableName} (entity, attribute, value, tx, added)
       VALUES ${placeholders}
-      ${dialect.onConflict || ""}
+      ON CONFLICT DO NOTHING
     `;
 
     const params = datoms.flatMap((d) => {

@@ -21,9 +21,8 @@ export { PostgreSQLDatabase } from "./database-postgres.js";
 // Note: SQL connection implementations (SQLiteConnection, PostgresConnection) are test-only
 // Users should create their own SqlConnection implementations with their preferred SQL libraries
 
-// SQL utilities
-export { mysqlDialect, postgresDialect, sqliteDialect } from "./sql-utils.js";
-export type { SqlConnection, SqlDialect } from "./sql-utils.js";
+// SQL connection adapter
+export type { SqlConnection } from "./sql-connection-adapter.js";
 
 // Datalog query types
 export {

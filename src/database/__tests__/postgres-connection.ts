@@ -6,7 +6,7 @@
  */
 
 import { Pool, PoolClient } from "pg";
-import type { SqlConnection } from "../sql-utils.js";
+import type { SqlConnection } from "../sql-connection-adapter.js";
 
 /**
  * PostgreSQL connection wrapper that implements SqlConnection interface
