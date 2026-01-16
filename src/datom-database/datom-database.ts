@@ -207,7 +207,7 @@ export interface DatomWriter<T = void> {
    */
   transact(
     ops: { add?: DatomInput[]; retract?: DatomInput[] },
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<T>;
 }
 
@@ -316,7 +316,7 @@ export abstract class DatomDatabase
       add?: DatomInput[];
       retract?: DatomInput[];
     },
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<TransactionId> {
     const result = await this.transactWithResult(ops, metadata);
     return result.txId;
@@ -339,7 +339,7 @@ export abstract class DatomDatabase
       add?: DatomInput[];
       retract?: DatomInput[];
     },
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<TransactResult> {
     await this.ensureInitialized();
     // Use a transaction to ensure atomicity
@@ -375,14 +375,14 @@ export abstract class DatomDatabase
    * // Override in your subclass to store metadata:
    * protected async onTransactionMetadata(
    *   txId: TransactionId,
-   *   metadata: Record<string, any>
+   *   metadata: Record<string, unknown>
    * ): Promise<void> {
    *   await this.metadataTable.insert({ txId, ...metadata });
    * }
    */
   protected async onTransactionMetadata(
     txId: TransactionId,
-    metadata: Record<string, any>
+    metadata: Record<string, unknown>
   ): Promise<void> {
     // Override in implementations if metadata storage is needed
     // Default: no-op (metadata is ignored)
@@ -675,7 +675,7 @@ export abstract class DatomDatabase
    */
   abstract getTransactionMetadata(
     txId: TransactionId
-  ): Promise<Record<string, any> | undefined>;
+  ): Promise<Record<string, unknown> | undefined>;
 
   /**
    * Query datoms from the database using query options

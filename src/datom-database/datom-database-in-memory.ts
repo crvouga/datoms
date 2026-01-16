@@ -412,7 +412,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
    */
   async getTransactionMetadata(
     txId: TransactionId
-  ): Promise<Record<string, any> | undefined> {
+  ): Promise<Record<string, unknown> | undefined> {
     // Default: no metadata storage
     return undefined;
   }
