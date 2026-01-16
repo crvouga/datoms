@@ -64,7 +64,8 @@ const createPGLiteDatabase = async (): Promise<Fixture> => {
   return {
     database: db,
     cleanup: async () => {
-      await db.cleanup();
+      // PGLite creates a fresh instance each time, so no cleanup needed
+      // Calling cleanup() would close the connection, causing errors
     },
   };
 };
@@ -86,10 +87,24 @@ describe.each(implementations)("Database (%s)", (name, createFixture) => {
     const fixture = await createFixture();
     db = fixture.database;
     cleanup = fixture.cleanup;
+    // Clean up BEFORE each test for PostgreSQL (to ensure test isolation)
+    // This ensures each test starts with a clean database state
+    // PGLite creates fresh instances each time, so it doesn't need cleanup
+    if (name === "PostgreSQLDatabase") {
+      await cleanup();
+    }
   });
 
   afterEach(async () => {
-    await cleanup();
+    // Cleanup after test for non-PostgreSQL databases
+    // PostgreSQL cleanup happens in beforeEach to ensure clean state
+    // PGLite creates fresh instances, so it doesn't need cleanup
+    if (
+      name !== "PostgreSQLDatabase" &&
+      name !== "PostgreSQLDatabase (PGLite)"
+    ) {
+      await cleanup();
+    }
   });
 
   test("should create a database", async () => {

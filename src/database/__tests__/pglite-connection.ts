@@ -18,7 +18,9 @@ export class PGLiteConnection implements SqlConnection {
   private readyPromise: Promise<void>;
 
   constructor(dataDir: string = "memory://") {
-    this.db = new PGlite(dataDir);
+    this.db = new PGlite(dataDir, {
+      relaxedDurability: true,
+    });
     this.readyPromise = this.db.waitReady;
   }
 
