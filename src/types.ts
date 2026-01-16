@@ -114,3 +114,122 @@ export interface Schema {
   /** Map of attribute names to their definitions */
   attributes: Map<string, AttributeDefinition>;
 }
+
+/**
+ * Database statistics for observability
+ */
+export interface DatabaseStats {
+  /** Total number of datoms in the database */
+  totalDatoms: number;
+  /** Total number of entities */
+  totalEntities: number;
+  /** Total number of transactions */
+  totalTransactions: number;
+  /** Latest transaction ID */
+  latestTransaction: TransactionId;
+  /** Number of attributes defined in schema */
+  schemaAttributeCount: number;
+  /** Query performance metrics (if available) */
+  queryMetrics?: {
+    averageQueryTime?: number;
+    totalQueries?: number;
+  };
+  /** Transaction throughput metrics (if available) */
+  transactionMetrics?: {
+    transactionsPerSecond?: number;
+    averageTransactionTime?: number;
+  };
+}
+
+/**
+ * Event types emitted by the database
+ */
+export type DatabaseEventType =
+  | "transaction"
+  | "error"
+  | "query"
+  | "migration"
+  | "backup"
+  | "restore";
+
+/**
+ * Event payload for transaction events
+ */
+export interface TransactionEvent {
+  type: "transaction";
+  txId: TransactionId;
+  addedCount: number;
+  retractedCount: number;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Event payload for error events
+ */
+export interface ErrorEvent {
+  type: "error";
+  error: Error;
+  context?: Record<string, unknown>;
+}
+
+/**
+ * Event payload for query events
+ */
+export interface QueryEvent {
+  type: "query";
+  options: QueryOptions;
+  resultCount: number;
+  duration?: number;
+}
+
+/**
+ * Event payload for migration events
+ */
+export interface MigrationEvent {
+  type: "migration";
+  version: number;
+  success: boolean;
+  error?: Error;
+}
+
+/**
+ * Event payload for backup/restore events
+ */
+export interface BackupEvent {
+  type: "backup" | "restore";
+  datomCount: number;
+  success: boolean;
+  error?: Error;
+}
+
+/**
+ * Union type for all database events
+ */
+export type DatabaseEvent =
+  | TransactionEvent
+  | ErrorEvent
+  | QueryEvent
+  | MigrationEvent
+  | BackupEvent;
+
+/**
+ * Event listener callback type
+ */
+export type DatabaseEventListener = (
+  event: DatabaseEvent
+) => void | Promise<void>;
+
+/**
+ * Options for optimistic locking
+ */
+export interface OptimisticLockOptions {
+  /** Expected transaction ID (transaction will fail if current txId doesn't match) */
+  expectedTxId?: TransactionId;
+  /** Retry configuration for conflicts */
+  retry?: {
+    /** Maximum number of retries */
+    maxRetries: number;
+    /** Delay between retries in milliseconds */
+    delayMs?: number;
+  };
+}

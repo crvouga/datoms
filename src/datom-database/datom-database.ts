@@ -9,11 +9,23 @@ import type {
   AttributeDefinition,
   Datom,
   DatomInput,
+  DatabaseEvent,
+  DatabaseEventListener,
+  DatabaseStats,
   EntityId,
+  OptimisticLockOptions,
   QueryOptions,
   TransactionId,
   Value,
 } from "../types.js";
+import {
+  CardinalityError,
+  DatomTypeError,
+  MigrationError,
+  QuerySafetyError,
+  TransactionConflictError,
+  UniqueConstraintError,
+} from "./errors.js";
 
 /**
  * Shared interface for reading datoms
@@ -295,25 +307,56 @@ export interface Transaction extends DatomReader, DatomWriter<void> {
  * - Within a transaction, all reads see uncommitted changes from earlier operations in the same transaction
  * - Concurrent transactions do not see each other's uncommitted changes
  * - If a transaction throws an error, all changes are automatically rolled back
+ * - Optimistic locking is supported via `transaction()` options for conflict detection
  *
  * **Schema Enforcement:**
  * - Attributes can be used without schema definitions (schema is optional)
  * - When an attribute is defined, validation is enforced (type, cardinality, uniqueness)
  * - Use `defineAttribute()` to add schema constraints, or work without schema for flexibility
+ * - Schema migrations are supported via `migrate()` and `getSchemaVersion()`
+ *
+ * **Observability:**
+ * - Event system for monitoring transactions, queries, errors, and migrations
+ * - Database statistics via `getStats()` for performance monitoring
+ * - Query and transaction metrics are tracked automatically
+ *
+ * **Backup & Recovery:**
+ * - Export datoms via `export()` for backup and replication
+ * - Import datoms via `import()` for restore and migration
+ * - Supports streaming for large datasets
  *
  * @example
  * // Example usage: Create, add and query
  * class MyDb extends DatomDatabase { ... }
  * const db = new MyDb();
  * await db.initialize();
+ *
+ * // Listen to events
+ * db.on("transaction", (event) => {
+ *   console.log(`Transaction ${event.txId} completed`);
+ * });
+ *
  * await db.add([[1, "name", "Alice"]]);
  * const name = await db.getValue(1, "name"); // "Alice"
+ *
+ * // Get statistics
+ * const stats = await db.getStats();
+ * console.log(`Total datoms: ${stats.totalDatoms}`);
  */
 export abstract class DatomDatabase
   implements DatomReader, DatomWriter<TransactionId>
 {
   protected initialized = false;
   protected schema: Map<string, AttributeDefinition> = new Map();
+  protected schemaVersion: number = 0;
+  private eventListeners: Map<
+    DatabaseEvent["type"],
+    Set<DatabaseEventListener>
+  > = new Map();
+  private queryCount: number = 0;
+  private transactionCount: number = 0;
+  private queryTimeSum: number = 0;
+  private transactionTimeSum: number = 0;
 
   /**
    * Initialize the database
@@ -501,11 +544,23 @@ export abstract class DatomDatabase
       if (metadata !== undefined) {
         await this.onTransactionMetadata(txId, metadata);
       }
-      return {
+
+      const result = {
         txId,
         addedCount,
         retractedCount,
       };
+
+      // Emit transaction event
+      await this.emitEvent({
+        type: "transaction",
+        txId,
+        addedCount,
+        retractedCount,
+        metadata,
+      });
+
+      return result;
     });
   }
 
@@ -857,15 +912,39 @@ export abstract class DatomDatabase
 
     if (!hasFilter && !hasLimit) {
       if (isHistory) {
-        throw new Error(
+        throw new QuerySafetyError(
           "History query must include at least one filter or a limit to prevent full table scans"
         );
       }
-      throw new Error(
+      throw new QuerySafetyError(
         "Query must include at least one filter (entity, attribute, value, tx, asOf) or a limit to prevent full table scans"
       );
     }
-    return this.executeQuery(options);
+
+    const startTime = Date.now();
+    try {
+      const results = await this.executeQuery(options);
+      const duration = Date.now() - startTime;
+
+      this.queryCount++;
+      this.queryTimeSum += duration;
+
+      await this.emitEvent({
+        type: "query",
+        options,
+        resultCount: results.length,
+        duration,
+      });
+
+      return results;
+    } catch (error) {
+      await this.emitEvent({
+        type: "error",
+        error: error instanceof Error ? error : new Error(String(error)),
+        context: { operation: "query", options },
+      });
+      throw error;
+    }
   }
 
   /**
@@ -950,7 +1029,12 @@ export abstract class DatomDatabase
             attribute
           );
           if (typeError) {
-            throw typeError;
+            throw new DatomTypeError(
+              String(attribute),
+              value,
+              definition.type!,
+              typeof value
+            );
           }
         }
       }
@@ -962,12 +1046,10 @@ export abstract class DatomDatabase
           const key = `${String(datom[0])}|${String(datom[1])}`;
           if (entityAttributePairs.has(key)) {
             // Multiple values for same entity-attribute pair in this batch
-            throw new Error(
-              `Attribute "${String(
-                datom[1]
-              )}" has cardinality: one, but multiple values provided for entity "${String(
-                datom[0]
-              )}" in the same transaction`
+            throw new CardinalityError(
+              String(datom[1]),
+              String(datom[0]),
+              "multiple_values_in_batch"
             );
           }
           entityAttributePairs.set(key, datom);
@@ -978,12 +1060,10 @@ export abstract class DatomDatabase
           const [entity, attribute] = key.split("|");
           const existingValues = await this.getValues(entity, attribute);
           if (existingValues.length > 0) {
-            throw new Error(
-              `Attribute "${String(
-                attribute
-              )}" has cardinality: one, but entity "${String(
-                entity
-              )}" already has a value. Retract the existing value first.`
+            throw new CardinalityError(
+              String(attribute),
+              String(entity),
+              "existing_value_conflict"
             );
           }
         }
@@ -1013,13 +1093,7 @@ export abstract class DatomDatabase
             // Check if any of the new datoms have a different entity
             for (const datom of valueDatoms) {
               if (String(datom[0]) !== String(existingEntity)) {
-                throw new Error(
-                  `Attribute "${String(
-                    attrKey
-                  )}" is unique, but value already exists for entity "${String(
-                    existingEntity
-                  )}"`
-                );
+                throw new UniqueConstraintError(attrKey, value, existingEntity);
               }
             }
           }
@@ -1034,6 +1108,7 @@ export abstract class DatomDatabase
    * @param expectedType The expected type from the attribute definition
    * @param attribute The attribute name (for error messages)
    * @returns Error if type mismatch, undefined if valid
+   * @internal
    */
   private validateValueType(
     value: Value,
@@ -1390,18 +1465,467 @@ export abstract class DatomDatabase
    * All operations performed through the transaction object will be
    * part of the same transaction. If the callback throws an error,
    * the transaction will be rolled back automatically.
+   *
+   * **Transaction Isolation:**
+   * - Transactions use READ COMMITTED isolation by default
+   * - Within a transaction, all reads see uncommitted changes from earlier operations in the same transaction
+   * - Concurrent transactions do not see each other's uncommitted changes
+   * - If a transaction throws an error, all changes are automatically rolled back
+   *
+   * **Optimistic Locking:**
+   * - Use `options.expectedTxId` to ensure the database hasn't changed since you last read it
+   * - If a conflict is detected, the transaction will fail with `TransactionConflictError`
+   * - Configure retries with `options.retry` to automatically retry on conflicts
+   *
    * @param callback Function that receives a transaction object
+   * @param options Optional optimistic locking options
    * @returns The return value of the callback
    * @example
+   * // Basic transaction
    * await db.transaction(async (tx) => {
    *   await tx.add([[101, "flag", true]]);
    *   const has = await tx.hasFact(101, "flag", true);
-   *   // ...
    * });
+   *
+   * // With optimistic locking and retries
+   * await db.transaction(
+   *   async (tx) => {
+   *     await tx.add([[101, "flag", true]]);
+   *   },
+   *   {
+   *     expectedTxId: 100,
+   *     retry: { maxRetries: 3, delayMs: 100 }
+   *   }
+   * );
    */
-  abstract transaction<T>(
+  async transaction<T>(
+    callback: (tx: Transaction) => Promise<T>,
+    options?: OptimisticLockOptions
+  ): Promise<T> {
+    await this.ensureInitialized();
+
+    const maxRetries = options?.retry?.maxRetries ?? 0;
+    const delayMs = options?.retry?.delayMs ?? 100;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // Check optimistic lock if specified
+        if (options?.expectedTxId !== undefined) {
+          const currentTxId = await this.getLatestTransaction();
+          if (currentTxId !== options.expectedTxId) {
+            throw new TransactionConflictError(
+              `Transaction conflict: expected txId ${options.expectedTxId}, but current is ${currentTxId}`,
+              options.expectedTxId,
+              currentTxId
+            );
+          }
+        }
+
+        const startTime = Date.now();
+        const result = await this.executeTransaction(callback);
+        const duration = Date.now() - startTime;
+
+        this.transactionCount++;
+        this.transactionTimeSum += duration;
+
+        return result;
+      } catch (error) {
+        // Retry on transaction conflicts if retries are configured
+        if (error instanceof TransactionConflictError && attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    // Should never reach here, but TypeScript needs it
+    throw new Error("Transaction failed after retries");
+  }
+
+  /**
+   * Internal method to execute a transaction
+   * Implementations should override this method
+   * @param callback Transaction callback
+   */
+  protected abstract executeTransaction<T>(
     callback: (tx: Transaction) => Promise<T>
   ): Promise<T>;
+
+  /**
+   * Get the current schema version
+   * @returns The current schema version number
+   * @example
+   * const version = await db.getSchemaVersion();
+   * if (version < 2) {
+   *   await db.migrate(2);
+   * }
+   */
+  async getSchemaVersion(): Promise<number> {
+    await this.ensureInitialized();
+    return this.schemaVersion;
+  }
+
+  /**
+   * Migrate the database schema to a specific version
+   * Implementations should override this method to perform actual migrations.
+   * The base implementation only updates the schema version counter.
+   * @param targetVersion Target schema version to migrate to
+   * @throws MigrationError if migration fails
+   * @example
+   * // In your implementation:
+   * async migrate(version: number): Promise<void> {
+   *   await super.migrate(version);
+   *   const current = await this.getSchemaVersion();
+   *   for (let v = current + 1; v <= version; v++) {
+   *     await this.runMigration(v);
+   *   }
+   * }
+   */
+  async migrate(targetVersion: number): Promise<void> {
+    await this.ensureInitialized();
+    if (targetVersion < this.schemaVersion) {
+      throw new MigrationError(
+        `Cannot migrate backwards from version ${this.schemaVersion} to ${targetVersion}`,
+        targetVersion
+      );
+    }
+    try {
+      await this.onMigrate(this.schemaVersion, targetVersion);
+      this.schemaVersion = targetVersion;
+      await this.emitEvent({
+        type: "migration",
+        version: targetVersion,
+        success: true,
+      });
+    } catch (error) {
+      await this.emitEvent({
+        type: "migration",
+        version: targetVersion,
+        success: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+      throw new MigrationError(
+        `Migration to version ${targetVersion} failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        targetVersion,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Hook for implementations to perform actual migration logic
+   * @param fromVersion Current schema version
+   * @param toVersion Target schema version
+   * @example
+   * protected async onMigrate(fromVersion: number, toVersion: number): Promise<void> {
+   *   // Perform migration steps
+   * }
+   */
+  protected async onMigrate(
+    fromVersion: number,
+    toVersion: number
+  ): Promise<void> {
+    // Override in implementations to perform actual migrations
+  }
+
+  /**
+   * Register an event listener for database events
+   * @param eventType Type of event to listen for
+   * @param listener Callback function to handle events
+   * @returns Function to unsubscribe the listener
+   * @example
+   * const unsubscribe = db.on("transaction", (event) => {
+   *   console.log(`Transaction ${event.txId} completed`);
+   * });
+   * // Later...
+   * unsubscribe();
+   */
+  on(
+    eventType: DatabaseEvent["type"],
+    listener: DatabaseEventListener
+  ): () => void {
+    if (!this.eventListeners.has(eventType)) {
+      this.eventListeners.set(eventType, new Set());
+    }
+    this.eventListeners.get(eventType)!.add(listener);
+    // Return unsubscribe function
+    return () => {
+      this.eventListeners.get(eventType)?.delete(listener);
+    };
+  }
+
+  /**
+   * Emit an event to all registered listeners
+   * @param event Event to emit
+   * @internal
+   */
+  protected async emitEvent(event: DatabaseEvent): Promise<void> {
+    const listeners = this.eventListeners.get(event.type);
+    if (listeners) {
+      await Promise.all(
+        Array.from(listeners).map((listener) => {
+          try {
+            return listener(event);
+          } catch (error) {
+            // Emit error event for listener failures
+            this.emitEvent({
+              type: "error",
+              error: error instanceof Error ? error : new Error(String(error)),
+              context: { eventType: event.type },
+            }).catch(() => {
+              // Ignore errors in error event emission
+            });
+          }
+        })
+      );
+    }
+  }
+
+  /**
+   * Get database statistics for observability
+   * @returns Database statistics
+   * @example
+   * const stats = await db.getStats();
+   * console.log(`Total datoms: ${stats.totalDatoms}`);
+   * console.log(`Latest transaction: ${stats.latestTransaction}`);
+   */
+  async getStats(): Promise<DatabaseStats> {
+    await this.ensureInitialized();
+    const latestTx = await this.getLatestTransaction();
+    const stats: DatabaseStats = {
+      totalDatoms: 0,
+      totalEntities: 0,
+      totalTransactions: latestTx,
+      latestTransaction: latestTx,
+      schemaAttributeCount: this.schema.size,
+    };
+
+    // Try to get more detailed stats (implementations can override)
+    const detailedStats = await this.getDetailedStats();
+    Object.assign(stats, detailedStats);
+
+    // Add query metrics if available
+    if (this.queryCount > 0) {
+      stats.queryMetrics = {
+        totalQueries: this.queryCount,
+        averageQueryTime: this.queryTimeSum / this.queryCount / 1000, // Convert to seconds
+      };
+    }
+
+    // Add transaction metrics if available
+    if (this.transactionCount > 0) {
+      stats.transactionMetrics = {
+        averageTransactionTime:
+          this.transactionTimeSum / this.transactionCount / 1000, // Convert to seconds
+      };
+    }
+
+    return stats;
+  }
+
+  /**
+   * Hook for implementations to provide detailed statistics
+   * Override this method to provide backend-specific stats
+   * @returns Partial stats object with implementation-specific metrics
+   */
+  protected async getDetailedStats(): Promise<
+    Partial<Pick<DatabaseStats, "totalDatoms" | "totalEntities">>
+  > {
+    return {};
+  }
+
+  /**
+   * Export all datoms from the database as an async iterable
+   * Useful for backup, replication, and migration scenarios
+   *
+   * **Note:** This method bypasses query safety checks and can perform full table scans.
+   * Use filters in options to limit the export scope when possible.
+   *
+   * @param options Optional export options (filters are recommended but not required)
+   * @returns Async iterable of datoms
+   * @example
+   * // Stream all datoms to a file (full export)
+   * const stream = db.export();
+   * for await (const datom of stream) {
+   *   await writeDatomToFile(datom);
+   * }
+   *
+   * // Export with filters (recommended for large databases)
+   * const filtered = db.export({ attribute: "status" });
+   * for await (const datom of filtered) {
+   *   // Process datom
+   * }
+   */
+  async *export(options?: QueryOptions): AsyncIterable<Datom> {
+    await this.ensureInitialized();
+    let datomCount = 0;
+    try {
+      // Use queryInternal to bypass safety checks for export (explicit operation)
+      const datoms = await this.queryInternal(options || {});
+      for (const datom of datoms) {
+        yield datom;
+        datomCount++;
+      }
+      await this.emitEvent({
+        type: "backup",
+        datomCount,
+        success: true,
+      });
+    } catch (error) {
+      await this.emitEvent({
+        type: "backup",
+        datomCount,
+        success: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Import datoms into the database from an async iterable
+   * Useful for restore, replication, and migration scenarios
+   * @param source Async iterable of datoms to import
+   * @param options Optional import options
+   * @returns Number of datoms imported
+   * @example
+   * // Import from a file
+   * const datoms = readDatomsFromFile();
+   * const count = await db.import(datoms);
+   * console.log(`Imported ${count} datoms`);
+   */
+  async import(
+    source: AsyncIterable<Datom>,
+    options?: { batchSize?: number; validate?: boolean }
+  ): Promise<number> {
+    await this.ensureInitialized();
+    const batchSize = options?.batchSize ?? 1000;
+    const validate = options?.validate ?? true;
+    let datomCount = 0;
+    let batch: DatomInput[] = [];
+
+    try {
+      for await (const datom of source) {
+        // Convert Datom to DatomInput
+        batch.push([datom.entity, datom.attribute, datom.value]);
+
+        if (batch.length >= batchSize) {
+          if (validate) {
+            await this.validateDatoms(batch, datom.added);
+          }
+          if (datom.added) {
+            await this.add(batch);
+          } else {
+            await this.retract(batch);
+          }
+          datomCount += batch.length;
+          batch = [];
+        }
+      }
+
+      // Process remaining batch
+      if (batch.length > 0) {
+        if (validate) {
+          await this.validateDatoms(batch, true);
+        }
+        await this.add(batch);
+        datomCount += batch.length;
+      }
+
+      await this.emitEvent({
+        type: "restore",
+        datomCount,
+        success: true,
+      });
+
+      return datomCount;
+    } catch (error) {
+      await this.emitEvent({
+        type: "restore",
+        datomCount,
+        success: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Check if an entity exists in the database
+   * @param entity Entity ID to check
+   * @returns True if the entity has any datoms
+   * @example
+   * if (await db.exists(123)) {
+   *   console.log("Entity 123 exists");
+   * }
+   */
+  async exists(entity: EntityId): Promise<boolean> {
+    await this.ensureInitialized();
+    const datoms = await this.query({ entity, limit: 1 });
+    return datoms.length > 0;
+  }
+
+  /**
+   * Upsert multiple values atomically
+   * For each entity-attribute pair, retracts existing values if cardinality is "one" and adds the new value
+   * @param upserts Array of {entity, attribute, value} objects to upsert
+   * @returns The transaction ID
+   * @example
+   * await db.upsertMany([
+   *   { entity: 1, attribute: "name", value: "Alice" },
+   *   { entity: 2, attribute: "name", value: "Bob" },
+   *   { entity: 1, attribute: "status", value: "active" }
+   * ]);
+   */
+  async upsertMany(
+    upserts: Array<{ entity: EntityId; attribute: string; value: Value }>
+  ): Promise<TransactionId> {
+    await this.ensureInitialized();
+    if (upserts.length === 0) {
+      return this.transact({});
+    }
+
+    // Group by attribute to batch validation
+    const byAttribute = new Map<
+      string,
+      Array<{ entity: EntityId; attribute: string; value: Value }>
+    >();
+    for (const upsert of upserts) {
+      const attrKey = String(upsert.attribute);
+      if (!byAttribute.has(attrKey)) {
+        byAttribute.set(attrKey, []);
+      }
+      byAttribute.get(attrKey)!.push(upsert);
+    }
+
+    // Collect retractions and additions
+    const toRetract: DatomInput[] = [];
+    const toAdd: DatomInput[] = [];
+
+    for (const [attrKey, attrUpserts] of byAttribute) {
+      const definition = this.getAttributeDefinition(attrKey);
+      const isCardinalityOne = definition?.cardinality === "one";
+
+      for (const { entity, attribute, value } of attrUpserts) {
+        if (isCardinalityOne) {
+          // Retract existing values
+          const existingValues = await this.getValues(entity, attribute);
+          for (const existingValue of existingValues) {
+            toRetract.push([entity, attribute, existingValue]);
+          }
+        }
+        toAdd.push([entity, attribute, value]);
+      }
+    }
+
+    return this.transact({
+      retract: toRetract.length > 0 ? toRetract : undefined,
+      add: toAdd,
+    });
+  }
 
   /**
    * Ensure the database is initialized

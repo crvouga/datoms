@@ -31,3 +31,14 @@ export {
 
 // Transaction type
 export type { Transaction } from "./datom-database.js";
+
+// Error classes
+export {
+  CardinalityError,
+  DatomDatabaseError,
+  DatomTypeError,
+  MigrationError,
+  QuerySafetyError,
+  TransactionConflictError,
+  UniqueConstraintError,
+} from "./errors.js";

@@ -772,7 +772,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     return this.query({ entity, added: true });
   }
 
-  async transaction<T>(callback: (tx: Transaction) => Promise<T>): Promise<T> {
+  protected async executeTransaction<T>(
+    callback: (tx: Transaction) => Promise<T>
+  ): Promise<T> {
     await this.ensureInitialized();
 
     if (
