@@ -726,11 +726,11 @@ class PostgreSQLTransaction implements Transaction {
   async query(options: QueryOptions): Promise<Datom[]> {
     // For asOf queries, only query committed state (ignore pending changes)
     if (options.asOf !== undefined) {
-      return this.db.queryInternal(options);
+      return this.db._queryInternalForTransaction(options);
     }
 
     // Query committed data (bypass validation since transactions manage their own constraints)
-    const committed = await this.db.queryInternal(options);
+    const committed = await this.db._queryInternalForTransaction(options);
 
     // Merge with pending changes
     const pending = this.mergePendingChanges(committed, options);

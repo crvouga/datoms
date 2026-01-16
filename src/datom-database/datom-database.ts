@@ -5,6 +5,7 @@
 
 import type { DatalogQuery, QueryResult } from "../datalog/datalog.js";
 import type {
+  Attribute,
   AttributeDefinition,
   Datom,
   DatomInput,
@@ -253,10 +254,25 @@ export abstract class DatomDatabase
    * Define an attribute schema
    * @param definition Attribute definition
    * @example
+   * // Basic attribute definition
    * await db.defineAttribute({
    *   name: "email",
    *   type: "string",
    *   unique: true,
+   *   cardinality: "one"
+   * });
+   *
+   * // Attribute with type constraint
+   * await db.defineAttribute({
+   *   name: "age",
+   *   type: "number",
+   *   cardinality: "one"
+   * });
+   *
+   * // Reference attribute (EntityId)
+   * await db.defineAttribute({
+   *   name: "parent",
+   *   type: "ref",
    *   cardinality: "one"
    * });
    */
@@ -295,8 +311,12 @@ export abstract class DatomDatabase
    * @param options Query options (must include at least one filter or limit to prevent full scans)
    * @returns Array of matching datoms
    * @example
-   * // Only query by filters to prevent accidental full table scan:
+   * // Query by filters to prevent accidental full table scan:
    * const datoms = await db.query({ attribute: "name", value: "Alice" });
+   *
+   * // Pagination example:
+   * const page1 = await db.query({ attribute: "status", limit: 10, offset: 0 });
+   * const page2 = await db.query({ attribute: "status", limit: 10, offset: 10 });
    */
   async query(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
@@ -324,85 +344,241 @@ export abstract class DatomDatabase
   }
 
   /**
-   * Internal query method that bypasses validation
-   * Used by datalog queries and transactions where validation is not needed
-   * This is public to allow transaction implementations to access it, but should
-   * not be used directly by external consumers - use query() instead
+   * Internal query method that bypasses validation.
+   * Used by datalog queries and transactions where validation is not needed.
+   * This is protected and should only be used by subclasses - external consumers should use query() instead.
    * @param options Query options
    * @returns Array of matching datoms
    * @example
    * // Used internally in datalog or in transaction implementations:
-   * await db.queryInternal({ entity: 42 });
+   * const datoms = await this.queryInternal({ entity: 42 });
    */
-  async queryInternal(options: QueryOptions): Promise<Datom[]> {
+  protected async queryInternal(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
     return this.executeQuery(options);
   }
 
   /**
-   * Validate datoms against the current schema
+   * Internal method for transaction classes to access queryInternal.
+   * This is public but marked as internal-use-only. External consumers should use query() instead.
+   * @internal
+   */
+  public _queryInternalForTransaction(options: QueryOptions): Promise<Datom[]> {
+    return this.queryInternal(options);
+  }
+
+  /**
+   * Validate datoms against the current schema.
+   *
+   * **Implementation Note:** This method should be called in `add()` and `retract()`
+   * implementations before writing datoms to the database. It validates:
+   * - Type constraints (if `type` is specified in the attribute definition)
+   * - Cardinality constraints (for `cardinality: "one"` attributes)
+   * - Uniqueness constraints (for `unique: true` attributes)
+   *
+   * Transaction implementations may optionally call this method on commit to validate
+   * all pending changes at once, or they may defer validation to the base class methods.
+   *
    * @param datoms Array of datoms to validate
    * @param isAdd Whether these datoms are being added (true) or retracted (false)
+   * @throws Error if validation fails (type mismatch, cardinality violation, uniqueness violation)
    * @example
-   * // Used internally before adding to enforce unique/cardinality constraints
-   * await db.validateDatoms(addList, true);
+   * // Typical usage in add() implementation:
+   * async add(datoms: DatomInput[]): Promise<TransactionId> {
+   *   await this.ensureInitialized();
+   *   await this.validateDatoms(datoms, true);
+   *   // ... proceed with adding datoms
+   * }
    */
   protected async validateDatoms(
     datoms: DatomInput[],
     isAdd: boolean
   ): Promise<void> {
-    for (const [entity, attribute, value] of datoms) {
-      const definition = this.getAttributeDefinition(attribute as string);
+    if (datoms.length === 0) {
+      return;
+    }
+
+    // Group datoms by attribute for efficient validation
+    const byAttribute = new Map<string, DatomInput[]>();
+    for (const datom of datoms) {
+      const attrKey = String(datom[1]);
+      if (!byAttribute.has(attrKey)) {
+        byAttribute.set(attrKey, []);
+      }
+      byAttribute.get(attrKey)!.push(datom);
+    }
+
+    // Validate each attribute group
+    for (const [attrKey, attrDatoms] of byAttribute) {
+      const definition = this.getAttributeDefinition(attrKey);
       if (!definition) {
-        // If no schema is defined, we allow any attribute but can't validate cardinality/uniqueness
+        // If no schema is defined, we allow any attribute but can't validate constraints
         continue;
       }
 
-      // If adding, check for cardinality: one
-      if (isAdd && definition.cardinality === "one") {
-        // Check if a value already exists for this entity/attribute
-        // In a transaction, we'd need to check uncommitted changes too
-        // For now, this is a basic check. Implementations can override for more complex validation.
-        const existingValues = await this.getValues(
-          entity,
-          attribute as string
-        );
-        if (existingValues.length > 0) {
-          // If we're adding a new value for a single-valued attribute,
-          // the user should have retracted the old one first, or we could auto-retract.
-          // Datomic usually auto-retracts for cardinality: one if you use entity maps,
-          // but for raw datom adds it might require explicit retraction.
-          // Let's be strict for now.
-          throw new Error(
-            `Attribute "${String(
-              attribute
-            )}" has cardinality: one, but entity "${String(
-              entity
-            )}" already has a value. Retract the existing value first.`
+      // Type validation (only for adds)
+      if (isAdd && definition.type !== undefined && definition.type !== null) {
+        for (const [entity, attribute, value] of attrDatoms) {
+          const typeError = this.validateValueType(
+            value,
+            definition.type,
+            attribute
           );
+          if (typeError) {
+            throw typeError;
+          }
         }
       }
 
-      // Check uniqueness
-      if (isAdd && definition.unique) {
-        const existingDatoms = await this.query({
-          attribute: attribute as string,
-          value,
-        });
-        if (existingDatoms.length > 0) {
-          const first = existingDatoms[0];
-          if (first.entity !== entity) {
+      // Batch cardinality checks: group by (entity, attribute)
+      if (isAdd && definition.cardinality === "one") {
+        const entityAttributePairs = new Map<string, DatomInput>();
+        for (const datom of attrDatoms) {
+          const key = `${String(datom[0])}|${String(datom[1])}`;
+          if (entityAttributePairs.has(key)) {
+            // Multiple values for same entity-attribute pair in this batch
+            throw new Error(
+              `Attribute "${String(
+                datom[1]
+              )}" has cardinality: one, but multiple values provided for entity "${String(
+                datom[0]
+              )}" in the same transaction`
+            );
+          }
+          entityAttributePairs.set(key, datom);
+        }
+
+        // Batch query for existing values
+        for (const [key, datom] of entityAttributePairs) {
+          const [entity, attribute] = key.split("|");
+          const existingValues = await this.getValues(entity, attribute);
+          if (existingValues.length > 0) {
             throw new Error(
               `Attribute "${String(
                 attribute
-              )}" is unique, but value already exists for entity "${String(
-                first.entity
-              )}"`
+              )}" has cardinality: one, but entity "${String(
+                entity
+              )}" already has a value. Retract the existing value first.`
             );
           }
         }
       }
+
+      // Batch uniqueness checks: group by (attribute, value)
+      if (isAdd && definition.unique) {
+        const valueGroups = new Map<string, DatomInput[]>();
+        for (const datom of attrDatoms) {
+          const valueKey = JSON.stringify(datom[2]);
+          if (!valueGroups.has(valueKey)) {
+            valueGroups.set(valueKey, []);
+          }
+          valueGroups.get(valueKey)!.push(datom);
+        }
+
+        // Batch query for existing datoms with same attribute-value
+        for (const [valueKey, valueDatoms] of valueGroups) {
+          const value = JSON.parse(valueKey);
+          const existingDatoms = await this.query({
+            attribute: attrKey,
+            value,
+          });
+
+          if (existingDatoms.length > 0) {
+            const existingEntity = existingDatoms[0].entity;
+            // Check if any of the new datoms have a different entity
+            for (const datom of valueDatoms) {
+              if (String(datom[0]) !== String(existingEntity)) {
+                throw new Error(
+                  `Attribute "${String(
+                    attrKey
+                  )}" is unique, but value already exists for entity "${String(
+                    existingEntity
+                  )}"`
+                );
+              }
+            }
+          }
+        }
+      }
     }
+  }
+
+  /**
+   * Validate that a value matches the expected type for an attribute
+   * @param value The value to validate
+   * @param expectedType The expected type from the attribute definition
+   * @param attribute The attribute name (for error messages)
+   * @returns Error if type mismatch, undefined if valid
+   */
+  private validateValueType(
+    value: Value,
+    expectedType: "string" | "number" | "boolean" | "date" | "ref",
+    attribute: Attribute
+  ): Error | undefined {
+    switch (expectedType) {
+      case "string":
+        if (typeof value !== "string") {
+          return new Error(
+            `Attribute "${String(
+              attribute
+            )}" expects type "string", but got ${typeof value}`
+          );
+        }
+        break;
+      case "number":
+        if (typeof value !== "number") {
+          return new Error(
+            `Attribute "${String(
+              attribute
+            )}" expects type "number", but got ${typeof value}`
+          );
+        }
+        break;
+      case "boolean":
+        if (typeof value !== "boolean") {
+          return new Error(
+            `Attribute "${String(
+              attribute
+            )}" expects type "boolean", but got ${typeof value}`
+          );
+        }
+        break;
+      case "date":
+        if (!(value instanceof Date) && typeof value !== "string") {
+          return new Error(
+            `Attribute "${String(
+              attribute
+            )}" expects type "date" (Date object or date string), but got ${typeof value}`
+          );
+        }
+        // If it's a string, try to parse it as a date
+        if (typeof value === "string") {
+          const parsed = new Date(value);
+          if (isNaN(parsed.getTime())) {
+            return new Error(
+              `Attribute "${String(
+                attribute
+              )}" expects type "date", but string "${value}" is not a valid date`
+            );
+          }
+        }
+        break;
+      case "ref":
+        // EntityId can be number, string, or symbol
+        if (
+          typeof value !== "number" &&
+          typeof value !== "string" &&
+          typeof value !== "symbol"
+        ) {
+          return new Error(
+            `Attribute "${String(
+              attribute
+            )}" expects type "ref" (EntityId), but got ${typeof value}`
+          );
+        }
+        break;
+    }
+    return undefined;
   }
 
   /**
@@ -490,10 +666,14 @@ export abstract class DatomDatabase
   /**
    * Query database state as it existed at a specific transaction ID (time-travel query)
    * @param tx Transaction ID to query at
-   * @param options Additional query options
+   * @param options Additional query options (supports pagination with limit/offset)
    * @returns Array of matching datoms at that point in time
    * @example
+   * // Basic time-travel query
    * const old = await db.queryAsOf(55, { entity: 1 });
+   *
+   * // Paginated time-travel query
+   * const page1 = await db.queryAsOf(100, { attribute: "status", limit: 10, offset: 0 });
    */
   async queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]> {
     return this.query({ ...options, asOf: tx });
@@ -501,10 +681,14 @@ export abstract class DatomDatabase
 
   /**
    * Query full history of changes (all datoms matching filters, not just latest)
-   * @param options Query options
+   * @param options Query options (supports pagination with limit/offset)
    * @returns Array of all matching datoms ordered by transaction ID
    * @example
+   * // Basic history query
    * const history = await db.queryHistory({ entity: 1 });
+   *
+   * // Paginated history query
+   * const page1 = await db.queryHistory({ attribute: "status", limit: 20, offset: 0 });
    */
   async queryHistory(options?: QueryOptions): Promise<Datom[]> {
     // For history queries, use the explicit history flag

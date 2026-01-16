@@ -96,6 +96,8 @@ export interface AttributeDefinition {
   unique?: boolean;
   /** Whether to create an index for this attribute */
   indexed?: boolean;
+  /** Optional type constraint for attribute values. If specified, values must match this type. Use null to allow any type. */
+  type?: "string" | "number" | "boolean" | "date" | "ref" | null;
 }
 
 /**

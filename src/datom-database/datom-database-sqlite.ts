@@ -1004,11 +1004,11 @@ class SQLiteTransaction implements Transaction {
   async query(options: QueryOptions): Promise<Datom[]> {
     // For asOf queries, only query committed state (ignore pending changes)
     if (options.asOf !== undefined) {
-      return this.db.queryInternal(options);
+      return this.db._queryInternalForTransaction(options);
     }
 
     // Query committed data (bypass validation since transactions manage their own constraints)
-    const committed = await this.db.queryInternal(options);
+    const committed = await this.db._queryInternalForTransaction(options);
 
     // Merge with pending changes
     const pending = this.mergePendingChanges(committed, options);
@@ -1017,7 +1017,7 @@ class SQLiteTransaction implements Transaction {
 
   async queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]> {
     // Query committed state at that transaction, ignoring pending changes
-    return this.db.queryInternal({ ...options, asOf: tx });
+    return this.db._queryInternalForTransaction({ ...options, asOf: tx });
   }
 
   async add(datoms: DatomInput[]): Promise<void> {
