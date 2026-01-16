@@ -6,6 +6,7 @@
 
 import { DatomDatabase, type Transaction } from "./datom-database.js";
 import type {
+  Attribute,
   Datom,
   DatomInput,
   EntityId,
@@ -316,16 +317,17 @@ export class InMemoryDatomDatabase extends DatomDatabase {
           if (aVal == null) return direction === "asc" ? -1 : 1;
           if (bVal == null) return direction === "asc" ? 1 : -1;
 
-          // Handle symbol comparison
+          // Handle symbol comparison (for Attribute values)
           if (typeof aVal === "symbol" || typeof bVal === "symbol") {
             const aStr = String(aVal);
             const bStr = String(bVal);
             if (aStr < bStr) return direction === "asc" ? -1 : 1;
             if (aStr > bStr) return direction === "asc" ? 1 : -1;
-          } else {
-            if (aVal < bVal) return direction === "asc" ? -1 : 1;
-            if (aVal > bVal) return direction === "asc" ? 1 : -1;
+            continue;
           }
+
+          if (aVal < bVal) return direction === "asc" ? -1 : 1;
+          if (aVal > bVal) return direction === "asc" ? 1 : -1;
         }
         return 0;
       });
@@ -377,7 +379,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   private async executeClause(
     clause: QueryClause,
     asOf?: TransactionId
-  ): Promise<Record<string, Value>[]> {
+  ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = this.isVariable(entityVal)
       ? undefined
@@ -397,7 +399,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Map datom fields to variable names from the clause
     return datoms.map((datom) => {
-      const result: Record<string, Value> = {};
+      const result: Record<string, Value | Attribute> = {};
       if (this.isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;
       }
@@ -415,11 +417,11 @@ export class InMemoryDatomDatabase extends DatomDatabase {
    * Join two result sets based on common variables
    */
   private joinResults(
-    left: Record<string, Value>[],
-    right: Record<string, Value>[],
+    left: Record<string, Value | Attribute>[],
+    right: Record<string, Value | Attribute>[],
     _clauses: QueryClause[]
-  ): Record<string, Value>[] {
-    const joined: Record<string, Value>[] = [];
+  ): Record<string, Value | Attribute>[] {
+    const joined: Record<string, Value | Attribute>[] = [];
 
     for (const leftRow of left) {
       for (const rightRow of right) {
@@ -445,7 +447,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
    * Project results to only include find variables
    */
   private project(
-    results: Record<string, Value>[],
+    results: Record<string, Value | Attribute>[],
     find: string[],
     _clauses: QueryClause[]
   ): QueryResult {
@@ -455,7 +457,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Results already have variable names as keys, so just extract the find variables
     return results.map((row) => {
-      const projected: Record<string, Value> = {};
+      const projected: Record<string, Value | Attribute> = {};
       for (const varName of find) {
         if (varName in row) {
           projected[varName] = row[varName];
@@ -883,7 +885,7 @@ class InMemoryTransaction implements Transaction {
 
   private async executeClause(
     clause: QueryClause
-  ): Promise<Record<string, Value>[]> {
+  ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = this.isVariable(entityVal)
       ? undefined
@@ -903,7 +905,7 @@ class InMemoryTransaction implements Transaction {
     const datoms = await this.query(queryOptions);
 
     return datoms.map((datom: Datom) => {
-      const result: Record<string, Value> = {};
+      const result: Record<string, Value | Attribute> = {};
       if (this.isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;
       }
@@ -918,11 +920,11 @@ class InMemoryTransaction implements Transaction {
   }
 
   private joinResults(
-    left: Record<string, Value>[],
-    right: Record<string, Value>[],
+    left: Record<string, Value | Attribute>[],
+    right: Record<string, Value | Attribute>[],
     _clauses: QueryClause[]
-  ): Record<string, Value>[] {
-    const joined: Record<string, Value>[] = [];
+  ): Record<string, Value | Attribute>[] {
+    const joined: Record<string, Value | Attribute>[] = [];
 
     for (const leftRow of left) {
       for (const rightRow of right) {
@@ -944,7 +946,7 @@ class InMemoryTransaction implements Transaction {
   }
 
   private project(
-    results: Record<string, Value>[],
+    results: Record<string, Value | Attribute>[],
     find: string[],
     _clauses: QueryClause[]
   ): QueryResult {
@@ -953,7 +955,7 @@ class InMemoryTransaction implements Transaction {
     }
 
     return results.map((row) => {
-      const projected: Record<string, Value> = {};
+      const projected: Record<string, Value | Attribute> = {};
       for (const varName of find) {
         if (varName in row) {
           projected[varName] = row[varName];

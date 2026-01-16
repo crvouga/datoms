@@ -29,12 +29,6 @@ describe.each(FIXTURES)("EntityId Validation (%s)", (_name, createFixture) => {
       expect(db.validateEntityId("")).toBe(true);
     });
 
-    test("should validate symbol EntityIds", () => {
-      const { db } = f;
-      const sym = Symbol("test");
-      expect(db.validateEntityId(sym)).toBe(true);
-    });
-
     test("should throw error for invalid EntityIds", () => {
       const { db } = f;
       try {
@@ -84,21 +78,6 @@ describe.each(FIXTURES)("EntityId Validation (%s)", (_name, createFixture) => {
       expect(deserialized).toBe("user-123");
     });
 
-    test("should serialize and deserialize symbol EntityIds", () => {
-      const { db } = f;
-      const entityId = Symbol("test-symbol");
-      const serialized = db.serializeEntityId(entityId);
-      expect(serialized).toBe("__SYMBOL__test-symbol");
-
-      const deserialized = db.deserializeEntityId(serialized);
-      expect(typeof deserialized).toBe("symbol");
-      // Verify the symbol description matches
-      expect(typeof deserialized === "symbol" && deserialized.description).toBe(
-        "test-symbol"
-      );
-      expect(String(deserialized)).toBe("Symbol(test-symbol)");
-    });
-
     test("should handle numeric strings correctly", () => {
       const { db } = f;
       // Numeric strings should be parsed as numbers
@@ -130,19 +109,6 @@ describe.each(FIXTURES)("EntityId Validation (%s)", (_name, createFixture) => {
       const entity = await db.getEntity("user-123");
       expect(entity).toHaveLength(1);
       expect(entity[0].entity).toBe("user-123");
-    });
-
-    test("should work with symbol EntityIds", async () => {
-      const { db } = f;
-      const sym = Symbol("test-entity");
-      await db.add([[sym, "name", "Alice"]]);
-      const entity = await db.getEntity(sym);
-      expect(entity).toHaveLength(1);
-      // Symbols are recreated on deserialization, so compare descriptions
-      expect(typeof entity[0].entity).toBe("symbol");
-      const e = entity[0].entity;
-      expect(typeof e === "symbol" && e.description).toBe("test-entity");
-      expect(String(entity[0].entity)).toBe("Symbol(test-entity)");
     });
   });
 });

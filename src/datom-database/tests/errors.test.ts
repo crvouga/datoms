@@ -243,7 +243,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       });
 
       try {
-        // Use null as invalid ref (ref should be EntityId: number, string, or symbol)
+        // Use null as invalid ref (ref should be EntityId: number or string)
         await db.add([[1, "parent", null as any]]);
         throw new Error("Should have thrown DatomTypeError");
       } catch (error) {

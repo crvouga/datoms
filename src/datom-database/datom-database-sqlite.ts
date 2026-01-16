@@ -5,6 +5,7 @@
 
 import { DatomDatabase, type Transaction } from "./datom-database.js";
 import type {
+  Attribute,
   Datom,
   DatomInput,
   EntityId,
@@ -142,16 +143,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
-      // Serialize entity properly (handles symbols)
-      let entityStr: string;
-      if (typeof options.entity === "symbol") {
-        const desc =
-          options.entity.description ?? String(options.entity).slice(7, -1);
-        entityStr = `__SYMBOL__${desc}`;
-      } else {
-        entityStr = String(options.entity);
-      }
-      params.push(entityStr);
+      params.push(String(options.entity));
     }
     if (options.attribute !== undefined) {
       conditions.push("attribute = ?");
@@ -162,10 +154,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       let value = options.value;
       if (value === undefined) {
         value = "__UNDEFINED__";
-      }
-      if (typeof value === "symbol") {
-        const desc = value.description ?? String(value).slice(7, -1);
-        value = `__SYMBOL__${desc}`;
       }
       params.push(JSON.stringify(value));
     }
@@ -208,10 +196,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
           if (value === "__UNDEFINED__") {
             return undefined;
           }
-          if (value.startsWith("__SYMBOL__")) {
-            const symbolDesc = value.substring("__SYMBOL__".length);
-            return Symbol(symbolDesc);
-          }
           if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
             return new Date(value);
           }
@@ -239,10 +223,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       return rows.map((row: Record<string, unknown>) => {
         let entity: EntityId = row.entity as EntityId;
         if (typeof entity === "string") {
-          if (entity.startsWith("__SYMBOL__")) {
-            const symbolDesc = entity.substring("__SYMBOL__".length);
-            entity = Symbol(symbolDesc);
-          } else if (/^-?\d+$/.test(entity)) {
+          if (/^-?\d+$/.test(entity)) {
             entity = parseInt(entity, 10);
           }
         }
@@ -327,10 +308,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         if (value === "__UNDEFINED__") {
           return undefined;
         }
-        if (value.startsWith("__SYMBOL__")) {
-          const symbolDesc = value.substring("__SYMBOL__".length);
-          return Symbol(symbolDesc);
-        }
         if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
           return new Date(value);
         }
@@ -358,10 +335,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     return rows.map((row: Record<string, unknown>) => {
       let entity: EntityId = row.entity as EntityId;
       if (typeof entity === "string") {
-        if (entity.startsWith("__SYMBOL__")) {
-          const symbolDesc = entity.substring("__SYMBOL__".length);
-          entity = Symbol(symbolDesc);
-        } else if (/^-?\d+$/.test(entity)) {
+        if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
       }
@@ -393,16 +367,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     }
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
-      // Serialize entity properly (handles symbols)
-      let entityStr: string;
-      if (typeof options.entity === "symbol") {
-        const desc =
-          options.entity.description ?? String(options.entity).slice(7, -1);
-        entityStr = `__SYMBOL__${desc}`;
-      } else {
-        entityStr = String(options.entity);
-      }
-      params.push(entityStr);
+      params.push(String(options.entity));
     }
     if (options.attribute !== undefined) {
       conditions.push("attribute = ?");
@@ -413,10 +378,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       let value = options.value;
       if (value === undefined) {
         value = "__UNDEFINED__";
-      }
-      if (typeof value === "symbol") {
-        const desc = value.description ?? String(value).slice(7, -1);
-        value = `__SYMBOL__${desc}`;
       }
       params.push(JSON.stringify(value));
     }
@@ -575,7 +536,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       });
 
       const results = datoms.map((datom) => {
-        const result: Record<string, Value> = {};
+        const result: Record<string, Value | Attribute> = {};
         if (this.isVariable(entityVal)) {
           result[entityVal as string] = datom.entity;
         }
@@ -620,15 +581,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       // Add filters for bound values
       if (!this.isVariable(entityVal)) {
         conditions.push(`entity = ?`);
-        // Serialize entity properly (handles symbols)
-        let entityStr: string;
-        if (typeof entityVal === "symbol") {
-          const desc = entityVal.description ?? String(entityVal).slice(7, -1);
-          entityStr = `__SYMBOL__${desc}`;
-        } else {
-          entityStr = String(entityVal);
-        }
-        params.push(entityStr);
+        params.push(String(entityVal));
       }
       if (!this.isVariable(attributeVal)) {
         conditions.push(`attribute = ?`);
@@ -638,10 +591,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         let value = valueVal as Value;
         if (value === undefined) {
           value = "__UNDEFINED__";
-        }
-        if (typeof value === "symbol") {
-          const desc = value.description ?? String(value).slice(7, -1);
-          value = `__SYMBOL__${desc}`;
         }
         conditions.push(`value = ?`);
         params.push(JSON.stringify(value));
@@ -837,7 +786,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     // Convert SQL results back to QueryResult format
     const results: QueryResult = rows.map((row: Record<string, unknown>) => {
-      const result: Record<string, Value> = {};
+      const result: Record<string, Value | Attribute> = {};
       for (const key of Object.keys(row)) {
         let value: unknown = row[key];
         // Parse JSON values - values are stored as JSON strings in SQLite
@@ -849,7 +798,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
             // Not valid JSON, keep as string
           }
         }
-        result[key] = this.reviveValue(value) as Value;
+        result[key] = this.reviveValue(value) as Value | Attribute;
       }
       return result;
     });
@@ -857,7 +806,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     // Apply projection if needed
     if (query.find.length > 0) {
       return results.map((row) => {
-        const projected: Record<string, Value> = {};
+        const projected: Record<string, Value | Attribute> = {};
         for (const varName of query.find) {
           if (varName in row) {
             projected[varName] = row[varName];
@@ -883,10 +832,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     if (typeof value === "string") {
       if (value === "__UNDEFINED__") {
         return undefined;
-      }
-      if (value.startsWith("__SYMBOL__")) {
-        const symbolDesc = value.substring("__SYMBOL__".length);
-        return Symbol(symbolDesc);
       }
       if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
         return new Date(value);
@@ -938,15 +883,17 @@ export class SQLiteDatomDatabase extends DatomDatabase {
           if (aVal == null) return direction === "asc" ? -1 : 1;
           if (bVal == null) return direction === "asc" ? 1 : -1;
 
+          // Handle symbol comparison (for Attribute values)
           if (typeof aVal === "symbol" || typeof bVal === "symbol") {
             const aStr = String(aVal);
             const bStr = String(bVal);
             if (aStr < bStr) return direction === "asc" ? -1 : 1;
             if (aStr > bStr) return direction === "asc" ? 1 : -1;
-          } else {
-            if (aVal < bVal) return direction === "asc" ? -1 : 1;
-            if (aVal > bVal) return direction === "asc" ? 1 : -1;
+            continue;
           }
+
+          if (aVal < bVal) return direction === "asc" ? -1 : 1;
+          if (aVal > bVal) return direction === "asc" ? 1 : -1;
         }
         return 0;
       });
@@ -1049,19 +996,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      if (typeof value === "symbol") {
-        const desc = value.description ?? String(value).slice(7, -1);
-        value = `__SYMBOL__${desc}`;
-      }
-      // Serialize entity properly (handles symbols)
-      let entityStr: string;
-      if (typeof d[0] === "symbol") {
-        const desc = d[0].description ?? String(d[0]).slice(7, -1);
-        entityStr = `__SYMBOL__${desc}`;
-      } else {
-        entityStr = String(d[0]);
-      }
-      return [entityStr, String(d[1]), JSON.stringify(value), tx, true];
+      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, true];
     });
 
     await this.connection.execute(sql, params);
@@ -1085,19 +1020,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      if (typeof value === "symbol") {
-        const desc = value.description ?? String(value).slice(7, -1);
-        value = `__SYMBOL__${desc}`;
-      }
-      // Serialize entity properly (handles symbols)
-      let entityStr: string;
-      if (typeof d[0] === "symbol") {
-        const desc = d[0].description ?? String(d[0]).slice(7, -1);
-        entityStr = `__SYMBOL__${desc}`;
-      } else {
-        entityStr = String(d[0]);
-      }
-      return [entityStr, String(d[1]), JSON.stringify(value), tx, false];
+      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, false];
     });
 
     await this.connection.execute(sql, params);
@@ -1106,7 +1029,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   private async executeClause(
     clause: QueryClause,
     asOf?: TransactionId
-  ): Promise<Record<string, Value>[]> {
+  ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = this.isVariable(entityVal)
       ? undefined
@@ -1127,7 +1050,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const datoms = await this.queryInternal(queryOptions);
 
     return datoms.map((datom: Datom) => {
-      const result: Record<string, Value> = {};
+      const result: Record<string, Value | Attribute> = {};
       if (this.isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;
       }
@@ -1142,11 +1065,11 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   }
 
   private joinResults(
-    left: Record<string, Value>[],
-    right: Record<string, Value>[],
+    left: Record<string, Value | Attribute>[],
+    right: Record<string, Value | Attribute>[],
     _clauses: QueryClause[]
-  ): Record<string, Value>[] {
-    const joined: Record<string, Value>[] = [];
+  ): Record<string, Value | Attribute>[] {
+    const joined: Record<string, Value | Attribute>[] = [];
 
     for (const leftRow of left) {
       for (const rightRow of right) {
@@ -1168,7 +1091,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   }
 
   private project(
-    results: Record<string, Value>[],
+    results: Record<string, Value | Attribute>[],
     find: string[],
     _clauses: QueryClause[]
   ): QueryResult {
@@ -1177,7 +1100,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     }
 
     return results.map((row) => {
-      const projected: Record<string, Value> = {};
+      const projected: Record<string, Value | Attribute> = {};
       for (const varName of find) {
         if (varName in row) {
           projected[varName] = row[varName];
@@ -1521,20 +1444,8 @@ class SQLiteTransaction implements Transaction {
         if (value === undefined) {
           value = "__UNDEFINED__";
         }
-        if (typeof value === "symbol") {
-          const desc = value.description ?? String(value).slice(7, -1);
-          value = `__SYMBOL__${desc}`;
-        }
-        // Serialize entity properly (handles symbols)
-        let entityStr: string;
-        if (typeof d.entity === "symbol") {
-          const desc = d.entity.description ?? String(d.entity).slice(7, -1);
-          entityStr = `__SYMBOL__${desc}`;
-        } else {
-          entityStr = String(d.entity);
-        }
         return [
-          entityStr,
+          String(d.entity),
           String(d.attribute),
           JSON.stringify(value),
           this.txId,
@@ -1559,20 +1470,8 @@ class SQLiteTransaction implements Transaction {
         if (value === undefined) {
           value = "__UNDEFINED__";
         }
-        if (typeof value === "symbol") {
-          const desc = value.description ?? String(value).slice(7, -1);
-          value = `__SYMBOL__${desc}`;
-        }
-        // Serialize entity properly (handles symbols)
-        let entityStr: string;
-        if (typeof d.entity === "symbol") {
-          const desc = d.entity.description ?? String(d.entity).slice(7, -1);
-          entityStr = `__SYMBOL__${desc}`;
-        } else {
-          entityStr = String(d.entity);
-        }
         return [
-          entityStr,
+          String(d.entity),
           String(d.attribute),
           JSON.stringify(value),
           this.txId,
@@ -1708,15 +1607,17 @@ class SQLiteTransaction implements Transaction {
           if (aVal == null) return direction === "asc" ? -1 : 1;
           if (bVal == null) return direction === "asc" ? 1 : -1;
 
+          // Handle symbol comparison (for Attribute values)
           if (typeof aVal === "symbol" || typeof bVal === "symbol") {
             const aStr = String(aVal);
             const bStr = String(bVal);
             if (aStr < bStr) return direction === "asc" ? -1 : 1;
             if (aStr > bStr) return direction === "asc" ? 1 : -1;
-          } else {
-            if (aVal < bVal) return direction === "asc" ? -1 : 1;
-            if (aVal > bVal) return direction === "asc" ? 1 : -1;
+            continue;
           }
+
+          if (aVal < bVal) return direction === "asc" ? -1 : 1;
+          if (aVal > bVal) return direction === "asc" ? 1 : -1;
         }
         return 0;
       });
@@ -1732,7 +1633,7 @@ class SQLiteTransaction implements Transaction {
   private async executeClause(
     clause: QueryClause,
     asOf?: TransactionId
-  ): Promise<Record<string, Value>[]> {
+  ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = this.isVariable(entityVal)
       ? undefined
@@ -1753,7 +1654,7 @@ class SQLiteTransaction implements Transaction {
     const datoms = await this.query(queryOptions);
 
     return datoms.map((datom: Datom) => {
-      const result: Record<string, Value> = {};
+      const result: Record<string, Value | Attribute> = {};
       if (this.isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;
       }
@@ -1768,11 +1669,11 @@ class SQLiteTransaction implements Transaction {
   }
 
   private joinResults(
-    left: Record<string, Value>[],
-    right: Record<string, Value>[],
+    left: Record<string, Value | Attribute>[],
+    right: Record<string, Value | Attribute>[],
     _clauses: QueryClause[]
-  ): Record<string, Value>[] {
-    const joined: Record<string, Value>[] = [];
+  ): Record<string, Value | Attribute>[] {
+    const joined: Record<string, Value | Attribute>[] = [];
 
     for (const leftRow of left) {
       for (const rightRow of right) {
@@ -1794,7 +1695,7 @@ class SQLiteTransaction implements Transaction {
   }
 
   private project(
-    results: Record<string, Value>[],
+    results: Record<string, Value | Attribute>[],
     find: string[],
     _clauses: QueryClause[]
   ): QueryResult {
@@ -1803,7 +1704,7 @@ class SQLiteTransaction implements Transaction {
     }
 
     return results.map((row) => {
-      const projected: Record<string, Value> = {};
+      const projected: Record<string, Value | Attribute> = {};
       for (const varName of find) {
         if (varName in row) {
           projected[varName] = row[varName];

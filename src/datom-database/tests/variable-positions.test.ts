@@ -112,28 +112,5 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.close();
     });
-
-    test("should handle symbol entity IDs", async () => {
-      const { db } = f;
-      const e1 = Symbol("entity1");
-      const e2 = Symbol("entity2");
-
-      await db.add([
-        [e1, "name", "Alice"],
-        [e2, "name", "Bob"],
-        [e1, "age", 30],
-      ]);
-
-      const query: DatalogQuery = {
-        find: ["?n"],
-        where: [[e1, "name", "?n"]],
-      };
-
-      const results = await db.queryDatalog(query);
-      expect(results).toHaveLength(1);
-      expect(results[0]["?n"]).toBe("Alice");
-
-      await db.close();
-    });
   });
 });

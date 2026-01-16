@@ -2,7 +2,7 @@
  * Datalog query interface and parser
  */
 
-import type { EntityId, TransactionId, Value } from "../types.js";
+import type { Attribute, EntityId, TransactionId, Value } from "../types.js";
 
 /**
  * A datalog query clause
@@ -32,5 +32,6 @@ export interface DatalogQuery {
 
 /**
  * Result of a datalog query execution
+ * Can contain EntityId, Attribute, or Value types
  */
-export type QueryResult = Record<string, Value>[];
+export type QueryResult = Record<string, Value | Attribute>[];

@@ -113,30 +113,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should handle symbol values", async () => {
-      const { db } = f;
-      const sym1 = Symbol("type1");
-      const sym2 = Symbol("type2");
-
-      await db.add([
-        [1, "type", sym1],
-        [2, "type", sym2],
-        [3, "type", sym1],
-      ]);
-
-      const query: DatalogQuery = {
-        find: ["?e"],
-        where: [["?e", "type", sym1]],
-      };
-
-      const results = await db.queryDatalog(query);
-      expect(results).toHaveLength(2);
-      const entities = results.map((r) => r["?e"]).sort();
-      expect(entities).toEqual([1, 3]);
-
-      await db.close();
-    });
-
     test("should handle mixed value types", async () => {
       const { db } = f;
       await db.add([

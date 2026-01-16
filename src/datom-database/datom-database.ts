@@ -413,11 +413,7 @@ export interface Transaction extends DatomReader, DatomWriter<void> {
  *   - Use `idleTimeout` and `maxLifetime` to prevent connection leaks
  *
  * **EntityId Types:**
- * - `EntityId` supports `number`, `string`, and `symbol` types
- * - **Symbol EntityIds:** Symbols are supported but require special serialization in SQL implementations
- *   - Symbols are serialized as `__SYMBOL__${String(symbol)}` when persisting to SQL/JSON
- *   - For persistent databases with sync/replication, prefer `number` or `string` EntityIds
- *   - Symbol EntityIds work well for in-memory databases but may have limitations in distributed scenarios
+ * - `EntityId` supports `number` and `string` types
  *
  * **Query Performance:**
  * - Query timeouts via `timeoutMs` option prevent runaway queries
@@ -1441,17 +1437,12 @@ export abstract class DatomDatabase
         }
         break;
       case "ref":
-        // EntityId can be number, string, or symbol
-        // Note: Symbols require special serialization in SQL implementations (see types.ts EntityId docs)
-        if (
-          typeof value !== "number" &&
-          typeof value !== "string" &&
-          typeof value !== "symbol"
-        ) {
+        // EntityId can be number or string
+        if (typeof value !== "number" && typeof value !== "string") {
           return new Error(
             `Attribute "${String(
               attribute
-            )}" expects type "ref" (EntityId: number | string | symbol), but got ${typeof value}`
+            )}" expects type "ref" (EntityId: number | string), but got ${typeof value}`
           );
         }
         break;
@@ -3016,57 +3007,41 @@ export abstract class DatomDatabase
 
   /**
    * Validate an EntityId value
-   * Checks that the EntityId is a valid type (number, string, or symbol)
+   * Checks that the EntityId is a valid type (number or string)
    * @param entityId EntityId to validate
    * @returns True if valid
    * @throws Error if invalid
    * @example
    * db.validateEntityId(123); // OK
    * db.validateEntityId("user-123"); // OK
-   * db.validateEntityId(Symbol("test")); // OK (but see symbol limitations)
    * db.validateEntityId(null); // Throws error
    */
   validateEntityId(entityId: unknown): entityId is EntityId {
-    if (
-      typeof entityId === "number" ||
-      typeof entityId === "string" ||
-      typeof entityId === "symbol"
-    ) {
+    if (typeof entityId === "number" || typeof entityId === "string") {
       return true;
     }
     throw new Error(
-      `Invalid EntityId type: expected number, string, or symbol, got ${typeof entityId}`
+      `Invalid EntityId type: expected number or string, got ${typeof entityId}`
     );
   }
 
   /**
    * Serialize an EntityId to a string for storage
-   * Handles symbol EntityIds with special prefix
    * @param entityId EntityId to serialize
    * @returns Serialized string representation
    * @internal
    */
   public serializeEntityId(entityId: EntityId): string {
-    if (typeof entityId === "symbol") {
-      // Get symbol description directly (Symbol.description or String(symbol).slice(7, -1))
-      const desc = entityId.description ?? String(entityId).slice(7, -1);
-      return `__SYMBOL__${desc}`;
-    }
     return String(entityId);
   }
 
   /**
    * Deserialize a string to an EntityId
-   * Handles symbol EntityIds with special prefix
    * @param serialized Serialized string representation
    * @returns Deserialized EntityId
    * @internal
    */
   public deserializeEntityId(serialized: string): EntityId {
-    if (serialized.startsWith("__SYMBOL__")) {
-      const symbolDesc = serialized.substring("__SYMBOL__".length);
-      return Symbol(symbolDesc);
-    }
     // Try to parse as number first
     const num = Number(serialized);
     if (!isNaN(num) && isFinite(num) && String(num) === serialized) {

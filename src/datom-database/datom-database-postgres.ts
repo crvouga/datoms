@@ -11,6 +11,7 @@ import type {
 import type { SQLDatabase } from "../sql-database/sql-database.js";
 import type { DatabaseRow } from "../sql-database/types.js";
 import type {
+  Attribute,
   Datom,
   DatomInput,
   EntityId,
@@ -183,16 +184,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
-      // Serialize entity properly (handles symbols)
-      let entityStr: string;
-      if (typeof options.entity === "symbol") {
-        const desc =
-          options.entity.description ?? String(options.entity).slice(7, -1);
-        entityStr = `__SYMBOL__${desc}`;
-      } else {
-        entityStr = String(options.entity);
-      }
-      params.push(entityStr);
+      params.push(String(options.entity));
     }
     if (options.attribute !== undefined) {
       conditions.push("attribute = ?");
@@ -202,10 +194,6 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       let value = options.value;
       if (value === undefined) {
         value = "__UNDEFINED__";
-      }
-      if (typeof value === "symbol") {
-        const desc = value.description ?? String(value).slice(7, -1);
-        value = `__SYMBOL__${desc}`;
       }
       conditions.push("value = ?::jsonb");
       params.push(JSON.stringify(value));
@@ -249,10 +237,6 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
           if (value === "__UNDEFINED__") {
             return undefined;
           }
-          if (value.startsWith("__SYMBOL__")) {
-            const symbolDesc = value.substring("__SYMBOL__".length);
-            return Symbol(symbolDesc);
-          }
           if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
             return new Date(value);
           }
@@ -279,10 +263,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       return rows.map((row: DatabaseRow) => {
         let entity: EntityId = row.entity as EntityId;
         if (typeof entity === "string") {
-          if (entity.startsWith("__SYMBOL__")) {
-            const symbolDesc = entity.substring("__SYMBOL__".length);
-            entity = Symbol(symbolDesc);
-          } else if (/^-?\d+$/.test(entity)) {
+          if (/^-?\d+$/.test(entity)) {
             entity = parseInt(entity, 10);
           }
         }
@@ -373,10 +354,6 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         if (value === "__UNDEFINED__") {
           return undefined;
         }
-        if (value.startsWith("__SYMBOL__")) {
-          const symbolDesc = value.substring("__SYMBOL__".length);
-          return Symbol(symbolDesc);
-        }
         if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
           return new Date(value);
         }
@@ -404,10 +381,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return rows.map((row: DatabaseRow) => {
       let entity: EntityId = row.entity as EntityId;
       if (typeof entity === "string") {
-        if (entity.startsWith("__SYMBOL__")) {
-          const symbolDesc = entity.substring("__SYMBOL__".length);
-          entity = Symbol(symbolDesc);
-        } else if (/^-?\d+$/.test(entity)) {
+        if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
       }
@@ -442,16 +416,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     }
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
-      // Serialize entity properly (handles symbols)
-      let entityStr: string;
-      if (typeof options.entity === "symbol") {
-        const desc =
-          options.entity.description ?? String(options.entity).slice(7, -1);
-        entityStr = `__SYMBOL__${desc}`;
-      } else {
-        entityStr = String(options.entity);
-      }
-      params.push(entityStr);
+      params.push(String(options.entity));
     }
     if (options.attribute !== undefined) {
       conditions.push("attribute = ?");
@@ -461,10 +426,6 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       let value = options.value;
       if (value === undefined) {
         value = "__UNDEFINED__";
-      }
-      if (typeof value === "symbol") {
-        const desc = value.description ?? String(value).slice(7, -1);
-        value = `__SYMBOL__${desc}`;
       }
       conditions.push("value = ?::jsonb");
       params.push(JSON.stringify(value));
@@ -642,15 +603,17 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
           if (aVal == null) return direction === "asc" ? -1 : 1;
           if (bVal == null) return direction === "asc" ? 1 : -1;
 
+          // Handle symbol comparison (for Attribute values)
           if (typeof aVal === "symbol" || typeof bVal === "symbol") {
             const aStr = String(aVal);
             const bStr = String(bVal);
             if (aStr < bStr) return direction === "asc" ? -1 : 1;
             if (aStr > bStr) return direction === "asc" ? 1 : -1;
-          } else {
-            if (aVal < bVal) return direction === "asc" ? -1 : 1;
-            if (aVal > bVal) return direction === "asc" ? 1 : -1;
+            continue;
           }
+
+          if (aVal < bVal) return direction === "asc" ? -1 : 1;
+          if (aVal > bVal) return direction === "asc" ? 1 : -1;
         }
         return 0;
       });
@@ -762,19 +725,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      if (typeof value === "symbol") {
-        const desc = value.description ?? String(value).slice(7, -1);
-        value = `__SYMBOL__${desc}`;
-      }
-      // Serialize entity properly (handles symbols)
-      let entityStr: string;
-      if (typeof d[0] === "symbol") {
-        const desc = d[0].description ?? String(d[0]).slice(7, -1);
-        entityStr = `__SYMBOL__${desc}`;
-      } else {
-        entityStr = String(d[0]);
-      }
-      return [entityStr, String(d[1]), JSON.stringify(value), tx, true];
+      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, true];
     });
 
     await this.connection.execute(sql, params);
@@ -798,19 +749,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      if (typeof value === "symbol") {
-        const desc = value.description ?? String(value).slice(7, -1);
-        value = `__SYMBOL__${desc}`;
-      }
-      // Serialize entity properly (handles symbols)
-      let entityStr: string;
-      if (typeof d[0] === "symbol") {
-        const desc = d[0].description ?? String(d[0]).slice(7, -1);
-        entityStr = `__SYMBOL__${desc}`;
-      } else {
-        entityStr = String(d[0]);
-      }
-      return [entityStr, String(d[1]), JSON.stringify(value), tx, false];
+      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, false];
     });
 
     await this.connection.execute(sql, params);
@@ -819,7 +758,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   private async executeClause(
     clause: QueryClause,
     asOf?: TransactionId
-  ): Promise<Record<string, Value>[]> {
+  ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = this.isVariable(entityVal)
       ? undefined
@@ -840,7 +779,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const datoms = await this.queryInternal(queryOptions);
 
     return datoms.map((datom: Datom) => {
-      const result: Record<string, Value> = {};
+      const result: Record<string, Value | Attribute> = {};
       if (this.isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;
       }
@@ -855,11 +794,11 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   }
 
   private joinResults(
-    left: Record<string, Value>[],
-    right: Record<string, Value>[],
+    left: Record<string, Value | Attribute>[],
+    right: Record<string, Value | Attribute>[],
     _clauses: QueryClause[]
-  ): Record<string, Value>[] {
-    const joined: Record<string, Value>[] = [];
+  ): Record<string, Value | Attribute>[] {
+    const joined: Record<string, Value | Attribute>[] = [];
 
     for (const leftRow of left) {
       for (const rightRow of right) {
@@ -881,7 +820,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   }
 
   private project(
-    results: Record<string, Value>[],
+    results: Record<string, Value | Attribute>[],
     find: string[],
     _clauses: QueryClause[]
   ): QueryResult {
@@ -890,7 +829,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     }
 
     return results.map((row) => {
-      const projected: Record<string, Value> = {};
+      const projected: Record<string, Value | Attribute> = {};
       for (const varName of find) {
         if (varName in row) {
           projected[varName] = row[varName];
@@ -1258,20 +1197,8 @@ class PostgreSQLTransaction implements Transaction {
         if (value === undefined) {
           value = "__UNDEFINED__";
         }
-        if (typeof value === "symbol") {
-          const desc = value.description ?? String(value).slice(7, -1);
-          value = `__SYMBOL__${desc}`;
-        }
-        // Serialize entity properly (handles symbols)
-        let entityStr: string;
-        if (typeof d.entity === "symbol") {
-          const desc = d.entity.description ?? String(d.entity).slice(7, -1);
-          entityStr = `__SYMBOL__${desc}`;
-        } else {
-          entityStr = String(d.entity);
-        }
         return [
-          entityStr,
+          String(d.entity),
           String(d.attribute),
           JSON.stringify(value),
           this.txId,
@@ -1296,20 +1223,8 @@ class PostgreSQLTransaction implements Transaction {
         if (value === undefined) {
           value = "__UNDEFINED__";
         }
-        if (typeof value === "symbol") {
-          const desc = value.description ?? String(value).slice(7, -1);
-          value = `__SYMBOL__${desc}`;
-        }
-        // Serialize entity properly (handles symbols)
-        let entityStr: string;
-        if (typeof d.entity === "symbol") {
-          const desc = d.entity.description ?? String(d.entity).slice(7, -1);
-          entityStr = `__SYMBOL__${desc}`;
-        } else {
-          entityStr = String(d.entity);
-        }
         return [
-          entityStr,
+          String(d.entity),
           String(d.attribute),
           JSON.stringify(value),
           this.txId,
@@ -1442,15 +1357,17 @@ class PostgreSQLTransaction implements Transaction {
           if (aVal == null) return direction === "asc" ? -1 : 1;
           if (bVal == null) return direction === "asc" ? 1 : -1;
 
+          // Handle symbol comparison (for Attribute values)
           if (typeof aVal === "symbol" || typeof bVal === "symbol") {
             const aStr = String(aVal);
             const bStr = String(bVal);
             if (aStr < bStr) return direction === "asc" ? -1 : 1;
             if (aStr > bStr) return direction === "asc" ? 1 : -1;
-          } else {
-            if (aVal < bVal) return direction === "asc" ? -1 : 1;
-            if (aVal > bVal) return direction === "asc" ? 1 : -1;
+            continue;
           }
+
+          if (aVal < bVal) return direction === "asc" ? -1 : 1;
+          if (aVal > bVal) return direction === "asc" ? 1 : -1;
         }
         return 0;
       });
@@ -1466,7 +1383,7 @@ class PostgreSQLTransaction implements Transaction {
   private async executeClause(
     clause: QueryClause,
     asOf?: TransactionId
-  ): Promise<Record<string, Value>[]> {
+  ): Promise<Record<string, Value | Attribute>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = this.isVariable(entityVal)
       ? undefined
@@ -1487,7 +1404,7 @@ class PostgreSQLTransaction implements Transaction {
     const datoms = await this.query(queryOptions);
 
     return datoms.map((datom: Datom) => {
-      const result: Record<string, Value> = {};
+      const result: Record<string, Value | Attribute> = {};
       if (this.isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;
       }
@@ -1502,11 +1419,11 @@ class PostgreSQLTransaction implements Transaction {
   }
 
   private joinResults(
-    left: Record<string, Value>[],
-    right: Record<string, Value>[],
+    left: Record<string, Value | Attribute>[],
+    right: Record<string, Value | Attribute>[],
     _clauses: QueryClause[]
-  ): Record<string, Value>[] {
-    const joined: Record<string, Value>[] = [];
+  ): Record<string, Value | Attribute>[] {
+    const joined: Record<string, Value | Attribute>[] = [];
 
     for (const leftRow of left) {
       for (const rightRow of right) {
@@ -1528,7 +1445,7 @@ class PostgreSQLTransaction implements Transaction {
   }
 
   private project(
-    results: Record<string, Value>[],
+    results: Record<string, Value | Attribute>[],
     find: string[],
     _clauses: QueryClause[]
   ): QueryResult {
@@ -1537,7 +1454,7 @@ class PostgreSQLTransaction implements Transaction {
     }
 
     return results.map((row) => {
-      const projected: Record<string, Value> = {};
+      const projected: Record<string, Value | Attribute> = {};
       for (const varName of find) {
         if (varName in row) {
           projected[varName] = row[varName];

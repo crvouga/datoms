@@ -4,13 +4,8 @@
 
 /**
  * A unique identifier for an entity
- *
- * **Note on symbol support:**
- * Symbols are supported but require special serialization when persisting to SQL/JSON.
- * For persistent databases with sync/replication, prefer `number` or `string` EntityIds.
- * Symbols are serialized as `__SYMBOL__${String(symbol)}` in SQL implementations.
  */
-export type EntityId = number | string | symbol;
+export type EntityId = number | string;
 
 /**
  * An attribute name (e.g., "name", "age", "email")
@@ -27,10 +22,10 @@ export type Attribute = string | symbol;
  * - Primitives: `string`, `number`, `boolean`
  * - Temporal: `Date` objects
  * - Nullability: `null`, `undefined` (for optional attributes)
- * - References: `EntityId` (number | string | symbol) for entity relationships
+ * - References: `EntityId` (number | string) for entity relationships
  *
  * **Note:** `EntityId` is included here to allow referencing other entities as values.
- * Since `EntityId` can be `number | string | symbol`, numeric entity IDs overlap with
+ * Since `EntityId` can be `number | string`, numeric entity IDs overlap with
  * the `number` type, which is intentional and handled correctly by TypeScript.
  *
  * @example
