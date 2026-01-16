@@ -404,6 +404,18 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   private isVariable(value: any): boolean {
     return typeof value === "string" && value.startsWith("?");
   }
+
+  /**
+   * Get metadata associated with a transaction
+   * Default implementation returns undefined (metadata storage not implemented)
+   * Override onTransactionMetadata and this method to support metadata storage
+   */
+  async getTransactionMetadata(
+    txId: TransactionId
+  ): Promise<Record<string, any> | undefined> {
+    // Default: no metadata storage
+    return undefined;
+  }
 }
 
 /**

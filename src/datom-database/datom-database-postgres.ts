@@ -682,6 +682,18 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   }
 
   /**
+   * Get metadata associated with a transaction
+   * Default implementation returns undefined (metadata storage not implemented)
+   * Override onTransactionMetadata and this method to support metadata storage
+   */
+  async getTransactionMetadata(
+    txId: TransactionId
+  ): Promise<Record<string, any> | undefined> {
+    // Default: no metadata storage
+    return undefined;
+  }
+
+  /**
    * PostgreSQL transaction implementation
    * Tracks pending changes and merges them with queries
    */

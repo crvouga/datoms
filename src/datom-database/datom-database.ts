@@ -143,6 +143,18 @@ export interface DatomReader {
 }
 
 /**
+ * Result of a transaction operation
+ */
+export interface TransactResult {
+  /** The transaction ID */
+  txId: TransactionId;
+  /** Number of datoms added */
+  addedCount: number;
+  /** Number of datoms retracted */
+  retractedCount: number;
+}
+
+/**
  * Shared interface for writing datoms
  */
 export interface DatomWriter<T = void> {
@@ -306,9 +318,35 @@ export abstract class DatomDatabase
     },
     metadata?: Record<string, any>
   ): Promise<TransactionId> {
+    const result = await this.transactWithResult(ops, metadata);
+    return result.txId;
+  }
+
+  /**
+   * Execute bulk operations atomically and return detailed result
+   * @param ops Object containing add and/or retract arrays
+   * @param metadata Optional metadata to associate with this transaction
+   * @returns Transaction result with counts
+   * @example
+   * const result = await db.transactWithResult({
+   *   add: [[300, "status", "active"]],
+   *   retract: [[42, "type", "cat"]]
+   * });
+   * // Returns: { txId: 123, addedCount: 1, retractedCount: 1 }
+   */
+  async transactWithResult(
+    ops: {
+      add?: DatomInput[];
+      retract?: DatomInput[];
+    },
+    metadata?: Record<string, any>
+  ): Promise<TransactResult> {
     await this.ensureInitialized();
     // Use a transaction to ensure atomicity
     return this.transaction(async (tx) => {
+      const addedCount = ops.add?.length ?? 0;
+      const retractedCount = ops.retract?.length ?? 0;
+
       if (ops.add && ops.add.length > 0) {
         await tx.add(ops.add);
       }
@@ -320,7 +358,11 @@ export abstract class DatomDatabase
       if (metadata !== undefined) {
         await this.onTransactionMetadata(txId, metadata);
       }
-      return txId;
+      return {
+        txId,
+        addedCount,
+        retractedCount,
+      };
     });
   }
 
@@ -590,6 +632,50 @@ export abstract class DatomDatabase
   ): Promise<void> {
     // Override in implementations if needed
   }
+
+  /**
+   * Export the current schema as an array of attribute definitions
+   * Useful for migrations, backups, or schema versioning
+   * @returns Array of attribute definitions
+   * @example
+   * const schema = db.exportSchema();
+   * // Save to file or version control
+   * await fs.writeFile("schema.json", JSON.stringify(schema, null, 2));
+   */
+  exportSchema(): AttributeDefinition[] {
+    return Array.from(this.schema.values());
+  }
+
+  /**
+   * Import a schema from an array of attribute definitions
+   * Useful for migrations or restoring schema from backup
+   * @param definitions Array of attribute definitions to import
+   * @example
+   * // Load schema from file
+   * const schema = JSON.parse(await fs.readFile("schema.json", "utf-8"));
+   * await db.importSchema(schema);
+   */
+  async importSchema(definitions: AttributeDefinition[]): Promise<void> {
+    await this.ensureInitialized();
+    // Clear existing schema
+    this.schema.clear();
+    // Import each definition
+    for (const definition of definitions) {
+      await this.defineAttribute(definition);
+    }
+  }
+
+  /**
+   * Get metadata associated with a transaction
+   * @param txId Transaction ID
+   * @returns Metadata object or undefined if no metadata was stored
+   * @example
+   * const metadata = await db.getTransactionMetadata(123);
+   * // Returns: { userId: "alice", reason: "update" } or undefined
+   */
+  abstract getTransactionMetadata(
+    txId: TransactionId
+  ): Promise<Record<string, any> | undefined>;
 
   /**
    * Query datoms from the database using query options
