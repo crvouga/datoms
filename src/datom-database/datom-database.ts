@@ -1089,7 +1089,7 @@ export abstract class DatomDatabase
         }
         break;
       case "ref":
-        // EntityId can be number, string, or symbol
+        // EntityId can be number, string, or symbol (symbol requires special serialization)
         if (
           typeof value !== "number" &&
           typeof value !== "string" &&
