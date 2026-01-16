@@ -3,6 +3,8 @@ import type { Database, DatalogQuery } from "../index";
 import { InMemoryDatabase } from "../index";
 import { SQLiteDatabase } from "./database-sqlite.js";
 import { PostgreSQLDatabase } from "./database-postgres.js";
+import { SQLiteConnection } from "./__tests__/sqlite-connection.js";
+import { PostgresConnection } from "./__tests__/postgres-connection.js";
 import { unlinkSync } from "fs";
 
 const createInMemoryDatabase = async (): Promise<Database> => {
@@ -20,7 +22,8 @@ const createSQLiteDatabase = async (filename: string): Promise<Database> => {
       // File doesn't exist, which is fine
     }
   }
-  const db = new SQLiteDatabase(filename);
+  const connection = new SQLiteConnection(filename);
+  const db = new SQLiteDatabase(connection);
   await db.initialize();
   return db;
 };
@@ -30,7 +33,8 @@ const createPostgreSQLDatabase = async (): Promise<Database | null> => {
     const connectionString =
       process.env.POSTGRES_URL ||
       "postgresql://datoms:datoms@localhost:5432/datoms_test";
-    const db = new PostgreSQLDatabase(connectionString);
+    const connection = new PostgresConnection(connectionString);
+    const db = new PostgreSQLDatabase(connection);
     await db.initialize();
     // Clean up before each test for isolation
     if (typeof (db as any).cleanup === "function") {
