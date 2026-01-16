@@ -278,7 +278,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       await db.add([[1, "name", "Alice"]]);
 
       try {
-        await db.queryHistory({});
+        await db.datoms({ history: true });
         throw new Error("Should have thrown QuerySafetyError");
       } catch (error) {
         expect(error).toBeInstanceOf(QuerySafetyError);

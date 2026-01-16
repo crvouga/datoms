@@ -1744,29 +1744,6 @@ export abstract class DatomDatabase
   }
 
   /**
-   * Query full history of changes (all datoms matching filters, not just latest)
-   * @param options Query options (supports pagination with limit/offset)
-   * @returns Array of all matching datoms ordered by transaction ID
-   * @example
-   * // Basic history query
-   * const history = await db.queryHistory({ entity: 1 });
-   *
-   * // Paginated history query
-   * const page1 = await db.queryHistory({ attribute: "status", limit: 20, offset: 0 });
-   */
-  async queryHistory(options?: QueryOptions): Promise<Datom[]> {
-    // For history queries, use the explicit history flag
-    // Remove asOf if present since history queries show all changes
-    if (options) {
-      const { asOf, ...historyOptions } = options;
-      // asOf is intentionally ignored for history queries
-      void asOf;
-      return this.datoms({ ...historyOptions, history: true });
-    }
-    return this.datoms({ history: true });
-  }
-
-  /**
    * Get all datoms for a specific entity at a specific transaction ID
    * @param entity Entity ID
    * @param tx Transaction ID to query at

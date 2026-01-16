@@ -70,7 +70,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.add([[1, "age", 30]]);
 
       // Query history - should return all changes
-      const history = await db.queryHistory({ entity: 1, attribute: "name" });
+      const history = await db.datoms({
+        history: true,
+        entity: 1,
+        attribute: "name",
+      });
       expect(history.length).toBeGreaterThanOrEqual(2);
       // Should include both the original and updated name
       const names = history.map((d) => d.value);
@@ -310,7 +314,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.retract([[1, "name", "Bob"]]);
       const tx4 = await db.add([[1, "name", "Charlie"]]);
 
-      const history = await db.queryHistory({ entity: 1, attribute: "name" });
+      const history = await db.datoms({
+        history: true,
+        entity: 1,
+        attribute: "name",
+      });
       expect(history.length).toBeGreaterThanOrEqual(3);
 
       // History should include all changes, ordered by transaction
