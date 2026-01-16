@@ -9,7 +9,11 @@ import type { EntityId, Value } from "../types.js";
  * A datalog query clause
  * Tuple format: [entity, attribute, value]
  */
-export type QueryClause = [string | EntityId, string, string | Value];
+export type QueryClause = [
+  entity: string | EntityId,
+  attribute: string,
+  value: string | Value
+];
 
 /**
  * A parsed datalog query
