@@ -1,7 +1,9 @@
 /**
- * Main database interface for working with datoms
+ * Abstract database class for working with datoms
+ * Provides a high-level interface for working with datoms and datalog queries
  */
 
+import type { DatalogQuery, QueryResult } from "./datalog.js";
 import type {
   Datom,
   DatomInput,
@@ -9,116 +11,60 @@ import type {
   QueryOptions,
   TransactionId,
   Value,
-} from "./types.js";
-import type { StorageBackend } from "./storage/backend.js";
+} from "../types.js";
 
 /**
- * Main database class that provides a high-level interface
+ * Abstract database class that provides a high-level interface
  * for working with datoms and datalog queries
+ * Concrete implementations: InMemoryDatabase, SqlDatabase
  */
-export class Database {
-  private backend: StorageBackend;
-  private initialized = false;
-
-  constructor(backend: StorageBackend) {
-    this.backend = backend;
-  }
+export abstract class Database {
+  protected initialized = false;
 
   /**
-   * Initialize the database and storage backend
+   * Initialize the database
    */
-  async initialize(): Promise<void> {
-    if (!this.initialized) {
-      await this.backend.initialize();
-      this.initialized = true;
-    }
-  }
+  abstract initialize(): Promise<void>;
 
   /**
    * Close the database and clean up resources
    */
-  async close(): Promise<void> {
-    await this.backend.close();
-    this.initialized = false;
-  }
+  abstract close(): Promise<void>;
 
   /**
    * Add datoms to the database
    * @param datoms Array of datoms to add
    * @returns The transaction ID
    */
-  async add(datoms: DatomInput[]): Promise<TransactionId> {
-    await this.ensureInitialized();
-    const tx = await this.backend.getNextTransactionId();
-
-    if (this.backend.supportsTransactions() && this.backend.beginTransaction) {
-      await this.backend.beginTransaction();
-      try {
-        await this.backend.addDatoms(datoms, tx);
-        if (this.backend.commitTransaction) {
-          await this.backend.commitTransaction();
-        }
-      } catch (error) {
-        if (this.backend.rollbackTransaction) {
-          await this.backend.rollbackTransaction();
-        }
-        throw error;
-      }
-    } else {
-      await this.backend.addDatoms(datoms, tx);
-    }
-
-    return tx;
-  }
+  abstract add(datoms: DatomInput[]): Promise<TransactionId>;
 
   /**
    * Retract datoms from the database
    * @param datoms Array of datoms to retract
    * @returns The transaction ID
    */
-  async retract(datoms: DatomInput[]): Promise<TransactionId> {
-    await this.ensureInitialized();
-    const tx = await this.backend.getNextTransactionId();
-
-    if (this.backend.supportsTransactions() && this.backend.beginTransaction) {
-      await this.backend.beginTransaction();
-      try {
-        await this.backend.retractDatoms(datoms, tx);
-        if (this.backend.commitTransaction) {
-          await this.backend.commitTransaction();
-        }
-      } catch (error) {
-        if (this.backend.rollbackTransaction) {
-          await this.backend.rollbackTransaction();
-        }
-        throw error;
-      }
-    } else {
-      await this.backend.retractDatoms(datoms, tx);
-    }
-
-    return tx;
-  }
+  abstract retract(datoms: DatomInput[]): Promise<TransactionId>;
 
   /**
-   * Query datoms from the database
+   * Query datoms from the database using query options
    * @param options Query options
    * @returns Array of matching datoms
    */
-  async query(options: QueryOptions = {}): Promise<Datom[]> {
-    await this.ensureInitialized();
-    return this.backend.queryDatoms(options);
-  }
+  abstract query(options?: QueryOptions): Promise<Datom[]>;
+
+  /**
+   * Execute a datalog query
+   * @param query Datalog query to execute
+   * @returns Query results as an array of records
+   */
+  abstract queryDatalog(query: DatalogQuery): Promise<QueryResult>;
 
   /**
    * Get all datoms for a specific entity
    * @param entity Entity ID
    * @returns Array of datoms for the entity
    */
-  async getEntity(entity: EntityId): Promise<Datom[]> {
-    await this.ensureInitialized();
-    return this.backend.getEntityDatoms(entity);
-  }
+  abstract getEntity(entity: EntityId): Promise<Datom[]>;
 
   /**
    * Get a single value for an entity-attribute pair
@@ -164,7 +110,7 @@ export class Database {
   /**
    * Ensure the database is initialized
    */
-  private async ensureInitialized(): Promise<void> {
+  protected async ensureInitialized(): Promise<void> {
     if (!this.initialized) {
       await this.initialize();
     }

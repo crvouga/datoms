@@ -1,53 +1,128 @@
 /**
- * Datalog query interface and parser
+ * In-memory database implementation
+ * Stores datoms in memory and executes queries in memory
+ * Useful for testing and small datasets
  */
 
-import type { Database } from "../database.js";
-import type { EntityId, Value } from "../types.js";
+import { Database } from "./database.js";
+import type {
+  Datom,
+  DatomInput,
+  EntityId,
+  QueryOptions,
+  TransactionId,
+  Value,
+} from "../types.js";
+import type { DatalogQuery, QueryClause, QueryResult } from "./datalog.js";
 
 /**
- * A datalog query clause
- * Tuple format: [entity, attribute, value]
+ * In-memory database implementation
+ * Stores datoms in memory using an array-based structure
  */
-export type QueryClause = [
-  entity: string | EntityId,
-  attribute: string,
-  value: string | Value
-];
+export class InMemoryDatabase extends Database {
+  private datoms: Datom[] = [];
+  private nextTx: TransactionId = 1;
 
-/**
- * A parsed datalog query
- */
-export interface DatalogQuery {
-  /** Find clause - what variables to return */
-  find: string[];
-  /** Where clause - the query patterns */
-  where: QueryClause[];
-  /** Optional ordering */
-  orderBy?: [variable: string, direction: "asc" | "desc"][];
-  /** Optional limit */
-  limit?: number;
-}
-
-/**
- * Result of a datalog query execution
- */
-export type QueryResult = Record<string, Value>[];
-
-/**
- * Simple datalog query executor
- */
-export class DatalogQueryEngine {
-  private db: Database;
-
-  constructor(db: Database) {
-    this.db = db;
+  async initialize(): Promise<void> {
+    if (!this.initialized) {
+      this.datoms = [];
+      this.nextTx = 1;
+      this.initialized = true;
+    }
   }
 
-  /**
-   * Execute a parsed datalog query
-   */
-  async execute(query: DatalogQuery): Promise<QueryResult> {
+  async close(): Promise<void> {
+    this.datoms = [];
+    this.initialized = false;
+  }
+
+  async add(datoms: DatomInput[]): Promise<TransactionId> {
+    await this.ensureInitialized();
+    const tx = this.nextTx++;
+
+    for (const datom of datoms) {
+      this.datoms.push({
+        entity: datom[0],
+        attribute: datom[1],
+        value: datom[2],
+        tx,
+        added: true,
+      });
+    }
+
+    return tx;
+  }
+
+  async retract(datoms: DatomInput[]): Promise<TransactionId> {
+    await this.ensureInitialized();
+    const tx = this.nextTx++;
+
+    for (const datom of datoms) {
+      // Add retraction datom
+      this.datoms.push({
+        entity: datom[0],
+        attribute: datom[1],
+        value: datom[2],
+        tx,
+        added: false,
+      });
+    }
+
+    return tx;
+  }
+
+  async query(options: QueryOptions = {}): Promise<Datom[]> {
+    await this.ensureInitialized();
+    let results = this.datoms;
+
+    // Apply filters
+    if (options.entity !== undefined) {
+      results = results.filter((d) => d.entity === options.entity);
+    }
+    if (options.attribute !== undefined) {
+      results = results.filter((d) => d.attribute === options.attribute);
+    }
+    if (options.value !== undefined) {
+      results = results.filter((d) => d.value === options.value);
+    }
+    if (options.tx !== undefined) {
+      results = results.filter((d) => d.tx === options.tx);
+    }
+
+    // Handle retractions: for each unique (entity, attribute, value) combination,
+    // keep only the most recent transaction
+    // This ensures that retracted datoms are not returned when querying
+    if (options.added === undefined || options.added === true) {
+      // Group by (entity, attribute, value) and keep only the most recent transaction
+      const latestDatoms = new Map<string, Datom>();
+      for (const datom of results) {
+        const key = `${String(datom.entity)}|${String(
+          datom.attribute
+        )}|${String(datom.value)}`;
+        const existing = latestDatoms.get(key);
+        if (!existing || datom.tx > existing.tx) {
+          latestDatoms.set(key, datom);
+        }
+      }
+      results = Array.from(latestDatoms.values());
+
+      // Filter to only added datoms (default behavior)
+      results = results.filter((d) => d.added);
+    } else if (options.added === false) {
+      // If explicitly requesting retractions, filter by added: false
+      results = results.filter((d) => !d.added);
+    }
+
+    // Apply pagination
+    const offset = options.offset ?? 0;
+    const limit = options.limit;
+    const paginated = results.slice(offset, limit ? offset + limit : undefined);
+
+    return paginated;
+  }
+
+  async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
+    await this.ensureInitialized();
     // Simple implementation: for each where clause, query the database
     // and join the results
     if (query.where.length === 0) {
@@ -108,6 +183,11 @@ export class DatalogQueryEngine {
     return projected;
   }
 
+  async getEntity(entity: EntityId): Promise<Datom[]> {
+    await this.ensureInitialized();
+    return this.query({ entity, added: true });
+  }
+
   /**
    * Execute a single query clause
    */
@@ -123,7 +203,7 @@ export class DatalogQueryEngine {
       : (attributeVal as string);
     const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    const datoms = await this.db.query({
+    const datoms = await this.query({
       entity,
       attribute,
       value,
@@ -204,12 +284,5 @@ export class DatalogQueryEngine {
    */
   private isVariable(value: any): boolean {
     return typeof value === "string" && value.startsWith("?");
-  }
-
-  /**
-   * Execute a datalog query
-   */
-  async query(query: DatalogQuery): Promise<QueryResult> {
-    return this.execute(query);
   }
 }

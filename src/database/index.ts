@@ -4,34 +4,27 @@
 
 // Core types
 export type {
-  EntityId,
   Attribute,
-  Value,
-  TransactionId,
   Datom,
   DatomInput,
+  EntityId,
   QueryOptions,
-} from "./types.js";
+  TransactionId,
+  Value,
+} from "../types.js";
 
-// Database interface
+// Database classes
 export { Database } from "./database.js";
+export { InMemoryDatabase } from "./database-in-memory.js";
+export { SqlDatabase } from "./database-sql.js";
 
-// Storage backends
-export type { StorageBackend } from "./storage/backend.js";
-export { MemoryBackend } from "./storage/memory.js";
-export {
-  SqlBackend,
-  type SqlConnection,
-  type SqlDialect,
-  postgresDialect,
-  sqliteDialect,
-  mysqlDialect,
-} from "./storage/sql.js";
+// SQL utilities
+export { mysqlDialect, postgresDialect, sqliteDialect } from "./sql-utils.js";
+export type { SqlConnection, SqlDialect } from "./sql-utils.js";
 
-// Datalog query engine
+// Datalog query types
 export {
-  DatalogQueryEngine,
   type DatalogQuery,
   type QueryClause,
   type QueryResult,
-} from "./datalog/datalog.js";
+} from "./datalog.js";
