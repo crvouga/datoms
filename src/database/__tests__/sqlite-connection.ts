@@ -13,6 +13,7 @@ import type { SqlConnection } from "../sql-connection-adapter.js";
  */
 export class SQLiteConnection implements SqlConnection {
   private db: BunDatabase;
+  private inTransaction: boolean = false;
 
   constructor(filename: string = ":memory:") {
     this.db = new BunDatabase(filename);
@@ -29,7 +30,34 @@ export class SQLiteConnection implements SqlConnection {
     stmt.run(...(params || []));
   }
 
+  async beginTransaction(): Promise<void> {
+    if (this.inTransaction) {
+      throw new Error("Transaction already in progress");
+    }
+    await this.execute("BEGIN TRANSACTION");
+    this.inTransaction = true;
+  }
+
+  async commitTransaction(): Promise<void> {
+    if (!this.inTransaction) {
+      throw new Error("No transaction in progress");
+    }
+    await this.execute("COMMIT");
+    this.inTransaction = false;
+  }
+
+  async rollbackTransaction(): Promise<void> {
+    if (!this.inTransaction) {
+      throw new Error("No transaction in progress");
+    }
+    await this.execute("ROLLBACK");
+    this.inTransaction = false;
+  }
+
   async close(): Promise<void> {
+    if (this.inTransaction) {
+      await this.rollbackTransaction();
+    }
     this.db.close();
   }
 }

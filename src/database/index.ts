@@ -30,3 +30,6 @@ export {
   type QueryClause,
   type QueryResult,
 } from "./datalog.js";
+
+// Transaction type
+export type { Transaction } from "./database.js";

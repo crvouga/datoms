@@ -3,7 +3,7 @@
  * Accepts a SqlConnection interface for PostgreSQL-compatible databases
  */
 
-import { Database } from "./database.js";
+import { Database, type Transaction } from "./database.js";
 import type {
   Datom,
   DatomInput,
@@ -329,6 +329,35 @@ export class PostgreSQLDatabase extends Database {
     return this.query({ entity, added: true });
   }
 
+  async transaction<T>(callback: (tx: Transaction) => Promise<T>): Promise<T> {
+    await this.ensureInitialized();
+
+    if (
+      !this.connection.beginTransaction ||
+      !this.connection.commitTransaction ||
+      !this.connection.rollbackTransaction
+    ) {
+      throw new Error(
+        "Transaction support requires beginTransaction, commitTransaction, and rollbackTransaction methods"
+      );
+    }
+
+    const txId = await this.getNextTransactionId();
+    const transaction = this.createTransaction(txId);
+
+    await this.connection.beginTransaction();
+    try {
+      const result = await callback(transaction);
+      // Apply pending changes before committing
+      await (transaction as any).commit();
+      await this.connection.commitTransaction();
+      return result;
+    } catch (error) {
+      await this.connection.rollbackTransaction();
+      throw error;
+    }
+  }
+
   /**
    * Clean up tables for test isolation
    * This method can be called before each test to ensure a clean state
@@ -372,7 +401,7 @@ export class PostgreSQLDatabase extends Database {
     return result[0].last_tx;
   }
 
-  private async addDatoms(
+  protected async addDatoms(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -399,7 +428,7 @@ export class PostgreSQLDatabase extends Database {
     await this.connection.execute(sql, params);
   }
 
-  private async retractDatoms(
+  protected async retractDatoms(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -424,6 +453,412 @@ export class PostgreSQLDatabase extends Database {
     });
 
     await this.connection.execute(sql, params);
+  }
+
+  private async executeClause(
+    clause: QueryClause
+  ): Promise<Record<string, Value>[]> {
+    const [entityVal, attributeVal, valueVal] = clause;
+    const entity = this.isVariable(entityVal)
+      ? undefined
+      : (entityVal as EntityId);
+    const attribute = this.isVariable(attributeVal)
+      ? undefined
+      : (attributeVal as string);
+    const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
+
+    const datoms = await this.query({
+      entity,
+      attribute,
+      value,
+    });
+
+    return datoms.map((datom) => {
+      const result: Record<string, Value> = {};
+      if (this.isVariable(entityVal)) {
+        result[entityVal as string] = datom.entity;
+      }
+      if (this.isVariable(attributeVal)) {
+        result[attributeVal as string] = datom.attribute;
+      }
+      if (this.isVariable(valueVal)) {
+        result[valueVal as string] = datom.value;
+      }
+      return result;
+    });
+  }
+
+  private joinResults(
+    left: Record<string, Value>[],
+    right: Record<string, Value>[],
+    clauses: QueryClause[]
+  ): Record<string, Value>[] {
+    const joined: Record<string, Value>[] = [];
+
+    for (const leftRow of left) {
+      for (const rightRow of right) {
+        let compatible = true;
+        for (const key of Object.keys(leftRow)) {
+          if (key in rightRow && leftRow[key] !== rightRow[key]) {
+            compatible = false;
+            break;
+          }
+        }
+
+        if (compatible) {
+          joined.push({ ...leftRow, ...rightRow });
+        }
+      }
+    }
+
+    return joined;
+  }
+
+  private project(
+    results: Record<string, Value>[],
+    find: string[],
+    clauses: QueryClause[]
+  ): QueryResult {
+    if (find.length === 0) {
+      return results;
+    }
+
+    return results.map((row) => {
+      const projected: Record<string, Value> = {};
+      for (const varName of find) {
+        if (varName in row) {
+          projected[varName] = row[varName];
+        }
+      }
+      return projected;
+    });
+  }
+
+  private isVariable(value: any): boolean {
+    return typeof value === "string" && value.startsWith("?");
+  }
+
+  /**
+   * PostgreSQL transaction implementation
+   * Tracks pending changes and merges them with queries
+   */
+  private createTransaction(txId: TransactionId): Transaction {
+    return new PostgreSQLTransaction(
+      this.connection,
+      this.tableName,
+      txId,
+      this
+    );
+  }
+}
+
+/**
+ * PostgreSQL transaction implementation
+ * Tracks pending changes and merges them with queries
+ */
+class PostgreSQLTransaction implements Transaction {
+  private connection: SqlConnection;
+  private tableName: string;
+  private txId: TransactionId;
+  private db: PostgreSQLDatabase;
+  private pendingAdds: Datom[] = [];
+  private pendingRetracts: Datom[] = [];
+
+  constructor(
+    connection: SqlConnection,
+    tableName: string,
+    txId: TransactionId,
+    db: PostgreSQLDatabase
+  ) {
+    this.connection = connection;
+    this.tableName = tableName;
+    this.txId = txId;
+    this.db = db;
+  }
+
+  async query(options: QueryOptions = {}): Promise<Datom[]> {
+    // Query committed data
+    const committed = await this.db.query(options);
+
+    // Merge with pending changes
+    const pending = this.mergePendingChanges(committed, options);
+    return pending;
+  }
+
+  async add(datoms: DatomInput[]): Promise<TransactionId> {
+    for (const datom of datoms) {
+      const d: Datom = {
+        entity: datom[0],
+        attribute: datom[1],
+        value: datom[2],
+        tx: this.txId,
+        added: true,
+      };
+      this.pendingAdds.push(d);
+    }
+    return this.txId;
+  }
+
+  async retract(datoms: DatomInput[]): Promise<TransactionId> {
+    for (const datom of datoms) {
+      const key = `${String(datom[0])}|${String(datom[1])}|${String(datom[2])}`;
+
+      // Remove from pending adds if it was added in this transaction
+      this.pendingAdds = this.pendingAdds.filter((d) => {
+        const dKey = `${String(d.entity)}|${String(d.attribute)}|${String(
+          d.value
+        )}`;
+        return dKey !== key;
+      });
+
+      // Add to pending retracts
+      const d: Datom = {
+        entity: datom[0],
+        attribute: datom[1],
+        value: datom[2],
+        tx: this.txId,
+        added: false,
+      };
+      this.pendingRetracts.push(d);
+    }
+    return this.txId;
+  }
+
+  async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
+    // Use the database's queryDatalog but with transaction-aware query
+    // We need to override executeClause to use transaction-aware query
+    return this.executeDatalogWithTransaction(query);
+  }
+
+  async getEntity(entity: EntityId): Promise<Datom[]> {
+    return this.query({ entity, added: true });
+  }
+
+  async getValue(
+    entity: EntityId,
+    attribute: string
+  ): Promise<Value | undefined> {
+    const datoms = await this.query({ entity, attribute });
+    return datoms.length > 0 ? datoms[0].value : undefined;
+  }
+
+  async getValues(entity: EntityId, attribute: string): Promise<Value[]> {
+    const datoms = await this.query({ entity, attribute });
+    return datoms.map((d) => d.value);
+  }
+
+  async hasFact(
+    entity: EntityId,
+    attribute: string,
+    value: Value
+  ): Promise<boolean> {
+    const datoms = await this.query({ entity, attribute, value });
+    return datoms.length > 0;
+  }
+
+  async commit(): Promise<void> {
+    // Apply all pending changes to the database
+    // We'll apply these directly via SQL since we're already in a transaction
+    if (this.pendingAdds.length > 0) {
+      const placeholders = this.pendingAdds
+        .map(() => "(?, ?, ?, ?, ?)")
+        .join(", ");
+      const sql = `
+        INSERT INTO ${this.tableName} (entity, attribute, value, tx, added)
+        VALUES ${placeholders}
+        ON CONFLICT DO NOTHING
+      `;
+
+      const params = this.pendingAdds.flatMap((d) => {
+        let value = d.value;
+        if (value === undefined) {
+          value = "__UNDEFINED__";
+        }
+        if (typeof value === "symbol") {
+          value = `__SYMBOL__${String(value)}`;
+        }
+        return [
+          String(d.entity),
+          String(d.attribute),
+          JSON.stringify(value),
+          this.txId,
+          true,
+        ];
+      });
+
+      await this.connection.execute(sql, params);
+    }
+    if (this.pendingRetracts.length > 0) {
+      const placeholders = this.pendingRetracts
+        .map(() => "(?, ?, ?, ?, ?)")
+        .join(", ");
+      const sql = `
+        INSERT INTO ${this.tableName} (entity, attribute, value, tx, added)
+        VALUES ${placeholders}
+        ON CONFLICT DO NOTHING
+      `;
+
+      const params = this.pendingRetracts.flatMap((d) => {
+        let value = d.value;
+        if (value === undefined) {
+          value = "__UNDEFINED__";
+        }
+        if (typeof value === "symbol") {
+          value = `__SYMBOL__${String(value)}`;
+        }
+        return [
+          String(d.entity),
+          String(d.attribute),
+          JSON.stringify(value),
+          this.txId,
+          false,
+        ];
+      });
+
+      await this.connection.execute(sql, params);
+    }
+  }
+
+  private mergePendingChanges(
+    committed: Datom[],
+    options: QueryOptions
+  ): Datom[] {
+    // Create a map of committed datoms by (entity, attribute, value)
+    const committedMap = new Map<string, Datom>();
+    for (const datom of committed) {
+      const key = `${String(datom.entity)}|${String(datom.attribute)}|${String(
+        datom.value
+      )}`;
+      const existing = committedMap.get(key);
+      if (!existing || datom.tx > existing.tx) {
+        committedMap.set(key, datom);
+      }
+    }
+
+    // Apply pending retracts (remove matching datoms)
+    for (const retract of this.pendingRetracts) {
+      const key = `${String(retract.entity)}|${String(
+        retract.attribute
+      )}|${String(retract.value)}`;
+      committedMap.delete(key);
+    }
+
+    // Apply pending adds (add or update datoms)
+    for (const add of this.pendingAdds) {
+      const key = `${String(add.entity)}|${String(add.attribute)}|${String(
+        add.value
+      )}`;
+      committedMap.set(key, add);
+    }
+
+    let results = Array.from(committedMap.values());
+
+    // Apply filters from options
+    if (options.entity !== undefined) {
+      results = results.filter((d) => d.entity === options.entity);
+    }
+    if (options.attribute !== undefined) {
+      results = results.filter((d) => d.attribute === options.attribute);
+    }
+    if (options.value !== undefined) {
+      results = results.filter((d) => d.value === options.value);
+    }
+    if (options.tx !== undefined) {
+      results = results.filter((d) => d.tx === options.tx);
+    }
+
+    // Handle added filter
+    if (options.added === undefined || options.added === true) {
+      results = results.filter((d) => d.added);
+    } else if (options.added === false) {
+      results = results.filter((d) => !d.added);
+    }
+
+    // Sort by entity, then attribute
+    results.sort((a, b) => {
+      let entityA: number;
+      if (typeof a.entity === "number") {
+        entityA = a.entity;
+      } else {
+        const entityStr = String(a.entity);
+        entityA = /^-?\d+$/.test(entityStr) ? parseInt(entityStr, 10) : 0;
+      }
+
+      let entityB: number;
+      if (typeof b.entity === "number") {
+        entityB = b.entity;
+      } else {
+        const entityStr = String(b.entity);
+        entityB = /^-?\d+$/.test(entityStr) ? parseInt(entityStr, 10) : 0;
+      }
+
+      if (entityA !== entityB) {
+        return entityA - entityB;
+      }
+      return String(a.attribute).localeCompare(String(b.attribute));
+    });
+
+    // Apply pagination
+    const offset = options.offset ?? 0;
+    const paginated = options.limit
+      ? results.slice(offset, offset + options.limit)
+      : results.slice(offset);
+
+    return paginated;
+  }
+
+  private async executeDatalogWithTransaction(
+    query: DatalogQuery
+  ): Promise<QueryResult> {
+    if (query.where.length === 0) {
+      return [];
+    }
+
+    const firstClause = query.where[0];
+    const firstResults = await this.executeClause(firstClause);
+
+    let results = firstResults;
+    for (let i = 1; i < query.where.length; i++) {
+      const clause = query.where[i];
+      const clauseResults = await this.executeClause(clause);
+      results = this.joinResults(
+        results,
+        clauseResults,
+        query.where.slice(0, i + 1)
+      );
+    }
+
+    const projected = this.project(results, query.find, query.where);
+
+    if (query.orderBy) {
+      projected.sort((a, b) => {
+        for (const [variable, direction] of query.orderBy!) {
+          const aVal = a[variable];
+          const bVal = b[variable];
+
+          if (aVal == null && bVal == null) continue;
+          if (aVal == null) return direction === "asc" ? -1 : 1;
+          if (bVal == null) return direction === "asc" ? 1 : -1;
+
+          if (typeof aVal === "symbol" || typeof bVal === "symbol") {
+            const aStr = String(aVal);
+            const bStr = String(bVal);
+            if (aStr < bStr) return direction === "asc" ? -1 : 1;
+            if (aStr > bStr) return direction === "asc" ? 1 : -1;
+          } else {
+            if (aVal < bVal) return direction === "asc" ? -1 : 1;
+            if (aVal > bVal) return direction === "asc" ? 1 : -1;
+          }
+        }
+        return 0;
+      });
+    }
+
+    if (query.limit) {
+      return projected.slice(0, query.limit);
+    }
+
+    return projected;
   }
 
   private async executeClause(
