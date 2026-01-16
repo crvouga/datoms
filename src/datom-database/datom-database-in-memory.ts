@@ -42,6 +42,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
   async add(datoms: DatomInput[]): Promise<TransactionId> {
     await this.ensureInitialized();
+    await this.validateDatoms(datoms, true);
     const tx = this.nextTx++;
 
     for (const datom of datoms) {
@@ -59,6 +60,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
   async retract(datoms: DatomInput[]): Promise<TransactionId> {
     await this.ensureInitialized();
+    await this.validateDatoms(datoms, false);
     const tx = this.nextTx++;
 
     for (const datom of datoms) {
@@ -318,7 +320,8 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       : (attributeVal as string);
     const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    const datoms = await this.executeQuery({
+    // Datalog queries manage their own limiting via joins, so bypass validation
+    const datoms = await this.queryInternal({
       entity,
       attribute,
       value,
@@ -416,6 +419,10 @@ class InMemoryTransaction implements Transaction {
     this.datoms = datoms;
     this.txId = txId;
     this.db = db;
+  }
+
+  getTransactionId(): TransactionId {
+    return this.txId;
   }
 
   async query(options: QueryOptions): Promise<Datom[]> {
@@ -660,19 +667,16 @@ class InMemoryTransaction implements Transaction {
       : (attributeVal as string);
     const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    // If all positions are variables, we need to query all datoms
-    // Use history: true to satisfy query validation (datalog queries are inherently limited by joins)
-    const allVariables = !entity && !attribute && !value;
+    // Use transaction's query method to see uncommitted changes
     const queryOptions: QueryOptions = {
       ...(entity !== undefined && { entity }),
       ...(attribute !== undefined && { attribute }),
       ...(value !== undefined && { value }),
-      ...(allVariables && { history: true }), // Use history flag for all-variable queries
     };
 
     const datoms = await this.query(queryOptions);
 
-    return datoms.map((datom) => {
+    return datoms.map((datom: Datom) => {
       const result: Record<string, Value> = {};
       if (this.isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;

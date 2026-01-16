@@ -95,6 +95,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
   async add(datoms: DatomInput[]): Promise<TransactionId> {
     await this.ensureInitialized();
+    await this.validateDatoms(datoms, true);
     const tx = await this.getNextTransactionId();
     await this.addDatoms(datoms, tx);
     return tx;
@@ -102,6 +103,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
   async retract(datoms: DatomInput[]): Promise<TransactionId> {
     await this.ensureInitialized();
+    await this.validateDatoms(datoms, false);
     const tx = await this.getNextTransactionId();
     await this.retractDatoms(datoms, tx);
     return tx;
@@ -895,20 +897,17 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       : (attributeVal as string);
     const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    // If all positions are variables, we need to query all datoms
-    // Use history: true to satisfy query validation (datalog queries are inherently limited by joins)
-    const allVariables = !entity && !attribute && !value;
+    // Datalog queries manage their own limiting via joins, so bypass validation
     const queryOptions: QueryOptions = {
       ...(entity !== undefined && { entity }),
       ...(attribute !== undefined && { attribute }),
       ...(value !== undefined && { value }),
       ...(asOf !== undefined && { asOf }),
-      ...(allVariables && { history: true }), // Use history flag for all-variable queries
     };
 
-    const datoms = await this.query(queryOptions);
+    const datoms = await this.queryInternal(queryOptions);
 
-    return datoms.map((datom) => {
+    return datoms.map((datom: Datom) => {
       const result: Record<string, Value> = {};
       if (this.isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;
@@ -998,14 +997,18 @@ class SQLiteTransaction implements Transaction {
     this.db = db;
   }
 
+  getTransactionId(): TransactionId {
+    return this.txId;
+  }
+
   async query(options: QueryOptions): Promise<Datom[]> {
     // For asOf queries, only query committed state (ignore pending changes)
     if (options.asOf !== undefined) {
-      return this.db.query(options);
+      return this.db.queryInternal(options);
     }
 
-    // Query committed data
-    const committed = await this.db.query(options);
+    // Query committed data (bypass validation since transactions manage their own constraints)
+    const committed = await this.db.queryInternal(options);
 
     // Merge with pending changes
     const pending = this.mergePendingChanges(committed, options);
@@ -1014,7 +1017,7 @@ class SQLiteTransaction implements Transaction {
 
   async queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]> {
     // Query committed state at that transaction, ignoring pending changes
-    return this.db.query({ ...options, asOf: tx });
+    return this.db.queryInternal({ ...options, asOf: tx });
   }
 
   async add(datoms: DatomInput[]): Promise<void> {
@@ -1329,20 +1332,17 @@ class SQLiteTransaction implements Transaction {
       : (attributeVal as string);
     const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    // If all positions are variables, we need to query all datoms
-    // Use history: true to satisfy query validation (datalog queries are inherently limited by joins)
-    const allVariables = !entity && !attribute && !value;
+    // Use transaction's query method to see uncommitted changes
     const queryOptions: QueryOptions = {
       ...(entity !== undefined && { entity }),
       ...(attribute !== undefined && { attribute }),
       ...(value !== undefined && { value }),
       ...(asOf !== undefined && { asOf }),
-      ...(allVariables && { history: true }), // Use history flag for all-variable queries
     };
 
     const datoms = await this.query(queryOptions);
 
-    return datoms.map((datom) => {
+    return datoms.map((datom: Datom) => {
       const result: Record<string, Value> = {};
       if (this.isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;

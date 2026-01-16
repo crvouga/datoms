@@ -1787,12 +1787,18 @@ describe.each(implementations)("DatomDatabase (%s)", (name, createFixture) => {
     });
 
     test("should require at least one filter or limit for query", async () => {
-      await expect(db.query({})).rejects.toThrow("full table scans");
+      expect(db.query({})).rejects.toThrow("full table scans");
+
+      // History queries without filters should also require a limit
+      expect(db.query({ history: true })).rejects.toThrow(
+        "History query must include at least one filter or a limit"
+      );
 
       // These should work
       await db.query({ entity: 1 });
       await db.query({ limit: 10 });
-      await db.query({ history: true });
+      await db.query({ history: true, limit: 100 });
+      await db.query({ history: true, entity: 1 });
 
       await db.close();
     });

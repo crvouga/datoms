@@ -97,6 +97,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
   async add(datoms: DatomInput[]): Promise<TransactionId> {
     await this.ensureInitialized();
+    await this.validateDatoms(datoms, true);
     const tx = await this.getNextTransactionId();
 
     if (
@@ -121,6 +122,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
   async retract(datoms: DatomInput[]): Promise<TransactionId> {
     await this.ensureInitialized();
+    await this.validateDatoms(datoms, false);
     const tx = await this.getNextTransactionId();
 
     if (
@@ -165,22 +167,8 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
 
-    // Safety check: validate query options to prevent full table scans
-    const hasFilter =
-      options.entity !== undefined ||
-      options.attribute !== undefined ||
-      options.value !== undefined ||
-      options.tx !== undefined ||
-      options.asOf !== undefined;
-    const hasLimit = options.limit !== undefined;
-    const isHistory = options.history === true;
-
-    if (!hasFilter && !hasLimit && !isHistory) {
-      throw new Error(
-        "Query must include at least one filter (entity, attribute, value, tx, asOf), a limit, or history: true to prevent full table scans"
-      );
-    }
-
+    // Note: Validation is handled by the base class query() method
+    // This method is also called by queryInternal() which bypasses validation
     const conditions: string[] = [];
     const params: any[] = [];
 
@@ -618,20 +606,17 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       : (attributeVal as string);
     const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    // If all positions are variables, we need to query all datoms
-    // Use history: true to satisfy query validation (datalog queries are inherently limited by joins)
-    const allVariables = !entity && !attribute && !value;
+    // Datalog queries manage their own limiting via joins, so bypass validation
     const queryOptions: QueryOptions = {
       ...(entity !== undefined && { entity }),
       ...(attribute !== undefined && { attribute }),
       ...(value !== undefined && { value }),
       ...(asOf !== undefined && { asOf }),
-      ...(allVariables && { history: true }), // Use history flag for all-variable queries
     };
 
-    const datoms = await this.query(queryOptions);
+    const datoms = await this.queryInternal(queryOptions);
 
-    return datoms.map((datom) => {
+    return datoms.map((datom: Datom) => {
       const result: Record<string, Value> = {};
       if (this.isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;
@@ -734,14 +719,18 @@ class PostgreSQLTransaction implements Transaction {
     this.db = db;
   }
 
+  getTransactionId(): TransactionId {
+    return this.txId;
+  }
+
   async query(options: QueryOptions): Promise<Datom[]> {
     // For asOf queries, only query committed state (ignore pending changes)
     if (options.asOf !== undefined) {
-      return this.db.query(options);
+      return this.db.queryInternal(options);
     }
 
-    // Query committed data
-    const committed = await this.db.query(options);
+    // Query committed data (bypass validation since transactions manage their own constraints)
+    const committed = await this.db.queryInternal(options);
 
     // Merge with pending changes
     const pending = this.mergePendingChanges(committed, options);
@@ -1065,20 +1054,17 @@ class PostgreSQLTransaction implements Transaction {
       : (attributeVal as string);
     const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    // If all positions are variables, we need to query all datoms
-    // Use history: true to satisfy query validation (datalog queries are inherently limited by joins)
-    const allVariables = !entity && !attribute && !value;
+    // Use transaction's query method to see uncommitted changes
     const queryOptions: QueryOptions = {
       ...(entity !== undefined && { entity }),
       ...(attribute !== undefined && { attribute }),
       ...(value !== undefined && { value }),
       ...(asOf !== undefined && { asOf }),
-      ...(allVariables && { history: true }), // Use history flag for all-variable queries
     };
 
     const datoms = await this.query(queryOptions);
 
-    return datoms.map((datom) => {
+    return datoms.map((datom: Datom) => {
       const result: Record<string, Value> = {};
       if (this.isVariable(entityVal)) {
         result[entityVal as string] = datom.entity;
