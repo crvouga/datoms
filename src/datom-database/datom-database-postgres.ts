@@ -13,6 +13,7 @@ import type {
   Datom,
   DatomInput,
   EntityId,
+  QueryExplainResult,
   QueryOptions,
   TransactionId,
   Value,
@@ -409,6 +410,168 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     });
   }
 
+  async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
+    await this.ensureInitialized();
+    const result = await super.explainQuery(options);
+
+    // Build the same query as executeQuery to explain it
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (options.asOf !== undefined) {
+      conditions.push("tx <= ?");
+      params.push(options.asOf);
+    }
+    if (options.entity !== undefined) {
+      conditions.push("entity = ?");
+      params.push(String(options.entity));
+    }
+    if (options.attribute !== undefined) {
+      conditions.push("attribute = ?");
+      params.push(String(options.attribute));
+    }
+    if (options.value !== undefined) {
+      let value = options.value;
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      if (typeof value === "symbol") {
+        value = `__SYMBOL__${String(value)}`;
+      }
+      conditions.push("value = ?::jsonb");
+      params.push(JSON.stringify(value));
+    }
+    if (options.tx !== undefined) {
+      conditions.push("tx = ?");
+      params.push(options.tx);
+    }
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const isHistoryQuery = options.history === true;
+    let explainSql: string;
+
+    if (isHistoryQuery) {
+      explainSql = `
+        EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+        SELECT entity, attribute, value, tx, added
+        FROM ${this.tableName}
+        ${whereClause}
+        ORDER BY tx ASC, entity ASC, attribute ASC
+      `;
+    } else {
+      const distinctOnColumns =
+        options.asOf !== undefined
+          ? "entity, attribute"
+          : "entity, attribute, value";
+      const orderByColumns =
+        options.asOf !== undefined
+          ? "entity, attribute, tx DESC"
+          : "entity, attribute, value, tx DESC";
+      const addedFilterAfter =
+        options.added === true || options.added === undefined
+          ? "WHERE added = true"
+          : options.added === false
+          ? "WHERE added = false"
+          : "";
+
+      explainSql = `
+        EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+        WITH latest_datoms AS (
+          SELECT DISTINCT ON (${distinctOnColumns})
+            entity, attribute, value, tx, added
+          FROM ${this.tableName}
+          ${whereClause}
+          ORDER BY ${orderByColumns}
+        )
+        SELECT 
+          entity,
+          attribute,
+          value,
+          tx,
+          added
+        FROM latest_datoms
+        ${addedFilterAfter}
+      `;
+    }
+
+    try {
+      const explainRows = await this.connection.query(explainSql, params);
+      result.raw = explainRows;
+
+      // PostgreSQL EXPLAIN ANALYZE returns JSON format
+      // Structure: [{ "Plan": {...}, "Planning Time": ..., "Execution Time": ... }]
+      if (Array.isArray(explainRows) && explainRows.length > 0) {
+        const explainData = explainRows[0];
+        const plan = explainData?.Plan;
+
+        if (plan) {
+          // Extract cost estimates
+          if (plan["Total Cost"] !== undefined) {
+            result.estimatedCost = plan["Total Cost"];
+          }
+          if (plan["Plan Rows"] !== undefined) {
+            result.estimatedRows = plan["Plan Rows"];
+          }
+
+          // Extract scan type and indexes
+          const nodeType = plan["Node Type"];
+          if (nodeType) {
+            if (nodeType.includes("Seq Scan")) {
+              result.scanType = "full-table";
+              result.warnings = result.warnings || [];
+              result.warnings.push(
+                "Query plan indicates sequential scan. Consider adding indexes on frequently queried attributes."
+              );
+            } else if (nodeType.includes("Index Scan")) {
+              result.scanType = "index";
+            } else if (nodeType.includes("Index Only Scan")) {
+              result.scanType = "index-only";
+            }
+          }
+
+          // Extract index names recursively
+          const indexesUsedSet = new Set<string>();
+          const extractIndexes = (node: any) => {
+            if (node["Index Name"]) {
+              indexesUsedSet.add(node["Index Name"]);
+            }
+            if (node["Plans"] && Array.isArray(node["Plans"])) {
+              for (const subPlan of node["Plans"]) {
+                extractIndexes(subPlan);
+              }
+            }
+          };
+          extractIndexes(plan);
+
+          if (indexesUsedSet.size > 0) {
+            result.indexesUsed = Array.from(indexesUsedSet);
+          }
+
+          // Extract actual execution time if available
+          if (explainData["Execution Time"] !== undefined) {
+            // Store in raw for detailed analysis
+            if (!result.raw) {
+              result.raw = {};
+            }
+            (result.raw as any).executionTime = explainData["Execution Time"];
+          }
+        }
+      }
+    } catch (error) {
+      // If EXPLAIN fails, return base result with warning
+      result.warnings = result.warnings || [];
+      result.warnings.push(
+        `Failed to get query plan: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+
+    return result;
+  }
+
   async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
     await this.ensureInitialized();
     if (query.where.length === 0) {
@@ -761,6 +924,11 @@ class PostgreSQLTransaction implements Transaction {
     // Merge with pending changes
     const pending = this.mergePendingChanges(committed, options);
     return pending;
+  }
+
+  async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
+    // Delegate to database's explainQuery
+    return this.db.explainQuery(options);
   }
 
   async queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]> {

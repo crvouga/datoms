@@ -9,6 +9,7 @@ import type {
   Datom,
   DatomInput,
   EntityId,
+  QueryExplainResult,
   QueryOptions,
   TransactionId,
   Value,
@@ -213,6 +214,67 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     const paginated = results.slice(offset, limit ? offset + limit : undefined);
 
     return paginated;
+  }
+
+  async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
+    await this.ensureInitialized();
+    const result = await super.explainQuery(options);
+
+    // Estimate result size based on filters and current data
+    let estimatedRows = this.datoms.length;
+
+    // Apply filters to estimate result size
+    if (options.entity !== undefined) {
+      const entityCount = this.datoms.filter(
+        (d) => d.entity === options.entity
+      ).length;
+      estimatedRows = Math.min(estimatedRows, entityCount);
+    }
+    if (options.attribute !== undefined) {
+      const attributeCount = this.datoms.filter(
+        (d) => d.attribute === options.attribute
+      ).length;
+      estimatedRows = Math.min(estimatedRows, attributeCount);
+    }
+    if (options.value !== undefined) {
+      const valueCount = this.datoms.filter(
+        (d) => d.value === options.value
+      ).length;
+      estimatedRows = Math.min(estimatedRows, valueCount);
+    }
+    if (options.tx !== undefined) {
+      const txCount = this.datoms.filter((d) => d.tx === options.tx).length;
+      estimatedRows = Math.min(estimatedRows, txCount);
+    }
+    if (options.asOf !== undefined) {
+      const asOfCount = this.datoms.filter((d) => d.tx <= options.asOf!).length;
+      estimatedRows = Math.min(estimatedRows, asOfCount);
+    }
+
+    // Apply limit if present
+    if (options.limit !== undefined) {
+      estimatedRows = Math.min(estimatedRows, options.limit);
+    }
+
+    // For history queries, don't deduplicate, so estimate is higher
+    if (options.history === true) {
+      // History queries return all matching datoms, not deduplicated
+      result.estimatedRows = estimatedRows;
+    } else {
+      // Normal queries deduplicate, so estimate is lower
+      // Rough estimate: assume 50% reduction from deduplication
+      result.estimatedRows = Math.floor(estimatedRows * 0.5);
+    }
+
+    // Set scan type based on filters
+    if (result.scanType === "full-table") {
+      result.warnings = result.warnings || [];
+      result.warnings.push(
+        `In-memory database will scan all ${this.datoms.length} datoms. Consider adding filters.`
+      );
+    }
+
+    return result;
   }
 
   async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
@@ -523,6 +585,11 @@ class InMemoryTransaction implements Transaction {
     const paginated = results.slice(offset, limit ? offset + limit : undefined);
 
     return paginated;
+  }
+
+  async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
+    // Delegate to database's explainQuery
+    return this.db.explainQuery(options);
   }
 
   async queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]> {

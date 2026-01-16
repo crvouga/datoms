@@ -8,6 +8,7 @@ import type {
   Datom,
   DatomInput,
   EntityId,
+  QueryExplainResult,
   QueryOptions,
   TransactionId,
   Value,
@@ -358,6 +359,163 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         added: Boolean(row.added),
       };
     });
+  }
+
+  async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
+    await this.ensureInitialized();
+    const result = await super.explainQuery(options);
+
+    // Build the same query as executeQuery to explain it
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (options.asOf !== undefined) {
+      conditions.push("tx <= ?");
+      params.push(options.asOf);
+    }
+    if (options.entity !== undefined) {
+      conditions.push("entity = ?");
+      params.push(String(options.entity));
+    }
+    if (options.attribute !== undefined) {
+      conditions.push("attribute = ?");
+      params.push(String(options.attribute));
+    }
+    if (options.value !== undefined) {
+      conditions.push("value = ?");
+      let value = options.value;
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      if (typeof value === "symbol") {
+        value = `__SYMBOL__${String(value)}`;
+      }
+      params.push(JSON.stringify(value));
+    }
+    if (options.tx !== undefined) {
+      conditions.push("tx = ?");
+      params.push(options.tx);
+    }
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const isHistoryQuery = options.history === true;
+    let explainSql: string;
+
+    if (isHistoryQuery) {
+      explainSql = `
+        EXPLAIN QUERY PLAN
+        SELECT entity, attribute, value, tx, added
+        FROM ${this.tableName}
+        ${whereClause}
+        ORDER BY tx ASC, entity ASC, attribute ASC
+      `;
+    } else {
+      const partitionByColumns =
+        options.asOf !== undefined
+          ? "entity, attribute"
+          : "entity, attribute, value";
+      const addedFilter =
+        options.added === true || options.added === undefined
+          ? "AND added = 1"
+          : options.added === false
+            ? "AND added = 0"
+            : "";
+
+      explainSql = `
+        EXPLAIN QUERY PLAN
+        WITH ranked_datoms AS (
+          SELECT 
+            entity,
+            attribute,
+            value,
+            tx,
+            added,
+            ROW_NUMBER() OVER (
+              PARTITION BY ${partitionByColumns}
+              ORDER BY tx DESC
+            ) AS rn
+          FROM ${this.tableName}
+          ${whereClause}
+        )
+        SELECT 
+          entity,
+          attribute,
+          value,
+          tx,
+          added
+        FROM ranked_datoms
+        WHERE rn = 1
+        ${addedFilter}
+      `;
+    }
+
+    try {
+      const explainRows = await this.connection.query(explainSql, params);
+      result.raw = explainRows;
+
+      // Parse SQLite EXPLAIN QUERY PLAN output
+      // Format: {selectid, order, from, detail}
+      const indexesUsedSet = new Set<string>();
+      let scanTypeDetected: "index" | "full-table" | "index-only" | "unknown" =
+        "unknown";
+
+      for (const row of explainRows as any[]) {
+        const detail = String(row.detail || "");
+        const from = String(row.from || "");
+
+        // Detect scan types
+        if (detail.includes("SCAN TABLE") || from.includes("SCAN TABLE")) {
+          scanTypeDetected = "full-table";
+        } else if (
+          detail.includes("SEARCH TABLE") ||
+          from.includes("SEARCH TABLE")
+        ) {
+          scanTypeDetected = "index";
+        } else if (
+          detail.includes("SCAN") &&
+          (detail.includes("COVERING INDEX") || detail.includes("INDEX"))
+        ) {
+          scanTypeDetected = "index-only";
+        }
+
+        // Extract index names
+        const indexMatch = detail.match(/USING INDEX (\w+)/i);
+        if (indexMatch) {
+          indexesUsedSet.add(indexMatch[1]);
+        }
+        const indexMatch2 = detail.match(/INDEX (\w+)/i);
+        if (indexMatch2 && !detail.includes("USING INDEX")) {
+          indexesUsedSet.add(indexMatch2[1]);
+        }
+      }
+
+      if (scanTypeDetected !== "unknown") {
+        result.scanType = scanTypeDetected;
+      }
+
+      if (indexesUsedSet.size > 0) {
+        result.indexesUsed = Array.from(indexesUsedSet);
+      }
+
+      // Estimate rows based on query plan detail
+      // SQLite doesn't provide row estimates in EXPLAIN QUERY PLAN, but we can infer from scan type
+      if (scanTypeDetected === "full-table") {
+        result.warnings = result.warnings || [];
+        result.warnings.push(
+          "Query plan indicates full table scan. Consider adding indexes on frequently queried attributes."
+        );
+      }
+    } catch (error) {
+      // If EXPLAIN fails, return base result with warning
+      result.warnings = result.warnings || [];
+      result.warnings.push(
+        `Failed to get query plan: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    return result;
   }
 
   async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
@@ -1038,6 +1196,11 @@ class SQLiteTransaction implements Transaction {
     // Merge with pending changes
     const pending = this.mergePendingChanges(committed, options);
     return pending;
+  }
+
+  async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
+    // Delegate to database's explainQuery
+    return this.db.explainQuery(options);
   }
 
   async queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]> {

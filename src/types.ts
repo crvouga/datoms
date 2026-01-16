@@ -233,3 +233,68 @@ export interface OptimisticLockOptions {
     delayMs?: number;
   };
 }
+
+/**
+ * Result of query explanation/analysis for optimization hints
+ */
+export interface QueryExplainResult {
+  /** Estimated number of rows that will be returned */
+  estimatedRows?: number;
+  /** Query cost estimate (backend-specific units) */
+  estimatedCost?: number;
+  /** Indexes that will be used for this query */
+  indexesUsed?: string[];
+  /** Type of scan that will be performed */
+  scanType?: "index" | "full-table" | "index-only" | "unknown";
+  /** Optimization warnings or suggestions */
+  warnings?: string[];
+  /** Backend-specific raw explain output (e.g., SQL EXPLAIN result) */
+  raw?: unknown;
+}
+
+/**
+ * Configuration for connection pooling
+ * Used by SQL database implementations to configure connection pools
+ */
+export interface ConnectionPoolConfig {
+  /** Maximum number of connections in the pool */
+  maxConnections?: number;
+  /** Minimum number of connections to maintain */
+  minConnections?: number;
+  /** Time in milliseconds before idle connections are closed */
+  idleTimeout?: number;
+  /** Time in milliseconds to wait for a connection before timing out */
+  connectionTimeout?: number;
+  /** Maximum lifetime of a connection in milliseconds before it's recycled */
+  maxLifetime?: number;
+}
+
+/**
+ * Statistics about a connection pool
+ * Used for monitoring and observability
+ */
+export interface ConnectionPoolStats {
+  /** Number of active connections currently in use */
+  activeConnections: number;
+  /** Number of idle connections available */
+  idleConnections: number;
+  /** Total number of connections in the pool */
+  totalConnections: number;
+  /** Number of requests waiting for a connection */
+  waitingRequests: number;
+}
+
+/**
+ * Versioned schema export format
+ * Includes metadata for schema evolution and migration tracking
+ */
+export interface SchemaExport {
+  /** Schema format version (for compatibility checking) */
+  version: number;
+  /** Application schema version (from getSchemaVersion()) */
+  schemaVersion: number;
+  /** ISO timestamp when schema was exported */
+  exportedAt: string;
+  /** Array of attribute definitions */
+  attributes: AttributeDefinition[];
+}

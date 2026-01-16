@@ -14,7 +14,9 @@ import type {
   DatabaseStats,
   EntityId,
   OptimisticLockOptions,
+  QueryExplainResult,
   QueryOptions,
+  SchemaExport,
   TransactionId,
   Value,
 } from "../types.js";
@@ -172,6 +174,16 @@ export interface DatomReader {
    * // Returns: [1, 5, 42]
    */
   findEntities(attribute: string, value: Value): Promise<EntityId[]>;
+
+  /**
+   * Explain a query to get optimization hints and execution plan
+   * @param options Query options to explain
+   * @returns Query explanation result with optimization hints
+   * @example
+   * const explanation = await db.explainQuery({ attribute: "name", value: "Alice" });
+   * console.log(`Estimated rows: ${explanation.estimatedRows}`);
+   */
+  explainQuery(options: QueryOptions): Promise<QueryExplainResult>;
 }
 
 /**
@@ -324,6 +336,17 @@ export interface Transaction extends DatomReader, DatomWriter<void> {
  * - Export datoms via `export()` for backup and replication
  * - Import datoms via `import()` for restore and migration
  * - Supports streaming for large datasets
+ *
+ * **Connection Pooling (SQL Implementations):**
+ * - SQL database implementations should use connection pooling for production workloads
+ * - Configure pools using `ConnectionPoolConfig` type with appropriate limits
+ * - Monitor pool health via `getPoolStats()` if implemented by your SQL adapter
+ * - **Best Practices:**
+ *   - Use connection pooling for multi-threaded/server applications
+ *   - Single connections are fine for CLI tools or single-user applications
+ *   - Set `maxConnections` based on your database server's connection limits
+ *   - Monitor `waitingRequests` to detect connection pool exhaustion
+ *   - Use `idleTimeout` and `maxLifetime` to prevent connection leaks
  *
  * @example
  * // Example usage: Create, add and query
@@ -832,35 +855,116 @@ export abstract class DatomDatabase
   }
 
   /**
-   * Export the current schema as an array of attribute definitions
+   * Export the current schema as a versioned schema export
    * Useful for migrations, backups, or schema versioning
-   * @returns Array of attribute definitions
+   * @returns Versioned schema export with metadata
    * @example
    * const schema = db.exportSchema();
    * // Save to file or version control
    * await fs.writeFile("schema.json", JSON.stringify(schema, null, 2));
+   * // Schema includes: version, schemaVersion, exportedAt, and attributes
    */
-  exportSchema(): AttributeDefinition[] {
-    return Array.from(this.schema.values());
+  async exportSchema(): Promise<SchemaExport> {
+    await this.ensureInitialized();
+    const schemaVersion = await this.getSchemaVersion();
+    return {
+      version: 1, // Schema format version
+      schemaVersion,
+      exportedAt: new Date().toISOString(),
+      attributes: Array.from(this.schema.values()),
+    };
   }
 
   /**
-   * Import a schema from an array of attribute definitions
+   * Import a schema from a versioned schema export or legacy array format
    * Useful for migrations or restoring schema from backup
-   * @param definitions Array of attribute definitions to import
+   *
+   * **Backward Compatibility:** Accepts both SchemaExport objects and legacy AttributeDefinition[] arrays
+   *
+   * **Schema Evolution:** When importing a versioned schema, validates format version compatibility.
+   * Implementations can override `onSchemaVersionChange()` to handle version changes.
+   *
+   * @param input SchemaExport object or legacy AttributeDefinition[] array
    * @example
-   * // Load schema from file
+   * // Import versioned schema
    * const schema = JSON.parse(await fs.readFile("schema.json", "utf-8"));
-   * await db.importSchema(schema);
+   * await db.importSchema(schema); // SchemaExport object
+   *
+   * // Import legacy format (backward compatible)
+   * const legacySchema = JSON.parse(await fs.readFile("old-schema.json", "utf-8"));
+   * await db.importSchema(legacySchema); // AttributeDefinition[] array
    */
-  async importSchema(definitions: AttributeDefinition[]): Promise<void> {
+  async importSchema(
+    input: SchemaExport | AttributeDefinition[]
+  ): Promise<void> {
     await this.ensureInitialized();
+
+    // Handle legacy format (backward compatibility)
+    if (Array.isArray(input)) {
+      // Legacy format: just an array of attribute definitions
+      this.schema.clear();
+      for (const definition of input) {
+        await this.defineAttribute(definition);
+      }
+      return;
+    }
+
+    // Versioned schema format
+    const schemaExport = input as SchemaExport;
+
+    // Validate format version (currently only version 1 is supported)
+    if (schemaExport.version !== 1) {
+      throw new Error(
+        `Unsupported schema format version: ${schemaExport.version}. Expected version 1.`
+      );
+    }
+
+    // Check if schema version is changing
+    const currentSchemaVersion = await this.getSchemaVersion();
+    const versionChanging = schemaExport.schemaVersion !== currentSchemaVersion;
+
+    if (versionChanging) {
+      await this.onSchemaVersionChange(
+        currentSchemaVersion,
+        schemaExport.schemaVersion
+      );
+    }
+
     // Clear existing schema
     this.schema.clear();
+
     // Import each definition
-    for (const definition of definitions) {
+    for (const definition of schemaExport.attributes) {
       await this.defineAttribute(definition);
     }
+
+    // Update schema version if different
+    if (versionChanging) {
+      await this.migrate(schemaExport.schemaVersion);
+    }
+  }
+
+  /**
+   * Hook for implementations to handle schema version changes during import
+   * Called when importing a schema with a different schemaVersion than the current one
+   * @param oldVersion Current schema version
+   * @param newVersion New schema version from import
+   * @example
+   * // Override in your subclass to handle schema version changes:
+   * protected async onSchemaVersionChange(
+   *   oldVersion: number,
+   *   newVersion: number
+   * ): Promise<void> {
+   *   // Perform any necessary migration logic
+   *   console.log(`Schema version changing from ${oldVersion} to ${newVersion}`);
+   * }
+   */
+  protected async onSchemaVersionChange(
+    oldVersion: number,
+    newVersion: number
+  ): Promise<void> {
+    // Override in implementations if needed
+    // Default: no-op (schema version change is handled by migrate())
   }
 
   /**
@@ -1200,6 +1304,74 @@ export abstract class DatomDatabase
    * protected async executeQuery(options: QueryOptions): Promise<Datom[]> { ... }
    */
   protected abstract executeQuery(options: QueryOptions): Promise<Datom[]>;
+
+  /**
+   * Explain a query to get optimization hints and execution plan
+   * Returns information about how the query will be executed, including
+   * estimated costs, indexes used, and scan types.
+   *
+   * **Implementation Note:** Backend implementations can override this method
+   * to provide backend-specific explain details (e.g., SQL EXPLAIN ANALYZE).
+   * The default implementation provides basic analysis based on query options.
+   *
+   * @param options Query options to explain
+   * @returns Query explanation result with optimization hints
+   * @example
+   * const explanation = await db.explainQuery({ attribute: "name", value: "Alice" });
+   * console.log(`Estimated rows: ${explanation.estimatedRows}`);
+   * console.log(`Indexes used: ${explanation.indexesUsed?.join(", ")}`);
+   * if (explanation.warnings) {
+   *   console.warn("Warnings:", explanation.warnings);
+   * }
+   */
+  async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
+    await this.ensureInitialized();
+    const result: QueryExplainResult = {};
+
+    // Basic analysis based on query options
+    const hasEntityFilter = options.entity !== undefined;
+    const hasAttributeFilter = options.attribute !== undefined;
+    const hasValueFilter = options.value !== undefined;
+    const hasTxFilter = options.tx !== undefined;
+    const hasAsOfFilter = options.asOf !== undefined;
+    const hasLimit = options.limit !== undefined;
+
+    // Determine scan type
+    if (hasEntityFilter || hasAttributeFilter) {
+      result.scanType = "index";
+      result.indexesUsed = [];
+      if (hasEntityFilter) {
+        result.indexesUsed.push("entity_index");
+      }
+      if (hasAttributeFilter) {
+        result.indexesUsed.push("attribute_index");
+      }
+    } else if (hasValueFilter || hasTxFilter || hasAsOfFilter) {
+      result.scanType = "index";
+      if (hasValueFilter) {
+        result.indexesUsed = ["value_index"];
+      }
+      if (hasTxFilter || hasAsOfFilter) {
+        result.indexesUsed = result.indexesUsed || [];
+        result.indexesUsed.push("tx_index");
+      }
+    } else {
+      result.scanType = "full-table";
+      result.warnings = [
+        "Query lacks filters - may perform full table scan. Consider adding entity, attribute, or value filters.",
+      ];
+    }
+
+    // Add warning if no limit on potentially large result set
+    if (!hasLimit && result.scanType === "full-table") {
+      result.warnings = result.warnings || [];
+      result.warnings.push(
+        "Query has no limit - may return large result set. Consider adding a limit."
+      );
+    }
+
+    return result;
+  }
 
   /**
    * Execute a datalog query

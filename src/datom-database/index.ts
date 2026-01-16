@@ -5,10 +5,16 @@
 // Core types
 export type {
   Attribute,
+  AttributeDefinition,
+  ConnectionPoolConfig,
+  ConnectionPoolStats,
   Datom,
   DatomInput,
   EntityId,
+  OptimisticLockOptions,
+  QueryExplainResult,
   QueryOptions,
+  SchemaExport,
   TransactionId,
   Value,
 } from "../types.js";
