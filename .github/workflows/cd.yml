@@ -24,22 +24,23 @@ jobs:
           set -e
           docker compose ps
           function wait_for_healthy() {
-            service="$1"
-            timeout="${2:-60}"
+            container_name="$1"
+            service_name="$2"
+            timeout="${3:-60}"
             elapsed=0
-            while [ "$(docker inspect --format='{{json .State.Health.Status}}' "$service")" != "\"healthy\"" ]; do
+            while [ "$(docker inspect --format='{{json .State.Health.Status}}' "$container_name")" != "\"healthy\"" ]; do
               if [ "$elapsed" -ge "$timeout" ]; then
-                echo "Service $service did not become healthy in $timeout seconds"
-                docker compose logs $service
+                echo "Service $service_name did not become healthy in $timeout seconds"
+                docker compose logs $service_name
                 exit 1
               fi
               sleep 2
               elapsed=$((elapsed+2))
             done
           }
-          wait_for_healthy datoms-postgres 60
-          wait_for_healthy datoms-mysql 60
-          wait_for_healthy datoms-mariadb 60
+          wait_for_healthy datoms-postgres postgres 60
+          wait_for_healthy datoms-mysql mysql 60
+          wait_for_healthy datoms-mariadb mariadb 60
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
