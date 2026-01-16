@@ -50,19 +50,11 @@ export interface DatomReader {
    *
    * // Query with a filter and limit
    * const recent = await db.datoms({ attribute: "age", limit: 5 });
+   *
+   * // Time-travel query: query database state at a specific transaction ID
+   * const atOldTx = await db.datoms({ asOf: 87, entity: 42 });
    */
   datoms(options: QueryOptions): Promise<Datom[]>;
-
-  /**
-   * Query database state as it existed at a specific transaction ID (time-travel query)
-   * @param tx Transaction ID to query at
-   * @param options Additional query options
-   * @returns Array of matching datoms at that point in time
-   * @example
-   * // Get what entity 42 looked like as of transaction 87
-   * const atOldTx = await db.datomsAsOf(87, { entity: 42 });
-   */
-  datomsAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]>;
 
   /**
    * Execute a datalog query
@@ -1767,25 +1759,6 @@ export abstract class DatomDatabase
       entitySet.add(datom.entity);
     }
     return Array.from(entitySet);
-  }
-
-  /**
-   * Query database state as it existed at a specific transaction ID (time-travel query)
-   * @param tx Transaction ID to query at
-   * @param options Additional query options (supports pagination with limit/offset)
-   * @returns Array of matching datoms at that point in time
-   * @example
-   * // Basic time-travel query
-   * const old = await db.datomsAsOf(55, { entity: 1 });
-   *
-   * // Paginated time-travel query
-   * const page1 = await db.datomsAsOf(100, { attribute: "status", limit: 10, offset: 0 });
-   */
-  async datomsAsOf(
-    tx: TransactionId,
-    options?: QueryOptions
-  ): Promise<Datom[]> {
-    return this.datoms({ ...options, asOf: tx });
   }
 
   /**

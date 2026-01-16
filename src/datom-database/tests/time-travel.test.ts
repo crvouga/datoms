@@ -24,20 +24,20 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const tx3 = await db.add([[1, "name", "Alice Updated"]]);
 
       // Query at tx1 - should only see name
-      const atTx1 = await db.datomsAsOf(tx1, { entity: 1 });
+      const atTx1 = await db.datoms({ asOf: tx1, entity: 1 });
       expect(atTx1).toHaveLength(1);
       expect(atTx1[0].attribute).toBe("name");
       expect(atTx1[0].value).toBe("Alice");
 
       // Query at tx2 - should see name and age
-      const atTx2 = await db.datomsAsOf(tx2, { entity: 1 });
+      const atTx2 = await db.datoms({ asOf: tx2, entity: 1 });
       expect(atTx2).toHaveLength(2);
       const valuesAtTx2 = atTx2.map((d) => d.value).sort();
       expect(valuesAtTx2).toContain("Alice");
       expect(valuesAtTx2).toContain(30);
 
       // Query at tx3 - should see updated name and age
-      const atTx3 = await db.datomsAsOf(tx3, { entity: 1 });
+      const atTx3 = await db.datoms({ asOf: tx3, entity: 1 });
       expect(atTx3).toHaveLength(2);
       const nameAtTx3 = atTx3.find((d) => d.attribute === "name");
       expect(nameAtTx3?.value).toBe("Alice Updated");
@@ -52,11 +52,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const tx3 = await db.retract([[1, "age", 30]]);
 
       // Query at tx2 - should see both name and age
-      const atTx2 = await db.datomsAsOf(tx2, { entity: 1 });
+      const atTx2 = await db.datoms({ asOf: tx2, entity: 1 });
       expect(atTx2).toHaveLength(2);
 
       // Query at tx3 - should only see name (age was retracted)
-      const atTx3 = await db.datomsAsOf(tx3, { entity: 1 });
+      const atTx3 = await db.datoms({ asOf: tx3, entity: 1 });
       expect(atTx3).toHaveLength(1);
       expect(atTx3[0].attribute).toBe("name");
 
@@ -152,7 +152,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         expect(current).toHaveLength(2);
 
         // Query at tx1 - should only see committed name (not uncommitted age)
-        const atTx1 = await tx.datomsAsOf(tx1, { entity: 1 });
+        const atTx1 = await tx.datoms({ asOf: tx1, entity: 1 });
         expect(atTx1).toHaveLength(1);
         expect(atTx1[0].attribute).toBe("name");
       });

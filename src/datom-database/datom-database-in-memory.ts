@@ -671,14 +671,6 @@ class InMemoryTransaction implements Transaction {
     return this.db.explainQuery(options);
   }
 
-  async datomsAsOf(
-    tx: TransactionId,
-    options?: QueryOptions
-  ): Promise<Datom[]> {
-    // Query committed state at that transaction, ignoring pending changes
-    return this.db.datoms({ ...options, asOf: tx });
-  }
-
   async add(datoms: DatomInput[]): Promise<void> {
     for (const datom of datoms) {
       this._datomsArray.push({
