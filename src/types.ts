@@ -10,7 +10,7 @@ export type EntityId = number | string;
 /**
  * An attribute name (e.g., "name", "age", "email")
  */
-export type Attribute = string | symbol;
+export type Attribute = string;
 
 /**
  * A value that can be stored in a datom.

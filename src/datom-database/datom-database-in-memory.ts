@@ -317,15 +317,6 @@ export class InMemoryDatomDatabase extends DatomDatabase {
           if (aVal == null) return direction === "asc" ? -1 : 1;
           if (bVal == null) return direction === "asc" ? 1 : -1;
 
-          // Handle symbol comparison (for Attribute values)
-          if (typeof aVal === "symbol" || typeof bVal === "symbol") {
-            const aStr = String(aVal);
-            const bStr = String(bVal);
-            if (aStr < bStr) return direction === "asc" ? -1 : 1;
-            if (aStr > bStr) return direction === "asc" ? 1 : -1;
-            continue;
-          }
-
           if (aVal < bVal) return direction === "asc" ? -1 : 1;
           if (aVal > bVal) return direction === "asc" ? 1 : -1;
         }
@@ -804,15 +795,8 @@ class InMemoryTransaction implements Transaction {
           if (aVal == null) return direction === "asc" ? -1 : 1;
           if (bVal == null) return direction === "asc" ? 1 : -1;
 
-          if (typeof aVal === "symbol" || typeof bVal === "symbol") {
-            const aStr = String(aVal);
-            const bStr = String(bVal);
-            if (aStr < bStr) return direction === "asc" ? -1 : 1;
-            if (aStr > bStr) return direction === "asc" ? 1 : -1;
-          } else {
-            if (aVal < bVal) return direction === "asc" ? -1 : 1;
-            if (aVal > bVal) return direction === "asc" ? 1 : -1;
-          }
+          if (aVal < bVal) return direction === "asc" ? -1 : 1;
+          if (aVal > bVal) return direction === "asc" ? 1 : -1;
         }
         return 0;
       });
