@@ -16,6 +16,7 @@
   "scripts": {
     "build": "tsc",
     "test": "bun test",
+    "check": "bun typecheck && bun lint && bun cir-deps && bun test && echo '✅ All checks passed'",
     "typecheck": "tsc --noEmit",
     "cir-deps": "madge --circular src/index.ts",
     "tc": "bun typecheck -- --watch",
