@@ -506,7 +506,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
    * Clean up tables for test isolation
    * This method can be called before each test to ensure a clean state
    */
-  async cleanup(): Promise<void> {
+  async cleanUp(): Promise<void> {
     await this.ensureInitialized();
     await this.connection.execute(
       `TRUNCATE TABLE ${this.tableName}, ${this.tableName}_tx RESTART IDENTITY CASCADE`
