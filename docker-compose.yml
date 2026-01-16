@@ -14,7 +14,8 @@ services:
       test: ["CMD-SHELL", "pg_isready -U datoms"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 30s
     networks:
       - datoms-network
 
@@ -34,7 +35,8 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pdatoms_root"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 30s
     command: --default-authentication-plugin=mysql_native_password
     networks:
       - datoms-network
@@ -52,10 +54,11 @@ services:
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pdatoms_root"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 30s
     networks:
       - datoms-network
 
