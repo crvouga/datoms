@@ -134,11 +134,20 @@ export class DatalogQueryEngine {
       value,
     });
 
-    return datoms.map((datom) => ({
-      entity: datom.entity,
-      attribute: datom.attribute,
-      value: datom.value,
-    }));
+    // Map datom fields to variable names from the clause
+    return datoms.map((datom) => {
+      const result: Record<string, Value> = {};
+      if (this.isVariable(clause.entity)) {
+        result[clause.entity as string] = datom.entity;
+      }
+      if (this.isVariable(clause.attribute)) {
+        result[clause.attribute as string] = datom.attribute;
+      }
+      if (this.isVariable(clause.value)) {
+        result[clause.value as string] = datom.value;
+      }
+      return result;
+    });
   }
 
   /**
@@ -183,30 +192,12 @@ export class DatalogQueryEngine {
       return results;
     }
 
-    // Map clause positions to variable names
-    const variableMap: Record<string, string> = {};
-    for (const clause of clauses) {
-      if (this.isVariable(clause.entity)) {
-        variableMap["entity"] = clause.entity as string;
-      }
-      if (this.isVariable(clause.attribute)) {
-        variableMap["attribute"] = clause.attribute as string;
-      }
-      if (this.isVariable(clause.value)) {
-        variableMap["value"] = clause.value as string;
-      }
-    }
-
+    // Results already have variable names as keys, so just extract the find variables
     return results.map((row) => {
       const projected: Record<string, Value> = {};
       for (const varName of find) {
-        // Map variable name to actual column
-        if (varName === variableMap.entity) {
-          projected[varName] = row.entity;
-        } else if (varName === variableMap.attribute) {
-          projected[varName] = row.attribute;
-        } else if (varName === variableMap.value) {
-          projected[varName] = row.value;
+        if (varName in row) {
+          projected[varName] = row[varName];
         }
       }
       return projected;
