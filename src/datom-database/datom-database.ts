@@ -900,29 +900,29 @@ export abstract class DatomDatabase
    */
   async query(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
-    // Validate that query has at least one filter or limit to prevent accidental full scans
-    const hasFilter =
-      options.entity !== undefined ||
-      options.attribute !== undefined ||
-      options.value !== undefined ||
-      options.tx !== undefined ||
-      options.asOf !== undefined;
-    const hasLimit = options.limit !== undefined;
-    const isHistory = options.history === true;
-
-    if (!hasFilter && !hasLimit) {
-      if (isHistory) {
-        throw new QuerySafetyError(
-          "History query must include at least one filter or a limit to prevent full table scans"
-        );
-      }
-      throw new QuerySafetyError(
-        "Query must include at least one filter (entity, attribute, value, tx, asOf) or a limit to prevent full table scans"
-      );
-    }
-
     const startTime = Date.now();
     try {
+      // Validate that query has at least one filter or limit to prevent accidental full scans
+      const hasFilter =
+        options.entity !== undefined ||
+        options.attribute !== undefined ||
+        options.value !== undefined ||
+        options.tx !== undefined ||
+        options.asOf !== undefined;
+      const hasLimit = options.limit !== undefined;
+      const isHistory = options.history === true;
+
+      if (!hasFilter && !hasLimit) {
+        if (isHistory) {
+          throw new QuerySafetyError(
+            "History query must include at least one filter or a limit to prevent full table scans"
+          );
+        }
+        throw new QuerySafetyError(
+          "Query must include at least one filter (entity, attribute, value, tx, asOf) or a limit to prevent full table scans"
+        );
+      }
+
       const results = await this.executeQuery(options);
       const duration = Date.now() - startTime;
 
@@ -1057,14 +1057,26 @@ export abstract class DatomDatabase
 
         // Batch query for existing values
         for (const [key, datom] of entityAttributePairs) {
-          const [entity, attribute] = key.split("|");
-          const existingValues = await this.getValues(entity, attribute);
+          // Use the original datom entity/attribute instead of splitting the key
+          // to preserve the original types (number vs string)
+          const entity = datom[0];
+          const attribute = datom[1];
+          const newValue = datom[2];
+          const existingValues = await this.getValues(
+            entity,
+            String(attribute)
+          );
           if (existingValues.length > 0) {
-            throw new CardinalityError(
-              String(attribute),
-              String(entity),
-              "existing_value_conflict"
-            );
+            // If the existing value is the same as what we're trying to add, allow it (idempotent)
+            // This is useful for imports where the same datom might appear multiple times
+            const existingValue = existingValues[0];
+            if (JSON.stringify(existingValue) !== JSON.stringify(newValue)) {
+              throw new CardinalityError(
+                String(attribute),
+                String(entity),
+                "existing_value_conflict"
+              );
+            }
           }
         }
       }
@@ -1584,13 +1596,21 @@ export abstract class DatomDatabase
    */
   async migrate(targetVersion: number): Promise<void> {
     await this.ensureInitialized();
-    if (targetVersion < this.schemaVersion) {
-      throw new MigrationError(
-        `Cannot migrate backwards from version ${this.schemaVersion} to ${targetVersion}`,
-        targetVersion
-      );
-    }
     try {
+      if (targetVersion < this.schemaVersion) {
+        const error = new MigrationError(
+          `Cannot migrate backwards from version ${this.schemaVersion} to ${targetVersion}`,
+          targetVersion
+        );
+        await this.emitEvent({
+          type: "migration",
+          version: targetVersion,
+          success: false,
+          error,
+        });
+        throw error;
+      }
+
       await this.onMigrate(this.schemaVersion, targetVersion);
       this.schemaVersion = targetVersion;
       await this.emitEvent({
@@ -1599,6 +1619,11 @@ export abstract class DatomDatabase
         success: true,
       });
     } catch (error) {
+      // If error is already a MigrationError (backward migration), event was already emitted
+      if (error instanceof MigrationError) {
+        throw error;
+      }
+      // For other errors during onMigrate, emit event and wrap in MigrationError
       await this.emitEvent({
         type: "migration",
         version: targetVersion,
@@ -1806,32 +1831,96 @@ export abstract class DatomDatabase
     const validate = options?.validate ?? true;
     let datomCount = 0;
     let batch: DatomInput[] = [];
+    let batchAdded: boolean[] = []; // Track which datoms in batch are added vs retracted
 
     try {
       for await (const datom of source) {
         // Convert Datom to DatomInput
         batch.push([datom.entity, datom.attribute, datom.value]);
+        batchAdded.push(datom.added);
 
         if (batch.length >= batchSize) {
+          // Process batch: separate added and retracted datoms
+          const addedBatch: DatomInput[] = [];
+          const retractedBatch: DatomInput[] = [];
+          for (let i = 0; i < batch.length; i++) {
+            if (batchAdded[i]) {
+              addedBatch.push(batch[i]);
+            } else {
+              retractedBatch.push(batch[i]);
+            }
+          }
+
+          // Deduplicate batches: keep only the latest occurrence of each (entity, attribute, value) pair
+          const dedupeAdded = this.deduplicateBatch(addedBatch);
+          const dedupeRetracted = this.deduplicateBatch(retractedBatch);
+
           if (validate) {
-            await this.validateDatoms(batch, datom.added);
+            if (dedupeAdded.length > 0) {
+              await this.validateDatoms(dedupeAdded, true);
+            }
+            if (dedupeRetracted.length > 0) {
+              await this.validateDatoms(dedupeRetracted, false);
+            }
           }
-          if (datom.added) {
-            await this.add(batch);
-          } else {
-            await this.retract(batch);
+
+          // Filter out datoms that already exist with the same value (idempotent import)
+          const filteredAdded = await this.filterExistingDatoms(dedupeAdded);
+          const filteredRetracted = await this.filterExistingDatoms(
+            dedupeRetracted
+          );
+
+          if (filteredAdded.length > 0) {
+            await this.add(filteredAdded);
           }
+          if (filteredRetracted.length > 0) {
+            await this.retract(filteredRetracted);
+          }
+
           datomCount += batch.length;
           batch = [];
+          batchAdded = [];
         }
       }
 
       // Process remaining batch
       if (batch.length > 0) {
-        if (validate) {
-          await this.validateDatoms(batch, true);
+        // Separate added and retracted datoms
+        const addedBatch: DatomInput[] = [];
+        const retractedBatch: DatomInput[] = [];
+        for (let i = 0; i < batch.length; i++) {
+          if (batchAdded[i]) {
+            addedBatch.push(batch[i]);
+          } else {
+            retractedBatch.push(batch[i]);
+          }
         }
-        await this.add(batch);
+
+        // Deduplicate batches: keep only the latest occurrence of each (entity, attribute, value) pair
+        const dedupeAdded = this.deduplicateBatch(addedBatch);
+        const dedupeRetracted = this.deduplicateBatch(retractedBatch);
+
+        if (validate) {
+          if (dedupeAdded.length > 0) {
+            await this.validateDatoms(dedupeAdded, true);
+          }
+          if (dedupeRetracted.length > 0) {
+            await this.validateDatoms(dedupeRetracted, false);
+          }
+        }
+
+        // Filter out datoms that already exist with the same value (idempotent import)
+        const filteredAdded = await this.filterExistingDatoms(dedupeAdded);
+        const filteredRetracted = await this.filterExistingDatoms(
+          dedupeRetracted
+        );
+
+        if (filteredAdded.length > 0) {
+          await this.add(filteredAdded);
+        }
+        if (filteredRetracted.length > 0) {
+          await this.retract(filteredRetracted);
+        }
         datomCount += batch.length;
       }
 
@@ -1851,6 +1940,52 @@ export abstract class DatomDatabase
       });
       throw error;
     }
+  }
+
+  /**
+   * Deduplicate a batch of datoms, keeping only the latest occurrence of each (entity, attribute, value) pair.
+   * This is useful when importing data that may contain duplicates.
+   */
+  private deduplicateBatch(batch: DatomInput[]): DatomInput[] {
+    if (batch.length === 0) {
+      return batch;
+    }
+    const seen = new Map<string, DatomInput>();
+    for (const datom of batch) {
+      const key = `${String(datom[0])}|${String(datom[1])}|${JSON.stringify(
+        datom[2]
+      )}`;
+      seen.set(key, datom); // Later occurrences overwrite earlier ones
+    }
+    return Array.from(seen.values());
+  }
+
+  /**
+   * Filter out datoms that already exist in the database with the same value.
+   * This makes imports idempotent - re-importing the same data won't cause errors.
+   */
+  private async filterExistingDatoms(
+    batch: DatomInput[]
+  ): Promise<DatomInput[]> {
+    if (batch.length === 0) {
+      return batch;
+    }
+    const filtered: DatomInput[] = [];
+    for (const datom of batch) {
+      const [entity, attribute, value] = datom;
+      const existingValues = await this.getValues(entity, String(attribute));
+      // Only include if value doesn't exist or is different
+      if (existingValues.length === 0) {
+        filtered.push(datom);
+      } else {
+        const existingValue = existingValues[0];
+        if (JSON.stringify(existingValue) !== JSON.stringify(value)) {
+          filtered.push(datom);
+        }
+        // If value matches, skip (idempotent)
+      }
+    }
+    return filtered;
   }
 
   /**

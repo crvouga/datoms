@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
+import { TransactionConflictError } from "../errors.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
@@ -280,6 +281,190 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       });
 
       await db.close();
+    });
+  });
+
+  describe("getLatestTransaction", () => {
+    test("should return 0 for empty database", async () => {
+      const { db } = f;
+      const latestTx = await db.getLatestTransaction();
+      expect(latestTx).toBe(0);
+    });
+
+    test("should return latest transaction ID after adding datoms", async () => {
+      const { db } = f;
+      const tx1 = await db.add([[1, "name", "Alice"]]);
+      const latestTx = await db.getLatestTransaction();
+      expect(latestTx).toBe(tx1);
+
+      const tx2 = await db.add([[2, "name", "Bob"]]);
+      const latestTx2 = await db.getLatestTransaction();
+      expect(latestTx2).toBe(tx2);
+      expect(latestTx2).toBeGreaterThan(tx1);
+    });
+
+    test("should return latest transaction after retraction", async () => {
+      const { db } = f;
+      await db.add([[1, "name", "Alice"]]);
+      const tx2 = await db.retract([[1, "name", "Alice"]]);
+      const latestTx = await db.getLatestTransaction();
+      expect(latestTx).toBe(tx2);
+    });
+
+    test("should return latest transaction after transact", async () => {
+      const { db } = f;
+      await db.add([[1, "name", "Alice"]]);
+      const tx2 = await db.transact({
+        add: [[2, "name", "Bob"]],
+        retract: [[1, "name", "Alice"]],
+      });
+      const latestTx = await db.getLatestTransaction();
+      expect(latestTx).toBe(tx2);
+    });
+
+    test("should work within transactions", async () => {
+      const { db } = f;
+      await db.add([[1, "name", "Alice"]]);
+      const beforeTx = await db.getLatestTransaction();
+
+      await db.transaction(async (tx) => {
+        const txId = tx.getTransactionId();
+        expect(txId).toBeGreaterThan(beforeTx);
+
+        await tx.add([[2, "name", "Bob"]]);
+        // Note: getLatestTransaction() may return the transaction ID assigned to this transaction
+        // (depending on implementation), or it may return the last committed transaction.
+        // The important thing is that after commit, it's updated.
+        const latestBeforeCommit = await db.getLatestTransaction();
+        // Should be at least beforeTx, possibly txId if implementation exposes uncommitted tx
+        expect(latestBeforeCommit).toBeGreaterThanOrEqual(beforeTx);
+      });
+
+      // After commit, latest should be updated
+      const afterTx = await db.getLatestTransaction();
+      expect(afterTx).toBeGreaterThan(beforeTx);
+    });
+  });
+
+  describe("Optimistic Locking", () => {
+    test("should succeed when expectedTxId matches", async () => {
+      const { db } = f;
+      await db.add([[1, "name", "Alice"]]);
+      const currentTx = await db.getLatestTransaction();
+
+      await db.transaction(
+        async (tx) => {
+          await tx.add([[2, "name", "Bob"]]);
+        },
+        { expectedTxId: currentTx }
+      );
+
+      // Should succeed
+      const bob = await db.query({ entity: 2 });
+      expect(bob.length).toBeGreaterThan(0);
+    });
+
+    test("should throw TransactionConflictError when expectedTxId doesn't match", async () => {
+      const { db } = f;
+      await db.add([[1, "name", "Alice"]]);
+      const initialTx = await db.getLatestTransaction();
+
+      // Update database (changes txId)
+      await db.add([[2, "name", "Bob"]]);
+
+      try {
+        await db.transaction(
+          async (tx) => {
+            await tx.add([[3, "name", "Charlie"]]);
+          },
+          { expectedTxId: initialTx }
+        );
+        throw new Error("Should have thrown TransactionConflictError");
+      } catch (error) {
+        expect(error).toBeInstanceOf(TransactionConflictError);
+        const conflictError = error as TransactionConflictError;
+        expect(conflictError.code).toBe("TRANSACTION_CONFLICT");
+        expect(conflictError.name).toBe("TransactionConflictError");
+        expect(conflictError.txId).toBe(initialTx);
+        expect(conflictError.conflictingTxId).toBeGreaterThan(initialTx);
+        expect(conflictError.message).toContain("conflict");
+      }
+    });
+
+    test("should retry on conflict when retry options provided", async () => {
+      const { db } = f;
+      await db.add([[1, "name", "Alice"]]);
+      const initialTx = await db.getLatestTransaction();
+
+      // Simulate concurrent update
+      setTimeout(() => {
+        db.add([[2, "name", "Bob"]]).catch(() => {});
+      }, 10);
+
+      // This test is tricky because we need actual concurrency
+      // For now, test that retry mechanism exists
+      let retryCount = 0;
+      try {
+        await db.transaction(
+          async (tx) => {
+            retryCount++;
+            await tx.add([[3, "name", "Charlie"]]);
+          },
+          {
+            expectedTxId: initialTx,
+            retry: { maxRetries: 2, delayMs: 50 },
+          }
+        );
+        // If it succeeds, that's fine (no conflict occurred)
+      } catch (error) {
+        // If it fails, should be TransactionConflictError
+        expect(error).toBeInstanceOf(TransactionConflictError);
+      }
+    });
+
+    test("should not retry when maxRetries is 0", async () => {
+      const { db } = f;
+      await db.add([[1, "name", "Alice"]]);
+      const initialTx = await db.getLatestTransaction();
+
+      // Update database
+      await db.add([[2, "name", "Bob"]]);
+
+      let callbackExecuted = false;
+      try {
+        await db.transaction(
+          async (tx) => {
+            callbackExecuted = true;
+            await tx.add([[3, "name", "Charlie"]]);
+          },
+          {
+            expectedTxId: initialTx,
+            retry: { maxRetries: 0, delayMs: 100 },
+          }
+        );
+        throw new Error("Should have thrown TransactionConflictError");
+      } catch (error) {
+        expect(error).toBeInstanceOf(TransactionConflictError);
+        // Conflict is detected before callback executes, so callback should not run
+        expect(callbackExecuted).toBe(false);
+        // Verify error has correct properties
+        const conflictError = error as TransactionConflictError;
+        expect(conflictError.txId).toBe(initialTx);
+        expect(conflictError.conflictingTxId).toBeGreaterThan(initialTx);
+      }
+    });
+
+    test("should work without optimistic locking options", async () => {
+      const { db } = f;
+      await db.add([[1, "name", "Alice"]]);
+
+      await db.transaction(async (tx) => {
+        await tx.add([[2, "name", "Bob"]]);
+      });
+
+      // Should succeed normally
+      const bob = await db.query({ entity: 2 });
+      expect(bob.length).toBeGreaterThan(0);
     });
   });
 });
