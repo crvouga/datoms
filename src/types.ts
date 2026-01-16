@@ -4,6 +4,11 @@
 
 /**
  * A unique identifier for an entity
+ *
+ * **Note on symbol support:**
+ * Symbols are supported but require special serialization when persisting to SQL/JSON.
+ * For persistent databases with sync/replication, prefer `number` or `string` EntityIds.
+ * Symbols are serialized as `__SYMBOL__${String(symbol)}` in SQL implementations.
  */
 export type EntityId = number | string | symbol;
 

@@ -227,6 +227,8 @@ export interface DatomWriter<T = void> {
    * Upsert a value for an entity-attribute pair
    * For `cardinality: "one"` attributes, this retracts any existing value and adds the new value atomically.
    * For `cardinality: "many"` attributes, this simply adds the value (no retraction).
+   *
+   * **Note:** Requires `cardinality: "one"` in schema to retract old values, otherwise just adds.
    * @param entity Entity ID
    * @param attribute Attribute name
    * @param value Value to upsert
@@ -420,9 +422,10 @@ export abstract class DatomDatabase
    * For `cardinality: "one"` attributes, this retracts any existing value and adds the new value atomically.
    * For `cardinality: "many"` attributes, this simply adds the value (no retraction).
    *
-   * **Note:** This method requires the attribute to be defined in the schema with `cardinality: "one"`
-   * to perform the retraction. If the attribute is not defined or has `cardinality: "many"`,
-   * it will only add the value without retracting existing ones.
+   * **Behavior:**
+   * - If the attribute is defined with `cardinality: "one"`, retracts any existing value and adds the new value
+   * - If the attribute is not defined or has `cardinality: "many"`, only adds the value (no retraction)
+   * - Works without schema definitions, but requires `cardinality: "one"` in schema to retract old values
    *
    * @param entity Entity ID
    * @param attribute Attribute name
@@ -430,6 +433,7 @@ export abstract class DatomDatabase
    * @returns The transaction ID
    * @example
    * // Upsert a single-valued attribute (retracts old value, adds new)
+   * await db.defineAttribute({ name: "status", cardinality: "one", type: "string" });
    * await db.upsert(123, "status", "active");
    *
    * // For multi-valued attributes, this just adds (use add() directly)
