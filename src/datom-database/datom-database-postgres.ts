@@ -9,6 +9,7 @@ import type {
   QueryResult,
 } from "../datalog/datalog.js";
 import type { SQLDatabase } from "../sql-database/sql-database.js";
+import type { DatabaseRow } from "../sql-database/types.js";
 import type {
   Datom,
   DatomInput,
@@ -171,7 +172,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     // Note: Validation is handled by the base class query() method
     // This method is also called by queryInternal() which bypasses validation
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
 
     // Apply time-travel filter: if asOf is specified, only consider datoms up to that transaction
     if (options.asOf !== undefined) {
@@ -243,7 +244,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
       const rows = await this.connection.query(sql, params);
 
-      const reviveValue = (value: any): any => {
+      const reviveValue = (value: unknown): unknown => {
         if (typeof value === "string") {
           if (value === "__UNDEFINED__") {
             return undefined;
@@ -265,18 +266,18 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         if (Array.isArray(value)) {
           return value.map(reviveValue);
         }
-        if (typeof value === "object") {
-          const revived: any = {};
+        if (typeof value === "object" && value !== null) {
+          const revived: Record<string, unknown> = {};
           for (const key in value) {
-            revived[key] = reviveValue(value[key]);
+            revived[key] = reviveValue((value as Record<string, unknown>)[key]);
           }
           return revived;
         }
         return value;
       };
 
-      return rows.map((row: any) => {
-        let entity: any = row.entity;
+      return rows.map((row: DatabaseRow) => {
+        let entity: EntityId = row.entity as EntityId;
         if (typeof entity === "string") {
           if (entity.startsWith("__SYMBOL__")) {
             const symbolDesc = entity.substring("__SYMBOL__".length);
@@ -286,16 +287,16 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
           }
         }
 
-        const parsedValue =
+        const parsedValue: unknown =
           typeof row.value === "string" ? JSON.parse(row.value) : row.value;
-        const revivedValue = reviveValue(parsedValue);
+        const revivedValue = reviveValue(parsedValue) as Value;
 
         return {
           entity,
-          attribute: row.attribute,
+          attribute: String(row.attribute),
           value: revivedValue,
-          tx: row.tx,
-          added: row.added,
+          tx: Number(row.tx),
+          added: Boolean(row.added),
         };
       });
     }
@@ -367,7 +368,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
     const rows = await this.connection.query(sql, params);
 
-    const reviveValue = (value: any): any => {
+    const reviveValue = (value: unknown): unknown => {
       if (typeof value === "string") {
         if (value === "__UNDEFINED__") {
           return undefined;
@@ -389,18 +390,19 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (Array.isArray(value)) {
         return value.map(reviveValue);
       }
-      if (typeof value === "object") {
-        const revived: any = {};
-        for (const key in value) {
-          revived[key] = reviveValue(value[key]);
+      if (typeof value === "object" && value !== null) {
+        const revived: Record<string, unknown> = {};
+        const valueObj = value as Record<string, unknown>;
+        for (const key in valueObj) {
+          revived[key] = reviveValue(valueObj[key]);
         }
         return revived;
       }
       return value;
     };
 
-    return rows.map((row: any) => {
-      let entity: any = row.entity;
+    return rows.map((row: DatabaseRow) => {
+      let entity: EntityId = row.entity as EntityId;
       if (typeof entity === "string") {
         if (entity.startsWith("__SYMBOL__")) {
           const symbolDesc = entity.substring("__SYMBOL__".length);
@@ -412,16 +414,16 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
       // PostgreSQL JSONB returns as parsed object, but connection adapter stringifies it
       // So we still need to parse
-      const parsedValue =
+      const parsedValue: unknown =
         typeof row.value === "string" ? JSON.parse(row.value) : row.value;
-      const revivedValue = reviveValue(parsedValue);
+      const revivedValue = reviveValue(parsedValue) as Value;
 
       return {
         entity,
-        attribute: row.attribute,
+        attribute: String(row.attribute),
         value: revivedValue,
-        tx: row.tx,
-        added: row.added,
+        tx: Number(row.tx),
+        added: Boolean(row.added),
       };
     });
   }
@@ -432,7 +434,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
     // Build the same query as executeQuery to explain it
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
 
     if (options.asOf !== undefined) {
       conditions.push("tx <= ?");
@@ -529,21 +531,21 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       // PostgreSQL EXPLAIN ANALYZE returns JSON format
       // Structure: [{ "Plan": {...}, "Planning Time": ..., "Execution Time": ... }]
       if (Array.isArray(explainRows) && explainRows.length > 0) {
-        const explainData = explainRows[0];
-        const plan = explainData?.Plan;
+        const explainData = explainRows[0] as Record<string, unknown>;
+        const plan = explainData?.Plan as Record<string, unknown> | undefined;
 
         if (plan) {
           // Extract cost estimates
-          if (plan["Total Cost"] !== undefined) {
+          if (typeof plan["Total Cost"] === "number") {
             result.estimatedCost = plan["Total Cost"];
           }
-          if (plan["Plan Rows"] !== undefined) {
+          if (typeof plan["Plan Rows"] === "number") {
             result.estimatedRows = plan["Plan Rows"];
           }
 
           // Extract scan type and indexes
           const nodeType = plan["Node Type"];
-          if (nodeType) {
+          if (typeof nodeType === "string") {
             if (nodeType.includes("Seq Scan")) {
               result.scanType = "full-table";
               result.warnings = result.warnings || [];
@@ -559,13 +561,17 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
           // Extract index names recursively
           const indexesUsedSet = new Set<string>();
-          const extractIndexes = (node: any) => {
-            if (node["Index Name"]) {
-              indexesUsedSet.add(node["Index Name"]);
+          const extractIndexes = (node: Record<string, unknown>) => {
+            const indexName = node["Index Name"];
+            if (typeof indexName === "string") {
+              indexesUsedSet.add(indexName);
             }
-            if (node["Plans"] && Array.isArray(node["Plans"])) {
-              for (const subPlan of node["Plans"]) {
-                extractIndexes(subPlan);
+            const plans = node["Plans"];
+            if (Array.isArray(plans)) {
+              for (const subPlan of plans) {
+                if (typeof subPlan === "object" && subPlan !== null) {
+                  extractIndexes(subPlan as Record<string, unknown>);
+                }
               }
             }
           };
@@ -576,23 +582,23 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
           }
 
           // Extract actual execution time if available
-          if (explainData["Execution Time"] !== undefined) {
+          const executionTime = explainData["Execution Time"];
+          if (typeof executionTime === "number") {
             // Store in raw for detailed analysis
             if (!result.raw) {
               result.raw = {};
             }
-            (result.raw as any).executionTime = explainData["Execution Time"];
+            (result.raw as Record<string, unknown>).executionTime =
+              executionTime;
           }
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       // If EXPLAIN fails, return base result with warning
       result.warnings = result.warnings || [];
-      result.warnings.push(
-        `Failed to get query plan: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      result.warnings.push(`Failed to get query plan: ${errorMessage}`);
     }
 
     return result;
@@ -664,7 +670,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
   protected async executeTransaction<T>(
     callback: (tx: Transaction) => Promise<T>,
-    isolationLevel?: import("../types.js").TransactionIsolationLevel
+    _isolationLevel?: import("../types.js").TransactionIsolationLevel
   ): Promise<T> {
     // Note: PostgreSQL isolation level support would require SET TRANSACTION ISOLATION LEVEL
     // For now, we use the database default (READ COMMITTED)
@@ -687,7 +693,10 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     try {
       const result = await callback(transaction);
       // Apply pending changes before committing
-      await (transaction as any).commit();
+      const txWithCommit = transaction as Transaction & {
+        commit: () => Promise<void>;
+      };
+      await txWithCommit.commit();
       await this.connection.commitTransaction();
       return result;
     } catch (error) {
@@ -731,7 +740,8 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     if (!result || result.length === 0) {
       throw new Error("Transaction counter row not found after update");
     }
-    return result[0].last_tx;
+    const row = result[0] as Record<string, unknown>;
+    return Number(row.last_tx);
   }
 
   private async addDatomsInternal(
@@ -847,7 +857,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   private joinResults(
     left: Record<string, Value>[],
     right: Record<string, Value>[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): Record<string, Value>[] {
     const joined: Record<string, Value>[] = [];
 
@@ -873,7 +883,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   private project(
     results: Record<string, Value>[],
     find: string[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): QueryResult {
     if (find.length === 0) {
       return results;
@@ -890,7 +900,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     });
   }
 
-  private isVariable(value: any): boolean {
+  private isVariable(value: unknown): boolean {
     return typeof value === "string" && value.startsWith("?");
   }
 
@@ -900,7 +910,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
    * Override onTransactionMetadata and this method to support metadata storage
    */
   async getTransactionMetadata(
-    txId: TransactionId
+    _txId: TransactionId
   ): Promise<Record<string, unknown> | undefined> {
     // Default: no metadata storage
     return undefined;
@@ -914,7 +924,8 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       // No transactions yet
       return 0;
     }
-    return result[0].last_tx;
+    const row = result[0] as Record<string, unknown>;
+    return Number(row.last_tx);
   }
 
   protected async recordQueryMetrics(duration: number): Promise<void> {
@@ -935,7 +946,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       >
     >
   > {
-    const stats: any = {};
+    const stats: Partial<import("../types.js").DatabaseStats> = {};
 
     // Count total datoms (only added ones, latest version)
     // PostgreSQL-specific: Use DISTINCT ON for efficient latest-row-per-group
@@ -951,7 +962,8 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       WHERE added = true
     `;
     const countResult = await this.connection.query(countSql);
-    const countValue = countResult[0]?.count ?? 0;
+    const countRow = countResult[0] as Record<string, unknown> | undefined;
+    const countValue = countRow?.count ?? 0;
     stats.totalDatoms =
       typeof countValue === "string"
         ? parseInt(countValue, 10)
@@ -964,7 +976,8 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       WHERE added = true
     `;
     const entityResult = await this.connection.query(entitySql);
-    const entityCountValue = entityResult[0]?.count ?? 0;
+    const entityRow = entityResult[0] as Record<string, unknown> | undefined;
+    const entityCountValue = entityRow?.count ?? 0;
     stats.totalEntities =
       typeof entityCountValue === "string"
         ? parseInt(entityCountValue, 10)
@@ -1491,7 +1504,7 @@ class PostgreSQLTransaction implements Transaction {
   private joinResults(
     left: Record<string, Value>[],
     right: Record<string, Value>[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): Record<string, Value>[] {
     const joined: Record<string, Value>[] = [];
 
@@ -1517,7 +1530,7 @@ class PostgreSQLTransaction implements Transaction {
   private project(
     results: Record<string, Value>[],
     find: string[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): QueryResult {
     if (find.length === 0) {
       return results;
@@ -1534,7 +1547,7 @@ class PostgreSQLTransaction implements Transaction {
     });
   }
 
-  private isVariable(value: any): boolean {
+  private isVariable(value: unknown): boolean {
     return typeof value === "string" && value.startsWith("?");
   }
 }

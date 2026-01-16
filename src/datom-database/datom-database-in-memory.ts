@@ -346,7 +346,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
   protected async executeTransaction<T>(
     callback: (tx: Transaction) => Promise<T>,
-    isolationLevel?: import("../types.js").TransactionIsolationLevel
+    _isolationLevel?: import("../types.js").TransactionIsolationLevel
   ): Promise<T> {
     // Note: In-memory implementation doesn't enforce isolation levels
     // All transactions see uncommitted changes immediately
@@ -417,7 +417,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   private joinResults(
     left: Record<string, Value>[],
     right: Record<string, Value>[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): Record<string, Value>[] {
     const joined: Record<string, Value>[] = [];
 
@@ -447,7 +447,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   private project(
     results: Record<string, Value>[],
     find: string[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): QueryResult {
     if (find.length === 0) {
       return results;
@@ -468,7 +468,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   /**
    * Check if a value is a variable (starts with ?)
    */
-  private isVariable(value: any): boolean {
+  private isVariable(value: unknown): boolean {
     return typeof value === "string" && value.startsWith("?");
   }
 
@@ -478,7 +478,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
    * Override onTransactionMetadata and this method to support metadata storage
    */
   async getTransactionMetadata(
-    txId: TransactionId
+    _txId: TransactionId
   ): Promise<Record<string, unknown> | undefined> {
     // Default: no metadata storage
     return undefined;
@@ -508,7 +508,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       >
     >
   > {
-    const stats: any = {};
+    const stats: Partial<import("../types.js").DatabaseStats> = {};
 
     // Count total datoms (only added ones)
     const addedDatoms = this.datoms.filter((d) => {
@@ -920,7 +920,7 @@ class InMemoryTransaction implements Transaction {
   private joinResults(
     left: Record<string, Value>[],
     right: Record<string, Value>[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): Record<string, Value>[] {
     const joined: Record<string, Value>[] = [];
 
@@ -946,7 +946,7 @@ class InMemoryTransaction implements Transaction {
   private project(
     results: Record<string, Value>[],
     find: string[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): QueryResult {
     if (find.length === 0) {
       return results;
@@ -963,7 +963,7 @@ class InMemoryTransaction implements Transaction {
     });
   }
 
-  private isVariable(value: any): boolean {
+  private isVariable(value: unknown): boolean {
     return typeof value === "string" && value.startsWith("?");
   }
 }

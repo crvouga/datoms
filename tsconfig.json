@@ -13,7 +13,7 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "noImplicitAny": true // <-- added to ban 'any' type
+    "noImplicitAny": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/__tests__/**", "**/__test__/**"]

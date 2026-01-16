@@ -3,8 +3,7 @@
  * Provides discovery, execution, and rollback of migrations
  */
 
-import type { Migration, MigrationState } from "../../types.js";
-import { MigrationError, MigrationRollbackError } from "../errors.js";
+import type { Migration } from "../../types.js";
 
 /**
  * Migration registry for managing and executing migrations

@@ -3,6 +3,7 @@
  */
 
 import type { ConnectionPoolStats } from "../types.js";
+import type { DatabaseRow, SQLParams } from "./types.js";
 
 /**
  * SQL connection interface that abstracts different SQL libraries
@@ -13,8 +14,8 @@ import type { ConnectionPoolStats } from "../types.js";
  * - Single-connection implementations can omit `getPoolStats()`
  */
 export interface SQLDatabase {
-  query(sql: string, params?: any[]): Promise<any[]>;
-  execute(sql: string, params?: any[]): Promise<void>;
+  query(sql: string, params?: SQLParams): Promise<DatabaseRow[]>;
+  execute(sql: string, params?: SQLParams): Promise<void>;
   beginTransaction?(): Promise<void>;
   commitTransaction?(): Promise<void>;
   rollbackTransaction?(): Promise<void>;

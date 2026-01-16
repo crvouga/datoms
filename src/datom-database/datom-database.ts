@@ -7,7 +7,6 @@ import type { DatalogQuery, QueryResult } from "../datalog/datalog.js";
 import type {
   Attribute,
   AttributeDefinition,
-  ConnectionPoolConfig,
   Datom,
   DatomInput,
   DatabaseEvent,
@@ -16,7 +15,6 @@ import type {
   DatabaseStats,
   EntityId,
   Logger,
-  OptimisticLockOptions,
   QueryExplainResult,
   QueryOptions,
   SchemaExport,
@@ -736,8 +734,8 @@ export abstract class DatomDatabase
    * }
    */
   protected async onTransactionMetadata(
-    txId: TransactionId,
-    metadata: Record<string, unknown>
+    _txId: TransactionId,
+    _metadata: Record<string, unknown>
   ): Promise<void> {
     // Optional: Override in implementations if metadata storage is needed
     // Default: no-op (metadata is ignored but still emitted in events)
@@ -783,7 +781,7 @@ export abstract class DatomDatabase
    * protected async onAttributeDefined(definition: AttributeDefinition) { ... }
    */
   protected async onAttributeDefined(
-    definition: AttributeDefinition
+    _definition: AttributeDefinition
   ): Promise<void> {
     // Override in implementations if needed
   }
@@ -860,7 +858,7 @@ export abstract class DatomDatabase
       for (const [valueKey, entities] of valueToEntities) {
         const uniqueEntities = new Set(entities.map((e) => String(e)));
         if (uniqueEntities.size > 1) {
-          const value = JSON.parse(valueKey);
+          const value: unknown = JSON.parse(valueKey);
           throw new Error(
             `Cannot add uniqueness constraint to attribute "${name}": duplicate value ${JSON.stringify(
               value
@@ -945,9 +943,9 @@ export abstract class DatomDatabase
    * ) { ... }
    */
   protected async onAttributeModified(
-    name: string,
-    oldDefinition: AttributeDefinition,
-    newDefinition: AttributeDefinition
+    _name: string,
+    _oldDefinition: AttributeDefinition,
+    _newDefinition: AttributeDefinition
   ): Promise<void> {
     // Override in implementations if needed
   }
@@ -982,8 +980,8 @@ export abstract class DatomDatabase
    * ) { ... }
    */
   protected async onAttributeRemoved(
-    name: string,
-    definition: AttributeDefinition
+    _name: string,
+    _definition: AttributeDefinition
   ): Promise<void> {
     // Override in implementations if needed
   }
@@ -1094,8 +1092,8 @@ export abstract class DatomDatabase
    * }
    */
   protected async onSchemaVersionChange(
-    oldVersion: number,
-    newVersion: number
+    _oldVersion: number,
+    _newVersion: number
   ): Promise<void> {
     // Override in implementations if needed
     // Default: no-op (schema version change is handled by migrate())
@@ -1285,7 +1283,8 @@ export abstract class DatomDatabase
 
       // Type validation (only for adds)
       if (isAdd && definition.type !== undefined && definition.type !== null) {
-        for (const [entity, attribute, value] of attrDatoms) {
+        for (const datom of attrDatoms) {
+          const [, attribute, value] = datom;
           const typeError = this.validateValueType(
             value,
             definition.type,
@@ -1319,7 +1318,7 @@ export abstract class DatomDatabase
         }
 
         // Batch query for existing values
-        for (const [key, datom] of entityAttributePairs) {
+        for (const datom of entityAttributePairs.values()) {
           // Use the original datom entity/attribute instead of splitting the key
           // to preserve the original types (number vs string)
           const entity = datom[0];
@@ -1357,17 +1356,20 @@ export abstract class DatomDatabase
 
         // Batch query for existing datoms with same attribute-value
         for (const [valueKey, valueDatoms] of valueGroups) {
-          const value = JSON.parse(valueKey);
+          const value = JSON.parse(valueKey) as Value;
           const existingDatoms = await this.query({
             attribute: attrKey,
             value,
           });
 
           if (existingDatoms.length > 0) {
-            const existingEntity = existingDatoms[0].entity;
+            const existingEntity = existingDatoms[0]?.entity;
             // Check if any of the new datoms have a different entity
             for (const datom of valueDatoms) {
-              if (String(datom[0]) !== String(existingEntity)) {
+              if (
+                existingEntity !== undefined &&
+                String(datom[0]) !== String(existingEntity)
+              ) {
                 throw new UniqueConstraintError(attrKey, value, existingEntity);
               }
             }
@@ -1797,8 +1799,13 @@ export abstract class DatomDatabase
   async queryHistory(options?: QueryOptions): Promise<Datom[]> {
     // For history queries, use the explicit history flag
     // Remove asOf if present since history queries show all changes
-    const { asOf, ...historyOptions } = options || {};
-    return this.query({ ...historyOptions, history: true });
+    if (options) {
+      const { asOf, ...historyOptions } = options;
+      // asOf is intentionally ignored for history queries
+      void asOf;
+      return this.query({ ...historyOptions, history: true });
+    }
+    return this.query({ history: true });
   }
 
   /**
@@ -2026,7 +2033,7 @@ export abstract class DatomDatabase
    * @returns Migration state or undefined if not applied
    */
   protected async getMigrationState(
-    version: number
+    _version: number
   ): Promise<MigrationState | undefined> {
     // Default: no migration state tracking
     // Implementations should override to persist state
@@ -2038,7 +2045,7 @@ export abstract class DatomDatabase
    * Implementations should override this to persist migration state
    * @param state Migration state to save
    */
-  protected async saveMigrationState(state: MigrationState): Promise<void> {
+  protected async saveMigrationState(_state: MigrationState): Promise<void> {
     // Default: no migration state tracking
     // Implementations should override to persist state
   }
@@ -2048,7 +2055,7 @@ export abstract class DatomDatabase
    * Implementations should override this to persist migration state
    * @param version Migration version to mark as rolled back
    */
-  protected async markMigrationRolledBack(version: number): Promise<void> {
+  protected async markMigrationRolledBack(_version: number): Promise<void> {
     // Default: no migration state tracking
     // Implementations should override to persist state
   }
@@ -2283,8 +2290,8 @@ export abstract class DatomDatabase
    * }
    */
   protected async onMigrate(
-    fromVersion: number,
-    toVersion: number
+    _fromVersion: number,
+    _toVersion: number
   ): Promise<void> {
     // Override in implementations to perform actual migrations
   }
@@ -2365,12 +2372,7 @@ export abstract class DatomDatabase
       // Use Promise.allSettled to ensure all listeners are called even if some fail
       const results = await Promise.allSettled(
         Array.from(listeners).map(async (listener) => {
-          try {
-            return await listener(event);
-          } catch (error) {
-            // Wrap sync errors in Promise.reject for allSettled
-            throw error;
-          }
+          return await listener(event);
         })
       );
 
@@ -2378,7 +2380,6 @@ export abstract class DatomDatabase
       for (let i = 0; i < results.length; i++) {
         const result = results[i];
         if (result.status === "rejected") {
-          const listener = Array.from(listeners)[i];
           try {
             await this.emitEvent({
               type: "error",
@@ -2599,7 +2600,7 @@ export abstract class DatomDatabase
    * @param duration Query duration in milliseconds
    * @internal
    */
-  protected async recordQueryMetrics(duration: number): Promise<void> {
+  protected async recordQueryMetrics(_duration: number): Promise<void> {
     // Default: no-op. Implementations should override to track metrics thread-safely.
   }
 
@@ -2610,7 +2611,7 @@ export abstract class DatomDatabase
    * @param duration Transaction duration in milliseconds
    * @internal
    */
-  protected async recordTransactionMetrics(duration: number): Promise<void> {
+  protected async recordTransactionMetrics(_duration: number): Promise<void> {
     // Default: no-op. Implementations should override to track metrics thread-safely.
   }
 

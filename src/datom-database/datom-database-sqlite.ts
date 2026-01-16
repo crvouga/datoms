@@ -132,7 +132,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
 
     // Apply time-travel filter: if asOf is specified, only consider datoms up to that transaction
     if (options.asOf !== undefined) {
@@ -203,7 +203,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
       const rows = await this.connection.query(sql, params);
 
-      const reviveValue = (value: any): any => {
+      const reviveValue = (value: unknown): unknown => {
         if (typeof value === "string") {
           if (value === "__UNDEFINED__") {
             return undefined;
@@ -225,18 +225,19 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         if (Array.isArray(value)) {
           return value.map(reviveValue);
         }
-        if (typeof value === "object") {
-          const revived: any = {};
-          for (const key in value) {
-            revived[key] = reviveValue(value[key]);
+        if (typeof value === "object" && value !== null) {
+          const revived: Record<string, unknown> = {};
+          const valueObj = value as Record<string, unknown>;
+          for (const key in valueObj) {
+            revived[key] = reviveValue(valueObj[key]);
           }
           return revived;
         }
         return value;
       };
 
-      return rows.map((row: any) => {
-        let entity: any = row.entity;
+      return rows.map((row: Record<string, unknown>) => {
+        let entity: EntityId = row.entity as EntityId;
         if (typeof entity === "string") {
           if (entity.startsWith("__SYMBOL__")) {
             const symbolDesc = entity.substring("__SYMBOL__".length);
@@ -246,14 +247,14 @@ export class SQLiteDatomDatabase extends DatomDatabase {
           }
         }
 
-        const parsedValue = JSON.parse(row.value);
-        const revivedValue = reviveValue(parsedValue);
+        const parsedValue: unknown = JSON.parse(String(row.value));
+        const revivedValue = reviveValue(parsedValue) as Value;
 
         return {
           entity,
-          attribute: row.attribute,
+          attribute: String(row.attribute),
           value: revivedValue,
-          tx: row.tx,
+          tx: Number(row.tx),
           added: Boolean(row.added),
         };
       });
@@ -321,7 +322,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     const rows = await this.connection.query(sql, params);
 
-    const reviveValue = (value: any): any => {
+    const reviveValue = (value: unknown): unknown => {
       if (typeof value === "string") {
         if (value === "__UNDEFINED__") {
           return undefined;
@@ -343,18 +344,19 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       if (Array.isArray(value)) {
         return value.map(reviveValue);
       }
-      if (typeof value === "object") {
-        const revived: any = {};
-        for (const key in value) {
-          revived[key] = reviveValue(value[key]);
+      if (typeof value === "object" && value !== null) {
+        const revived: Record<string, unknown> = {};
+        const valueObj = value as Record<string, unknown>;
+        for (const key in valueObj) {
+          revived[key] = reviveValue(valueObj[key]);
         }
         return revived;
       }
       return value;
     };
 
-    return rows.map((row: any) => {
-      let entity: any = row.entity;
+    return rows.map((row: Record<string, unknown>) => {
+      let entity: EntityId = row.entity as EntityId;
       if (typeof entity === "string") {
         if (entity.startsWith("__SYMBOL__")) {
           const symbolDesc = entity.substring("__SYMBOL__".length);
@@ -364,14 +366,14 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         }
       }
 
-      const parsedValue = JSON.parse(row.value);
-      const revivedValue = reviveValue(parsedValue);
+      const parsedValue: unknown = JSON.parse(String(row.value));
+      const revivedValue = reviveValue(parsedValue) as Value;
 
       return {
         entity,
-        attribute: row.attribute,
+        attribute: String(row.attribute),
         value: revivedValue,
-        tx: row.tx,
+        tx: Number(row.tx),
         added: Boolean(row.added),
       };
     });
@@ -383,7 +385,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     // Build the same query as executeQuery to explain it
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
 
     if (options.asOf !== undefined) {
       conditions.push("tx <= ?");
@@ -487,7 +489,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       let scanTypeDetected: "index" | "full-table" | "index-only" | "unknown" =
         "unknown";
 
-      for (const row of explainRows as any[]) {
+      for (const row of explainRows as Array<Record<string, unknown>>) {
         const detail = String(row.detail || "");
         const from = String(row.from || "");
 
@@ -598,9 +600,8 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     query: DatalogQuery
   ): Promise<QueryResult> {
     const clauses = query.where;
-    const params: any[] = [];
+    const params: unknown[] = [];
     const ctes: string[] = [];
-    const joins: string[] = [];
     const selectColumns: string[] = [];
     const joinConditions: string[] = [];
 
@@ -740,7 +741,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     }
 
     // Build JOIN conditions for shared variables
-    for (const [varName, occurrences] of variableToClause.entries()) {
+    for (const occurrences of variableToClause.values()) {
       if (occurrences.length > 1) {
         // This variable appears in multiple clauses, need to join on it
         for (let i = 1; i < occurrences.length; i++) {
@@ -782,11 +783,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       }
 
       if (conditions.length > 0) {
-        // Find the first alias this joins to
-        const firstCond = conditions[0];
-        const otherAlias = firstCond.includes("d0.")
-          ? "d0"
-          : firstCond.match(/d\d+/)?.find((a) => a !== alias) || "d0";
         joinClauses.push(`JOIN ${alias} ON ${conditions.join(" AND ")}`);
       } else {
         // Cross join if no conditions (shouldn't happen in practice)
@@ -840,10 +836,10 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const rows = await this.connection.query(sql, params);
 
     // Convert SQL results back to QueryResult format
-    const results: QueryResult = rows.map((row: any) => {
+    const results: QueryResult = rows.map((row: Record<string, unknown>) => {
       const result: Record<string, Value> = {};
       for (const key of Object.keys(row)) {
-        let value = row[key];
+        let value: unknown = row[key];
         // Parse JSON values - values are stored as JSON strings in SQLite
         if (typeof value === "string") {
           try {
@@ -853,7 +849,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
             // Not valid JSON, keep as string
           }
         }
-        result[key] = this.reviveValue(value);
+        result[key] = this.reviveValue(value) as Value;
       }
       return result;
     });
@@ -883,7 +879,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     return `"${name.replace(/"/g, '""')}"`;
   }
 
-  private reviveValue(value: any): any {
+  private reviveValue(value: unknown): unknown {
     if (typeof value === "string") {
       if (value === "__UNDEFINED__") {
         return undefined;
@@ -901,7 +897,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         value.length > 1
       ) {
         try {
-          const parsed = JSON.parse(value);
+          const parsed: unknown = JSON.parse(value);
           return this.reviveValue(parsed);
         } catch {
           // Not valid JSON, return as string
@@ -917,10 +913,11 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     if (Array.isArray(value)) {
       return value.map((v) => this.reviveValue(v));
     }
-    if (typeof value === "object") {
-      const revived: any = {};
-      for (const key in value) {
-        revived[key] = this.reviveValue(value[key]);
+    if (typeof value === "object" && value !== null) {
+      const revived: Record<string, unknown> = {};
+      const valueObj = value as Record<string, unknown>;
+      for (const key in valueObj) {
+        revived[key] = this.reviveValue(valueObj[key]);
       }
       return revived;
     }
@@ -969,7 +966,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
   protected async executeTransaction<T>(
     callback: (tx: Transaction) => Promise<T>,
-    isolationLevel?: import("../types.js").TransactionIsolationLevel
+    _isolationLevel?: import("../types.js").TransactionIsolationLevel
   ): Promise<T> {
     // Note: SQLite isolation level support would require PRAGMA isolation_level
     // For now, we use the database default (SERIALIZABLE in SQLite)
@@ -992,7 +989,10 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     try {
       const result = await callback(transaction);
       // Apply pending changes before committing
-      await (transaction as any).commit();
+      const txWithCommit = transaction as Transaction & {
+        commit: () => Promise<void>;
+      };
+      await txWithCommit.commit();
       await this.connection.commitTransaction();
       return result;
     } catch (error) {
@@ -1027,7 +1027,8 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     if (!result || result.length === 0) {
       throw new Error("Transaction counter row not found after update");
     }
-    return result[0].last_tx;
+    const row = result[0] as Record<string, unknown>;
+    return Number(row.last_tx);
   }
 
   private async addDatomsInternal(
@@ -1143,7 +1144,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   private joinResults(
     left: Record<string, Value>[],
     right: Record<string, Value>[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): Record<string, Value>[] {
     const joined: Record<string, Value>[] = [];
 
@@ -1169,7 +1170,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   private project(
     results: Record<string, Value>[],
     find: string[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): QueryResult {
     if (find.length === 0) {
       return results;
@@ -1186,7 +1187,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     });
   }
 
-  private isVariable(value: any): boolean {
+  private isVariable(value: unknown): boolean {
     return typeof value === "string" && value.startsWith("?");
   }
 
@@ -1196,7 +1197,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
    * Override onTransactionMetadata and this method to support metadata storage
    */
   async getTransactionMetadata(
-    txId: TransactionId
+    _txId: TransactionId
   ): Promise<Record<string, unknown> | undefined> {
     // Default: no metadata storage
     return undefined;
@@ -1210,7 +1211,8 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       // No transactions yet
       return 0;
     }
-    return result[0].last_tx;
+    const row = result[0] as Record<string, unknown>;
+    return Number(row.last_tx);
   }
 
   protected async recordQueryMetrics(duration: number): Promise<void> {
@@ -1231,7 +1233,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       >
     >
   > {
-    const stats: any = {};
+    const stats: Partial<import("../types.js").DatabaseStats> = {};
 
     // Count total datoms (only added ones, latest version)
     const countSql = `
@@ -1245,7 +1247,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       WHERE rn = 1 AND added = 1
     `;
     const countResult = await this.connection.query(countSql);
-    stats.totalDatoms = countResult[0]?.count ?? 0;
+    const countRow = countResult[0] as Record<string, unknown> | undefined;
+    stats.totalDatoms =
+      typeof countRow?.count === "number" ? countRow.count : 0;
 
     // Count unique entities
     const entitySql = `
@@ -1254,7 +1258,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       WHERE added = 1
     `;
     const entityResult = await this.connection.query(entitySql);
-    stats.totalEntities = entityResult[0]?.count ?? 0;
+    const entityRow = entityResult[0] as Record<string, unknown> | undefined;
+    stats.totalEntities =
+      typeof entityRow?.count === "number" ? entityRow.count : 0;
 
     // Add query metrics if available
     if (this.queryCount > 0) {
@@ -1764,7 +1770,7 @@ class SQLiteTransaction implements Transaction {
   private joinResults(
     left: Record<string, Value>[],
     right: Record<string, Value>[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): Record<string, Value>[] {
     const joined: Record<string, Value>[] = [];
 
@@ -1790,7 +1796,7 @@ class SQLiteTransaction implements Transaction {
   private project(
     results: Record<string, Value>[],
     find: string[],
-    clauses: QueryClause[]
+    _clauses: QueryClause[]
   ): QueryResult {
     if (find.length === 0) {
       return results;
@@ -1807,7 +1813,7 @@ class SQLiteTransaction implements Transaction {
     });
   }
 
-  private isVariable(value: any): boolean {
+  private isVariable(value: unknown): boolean {
     return typeof value === "string" && value.startsWith("?");
   }
 }
