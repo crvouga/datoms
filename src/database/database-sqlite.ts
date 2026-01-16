@@ -101,6 +101,12 @@ export class SQLiteDatabase extends Database {
     const conditions: string[] = [];
     const params: any[] = [];
 
+    // Apply time-travel filter: if asOf is specified, only consider datoms up to that transaction
+    if (options.asOf !== undefined) {
+      conditions.push("tx <= ?");
+      params.push(options.asOf);
+    }
+
     if (options.entity !== undefined) {
       conditions.push("entity = ?");
       params.push(String(options.entity));
@@ -128,6 +134,75 @@ export class SQLiteDatabase extends Database {
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
+    // For history queries (when added is undefined and asOf is not set),
+    // return all datoms ordered by tx
+    if (options.added === undefined && options.asOf === undefined) {
+      const sql = `
+        SELECT entity, attribute, value, tx, added
+        FROM ${this.tableName}
+        ${whereClause}
+        ORDER BY tx ASC, entity ASC, attribute ASC
+      `;
+
+      const rows = await this.connection.query(sql, params);
+      const offset = options.offset ?? 0;
+      const paginated = options.limit
+        ? rows.slice(offset, offset + options.limit)
+        : rows.slice(offset);
+
+      const reviveValue = (value: any): any => {
+        if (typeof value === "string") {
+          if (value === "__UNDEFINED__") {
+            return undefined;
+          }
+          if (value.startsWith("__SYMBOL__")) {
+            const symbolDesc = value.substring("__SYMBOL__".length);
+            return Symbol(symbolDesc);
+          }
+          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+            return new Date(value);
+          }
+        }
+        if (value === null) {
+          return null;
+        }
+        if (value === undefined) {
+          return undefined;
+        }
+        if (Array.isArray(value)) {
+          return value.map(reviveValue);
+        }
+        if (typeof value === "object") {
+          const revived: any = {};
+          for (const key in value) {
+            revived[key] = reviveValue(value[key]);
+          }
+          return revived;
+        }
+        return value;
+      };
+
+      return paginated.map((row: any) => {
+        let entity: any = row.entity;
+        if (typeof entity === "string") {
+          if (/^-?\d+$/.test(entity)) {
+            entity = parseInt(entity, 10);
+          }
+        }
+
+        const parsedValue = JSON.parse(row.value);
+        const revivedValue = reviveValue(parsedValue);
+
+        return {
+          entity,
+          attribute: row.attribute,
+          value: revivedValue,
+          tx: row.tx,
+          added: row.added,
+        };
+      });
+    }
+
     const sql = `
       SELECT entity, attribute, value, tx, added
       FROM ${this.tableName}
@@ -137,9 +212,17 @@ export class SQLiteDatabase extends Database {
 
     const rows = await this.connection.query(sql, params);
 
+    // Group by (entity, attribute, value) or (entity, attribute) depending on query type
+    // For time-travel queries (asOf), deduplicate by (entity, attribute) to get latest value per attribute
+    // For regular queries, deduplicate by (entity, attribute, value) to support multi-valued attributes
+    // Note: row.value is already a JSON string from the database, use it directly
     const latestDatoms = new Map<string, any>();
     for (const row of rows) {
-      const key = `${row.entity}|${row.attribute}|${row.value}`;
+      // Use (entity, attribute) key for time-travel queries to get latest value per attribute
+      // Use (entity, attribute, value) key for regular queries to support multi-valued attributes
+      const key = options.asOf !== undefined
+        ? `${row.entity}|${row.attribute}`
+        : `${row.entity}|${row.attribute}|${row.value}`;
       const existing = latestDatoms.get(key);
       if (!existing || row.tx > existing.tx) {
         latestDatoms.set(key, row);
@@ -148,10 +231,17 @@ export class SQLiteDatabase extends Database {
 
     let results = Array.from(latestDatoms.values());
 
+    // Convert added from integer (0/1) to boolean for consistent filtering
+    // SQLite stores added as INTEGER, so we need to convert it
+    results = results.map((r) => ({
+      ...r,
+      added: Boolean(r.added),
+    }));
+
     if (options.added === undefined || options.added === true) {
-      results = results.filter((r) => r.added);
+      results = results.filter((r) => r.added === true);
     } else if (options.added === false) {
-      results = results.filter((r) => !r.added);
+      results = results.filter((r) => r.added === false);
     }
 
     // Sort by entity, then attribute for consistent ordering
@@ -232,7 +322,7 @@ export class SQLiteDatabase extends Database {
         attribute: row.attribute,
         value: revivedValue,
         tx: row.tx,
-        added: row.added,
+        added: Boolean(row.added), // Ensure boolean conversion
       };
     });
   }
@@ -244,12 +334,12 @@ export class SQLiteDatabase extends Database {
     }
 
     const firstClause = query.where[0];
-    const firstResults = await this.executeClause(firstClause);
+    const firstResults = await this.executeClause(firstClause, query.asOf);
 
     let results = firstResults;
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
-      const clauseResults = await this.executeClause(clause);
+      const clauseResults = await this.executeClause(clause, query.asOf);
       results = this.joinResults(
         results,
         clauseResults,
@@ -412,7 +502,8 @@ export class SQLiteDatabase extends Database {
   }
 
   private async executeClause(
-    clause: QueryClause
+    clause: QueryClause,
+    asOf?: TransactionId
   ): Promise<Record<string, Value>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = this.isVariable(entityVal)
@@ -427,6 +518,7 @@ export class SQLiteDatabase extends Database {
       entity,
       attribute,
       value,
+      asOf,
     });
 
     return datoms.map((datom) => {
@@ -520,12 +612,22 @@ class SQLiteTransaction implements Transaction {
   }
 
   async query(options: QueryOptions = {}): Promise<Datom[]> {
+    // For asOf queries, only query committed state (ignore pending changes)
+    if (options.asOf !== undefined) {
+      return this.db.query(options);
+    }
+
     // Query committed data
     const committed = await this.db.query(options);
 
     // Merge with pending changes
     const pending = this.mergePendingChanges(committed, options);
     return pending;
+  }
+
+  async queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]> {
+    // Query committed state at that transaction, ignoring pending changes
+    return this.db.query({ ...options, asOf: tx });
   }
 
   async add(datoms: DatomInput[]): Promise<TransactionId> {
@@ -664,6 +766,7 @@ class SQLiteTransaction implements Transaction {
     options: QueryOptions
   ): Datom[] {
     // Create a map of committed datoms by (entity, attribute, value)
+    // This supports multi-valued attributes (multiple values per attribute)
     const committedMap = new Map<string, Datom>();
     for (const datom of committed) {
       const key = `${String(datom.entity)}|${String(datom.attribute)}|${String(
@@ -676,6 +779,7 @@ class SQLiteTransaction implements Transaction {
     }
 
     // Apply pending retracts (remove matching datoms)
+    // Retracts match by (entity, attribute, value) to remove specific values
     for (const retract of this.pendingRetracts) {
       const key = `${String(retract.entity)}|${String(
         retract.attribute
@@ -684,6 +788,7 @@ class SQLiteTransaction implements Transaction {
     }
 
     // Apply pending adds (add or update datoms)
+    // Adds update the state of (entity, attribute, value) combinations
     for (const add of this.pendingAdds) {
       const key = `${String(add.entity)}|${String(add.attribute)}|${String(
         add.value
@@ -755,12 +860,12 @@ class SQLiteTransaction implements Transaction {
     }
 
     const firstClause = query.where[0];
-    const firstResults = await this.executeClause(firstClause);
+    const firstResults = await this.executeClause(firstClause, query.asOf);
 
     let results = firstResults;
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
-      const clauseResults = await this.executeClause(clause);
+      const clauseResults = await this.executeClause(clause, query.asOf);
       results = this.joinResults(
         results,
         clauseResults,
@@ -802,7 +907,8 @@ class SQLiteTransaction implements Transaction {
   }
 
   private async executeClause(
-    clause: QueryClause
+    clause: QueryClause,
+    asOf?: TransactionId
   ): Promise<Record<string, Value>[]> {
     const [entityVal, attributeVal, valueVal] = clause;
     const entity = this.isVariable(entityVal)
@@ -817,6 +923,7 @@ class SQLiteTransaction implements Transaction {
       entity,
       attribute,
       value,
+      asOf,
     });
 
     return datoms.map((datom) => {

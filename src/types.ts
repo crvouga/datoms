@@ -78,4 +78,6 @@ export interface QueryOptions {
   limit?: number;
   /** Offset for pagination */
   offset?: number;
+  /** Query database state as it existed at this transaction ID (time-travel query) */
+  asOf?: TransactionId;
 }

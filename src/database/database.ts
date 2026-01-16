@@ -27,6 +27,15 @@ export interface Transaction {
   query(options?: QueryOptions): Promise<Datom[]>;
 
   /**
+   * Query database state as it existed at a specific transaction ID (time-travel query)
+   * Queries only committed state at that transaction, ignoring pending changes
+   * @param tx Transaction ID to query at
+   * @param options Additional query options
+   * @returns Array of matching datoms at that point in time
+   */
+  queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]>;
+
+  /**
    * Add datoms to the database within this transaction
    * @param datoms Array of datoms to add
    * @returns The transaction ID
@@ -144,7 +153,13 @@ export abstract class Database {
     attribute: string
   ): Promise<Value | undefined> {
     const datoms = await this.query({ entity, attribute });
-    return datoms.length > 0 ? datoms[0].value : undefined;
+    if (datoms.length === 0) {
+      return undefined;
+    }
+    // Return the value with the highest tx (latest value for this attribute)
+    // Sort by tx DESC to get the latest value first
+    const sorted = datoms.sort((a, b) => b.tx - a.tx);
+    return sorted[0].value;
   }
 
   /**
@@ -172,6 +187,61 @@ export abstract class Database {
   ): Promise<boolean> {
     const datoms = await this.query({ entity, attribute, value });
     return datoms.length > 0;
+  }
+
+  /**
+   * Query database state as it existed at a specific transaction ID (time-travel query)
+   * @param tx Transaction ID to query at
+   * @param options Additional query options
+   * @returns Array of matching datoms at that point in time
+   */
+  async queryAsOf(tx: TransactionId, options?: QueryOptions): Promise<Datom[]> {
+    return this.query({ ...options, asOf: tx });
+  }
+
+  /**
+   * Query full history of changes (all datoms matching filters, not just latest)
+   * @param options Query options
+   * @returns Array of all matching datoms ordered by transaction ID
+   */
+  async queryHistory(options?: QueryOptions): Promise<Datom[]> {
+    // For history queries, we need to get all datoms, not just latest
+    // Pass added: undefined to trigger history mode in implementations
+    // Remove asOf if present since history queries show all changes
+    const { asOf, ...historyOptions } = options || {};
+    return this.query({ ...historyOptions, added: undefined });
+  }
+
+  /**
+   * Get all datoms for a specific entity at a specific transaction ID
+   * @param entity Entity ID
+   * @param tx Transaction ID to query at
+   * @returns Array of datoms for the entity at that point in time
+   */
+  async getEntityAsOf(entity: EntityId, tx: TransactionId): Promise<Datom[]> {
+    return this.query({ entity, asOf: tx, added: true });
+  }
+
+  /**
+   * Get a single value for an entity-attribute pair at a specific transaction ID
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @param tx Transaction ID to query at
+   * @returns The value or undefined if not found at that point in time
+   */
+  async getValueAsOf(
+    entity: EntityId,
+    attribute: string,
+    tx: TransactionId
+  ): Promise<Value | undefined> {
+    const datoms = await this.query({ entity, attribute, asOf: tx });
+    if (datoms.length === 0) {
+      return undefined;
+    }
+    // Return the value with the highest tx (latest value for this attribute at that point in time)
+    // Sort by tx DESC to get the latest value first
+    const sorted = datoms.sort((a, b) => b.tx - a.tx);
+    return sorted[0].value;
   }
 
   /**
