@@ -9,8 +9,8 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 2, attribute: "name", value: "Bob" },
+      [1, "name", "Alice"],
+      [2, "name", "Bob"],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -36,10 +36,10 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 1, attribute: "age", value: 30 },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 2, attribute: "age", value: 40 },
+      [1, "name", "Alice"],
+      [1, "age", 30],
+      [2, "name", "Bob"],
+      [2, "age", 40],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -66,9 +66,9 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "score", value: 100 },
-      { entity: 2, attribute: "score", value: 400 },
-      { entity: 3, attribute: "score", value: 250 },
+      [1, "score", 100],
+      [2, "score", 400],
+      [3, "score", 250],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -111,9 +111,9 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "type", value: "person" },
-      { entity: 2, attribute: "type", value: "car" },
-      { entity: 3, attribute: "type", value: "person" },
+      [1, "type", "person"],
+      [2, "type", "car"],
+      [3, "type", "person"],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -135,16 +135,16 @@ describe("DatalogQueryEngine", () => {
 
     // Create people
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 3, attribute: "name", value: "Charlie" },
+      [1, "name", "Alice"],
+      [2, "name", "Bob"],
+      [3, "name", "Charlie"],
       // Friendships: Alice -> Bob, Bob -> Charlie
-      { entity: 10, attribute: "from", value: 1 },
-      { entity: 10, attribute: "to", value: 2 },
-      { entity: 10, attribute: "type", value: "friendship" },
-      { entity: 11, attribute: "from", value: 2 },
-      { entity: 11, attribute: "to", value: 3 },
-      { entity: 11, attribute: "type", value: "friendship" },
+      [10, "from", 1],
+      [10, "to", 2],
+      [10, "type", "friendship"],
+      [11, "from", 2],
+      [11, "to", 3],
+      [11, "type", "friendship"],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -174,17 +174,17 @@ describe("DatalogQueryEngine", () => {
 
     // Create people and friendships
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 3, attribute: "name", value: "Charlie" },
-      { entity: 4, attribute: "name", value: "Diana" },
+      [1, "name", "Alice"],
+      [2, "name", "Bob"],
+      [3, "name", "Charlie"],
+      [4, "name", "Diana"],
       // Friendships: Alice -> Bob, Bob -> Charlie, Bob -> Diana
-      { entity: 10, attribute: "from", value: 1 },
-      { entity: 10, attribute: "to", value: 2 },
-      { entity: 11, attribute: "from", value: 2 },
-      { entity: 11, attribute: "to", value: 3 },
-      { entity: 12, attribute: "from", value: 2 },
-      { entity: 12, attribute: "to", value: 4 },
+      [10, "from", 1],
+      [10, "to", 2],
+      [11, "from", 2],
+      [11, "to", 3],
+      [12, "from", 2],
+      [12, "to", 4],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -215,21 +215,21 @@ describe("DatalogQueryEngine", () => {
     // Create a company structure: employees, departments, and their relationships
     await db.add([
       // Employees
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 1, attribute: "role", value: "engineer" },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 2, attribute: "role", value: "manager" },
-      { entity: 3, attribute: "name", value: "Charlie" },
-      { entity: 3, attribute: "role", value: "engineer" },
+      [1, "name", "Alice"],
+      [1, "role", "engineer"],
+      [2, "name", "Bob"],
+      [2, "role", "manager"],
+      [3, "name", "Charlie"],
+      [3, "role", "engineer"],
       // Departments
-      { entity: 10, attribute: "name", value: "Engineering" },
-      { entity: 10, attribute: "budget", value: 100000 },
-      { entity: 11, attribute: "name", value: "Sales" },
-      { entity: 11, attribute: "budget", value: 50000 },
+      [10, "name", "Engineering"],
+      [10, "budget", 100000],
+      [11, "name", "Sales"],
+      [11, "budget", 50000],
       // Employee-Department relationships
-      { entity: 1, attribute: "department", value: 10 },
-      { entity: 2, attribute: "department", value: 10 },
-      { entity: 3, attribute: "department", value: 10 },
+      [1, "department", 10],
+      [2, "department", 10],
+      [3, "department", 10],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -264,15 +264,15 @@ describe("DatalogQueryEngine", () => {
 
     // Create a family tree
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 3, attribute: "name", value: "Charlie" },
-      { entity: 4, attribute: "name", value: "Diana" },
+      [1, "name", "Alice"],
+      [2, "name", "Bob"],
+      [3, "name", "Charlie"],
+      [4, "name", "Diana"],
       // Alice is parent of Bob and Charlie
-      { entity: 1, attribute: "child", value: 2 },
-      { entity: 1, attribute: "child", value: 3 },
+      [1, "child", 2],
+      [1, "child", 3],
       // Bob is parent of Diana
-      { entity: 2, attribute: "child", value: 4 },
+      [2, "child", 4],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -307,18 +307,18 @@ describe("DatalogQueryEngine", () => {
     // Create students and courses with enrollments
     await db.add([
       // Students
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 2, attribute: "name", value: "Bob" },
+      [1, "name", "Alice"],
+      [2, "name", "Bob"],
       // Courses
-      { entity: 10, attribute: "title", value: "Math 101" },
-      { entity: 11, attribute: "title", value: "CS 101" },
+      [10, "title", "Math 101"],
+      [11, "title", "CS 101"],
       // Enrollments (many-to-many)
-      { entity: 100, attribute: "student", value: 1 },
-      { entity: 100, attribute: "course", value: 10 },
-      { entity: 101, attribute: "student", value: 1 },
-      { entity: 101, attribute: "course", value: 11 },
-      { entity: 102, attribute: "student", value: 2 },
-      { entity: 102, attribute: "course", value: 10 },
+      [100, "student", 1],
+      [100, "course", 10],
+      [101, "student", 1],
+      [101, "course", 11],
+      [102, "student", 2],
+      [102, "course", 10],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -352,15 +352,15 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 1, attribute: "age", value: 30 },
-      { entity: 1, attribute: "city", value: "NYC" },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 2, attribute: "age", value: 25 },
-      { entity: 2, attribute: "city", value: "NYC" },
-      { entity: 3, attribute: "name", value: "Charlie" },
-      { entity: 3, attribute: "age", value: 30 },
-      { entity: 3, attribute: "city", value: "LA" },
+      [1, "name", "Alice"],
+      [1, "age", 30],
+      [1, "city", "NYC"],
+      [2, "name", "Bob"],
+      [2, "age", 25],
+      [2, "city", "NYC"],
+      [3, "name", "Charlie"],
+      [3, "age", 30],
+      [3, "city", "LA"],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -388,15 +388,15 @@ describe("DatalogQueryEngine", () => {
 
     // Create a network of connections
     await db.add([
-      { entity: 1, attribute: "name", value: "Node1" },
-      { entity: 2, attribute: "name", value: "Node2" },
-      { entity: 3, attribute: "name", value: "Node3" },
-      { entity: 4, attribute: "name", value: "Node4" },
+      [1, "name", "Node1"],
+      [2, "name", "Node2"],
+      [3, "name", "Node3"],
+      [4, "name", "Node4"],
       // Connections: 1->2, 2->3, 3->4, 1->4
-      { entity: 1, attribute: "connects", value: 2 },
-      { entity: 2, attribute: "connects", value: 3 },
-      { entity: 3, attribute: "connects", value: 4 },
-      { entity: 1, attribute: "connects", value: 4 },
+      [1, "connects", 2],
+      [2, "connects", 3],
+      [3, "connects", 4],
+      [1, "connects", 4],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -424,15 +424,15 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 1, attribute: "score", value: 100 },
-      { entity: 1, attribute: "age", value: 30 },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 2, attribute: "score", value: 100 },
-      { entity: 2, attribute: "age", value: 25 },
-      { entity: 3, attribute: "name", value: "Charlie" },
-      { entity: 3, attribute: "score", value: 200 },
-      { entity: 3, attribute: "age", value: 30 },
+      [1, "name", "Alice"],
+      [1, "score", 100],
+      [1, "age", 30],
+      [2, "name", "Bob"],
+      [2, "score", 100],
+      [2, "age", 25],
+      [3, "name", "Charlie"],
+      [3, "score", 200],
+      [3, "age", 30],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -467,9 +467,9 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 3, attribute: "age", value: 30 },
+      [1, "name", "Alice"],
+      [2, "name", "Bob"],
+      [3, "age", 30],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -494,10 +494,10 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 1, attribute: "age", value: 30 },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 2, attribute: "city", value: "NYC" },
+      [1, "name", "Alice"],
+      [1, "age", 30],
+      [2, "name", "Bob"],
+      [2, "city", "NYC"],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -522,10 +522,10 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 1, attribute: "age", value: 30 },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 2, attribute: "age", value: 25 },
+      [1, "name", "Alice"],
+      [1, "age", 30],
+      [2, "name", "Bob"],
+      [2, "age", 25],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -552,8 +552,8 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 2, attribute: "name", value: "Bob" },
+      [1, "name", "Alice"],
+      [2, "name", "Bob"],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -576,8 +576,8 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 2, attribute: "name", value: "Bob" },
+      [1, "name", "Alice"],
+      [2, "name", "Bob"],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -603,9 +603,9 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "active", value: true },
-      { entity: 2, attribute: "active", value: false },
-      { entity: 3, attribute: "active", value: true },
+      [1, "active", true],
+      [2, "active", false],
+      [3, "active", true],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -632,9 +632,9 @@ describe("DatalogQueryEngine", () => {
     const date3 = new Date("2023-01-01");
 
     await db.add([
-      { entity: 1, attribute: "created", value: date1 },
-      { entity: 2, attribute: "created", value: date2 },
-      { entity: 3, attribute: "created", value: date3 },
+      [1, "created", date1],
+      [2, "created", date2],
+      [3, "created", date3],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -660,9 +660,9 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "middleName", value: null },
-      { entity: 2, attribute: "middleName", value: "Smith" },
-      { entity: 3, attribute: "middleName", value: null },
+      [1, "middleName", null],
+      [2, "middleName", "Smith"],
+      [3, "middleName", null],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -685,9 +685,9 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "optional", value: undefined },
-      { entity: 2, attribute: "optional", value: "value" },
-      { entity: 3, attribute: "optional", value: undefined },
+      [1, "optional", undefined],
+      [2, "optional", "value"],
+      [3, "optional", undefined],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -719,9 +719,9 @@ describe("DatalogQueryEngine", () => {
     const sym2 = Symbol("type2");
 
     await db.add([
-      { entity: 1, attribute: "type", value: sym1 },
-      { entity: 2, attribute: "type", value: sym2 },
-      { entity: 3, attribute: "type", value: sym1 },
+      [1, "type", sym1],
+      [2, "type", sym2],
+      [3, "type", sym1],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -744,11 +744,11 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "data", value: "string" },
-      { entity: 1, attribute: "data", value: 42 },
-      { entity: 1, attribute: "data", value: true },
-      { entity: 2, attribute: "data", value: "string" },
-      { entity: 2, attribute: "data", value: 100 },
+      [1, "data", "string"],
+      [1, "data", 42],
+      [1, "data", true],
+      [2, "data", "string"],
+      [2, "data", 100],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -774,9 +774,9 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: "user-1", attribute: "name", value: "Alice" },
-      { entity: "user-2", attribute: "name", value: "Bob" },
-      { entity: "user-1", attribute: "age", value: 30 },
+      ["user-1", "name", "Alice"],
+      ["user-2", "name", "Bob"],
+      ["user-1", "age", 30],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -805,9 +805,9 @@ describe("DatalogQueryEngine", () => {
     const e2 = Symbol("entity2");
 
     await db.add([
-      { entity: e1, attribute: "name", value: "Alice" },
-      { entity: e2, attribute: "name", value: "Bob" },
-      { entity: e1, attribute: "age", value: 30 },
+      [e1, "name", "Alice"],
+      [e2, "name", "Bob"],
+      [e1, "age", 30],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -829,9 +829,9 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "score", value: 100 },
-      { entity: 2, attribute: "score", value: 200 },
-      { entity: 3, attribute: "score", value: 300 },
+      [1, "score", 100],
+      [2, "score", 200],
+      [3, "score", 300],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -856,8 +856,8 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "score", value: 100 },
-      { entity: 2, attribute: "score", value: 200 },
+      [1, "score", 100],
+      [2, "score", 200],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -879,10 +879,10 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "score", value: 100 },
-      { entity: 2, attribute: "score", value: 400 },
-      { entity: 3, attribute: "score", value: 250 },
-      { entity: 4, attribute: "score", value: 300 },
+      [1, "score", 100],
+      [2, "score", 400],
+      [3, "score", 250],
+      [4, "score", 300],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -907,10 +907,10 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 1, attribute: "score", value: 100 },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 2, attribute: "score", value: 200 },
+      [1, "name", "Alice"],
+      [1, "score", 100],
+      [2, "name", "Bob"],
+      [2, "score", 200],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -957,10 +957,10 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "score", value: 100 },
-      { entity: 2, attribute: "score", value: null },
-      { entity: 3, attribute: "score", value: 200 },
-      { entity: 4, attribute: "score", value: null },
+      [1, "score", 100],
+      [2, "score", null],
+      [3, "score", 200],
+      [4, "score", null],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -986,10 +986,10 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "value", value: "zebra" },
-      { entity: 2, attribute: "value", value: 100 },
-      { entity: 3, attribute: "value", value: "apple" },
-      { entity: 4, attribute: "value", value: 50 },
+      [1, "value", "zebra"],
+      [2, "value", 100],
+      [3, "value", "apple"],
+      [4, "value", 50],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -1013,9 +1013,9 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 3, attribute: "age", value: 30 },
+      [1, "name", "Alice"],
+      [2, "name", "Bob"],
+      [3, "age", 30],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -1041,13 +1041,13 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 1, attribute: "age", value: 30 },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 2, attribute: "age", value: 25 },
+      [1, "name", "Alice"],
+      [1, "age", 30],
+      [2, "name", "Bob"],
+      [2, "age", 25],
       // Entity 3 has name "Alice" but age 25 (different from entity 1)
-      { entity: 3, attribute: "name", value: "Alice" },
-      { entity: 3, attribute: "age", value: 25 },
+      [3, "name", "Alice"],
+      [3, "age", 25],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -1073,12 +1073,12 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 1, attribute: "age", value: 30 },
-      { entity: 1, attribute: "city", value: "NYC" },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 2, attribute: "age", value: 30 },
-      { entity: 2, attribute: "city", value: "LA" },
+      [1, "name", "Alice"],
+      [1, "age", 30],
+      [1, "city", "NYC"],
+      [2, "name", "Bob"],
+      [2, "age", 30],
+      [2, "city", "LA"],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -1107,13 +1107,13 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 3, attribute: "name", value: "Charlie" },
+      [1, "name", "Alice"],
+      [2, "name", "Bob"],
+      [3, "name", "Charlie"],
     ]);
 
     // Retract one datom
-    await db.retract([{ entity: 2, attribute: "name", value: "Bob" }]);
+    await db.retract([[2, "name", "Bob"]]);
 
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
@@ -1135,10 +1135,10 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "tag", value: "red" },
-      { entity: 1, attribute: "tag", value: "blue" },
-      { entity: 1, attribute: "tag", value: "green" },
-      { entity: 2, attribute: "tag", value: "red" },
+      [1, "tag", "red"],
+      [1, "tag", "blue"],
+      [1, "tag", "green"],
+      [2, "tag", "red"],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -1165,10 +1165,10 @@ describe("DatalogQueryEngine", () => {
 
     // Create a graph where nodes can connect to themselves
     await db.add([
-      { entity: 1, attribute: "connects", value: 2 },
-      { entity: 1, attribute: "connects", value: 1 }, // self-connection
-      { entity: 2, attribute: "connects", value: 3 },
-      { entity: 3, attribute: "connects", value: 3 }, // self-connection
+      [1, "connects", 2],
+      [1, "connects", 1], // self-connection
+      [2, "connects", 3],
+      [3, "connects", 3], // self-connection
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -1208,9 +1208,9 @@ describe("DatalogQueryEngine", () => {
 
     // Create a circular graph: 1 -> 2 -> 3 -> 1
     await db.add([
-      { entity: 1, attribute: "next", value: 2 },
-      { entity: 2, attribute: "next", value: 3 },
-      { entity: 3, attribute: "next", value: 1 },
+      [1, "next", 2],
+      [2, "next", 3],
+      [3, "next", 1],
     ]);
 
     const engine = new DatalogQueryEngine(db);
@@ -1236,14 +1236,14 @@ describe("DatalogQueryEngine", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 1, attribute: "age", value: 30 },
-      { entity: 2, attribute: "name", value: "Bob" },
-      { entity: 2, attribute: "age", value: 25 },
-      { entity: 10, attribute: "employee", value: 1 },
-      { entity: 10, attribute: "department", value: "Engineering" },
-      { entity: 11, attribute: "employee", value: 2 },
-      { entity: 11, attribute: "department", value: "Sales" },
+      [1, "name", "Alice"],
+      [1, "age", 30],
+      [2, "name", "Bob"],
+      [2, "age", 25],
+      [10, "employee", 1],
+      [10, "department", "Engineering"],
+      [11, "employee", 2],
+      [11, "department", "Sales"],
     ]);
 
     const engine = new DatalogQueryEngine(db);

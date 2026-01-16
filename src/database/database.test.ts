@@ -17,8 +17,8 @@ describe("Database", () => {
     await db.initialize();
 
     const tx = await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 1, attribute: "age", value: 30 },
+      [1, "name", "Alice"],
+      [1, "age", 30],
     ]);
 
     expect(tx).toBe(1);
@@ -37,8 +37,8 @@ describe("Database", () => {
     await db.initialize();
 
     await db.add([
-      { entity: 1, attribute: "name", value: "Alice" },
-      { entity: 2, attribute: "name", value: "Bob" },
+      [1, "name", "Alice"],
+      [2, "name", "Bob"],
     ]);
 
     const results = await db.query({ attribute: "name" });
@@ -52,8 +52,8 @@ describe("Database", () => {
     const db = new Database(backend);
     await db.initialize();
 
-    await db.add([{ entity: 1, attribute: "name", value: "Alice" }]);
-    await db.retract([{ entity: 1, attribute: "name", value: "Alice" }]);
+    await db.add([[1, "name", "Alice"]]);
+    await db.retract([[1, "name", "Alice"]]);
 
     const entity = await db.getEntity(1);
     expect(entity).toHaveLength(0);
@@ -66,7 +66,7 @@ describe("Database", () => {
     const db = new Database(backend);
     await db.initialize();
 
-    await db.add([{ entity: 1, attribute: "name", value: "Alice" }]);
+    await db.add([[1, "name", "Alice"]]);
 
     const name = await db.getValue(1, "name");
     expect(name).toBe("Alice");

@@ -122,9 +122,9 @@ export abstract class SqlBackend implements StorageBackend {
     `;
 
     const params = datoms.flatMap((d) => [
-      String(d.entity),
-      String(d.attribute),
-      JSON.stringify(d.value),
+      String(d[0]), // entity
+      String(d[1]), // attribute
+      JSON.stringify(d[2]), // value
       tx,
       true,
     ]);
@@ -144,9 +144,9 @@ export abstract class SqlBackend implements StorageBackend {
     `;
 
     const params = datoms.flatMap((d) => [
-      String(d.entity),
-      String(d.attribute),
-      JSON.stringify(d.value),
+      String(d[0]), // entity
+      String(d[1]), // attribute
+      JSON.stringify(d[2]), // value
       tx,
       false,
     ]);

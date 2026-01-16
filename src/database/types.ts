@@ -48,12 +48,17 @@ export interface Datom {
 
 /**
  * A partial datom for adding/retracting facts (without tx and added)
+ * Tuple format: [entity, attribute, value]
+ * This is more efficient and aligns with the fixed EAV structure
  */
-export interface DatomInput {
-  entity: EntityId;
-  attribute: Attribute;
-  value: Value;
-}
+export type DatomInput = [EntityId, Attribute, Value];
+
+/**
+ * Constants for tuple indices (for better readability when needed)
+ */
+export const DATOM_ENTITY = 0;
+export const DATOM_ATTRIBUTE = 1;
+export const DATOM_VALUE = 2;
 
 /**
  * Options for querying datoms

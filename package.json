@@ -16,6 +16,8 @@
   "scripts": {
     "build": "tsc",
     "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "tc": "bun typecheck -- --watch",
     "prepublishOnly": "npm run build"
   },
   "keywords": [],

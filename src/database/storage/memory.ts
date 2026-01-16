@@ -36,7 +36,9 @@ export class MemoryBackend implements StorageBackend {
   async addDatoms(datoms: DatomInput[], tx: TransactionId): Promise<void> {
     for (const datom of datoms) {
       this.datoms.push({
-        ...datom,
+        entity: datom[0],
+        attribute: datom[1],
+        value: datom[2],
         tx,
         added: true,
       });
@@ -47,7 +49,9 @@ export class MemoryBackend implements StorageBackend {
     for (const datom of datoms) {
       // Add retraction datom
       this.datoms.push({
-        ...datom,
+        entity: datom[0],
+        attribute: datom[1],
+        value: datom[2],
         tx,
         added: false,
       });
