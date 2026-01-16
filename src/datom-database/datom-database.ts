@@ -457,6 +457,14 @@ export abstract class DatomDatabase
   protected logger?: Logger;
   /** Migration registry for managing migrations */
   protected migrationRegistry: MigrationRegistry = new MigrationRegistry();
+  /**
+   * Concurrency limit for batch queries (default: 50)
+   * Override this property in subclasses to tune batch query performance
+   * @example
+   * // In your subclass constructor:
+   * this.batchQueryConcurrencyLimit = 100; // Increase for high-performance scenarios
+   */
+  protected batchQueryConcurrencyLimit: number = 50;
 
   /**
    * Set an optional logger for structured logging
@@ -1661,11 +1669,10 @@ export abstract class DatomDatabase
 
     // Default implementation: parallel individual queries with concurrency limit
     // Limit concurrent queries to prevent overwhelming the database
-    const CONCURRENCY_LIMIT = 50;
     const results: Array<{ key: string; value: Value | undefined }> = [];
 
-    for (let i = 0; i < queries.length; i += CONCURRENCY_LIMIT) {
-      const chunk = queries.slice(i, i + CONCURRENCY_LIMIT);
+    for (let i = 0; i < queries.length; i += this.batchQueryConcurrencyLimit) {
+      const chunk = queries.slice(i, i + this.batchQueryConcurrencyLimit);
       const chunkResults = await Promise.all(
         chunk.map(async (q) => {
           const value = await this.getValue(q.entity, q.attribute);
@@ -2083,6 +2090,20 @@ export abstract class DatomDatabase
 
     // Get pending migrations
     const appliedVersions = new Set<number>();
+    const firstPendingVersion = currentVersion + 1;
+    const hasPendingMigrations = firstPendingVersion <= targetVersion;
+
+    // Warn if migration state tracking is not implemented and we have migrations to run
+    // Check on first migration attempt (version 1) if state tracking is not implemented
+    if (hasPendingMigrations && firstPendingVersion === 1) {
+      const migrationState = await this.getMigrationState(1);
+      if (migrationState === undefined && this.logger) {
+        this.logger.warn(
+          "Migration state tracking not implemented - migrations may re-run on restart. Override getMigrationState() and saveMigrationState() to persist migration state."
+        );
+      }
+    }
+
     // TODO: Load applied migrations from database (implementations should override getMigrationState)
     const pendingMigrations = this.migrationRegistry
       .getRange(currentVersion + 1, targetVersion)
