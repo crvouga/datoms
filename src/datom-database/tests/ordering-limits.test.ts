@@ -31,7 +31,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         limit: 2,
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results).toHaveLength(2);
       expect(results[0]["s"]).toBe(400);
       expect(results[1]["s"]).toBe(250);
@@ -67,7 +67,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results).toHaveLength(3);
       expect(results[0]["score"]).toBe(200); // Charlie first (highest score)
       expect(results[1]["score"]).toBe(100); // Bob second (same score, younger)
@@ -92,7 +92,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         limit: 0,
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       // Note: Current implementation doesn't handle limit 0 correctly (if (query.limit) is false for 0)
       // This test documents the current behavior - limit 0 doesn't apply the limit
       // In a proper implementation, limit 0 should return empty array
@@ -114,7 +114,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         limit: 10,
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results).toHaveLength(2);
 
       await db.close();
@@ -136,7 +136,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         limit: 2,
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results).toHaveLength(2);
       expect(results[0]["s"]).toBe(400);
       expect(results[1]["s"]).toBe(300);
@@ -166,9 +166,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       };
 
       // Ordering by ?score won't work since it's not in find
-      const resultsWithoutScore = await db.queryDatalog(
-        queryWithoutScoreInFind
-      );
+      const resultsWithoutScore = await db.query(queryWithoutScoreInFind);
       expect(resultsWithoutScore).toHaveLength(2);
       // Results may not be properly ordered since ?score is undefined after projection
 
@@ -182,7 +180,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         orderBy: [["?score", "desc"]],
       };
 
-      const resultsWithScore = await db.queryDatalog(queryWithScoreInFind);
+      const resultsWithScore = await db.query(queryWithScoreInFind);
       expect(resultsWithScore).toHaveLength(2);
       expect(resultsWithScore[0]["name"]).toBe("Bob");
       expect(resultsWithScore[0]["score"]).toBe(200);
@@ -207,7 +205,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         orderBy: [["?s", "asc"]],
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Null values should be handled (sorted first or last depending on implementation)
       const scores = results.map((r) => r["s"]);
@@ -232,7 +230,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         orderBy: [["?v", "asc"]],
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results).toHaveLength(4);
       // Mixed types should be sortable (strings vs numbers)
       // The exact order depends on implementation, but should be consistent

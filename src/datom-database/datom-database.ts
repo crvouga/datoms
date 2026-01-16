@@ -61,10 +61,10 @@ export interface DatomReader {
    * @param query Datalog query to execute
    * @returns Query results as an array of records
    * @example
-   * const results = await db.queryDatalog(["find", "?e", "where", ["?e", "name", "alice"]]);
+   * const results = await db.query(["find", "?e", "where", ["?e", "name", "alice"]]);
    * //=> [{"e": 1}, {"e": 2}]
    */
-  queryDatalog(query: DatalogQuery): Promise<QueryResult>;
+  query(query: DatalogQuery): Promise<QueryResult>;
 
   /**
    * Get a single value for an entity-attribute pair
@@ -1523,10 +1523,10 @@ export abstract class DatomDatabase
    * @param query Datalog query to execute
    * @returns Query results as an array of records with keys that have the question mark prefix stripped
    * @example
-   * const result = await db.queryDatalog({ find: ["?e"], where: [["?e", "name", "Alice"]] });
+   * const result = await db.query({ find: ["?e"], where: [["?e", "name", "Alice"]] });
    * // result will be [{"e": 123}] not [{"?e": 123}]
    */
-  abstract queryDatalog(query: DatalogQuery): Promise<QueryResult>;
+  abstract query(query: DatalogQuery): Promise<QueryResult>;
 
   /**
    * Get a single value for an entity-attribute pair

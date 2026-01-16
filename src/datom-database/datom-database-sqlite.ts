@@ -509,7 +509,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     return result;
   }
 
-  async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
+  async query(query: DatalogQuery): Promise<QueryResult> {
     await this.ensureInitialized();
     if (query.where.length === 0) {
       return [];
@@ -1368,7 +1368,7 @@ class SQLiteTransaction implements Transaction {
     }
   }
 
-  async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
+  async query(query: DatalogQuery): Promise<QueryResult> {
     return this.executeDatalogWithTransaction(query);
   }
 

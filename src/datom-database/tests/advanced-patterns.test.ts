@@ -32,7 +32,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [["?e", "name", "?name"]],
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results).toHaveLength(2);
       const names = results.map((r) => r["name"]).sort();
       expect(names).toEqual(["Alice", "Charlie"]);
@@ -69,7 +69,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [["?from", "connects", "?to"]],
       };
 
-      const allResults = await db.queryDatalog(simpleQuery);
+      const allResults = await db.query(simpleQuery);
       // Filter to self-connections where from equals to
       const selfConnections = allResults.filter((r) => r["from"] === r["to"]);
       expect(selfConnections).toHaveLength(2);
@@ -94,7 +94,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [["?from", "next", "?to"]],
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results).toHaveLength(3);
       const relationships = results.map((r) => [r["from"], r["to"]]);
       expect(relationships).toContainEqual([1, 2]);
@@ -127,7 +127,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results).toHaveLength(2);
       const alice = results.find((r) => r["name"] === "Alice");
       expect(alice).toBeDefined();

@@ -287,7 +287,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return result;
   }
 
-  async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
+  async query(query: DatalogQuery): Promise<QueryResult> {
     await this.ensureInitialized();
     // Simple implementation: for each where clause, query the database
     // and join the results
@@ -779,7 +779,7 @@ class InMemoryTransaction implements Transaction {
     }
   }
 
-  async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
+  async query(query: DatalogQuery): Promise<QueryResult> {
     if (query.where.length === 0) {
       return [];
     }

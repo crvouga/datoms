@@ -565,7 +565,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return result;
   }
 
-  async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
+  async query(query: DatalogQuery): Promise<QueryResult> {
     await this.ensureInitialized();
     if (query.where.length === 0) {
       return [];
@@ -1111,8 +1111,8 @@ class PostgreSQLTransaction implements Transaction {
     }
   }
 
-  async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
-    // Use the database's queryDatalog but with transaction-aware query
+  async query(query: DatalogQuery): Promise<QueryResult> {
+    // Use the database's query but with transaction-aware query
     // We need to override executeClause to use transaction-aware query
     return this.executeDatalogWithTransaction(query);
   }

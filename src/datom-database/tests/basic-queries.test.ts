@@ -31,7 +31,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(query.find).toContain("?x");
       expect(query.where).toHaveLength(1);
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results).toHaveLength(2);
       expect(results[0]["x"]).toBe(1);
       expect(results[1]["x"]).toBe(2);
@@ -46,7 +46,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [],
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(Array.isArray(results)).toBe(true);
       expect(results).toHaveLength(0);
 
@@ -66,7 +66,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [["?x", "type", "person"]],
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results.map((r) => r["x"]).sort()).toEqual([1, 3]);
 
       await db.close();
@@ -84,7 +84,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [["?x", "name", "?y"]],
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results).toHaveLength(2);
       // Empty find should return all variables from where clause
       expect(Object.keys(results[0]).length).toBeGreaterThan(0);
@@ -104,7 +104,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [["?x", "name", "?y"]],
       };
 
-      const results = await db.queryDatalog(query);
+      const results = await db.query(query);
       expect(results).toHaveLength(2);
       // Missing variable should be undefined
       expect(results[0]["x"]).toBeDefined();

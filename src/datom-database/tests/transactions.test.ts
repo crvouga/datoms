@@ -118,7 +118,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should handle queryDatalog within transaction", async () => {
+    test("should handle query within transaction", async () => {
       const { db } = f;
 
       await db.add([
@@ -131,7 +131,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         await tx.add([[3, "name", "Charlie"]]);
 
         // Query should see uncommitted change
-        const results = await tx.queryDatalog({
+        const results = await tx.query({
           find: ["?x"],
           where: [["?x", "name", "?y"]],
         });
@@ -267,7 +267,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ]);
 
         // Query should see uncommitted change
-        const results = await tx.queryDatalog({
+        const results = await tx.query({
           find: ["?name"],
           where: [
             ["?e", "name", "?name"],

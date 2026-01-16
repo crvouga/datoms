@@ -120,7 +120,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [["?e", "name", "?name"]],
         asOf: tx1,
       };
-      const resultsAtTx1 = await db.queryDatalog(queryAtTx1);
+      const resultsAtTx1 = await db.query(queryAtTx1);
       expect(resultsAtTx1).toHaveLength(2);
       const namesAtTx1 = resultsAtTx1.map((r) => r["name"]).sort();
       expect(namesAtTx1).toEqual(["Alice", "Bob"]);
@@ -131,7 +131,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [["?e", "name", "?name"]],
         asOf: tx2,
       };
-      const resultsAtTx2 = await db.queryDatalog(queryAtTx2);
+      const resultsAtTx2 = await db.query(queryAtTx2);
       expect(resultsAtTx2).toHaveLength(3);
       const namesAtTx2 = resultsAtTx2.map((r) => r["name"]).sort();
       expect(namesAtTx2).toEqual(["Alice", "Bob", "Charlie"]);
