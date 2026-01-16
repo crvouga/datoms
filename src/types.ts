@@ -82,6 +82,8 @@ export interface QueryOptions {
   asOf?: TransactionId;
   /** Query full history of changes (all datoms matching filters, not just latest) */
   history?: boolean;
+  /** Hint for which index to use (backend-specific, may be ignored) */
+  indexHint?: string | string[];
 }
 
 /**

@@ -819,7 +819,12 @@ class PostgreSQLTransaction implements Transaction {
     attribute: string
   ): Promise<Value | undefined> {
     const datoms = await this.query({ entity, attribute });
-    return datoms.length > 0 ? datoms[0].value : undefined;
+    if (datoms.length === 0) {
+      return undefined;
+    }
+    // Return the value with the highest tx (latest value for this attribute)
+    const sorted = datoms.sort((a, b) => b.tx - a.tx);
+    return sorted[0].value;
   }
 
   async getValues(entity: EntityId, attribute: string): Promise<Value[]> {
@@ -834,6 +839,33 @@ class PostgreSQLTransaction implements Transaction {
   ): Promise<boolean> {
     const datoms = await this.query({ entity, attribute, value });
     return datoms.length > 0;
+  }
+
+  async getValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<(Value | undefined)[]> {
+    const results = await Promise.all(
+      queries.map((q) => this.getValue(q.entity, q.attribute))
+    );
+    return results;
+  }
+
+  async getAllValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<Value[][]> {
+    const results = await Promise.all(
+      queries.map((q) => this.getValues(q.entity, q.attribute))
+    );
+    return results;
+  }
+
+  async findEntities(attribute: string, value: Value): Promise<EntityId[]> {
+    const datoms = await this.query({ attribute, value });
+    const entitySet = new Set<EntityId>();
+    for (const datom of datoms) {
+      entitySet.add(datom.entity);
+    }
+    return Array.from(entitySet);
   }
 
   async commit(): Promise<void> {

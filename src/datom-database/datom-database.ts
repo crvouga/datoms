@@ -63,11 +63,18 @@ export interface DatomReader {
 
   /**
    * Get a single value for an entity-attribute pair
+   *
+   * **Cardinality behavior:**
+   * - For `cardinality: "one"` attributes: Returns the single value
+   * - For `cardinality: "many"` attributes: Returns the value with the highest transaction ID (most recent)
+   *
    * @param entity Entity ID
    * @param attribute Attribute name
-   * @returns The value or undefined if not found
+   * @returns The value or undefined if not found. For multi-valued attributes, returns the most recent value.
    * @example
    * const name = await db.getValue(42, "name"); // e.g. "Alice"
+   * // For multi-valued attributes, returns the latest value
+   * const latestTag = await db.getValue(42, "tag"); // Returns most recent tag
    */
   getValue(entity: EntityId, attribute: string): Promise<Value | undefined>;
 
@@ -91,6 +98,48 @@ export interface DatomReader {
    * if (await db.hasFact(42, "name", "Alice")) { ... }
    */
   hasFact(entity: EntityId, attribute: string, value: Value): Promise<boolean>;
+
+  /**
+   * Batch get values for multiple entity-attribute pairs
+   * @param queries Array of {entity, attribute} pairs to query
+   * @returns Array of values in the same order as queries (undefined if not found)
+   * @example
+   * const values = await db.getValuesBatch([
+   *   { entity: 1, attribute: "name" },
+   *   { entity: 2, attribute: "age" },
+   *   { entity: 1, attribute: "email" }
+   * ]);
+   * // Returns: ["Alice", 30, "alice@example.com"]
+   */
+  getValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<(Value | undefined)[]>;
+
+  /**
+   * Batch get all values for multiple entity-attribute pairs (for multi-valued attributes)
+   * @param queries Array of {entity, attribute} pairs to query
+   * @returns Array of value arrays in the same order as queries
+   * @example
+   * const allValues = await db.getAllValuesBatch([
+   *   { entity: 1, attribute: "tag" },
+   *   { entity: 2, attribute: "tag" }
+   * ]);
+   * // Returns: [["red", "big"], ["blue"]]
+   */
+  getAllValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<Value[][]>;
+
+  /**
+   * Find all entities that have a specific attribute-value pair
+   * @param attribute Attribute name
+   * @param value Value to search for
+   * @returns Array of entity IDs that have this attribute-value pair
+   * @example
+   * const users = await db.findEntities("status", "active");
+   * // Returns: [1, 5, 42]
+   */
+  findEntities(attribute: string, value: Value): Promise<EntityId[]>;
 }
 
 /**
@@ -304,6 +353,89 @@ export abstract class DatomDatabase
    */
   getAttributeDefinition(name: string): AttributeDefinition | undefined {
     return this.schema.get(name);
+  }
+
+  /**
+   * Modify an existing attribute definition
+   * @param name Attribute name
+   * @param updates Partial attribute definition with fields to update
+   * @example
+   * // Change cardinality from "one" to "many"
+   * await db.modifyAttribute("tag", { cardinality: "many" });
+   *
+   * // Add uniqueness constraint
+   * await db.modifyAttribute("email", { unique: true });
+   */
+  async modifyAttribute(
+    name: string,
+    updates: Partial<Omit<AttributeDefinition, "name">>
+  ): Promise<void> {
+    await this.ensureInitialized();
+    const existing = this.schema.get(name);
+    if (!existing) {
+      throw new Error(`Attribute "${name}" is not defined`);
+    }
+    const updated: AttributeDefinition = { ...existing, ...updates };
+    this.schema.set(name, updated);
+    await this.onAttributeModified(name, existing, updated);
+  }
+
+  /**
+   * Hook for implementations to handle attribute modification
+   * (e.g., update indexes, validate existing data)
+   * @param name Attribute name
+   * @param oldDefinition Previous attribute definition
+   * @param newDefinition Updated attribute definition
+   * @example
+   * // Override in your subclass to handle attribute modifications
+   * protected async onAttributeModified(
+   *   name: string,
+   *   oldDefinition: AttributeDefinition,
+   *   newDefinition: AttributeDefinition
+   * ) { ... }
+   */
+  protected async onAttributeModified(
+    name: string,
+    oldDefinition: AttributeDefinition,
+    newDefinition: AttributeDefinition
+  ): Promise<void> {
+    // Override in implementations if needed
+  }
+
+  /**
+   * Remove an attribute definition from the schema
+   * Note: This does not remove existing datoms, only the schema definition
+   * @param name Attribute name
+   * @example
+   * await db.removeAttribute("deprecated-field");
+   */
+  async removeAttribute(name: string): Promise<void> {
+    await this.ensureInitialized();
+    const existing = this.schema.get(name);
+    if (!existing) {
+      throw new Error(`Attribute "${name}" is not defined`);
+    }
+    this.schema.delete(name);
+    await this.onAttributeRemoved(name, existing);
+  }
+
+  /**
+   * Hook for implementations to handle attribute removal
+   * (e.g., drop indexes)
+   * @param name Attribute name
+   * @param definition The removed attribute definition
+   * @example
+   * // Override in your subclass to handle attribute removal
+   * protected async onAttributeRemoved(
+   *   name: string,
+   *   definition: AttributeDefinition
+   * ) { ... }
+   */
+  protected async onAttributeRemoved(
+    name: string,
+    definition: AttributeDefinition
+  ): Promise<void> {
+    // Override in implementations if needed
   }
 
   /**
@@ -609,11 +741,18 @@ export abstract class DatomDatabase
 
   /**
    * Get a single value for an entity-attribute pair
+   *
+   * **Cardinality behavior:**
+   * - For `cardinality: "one"` attributes: Returns the single value
+   * - For `cardinality: "many"` attributes: Returns the value with the highest transaction ID (most recent)
+   *
    * @param entity Entity ID
    * @param attribute Attribute name
-   * @returns The value or undefined if not found
+   * @returns The value or undefined if not found. For multi-valued attributes, returns the most recent value.
    * @example
    * const value = await db.getValue(1, "name");
+   * // For multi-valued attributes, returns the latest value
+   * const latestTag = await db.getValue(1, "tag");
    */
   async getValue(
     entity: EntityId,
@@ -661,6 +800,71 @@ export abstract class DatomDatabase
   ): Promise<boolean> {
     const datoms = await this.query({ entity, attribute, value });
     return datoms.length > 0;
+  }
+
+  /**
+   * Batch get values for multiple entity-attribute pairs
+   * @param queries Array of {entity, attribute} pairs to query
+   * @returns Array of values in the same order as queries (undefined if not found)
+   * @example
+   * const values = await db.getValuesBatch([
+   *   { entity: 1, attribute: "name" },
+   *   { entity: 2, attribute: "age" },
+   *   { entity: 1, attribute: "email" }
+   * ]);
+   * // Returns: ["Alice", 30, "alice@example.com"]
+   */
+  async getValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<(Value | undefined)[]> {
+    await this.ensureInitialized();
+    // Execute all queries in parallel for better performance
+    const results = await Promise.all(
+      queries.map((q) => this.getValue(q.entity, q.attribute))
+    );
+    return results;
+  }
+
+  /**
+   * Batch get all values for multiple entity-attribute pairs (for multi-valued attributes)
+   * @param queries Array of {entity, attribute} pairs to query
+   * @returns Array of value arrays in the same order as queries
+   * @example
+   * const allValues = await db.getAllValuesBatch([
+   *   { entity: 1, attribute: "tag" },
+   *   { entity: 2, attribute: "tag" }
+   * ]);
+   * // Returns: [["red", "big"], ["blue"]]
+   */
+  async getAllValuesBatch(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<Value[][]> {
+    await this.ensureInitialized();
+    // Execute all queries in parallel for better performance
+    const results = await Promise.all(
+      queries.map((q) => this.getValues(q.entity, q.attribute))
+    );
+    return results;
+  }
+
+  /**
+   * Find all entities that have a specific attribute-value pair
+   * @param attribute Attribute name
+   * @param value Value to search for
+   * @returns Array of entity IDs that have this attribute-value pair
+   * @example
+   * const users = await db.findEntities("status", "active");
+   * // Returns: [1, 5, 42]
+   */
+  async findEntities(attribute: string, value: Value): Promise<EntityId[]> {
+    await this.ensureInitialized();
+    const datoms = await this.query({ attribute, value });
+    // Extract unique entity IDs
+    const entitySet = new Set<EntityId>();
+    for (const datom of datoms) {
+      entitySet.add(datom.entity);
+    }
+    return Array.from(entitySet);
   }
 
   /**
