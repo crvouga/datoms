@@ -905,11 +905,6 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     return results;
   }
 
-  async getEntity(entity: EntityId): Promise<Datom[]> {
-    await this.ensureInitialized();
-    return this.datoms({ entity, added: true });
-  }
-
   protected async executeTransaction<T>(
     callback: (tx: Transaction) => Promise<T>,
     _isolationLevel?: import("../types.js").TransactionIsolationLevel
@@ -1375,10 +1370,6 @@ class SQLiteTransaction implements Transaction {
 
   async queryDatalog(query: DatalogQuery): Promise<QueryResult> {
     return this.executeDatalogWithTransaction(query);
-  }
-
-  async getEntity(entity: EntityId): Promise<Datom[]> {
-    return this.datoms({ entity, added: true });
   }
 
   async getValue(

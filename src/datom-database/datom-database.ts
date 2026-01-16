@@ -67,15 +67,6 @@ export interface DatomReader {
   queryDatalog(query: DatalogQuery): Promise<QueryResult>;
 
   /**
-   * Get all datoms for a specific entity
-   * @param entity Entity ID
-   * @returns Array of datoms for the entity
-   * @example
-   * const datoms = await db.getEntity(1234);
-   */
-  getEntity(entity: EntityId): Promise<Datom[]>;
-
-  /**
    * Get a single value for an entity-attribute pair
    *
    * **Cardinality behavior:**
@@ -1536,15 +1527,6 @@ export abstract class DatomDatabase
    * // result will be [{"e": 123}] not [{"?e": 123}]
    */
   abstract queryDatalog(query: DatalogQuery): Promise<QueryResult>;
-
-  /**
-   * Get all datoms for a specific entity
-   * @param entity Entity ID
-   * @returns Array of datoms for the entity
-   * @example
-   * const datoms = await db.getEntity(100);
-   */
-  abstract getEntity(entity: EntityId): Promise<Datom[]>;
 
   /**
    * Get a single value for an entity-attribute pair

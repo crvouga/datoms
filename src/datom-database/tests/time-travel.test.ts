@@ -202,12 +202,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         [1, "email", "alice@example.com"],
       ]);
 
-      const before = await db.getEntity(1);
+      const before = await db.datoms({ entity: 1, added: true });
       expect(before).toHaveLength(3);
 
       const tx = await db.retractEntity(1);
 
-      const after = await db.getEntity(1);
+      const after = await db.datoms({ entity: 1, added: true });
       expect(after).toHaveLength(0);
 
       // Verify transaction ID was returned
@@ -226,11 +226,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.transaction(async (tx) => {
         await tx.retractEntity(1);
-        const during = await tx.getEntity(1);
+        const during = await tx.datoms({ entity: 1, added: true });
         expect(during).toHaveLength(0);
       });
 
-      const after = await db.getEntity(1);
+      const after = await db.datoms({ entity: 1, added: true });
       expect(after).toHaveLength(0);
 
       await db.close();
@@ -249,16 +249,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(typeof tx).toBe("number");
       expect(tx).toBeGreaterThan(0);
 
-      const alice = await db.getEntity(1);
+      const alice = await db.datoms({ entity: 1, added: true });
       expect(alice).toHaveLength(1);
       expect(alice[0].value).toBe("Alice");
 
-      const bob = await db.getEntity(2);
+      const bob = await db.datoms({ entity: 2, added: true });
       expect(bob).toHaveLength(1);
       expect(bob[0].value).toBe("Bob");
 
       // Charlie should not exist (or was retracted if existed)
-      const charlie = await db.getEntity(3);
+      const charlie = await db.datoms({ entity: 3, added: true });
       expect(charlie).toHaveLength(0);
 
       await db.close();
@@ -274,11 +274,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
           ],
         });
 
-        const entity = await tx.getEntity(1);
+        const entity = await tx.datoms({ entity: 1, added: true });
         expect(entity).toHaveLength(2);
       });
 
-      const entity = await db.getEntity(1);
+      const entity = await db.datoms({ entity: 1, added: true });
       expect(entity).toHaveLength(2);
 
       await db.close();

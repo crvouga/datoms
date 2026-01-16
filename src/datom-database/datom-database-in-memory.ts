@@ -342,11 +342,6 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return projected;
   }
 
-  async getEntity(entity: EntityId): Promise<Datom[]> {
-    await this.ensureInitialized();
-    return this.executeQuery({ entity, added: true });
-  }
-
   protected async executeTransaction<T>(
     callback: (tx: Transaction) => Promise<T>,
     _isolationLevel?: import("../types.js").TransactionIsolationLevel
@@ -828,10 +823,6 @@ class InMemoryTransaction implements Transaction {
     }
 
     return projected;
-  }
-
-  async getEntity(entity: EntityId): Promise<Datom[]> {
-    return this.datoms({ entity, added: true });
   }
 
   async getValue(

@@ -618,11 +618,6 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return projected;
   }
 
-  async getEntity(entity: EntityId): Promise<Datom[]> {
-    await this.ensureInitialized();
-    return this.executeQuery({ entity, added: true });
-  }
-
   protected async executeTransaction<T>(
     callback: (tx: Transaction) => Promise<T>,
     _isolationLevel?: import("../types.js").TransactionIsolationLevel
@@ -1120,10 +1115,6 @@ class PostgreSQLTransaction implements Transaction {
     // Use the database's queryDatalog but with transaction-aware query
     // We need to override executeClause to use transaction-aware query
     return this.executeDatalogWithTransaction(query);
-  }
-
-  async getEntity(entity: EntityId): Promise<Datom[]> {
-    return this.datoms({ entity, added: true });
   }
 
   async getValue(

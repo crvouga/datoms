@@ -215,17 +215,17 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should handle getEntity within transaction", async () => {
+    test("should handle datoms query within transaction", async () => {
       const { db } = f;
 
       await db.add([[1, "name", "Alice"]]);
 
       await db.transaction(async (tx) => {
-        let entity = await tx.getEntity(1);
+        let entity = await tx.datoms({ entity: 1, added: true });
         expect(entity).toHaveLength(1);
 
         await tx.add([[1, "age", 30]]);
-        entity = await tx.getEntity(1);
+        entity = await tx.datoms({ entity: 1, added: true });
         expect(entity).toHaveLength(2);
       });
 
@@ -480,7 +480,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       );
       expect(result).toBe("success");
 
-      const entity = await db.getEntity(1);
+      const entity = await db.datoms({ entity: 1, added: true });
       expect(entity).toHaveLength(1);
       expect(entity[0].value).toBe("Alice");
     });
@@ -520,14 +520,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
           { timeoutMs: 1 }
         );
         // If timeout didn't trigger, verify data was committed
-        const entity = await db.getEntity(1);
+        const entity = await db.datoms({ entity: 1, added: true });
         // Either timeout triggered (no data) or transaction completed (data exists)
         expect(entity.length).toBeGreaterThanOrEqual(0);
       } catch (error) {
         if (error instanceof QueryTimeoutError) {
           timeoutError = error;
           // Verify rollback occurred
-          const entity = await db.getEntity(1);
+          const entity = await db.datoms({ entity: 1, added: true });
           expect(entity).toHaveLength(0);
         } else {
           throw error;
