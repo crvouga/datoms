@@ -2,22 +2,14 @@
  * Datalog query interface and parser
  */
 
-import type { Database } from "./database.js";
-import type { EntityId, Value } from "./types.js";
+import type { Database } from "../database.js";
+import type { EntityId, Value } from "../types.js";
 
 /**
  * A datalog query clause
+ * Tuple format: [entity, attribute, value]
  */
-export interface QueryClause {
-  /** Variable name or entity ID */
-  entity: string | EntityId;
-  /** Attribute name */
-  attribute: string;
-  /** Value, variable name, or constant */
-  value: string | Value;
-  /** Whether this is a variable (starts with ?) */
-  isVariable?: boolean;
-}
+export type QueryClause = [string | EntityId, string, string | Value];
 
 /**
  * A parsed datalog query
@@ -28,7 +20,7 @@ export interface DatalogQuery {
   /** Where clause - the query patterns */
   where: QueryClause[];
   /** Optional ordering */
-  orderBy?: { variable: string; direction: "asc" | "desc" }[];
+  orderBy?: [variable: string, direction: "asc" | "desc"][];
   /** Optional limit */
   limit?: number;
 }
@@ -80,24 +72,24 @@ export class DatalogQueryEngine {
     // Apply ordering if specified
     if (query.orderBy) {
       projected.sort((a, b) => {
-        for (const order of query.orderBy!) {
-          const aVal = a[order.variable];
-          const bVal = b[order.variable];
+        for (const [variable, direction] of query.orderBy!) {
+          const aVal = a[variable];
+          const bVal = b[variable];
 
           // Handle null/undefined
           if (aVal == null && bVal == null) continue;
-          if (aVal == null) return order.direction === "asc" ? -1 : 1;
-          if (bVal == null) return order.direction === "asc" ? 1 : -1;
+          if (aVal == null) return direction === "asc" ? -1 : 1;
+          if (bVal == null) return direction === "asc" ? 1 : -1;
 
           // Handle symbol comparison
           if (typeof aVal === "symbol" || typeof bVal === "symbol") {
             const aStr = String(aVal);
             const bStr = String(bVal);
-            if (aStr < bStr) return order.direction === "asc" ? -1 : 1;
-            if (aStr > bStr) return order.direction === "asc" ? 1 : -1;
+            if (aStr < bStr) return direction === "asc" ? -1 : 1;
+            if (aStr > bStr) return direction === "asc" ? 1 : -1;
           } else {
-            if (aVal < bVal) return order.direction === "asc" ? -1 : 1;
-            if (aVal > bVal) return order.direction === "asc" ? 1 : -1;
+            if (aVal < bVal) return direction === "asc" ? -1 : 1;
+            if (aVal > bVal) return direction === "asc" ? 1 : -1;
           }
         }
         return 0;
@@ -118,15 +110,14 @@ export class DatalogQueryEngine {
   private async executeClause(
     clause: QueryClause
   ): Promise<Record<string, Value>[]> {
-    const entity = this.isVariable(clause.entity)
+    const [entityVal, attributeVal, valueVal] = clause;
+    const entity = this.isVariable(entityVal)
       ? undefined
-      : (clause.entity as EntityId);
-    const attribute = this.isVariable(clause.attribute)
+      : (entityVal as EntityId);
+    const attribute = this.isVariable(attributeVal)
       ? undefined
-      : (clause.attribute as string);
-    const value = this.isVariable(clause.value)
-      ? undefined
-      : (clause.value as Value);
+      : (attributeVal as string);
+    const value = this.isVariable(valueVal) ? undefined : (valueVal as Value);
 
     const datoms = await this.db.query({
       entity,
@@ -137,14 +128,14 @@ export class DatalogQueryEngine {
     // Map datom fields to variable names from the clause
     return datoms.map((datom) => {
       const result: Record<string, Value> = {};
-      if (this.isVariable(clause.entity)) {
-        result[clause.entity as string] = datom.entity;
+      if (this.isVariable(entityVal)) {
+        result[entityVal as string] = datom.entity;
       }
-      if (this.isVariable(clause.attribute)) {
-        result[clause.attribute as string] = datom.attribute;
+      if (this.isVariable(attributeVal)) {
+        result[attributeVal as string] = datom.attribute;
       }
-      if (this.isVariable(clause.value)) {
-        result[clause.value as string] = datom.value;
+      if (this.isVariable(valueVal)) {
+        result[valueVal as string] = datom.value;
       }
       return result;
     });

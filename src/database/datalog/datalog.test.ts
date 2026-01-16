@@ -1,6 +1,6 @@
 import { test, expect, describe } from "bun:test";
-import { Database, MemoryBackend, DatalogQueryEngine } from "../index";
-import type { DatalogQuery } from "../index";
+import { Database, MemoryBackend, DatalogQueryEngine } from "../../index";
+import type { DatalogQuery } from "../../index";
 
 describe("DatalogQueryEngine", () => {
   test("should execute simple query", async () => {
@@ -16,7 +16,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?x"],
-      where: [{ entity: "?x", attribute: "name", value: "?y" }],
+      where: [["?x", "name", "?y"]],
     };
 
     expect(query.find).toContain("?x");
@@ -46,8 +46,8 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?x", "?a"],
       where: [
-        { entity: "?x", attribute: "name", value: "?n" },
-        { entity: "?x", attribute: "age", value: "?a" },
+        ["?x", "name", "?n"],
+        ["?x", "age", "?a"],
       ],
     };
 
@@ -74,8 +74,8 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e", "?s"],
-      where: [{ entity: "?e", attribute: "score", value: "?s" }],
-      orderBy: [{ variable: "?s", direction: "desc" }],
+      where: [["?e", "score", "?s"]],
+      orderBy: [["?s", "desc"]],
       limit: 2,
     };
 
@@ -119,7 +119,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?x"],
-      where: [{ entity: "?x", attribute: "type", value: "person" }],
+      where: [["?x", "type", "person"]],
     };
 
     const results = await engine.query(query);
@@ -152,9 +152,9 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?from", "?to"],
       where: [
-        { entity: "?f", attribute: "from", value: "?from" },
-        { entity: "?f", attribute: "to", value: "?to" },
-        { entity: "?f", attribute: "type", value: "friendship" },
+        ["?f", "from", "?from"],
+        ["?f", "to", "?to"],
+        ["?f", "type", "friendship"],
       ],
     };
 
@@ -192,10 +192,10 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?friendOfFriend"],
       where: [
-        { entity: "?f1", attribute: "from", value: 1 },
-        { entity: "?f1", attribute: "to", value: "?friend" },
-        { entity: "?f2", attribute: "from", value: "?friend" },
-        { entity: "?f2", attribute: "to", value: "?friendOfFriend" },
+        ["?f1", "from", 1],
+        ["?f1", "to", "?friend"],
+        ["?f2", "from", "?friend"],
+        ["?f2", "to", "?friendOfFriend"],
       ],
     };
 
@@ -237,10 +237,10 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?emp", "?dept", "?budget"],
       where: [
-        { entity: "?emp", attribute: "role", value: "engineer" },
-        { entity: "?emp", attribute: "department", value: "?dept" },
-        { entity: "?dept", attribute: "name", value: "Engineering" },
-        { entity: "?dept", attribute: "budget", value: "?budget" },
+        ["?emp", "role", "engineer"],
+        ["?emp", "department", "?dept"],
+        ["?dept", "name", "Engineering"],
+        ["?dept", "budget", "?budget"],
       ],
     };
 
@@ -280,9 +280,9 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?parentName", "?childName"],
       where: [
-        { entity: "?parent", attribute: "name", value: "?parentName" },
-        { entity: "?parent", attribute: "child", value: "?child" },
-        { entity: "?child", attribute: "name", value: "?childName" },
+        ["?parent", "name", "?parentName"],
+        ["?parent", "child", "?child"],
+        ["?child", "name", "?childName"],
       ],
     };
 
@@ -326,10 +326,10 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?studentName", "?courseTitle"],
       where: [
-        { entity: "?enrollment", attribute: "student", value: "?student" },
-        { entity: "?enrollment", attribute: "course", value: "?course" },
-        { entity: "?student", attribute: "name", value: "?studentName" },
-        { entity: "?course", attribute: "title", value: "?courseTitle" },
+        ["?enrollment", "student", "?student"],
+        ["?enrollment", "course", "?course"],
+        ["?student", "name", "?studentName"],
+        ["?course", "title", "?courseTitle"],
       ],
     };
 
@@ -368,9 +368,9 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?name"],
       where: [
-        { entity: "?person", attribute: "name", value: "?name" },
-        { entity: "?person", attribute: "age", value: 30 },
-        { entity: "?person", attribute: "city", value: "NYC" },
+        ["?person", "name", "?name"],
+        ["?person", "age", 30],
+        ["?person", "city", "NYC"],
       ],
     };
 
@@ -404,8 +404,8 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?a", "?b", "?c"],
       where: [
-        { entity: "?a", attribute: "connects", value: "?b" },
-        { entity: "?b", attribute: "connects", value: "?c" },
+        ["?a", "connects", "?b"],
+        ["?b", "connects", "?c"],
       ],
     };
 
@@ -440,13 +440,13 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?name", "?score", "?age"],
       where: [
-        { entity: "?person", attribute: "name", value: "?name" },
-        { entity: "?person", attribute: "score", value: "?score" },
-        { entity: "?person", attribute: "age", value: "?age" },
+        ["?person", "name", "?name"],
+        ["?person", "score", "?score"],
+        ["?person", "age", "?age"],
       ],
       orderBy: [
-        { variable: "?score", direction: "desc" },
-        { variable: "?age", direction: "asc" },
+        ["?score", "desc"],
+        ["?age", "asc"],
       ],
     };
 
@@ -475,7 +475,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e", "?v"],
-      where: [{ entity: "?e", attribute: "name", value: "?v" }],
+      where: [["?e", "name", "?v"]],
     };
 
     const results = await engine.query(query);
@@ -503,7 +503,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?attr", "?v"],
-      where: [{ entity: 1, attribute: "?attr", value: "?v" }],
+      where: [[1, "?attr", "?v"]],
     };
 
     const results = await engine.query(query);
@@ -531,7 +531,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e", "?attr", "?v"],
-      where: [{ entity: "?e", attribute: "?attr", value: "?v" }],
+      where: [["?e", "?attr", "?v"]],
     };
 
     const results = await engine.query(query);
@@ -559,7 +559,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: [],
-      where: [{ entity: "?x", attribute: "name", value: "?y" }],
+      where: [["?x", "name", "?y"]],
     };
 
     const results = await engine.query(query);
@@ -583,7 +583,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?x", "?missing"],
-      where: [{ entity: "?x", attribute: "name", value: "?y" }],
+      where: [["?x", "name", "?y"]],
     };
 
     const results = await engine.query(query);
@@ -611,7 +611,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e"],
-      where: [{ entity: "?e", attribute: "active", value: true }],
+      where: [["?e", "active", true]],
     };
 
     const results = await engine.query(query);
@@ -640,7 +640,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e", "?d"],
-      where: [{ entity: "?e", attribute: "created", value: "?d" }],
+      where: [["?e", "created", "?d"]],
     };
 
     const results = await engine.query(query);
@@ -668,7 +668,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e"],
-      where: [{ entity: "?e", attribute: "middleName", value: null }],
+      where: [["?e", "middleName", null]],
     };
 
     const results = await engine.query(query);
@@ -695,7 +695,7 @@ describe("DatalogQueryEngine", () => {
     // Instead, test that we can retrieve all optional values and filter in the query
     const query: DatalogQuery = {
       find: ["?e", "?v"],
-      where: [{ entity: "?e", attribute: "optional", value: "?v" }],
+      where: [["?e", "optional", "?v"]],
     };
 
     const results = await engine.query(query);
@@ -727,7 +727,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e"],
-      where: [{ entity: "?e", attribute: "type", value: sym1 }],
+      where: [["?e", "type", sym1]],
     };
 
     const results = await engine.query(query);
@@ -754,7 +754,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e", "?v"],
-      where: [{ entity: "?e", attribute: "data", value: "?v" }],
+      where: [["?e", "data", "?v"]],
     };
 
     const results = await engine.query(query);
@@ -783,8 +783,8 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?e", "?n"],
       where: [
-        { entity: "?e", attribute: "name", value: "?n" },
-        { entity: "?e", attribute: "age", value: "?a" },
+        ["?e", "name", "?n"],
+        ["?e", "age", "?a"],
       ],
     };
 
@@ -813,7 +813,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?n"],
-      where: [{ entity: e1, attribute: "name", value: "?n" }],
+      where: [[e1, "name", "?n"]],
     };
 
     const results = await engine.query(query);
@@ -837,7 +837,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e", "?s"],
-      where: [{ entity: "?e", attribute: "score", value: "?s" }],
+      where: [["?e", "score", "?s"]],
       limit: 0,
     };
 
@@ -863,7 +863,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e", "?s"],
-      where: [{ entity: "?e", attribute: "score", value: "?s" }],
+      where: [["?e", "score", "?s"]],
       limit: 10,
     };
 
@@ -888,8 +888,8 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e", "?s"],
-      where: [{ entity: "?e", attribute: "score", value: "?s" }],
-      orderBy: [{ variable: "?s", direction: "desc" }],
+      where: [["?e", "score", "?s"]],
+      orderBy: [["?s", "desc"]],
       limit: 2,
     };
 
@@ -920,10 +920,10 @@ describe("DatalogQueryEngine", () => {
     const queryWithoutScoreInFind: DatalogQuery = {
       find: ["?name"],
       where: [
-        { entity: "?e", attribute: "name", value: "?name" },
-        { entity: "?e", attribute: "score", value: "?score" },
+        ["?e", "name", "?name"],
+        ["?e", "score", "?score"],
       ],
-      orderBy: [{ variable: "?score", direction: "desc" }],
+      orderBy: [["?score", "desc"]],
     };
 
     // Ordering by ?score won't work since it's not in find
@@ -935,10 +935,10 @@ describe("DatalogQueryEngine", () => {
     const queryWithScoreInFind: DatalogQuery = {
       find: ["?name", "?score"],
       where: [
-        { entity: "?e", attribute: "name", value: "?name" },
-        { entity: "?e", attribute: "score", value: "?score" },
+        ["?e", "name", "?name"],
+        ["?e", "score", "?score"],
       ],
-      orderBy: [{ variable: "?score", direction: "desc" }],
+      orderBy: [["?score", "desc"]],
     };
 
     const resultsWithScore = await engine.query(queryWithScoreInFind);
@@ -966,8 +966,8 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e", "?s"],
-      where: [{ entity: "?e", attribute: "score", value: "?s" }],
-      orderBy: [{ variable: "?s", direction: "asc" }],
+      where: [["?e", "score", "?s"]],
+      orderBy: [["?s", "asc"]],
     };
 
     const results = await engine.query(query);
@@ -995,8 +995,8 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e", "?v"],
-      where: [{ entity: "?e", attribute: "value", value: "?v" }],
-      orderBy: [{ variable: "?v", direction: "asc" }],
+      where: [["?e", "value", "?v"]],
+      orderBy: [["?v", "asc"]],
     };
 
     const results = await engine.query(query);
@@ -1022,8 +1022,8 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?name", "?age"],
       where: [
-        { entity: "?e", attribute: "name", value: "?name" },
-        { entity: "?e", attribute: "age", value: "?age" },
+        ["?e", "name", "?name"],
+        ["?e", "age", "?age"],
       ],
     };
 
@@ -1055,8 +1055,8 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?e"],
       where: [
-        { entity: "?e", attribute: "name", value: "Alice" },
-        { entity: "?e", attribute: "age", value: 25 },
+        ["?e", "name", "Alice"],
+        ["?e", "age", 25],
       ],
     };
 
@@ -1085,9 +1085,9 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?name", "?age", "?city"],
       where: [
-        { entity: "?e", attribute: "name", value: "?name" },
-        { entity: "?e", attribute: "age", value: "?age" },
-        { entity: "?e", attribute: "city", value: "?city" },
+        ["?e", "name", "?name"],
+        ["?e", "age", "?age"],
+        ["?e", "city", "?city"],
       ],
     };
 
@@ -1118,7 +1118,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?name"],
-      where: [{ entity: "?e", attribute: "name", value: "?name" }],
+      where: [["?e", "name", "?name"]],
     };
 
     const results = await engine.query(query);
@@ -1144,7 +1144,7 @@ describe("DatalogQueryEngine", () => {
     const engine = new DatalogQueryEngine(db);
     const query: DatalogQuery = {
       find: ["?e", "?tag"],
-      where: [{ entity: "?e", attribute: "tag", value: "?tag" }],
+      where: [["?e", "tag", "?tag"]],
     };
 
     const results = await engine.query(query);
@@ -1179,8 +1179,8 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?node"],
       where: [
-        { entity: "?node", attribute: "connects", value: "?target" },
-        { entity: "?node", attribute: "connects", value: "?node" },
+        ["?node", "connects", "?target"],
+        ["?node", "connects", "?node"],
       ],
     };
 
@@ -1188,7 +1188,7 @@ describe("DatalogQueryEngine", () => {
     // Or test that we can query connections and verify self-connections exist
     const simpleQuery: DatalogQuery = {
       find: ["?from", "?to"],
-      where: [{ entity: "?from", attribute: "connects", value: "?to" }],
+      where: [["?from", "connects", "?to"]],
     };
 
     const allResults = await engine.query(simpleQuery);
@@ -1217,7 +1217,7 @@ describe("DatalogQueryEngine", () => {
     // Find all next relationships
     const query: DatalogQuery = {
       find: ["?from", "?to"],
-      where: [{ entity: "?from", attribute: "next", value: "?to" }],
+      where: [["?from", "next", "?to"]],
     };
 
     const results = await engine.query(query);
@@ -1251,9 +1251,9 @@ describe("DatalogQueryEngine", () => {
     const query: DatalogQuery = {
       find: ["?name", "?dept"],
       where: [
-        { entity: "?e", attribute: "name", value: "?name" },
-        { entity: "?j", attribute: "employee", value: "?e" },
-        { entity: "?j", attribute: "department", value: "?dept" },
+        ["?e", "name", "?name"],
+        ["?j", "employee", "?e"],
+        ["?j", "department", "?dept"],
       ],
     };
 

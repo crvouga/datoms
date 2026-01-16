@@ -34,4 +34,4 @@ export {
   type DatalogQuery,
   type QueryClause,
   type QueryResult,
-} from "./datalog.js";
+} from "./datalog/datalog.js";
