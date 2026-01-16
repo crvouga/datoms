@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { MigrationError, MigrationRollbackError } from "../errors.js";
-import type { Migration } from "../../types.js";
+import type { DatabaseEvent, Migration } from "../../types.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
 
 describe.each(FIXTURES)("Migrations (%s)", (_name, createFixture) => {
@@ -74,7 +74,7 @@ describe.each(FIXTURES)("Migrations (%s)", (_name, createFixture) => {
 
     test("should emit migration event on success", async () => {
       const { db } = f;
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
 
       const unsubscribe = db.on("migration", (event) => {
         events.push(event);
@@ -84,9 +84,11 @@ describe.each(FIXTURES)("Migrations (%s)", (_name, createFixture) => {
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("migration");
-      expect(events[0].version).toBe(2);
-      expect(events[0].success).toBe(true);
-      expect(events[0].error).toBeUndefined();
+      if (events[0].type === "migration") {
+        expect(events[0].version).toBe(2);
+        expect(events[0].success).toBe(true);
+        expect(events[0].error).toBeUndefined();
+      }
 
       unsubscribe();
     });
@@ -95,7 +97,7 @@ describe.each(FIXTURES)("Migrations (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.migrate(5);
 
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
       const unsubscribe = db.on("migration", (event) => {
         events.push(event);
       });
@@ -108,9 +110,11 @@ describe.each(FIXTURES)("Migrations (%s)", (_name, createFixture) => {
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("migration");
-      expect(events[0].version).toBe(3);
-      expect(events[0].success).toBe(false);
-      expect(events[0].error).toBeDefined();
+      if (events[0].type === "migration") {
+        expect(events[0].version).toBe(3);
+        expect(events[0].success).toBe(false);
+        expect(events[0].error).toBeDefined();
+      }
 
       unsubscribe();
     });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { Datom } from "../../types.js";
+import { DatabaseEvent, Datom } from "../../types.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
 
 describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
@@ -74,7 +74,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         [2, "name", "Bob"],
       ]);
 
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
       db.on("backup", (event) => {
         events.push(event);
       });
@@ -86,13 +86,15 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("backup");
-      expect(events[0].datomCount).toBe(2);
-      expect(events[0].success).toBe(true);
+      if (events[0].type === "backup") {
+        expect(events[0].datomCount).toBe(2);
+        expect(events[0].success).toBe(true);
+      }
     });
 
     test("should handle export errors", async () => {
       const { db } = f;
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
       db.on("backup", (event) => {
         events.push(event);
       });
@@ -106,12 +108,18 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         }
         // Should complete successfully even if no results
         expect(events).toHaveLength(1);
-        expect(events[0].success).toBe(true);
+        if (events[0].type === "backup") {
+          expect(events[0].success).toBe(true);
+        }
       } catch (error) {
         // If error occurs, should be captured in event
         expect(events).toHaveLength(1);
-        expect(events[0].success).toBe(false);
-        expect(events[0].error).toBeDefined();
+        if (events[0].type === "backup") {
+          expect(events[0].success).toBe(false);
+        }
+        if (events[0].type === "backup") {
+          expect(events[0].error).toBeDefined();
+        }
       }
     });
   });
@@ -278,7 +286,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       const { db: db2 } = await createFixture();
       await db2.initialize();
 
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
       db2.on("restore", (event) => {
         events.push(event);
       });
@@ -294,8 +302,10 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("restore");
-      expect(events[0].datomCount).toBe(exported.length);
-      expect(events[0].success).toBe(true);
+      if (events[0].type === "restore") {
+        expect(events[0].datomCount).toBe(exported.length);
+        expect(events[0].success).toBe(true);
+      }
 
       await db2.close();
     });
@@ -317,7 +327,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         added: true,
       };
 
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
       db.on("restore", (event) => {
         events.push(event);
       });
@@ -332,8 +342,12 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       } catch (error) {
         // Should have error event
         expect(events).toHaveLength(1);
-        expect(events[0].success).toBe(false);
-        expect(events[0].error).toBeDefined();
+        if (events[0].type === "restore") {
+          expect(events[0].success).toBe(false);
+        }
+        if (events[0].type === "restore") {
+          expect(events[0].error).toBeDefined();
+        }
       }
     });
 

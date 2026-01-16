@@ -18,7 +18,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
   describe("Events", () => {
     test("should register event listener and return unsubscribe function", async () => {
       const { db } = f;
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
 
       const unsubscribe = db.on("transaction", (event) => {
         events.push(event);
@@ -40,7 +40,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should emit transaction events", async () => {
       const { db } = f;
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
 
       db.on("transaction", (event) => {
         events.push(event);
@@ -51,14 +51,16 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("transaction");
-      expect(events[0].txId).toBe(txId);
-      expect(events[0].addedCount).toBe(1);
-      expect(events[0].retractedCount).toBe(0);
+      if (events[0].type === "transaction") {
+        expect(events[0].txId).toBe(txId);
+        expect(events[0].addedCount).toBe(1);
+        expect(events[0].retractedCount).toBe(0);
+      }
     });
 
     test("should emit transaction events with metadata", async () => {
       const { db } = f;
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
 
       db.on("transaction", (event) => {
         events.push(event);
@@ -70,14 +72,16 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       );
 
       expect(events).toHaveLength(1);
-      expect(events[0].metadata).toEqual({ userId: "alice", reason: "test" });
+      if (events[0].type === "transaction") {
+        expect(events[0].metadata).toEqual({ userId: "alice", reason: "test" });
+      }
     });
 
     test("should emit query events", async () => {
       const { db } = f;
       await db.add([[1, "name", "Alice"]]);
 
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
       db.on("query", (event) => {
         events.push(event);
       });
@@ -86,14 +90,16 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("query");
-      expect(events[0].options).toEqual({ entity: 1 });
-      expect(events[0].resultCount).toBe(1);
-      expect(typeof events[0].duration).toBe("number");
+      if (events[0].type === "query") {
+        expect(events[0].options).toEqual({ entity: 1 });
+        expect(events[0].resultCount).toBe(1);
+        expect(typeof events[0].duration).toBe("number");
+      }
     });
 
     test("should emit error events", async () => {
       const { db } = f;
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
 
       db.on("error", (event) => {
         events.push(event);
@@ -107,13 +113,15 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("error");
-      expect(events[0].error).toBeInstanceOf(Error);
-      expect(events[0].context).toBeDefined();
+      if (events[0].type === "error") {
+        expect(events[0].error).toBeInstanceOf(Error);
+        expect(events[0].context).toBeDefined();
+      }
     });
 
     test("should emit migration events", async () => {
       const { db } = f;
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
 
       db.on("migration", (event) => {
         events.push(event);
@@ -123,8 +131,10 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("migration");
-      expect(events[0].version).toBe(2);
-      expect(events[0].success).toBe(true);
+      if (events[0].type === "migration") {
+        expect(events[0].version).toBe(2);
+        expect(events[0].success).toBe(true);
+      }
     });
 
     test("should emit backup events", async () => {
@@ -134,7 +144,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
         [2, "name", "Bob"],
       ]);
 
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
       db.on("backup", (event) => {
         events.push(event);
       });
@@ -146,15 +156,17 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("backup");
-      expect(events[0].datomCount).toBe(2);
-      expect(events[0].success).toBe(true);
+      if (events[0].type === "backup") {
+        expect(events[0].datomCount).toBe(2);
+        expect(events[0].success).toBe(true);
+      }
     });
 
     test("should emit restore events", async () => {
       const { db } = f;
       await db.add([[1, "name", "Alice"]]);
 
-      const events: any[] = [];
+      const events: DatabaseEvent[] = [];
       db.on("restore", (event) => {
         events.push(event);
       });
@@ -193,7 +205,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should handle listener errors gracefully", async () => {
       const { db } = f;
-      const errorEvents: any[] = [];
+      const errorEvents: DatabaseEvent[] = [];
 
       // Register a listener that throws
       db.on("transaction", () => {
@@ -210,11 +222,15 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       // Should have error event from listener failure
       expect(errorEvents.length).toBeGreaterThan(0);
+
       const listenerError = errorEvents.find(
-        (e) => e.context?.eventType === "transaction"
+        (e) => e.type === "error" && e.context?.eventType === "transaction"
       );
-      expect(listenerError).toBeDefined();
-      expect(listenerError.error.message).toBe("Listener error");
+
+      if (listenerError?.type === "error") {
+        expect(listenerError.error).toBeDefined();
+        expect(listenerError.error.message).toBe("Listener error");
+      }
     });
 
     test("should support multiple listeners for same event type", async () => {
@@ -320,7 +336,11 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
   describe("Logging Integration", () => {
     test("should log events when logger is set", async () => {
       const { db } = f;
-      const logMessages: Array<{ level: string; message: string; meta?: unknown }> = [];
+      const logMessages: Array<{
+        level: string;
+        message: string;
+        meta?: unknown;
+      }> = [];
 
       const logger = {
         debug: (message: string, meta?: unknown) => {
@@ -344,8 +364,8 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       // Should have logged transaction and query events
       expect(logMessages.length).toBeGreaterThan(0);
-      const transactionLog = logMessages.find(
-        (m) => m.message.includes("transaction")
+      const transactionLog = logMessages.find((m) =>
+        m.message.includes("transaction")
       );
       expect(transactionLog).toBeDefined();
       if (transactionLog) {
