@@ -421,6 +421,281 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     });
   }
 
+  public async executeAsOfQuery(
+    options: QueryOptions,
+    txId: TransactionId
+  ): Promise<Datom[]> {
+    await this.ensureInitialized();
+
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    // Build WHERE conditions
+    if (options.entity !== undefined) {
+      conditions.push("entity = ?");
+      params.push(String(options.entity));
+    }
+    if (options.attribute !== undefined) {
+      conditions.push("attribute = ?");
+      params.push(String(options.attribute));
+    }
+    if (options.value !== undefined) {
+      let value = options.value;
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      conditions.push("value = ?::jsonb");
+      params.push(JSON.stringify(value));
+    }
+
+    // Merge options.tx with txId: use minimum of both if options.tx is specified
+    const maxTx =
+      options.tx !== undefined ? Math.min(options.tx, txId) : txId;
+    conditions.push("tx <= ?");
+    params.push(maxTx);
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const limitClause = options.limit ? "LIMIT ?" : "";
+    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+
+    // Use DISTINCT ON (entity, attribute) to deduplicate by entity-attribute pair
+    // This keeps the latest value per attribute (asOf semantics)
+    const sql = `
+      SELECT DISTINCT ON (entity, attribute)
+        entity, attribute, value, tx, added
+      FROM ${this.tableName}
+      ${whereClause}
+      ORDER BY entity, attribute, tx DESC
+    `;
+
+    // Filter to only added datoms after DISTINCT ON
+    const finalSql = `
+      WITH latest_datoms AS (${sql})
+      SELECT 
+        entity,
+        attribute,
+        value,
+        tx,
+        added
+      FROM latest_datoms
+      WHERE added = true
+      ORDER BY
+        CASE 
+          WHEN entity ~ '^-{0,1}[0-9]+$' THEN entity::BIGINT 
+          ELSE 0 
+        END,
+        attribute
+      ${limitClause}
+      ${offsetClause}
+    `;
+
+    if (options.limit) {
+      params.push(options.limit);
+    }
+    if (options.offset !== undefined) {
+      params.push(options.offset);
+    }
+
+    const rows = await this.connection.query(finalSql, params);
+    return this.mapRowsToDatoms(rows);
+  }
+
+  public async executeHistoryQuery(options: QueryOptions): Promise<Datom[]> {
+    await this.ensureInitialized();
+
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    // Build WHERE conditions
+    if (options.entity !== undefined) {
+      conditions.push("entity = ?");
+      params.push(String(options.entity));
+    }
+    if (options.attribute !== undefined) {
+      conditions.push("attribute = ?");
+      params.push(String(options.attribute));
+    }
+    if (options.value !== undefined) {
+      let value = options.value;
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      conditions.push("value = ?::jsonb");
+      params.push(JSON.stringify(value));
+    }
+    if (options.tx !== undefined) {
+      conditions.push("tx = ?");
+      params.push(options.tx);
+    }
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const limitClause = options.limit ? "LIMIT ?" : "";
+    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+
+    // History query: no deduplication, include all datoms including retracted
+    const sql = `
+      SELECT 
+        entity,
+        attribute,
+        value,
+        tx,
+        added
+      FROM ${this.tableName}
+      ${whereClause}
+      ORDER BY tx ASC, entity ASC, attribute ASC
+      ${limitClause}
+      ${offsetClause}
+    `;
+
+    if (options.limit) {
+      params.push(options.limit);
+    }
+    if (options.offset !== undefined) {
+      params.push(options.offset);
+    }
+
+    const rows = await this.connection.query(sql, params);
+    return this.mapRowsToDatoms(rows);
+  }
+
+  public async executeSinceQuery(
+    options: QueryOptions,
+    txId: TransactionId
+  ): Promise<Datom[]> {
+    await this.ensureInitialized();
+
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    // Build WHERE conditions
+    if (options.entity !== undefined) {
+      conditions.push("entity = ?");
+      params.push(String(options.entity));
+    }
+    if (options.attribute !== undefined) {
+      conditions.push("attribute = ?");
+      params.push(String(options.attribute));
+    }
+    if (options.value !== undefined) {
+      let value = options.value;
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      conditions.push("value = ?::jsonb");
+      params.push(JSON.stringify(value));
+    }
+
+    // Filter to only datoms with tx > txId
+    conditions.push("tx > ?");
+    params.push(txId);
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const limitClause = options.limit ? "LIMIT ?" : "";
+    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+
+    // Use DISTINCT ON (entity, attribute, value) for normal deduplication
+    const sql = `
+      SELECT DISTINCT ON (entity, attribute, value)
+        entity, attribute, value, tx, added
+      FROM ${this.tableName}
+      ${whereClause}
+      ORDER BY entity, attribute, value, tx DESC
+    `;
+
+    // Filter to only added datoms after DISTINCT ON
+    const finalSql = `
+      WITH latest_datoms AS (${sql})
+      SELECT 
+        entity,
+        attribute,
+        value,
+        tx,
+        added
+      FROM latest_datoms
+      WHERE added = true
+      ORDER BY
+        CASE 
+          WHEN entity ~ '^-{0,1}[0-9]+$' THEN entity::BIGINT 
+          ELSE 0 
+        END,
+        attribute
+      ${limitClause}
+      ${offsetClause}
+    `;
+
+    if (options.limit) {
+      params.push(options.limit);
+    }
+    if (options.offset !== undefined) {
+      params.push(options.offset);
+    }
+
+    const rows = await this.connection.query(finalSql, params);
+    return this.mapRowsToDatoms(rows);
+  }
+
+  /**
+   * Helper method to map database rows to Datom objects
+   * Reused across query methods
+   */
+  private mapRowsToDatoms(rows: DatabaseRow[]): Datom[] {
+    const reviveValue = (value: unknown): unknown => {
+      if (typeof value === "string") {
+        if (value === "__UNDEFINED__") {
+          return undefined;
+        }
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+          return new Date(value);
+        }
+      }
+      if (value === null) {
+        return null;
+      }
+      if (value === undefined) {
+        return undefined;
+      }
+      if (Array.isArray(value)) {
+        return value.map(reviveValue);
+      }
+      if (typeof value === "object" && value !== null) {
+        const revived: Record<string, unknown> = {};
+        const valueObj = value as Record<string, unknown>;
+        for (const key in valueObj) {
+          revived[key] = reviveValue(valueObj[key]);
+        }
+        return revived;
+      }
+      return value;
+    };
+
+    return rows.map((row: DatabaseRow) => {
+      let entity: EntityId = row.entity as EntityId;
+      if (typeof entity === "string") {
+        if (/^-?\d+$/.test(entity)) {
+          entity = parseInt(entity, 10);
+        }
+      }
+
+      const parsedValue: unknown =
+        typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+      const revivedValue = reviveValue(parsedValue) as Value;
+
+      return {
+        entity,
+        attribute: String(row.attribute),
+        value: revivedValue,
+        tx: Number(row.tx),
+        added: Boolean(row.added),
+      };
+    });
+  }
+
   async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
     await this.ensureInitialized();
     const result = await super.explainQuery(options);

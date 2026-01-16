@@ -35,7 +35,8 @@ import {
   UniqueConstraintError,
 } from "./errors.js";
 import { MigrationRegistry } from "./migrations/migration-registry.js";
-import { stripQuestionMark } from "./shared/datalog-helpers.js";
+import { isVariable, stripQuestionMark } from "./shared/datalog-helpers.js";
+import { joinResults, project } from "./shared/query-helpers.js";
 
 /**
  * Shared interface for reading datoms
@@ -432,9 +433,7 @@ abstract class BaseDatabaseView implements DatabaseView {
       return [];
     }
 
-    // Import helpers dynamically to avoid circular dependencies
-    const { isVariable } = await import("./shared/datalog-helpers.js");
-    const { joinResults, project } = await import("./shared/query-helpers.js");
+    
 
     // Execute first clause using view's datoms() method
     const firstClause = query.where[0];
@@ -608,30 +607,8 @@ class AsOfDatabaseView extends BaseDatabaseView {
       );
     }
 
-    // Get all matching datoms without tx filter and without deduplication
-    // We need raw datoms to properly deduplicate by (entity, attribute) for asOf queries
-    const allDatoms = await this.db.getRawDatoms({
-      ...options,
-      tx: undefined, // Remove tx filter, we'll apply our own
-    });
-    
-    // Filter to only datoms with tx <= this.txId
-    // If options.tx is specified, use the minimum of both
-    const maxTx = options.tx !== undefined ? Math.min(options.tx, this.txId) : this.txId;
-    const filtered = allDatoms.filter((d) => d.tx <= maxTx);
-    
-    // Deduplicate by (entity, attribute) keeping the latest tx
-    const deduplicated = new Map<string, Datom>();
-    for (const datom of filtered) {
-      const key = `${String(datom.entity)}|${String(datom.attribute)}`;
-      const existing = deduplicated.get(key);
-      if (!existing || datom.tx > existing.tx) {
-        deduplicated.set(key, datom);
-      }
-    }
-    
-    // Filter out retracted datoms (keep only added: true)
-    return Array.from(deduplicated.values()).filter((d) => d.added);
+    // Use implementation-specific method for optimized SQL queries
+    return this.db.executeAsOfQuery(options, this.txId);
   }
 }
 
@@ -655,12 +632,8 @@ class HistoryDatabaseView extends BaseDatabaseView {
       );
     }
 
-    // History view: no deduplication, include retracted datoms
-    // Get all datoms matching the filters, including retracted ones
-    return this.db.getRawDatoms({
-      ...options,
-      added: undefined, // Don't filter by added/retracted
-    });
+    // Use implementation-specific method for optimized SQL queries
+    return this.db.executeHistoryQuery(options);
   }
 }
 
@@ -688,29 +661,8 @@ class SinceDatabaseView extends BaseDatabaseView {
       );
     }
 
-    // Get all matching datoms without deduplication
-    const allDatoms = await this.db.getRawDatoms({
-      ...options,
-      tx: undefined, // Remove tx filter if present
-    });
-    
-    // Filter to only datoms with tx > this.txId
-    const filtered = allDatoms.filter((d) => d.tx > this.txId);
-    
-    // Deduplicate by (entity, attribute, value) keeping the latest tx
-    // This is normal deduplication (not like asOf which keeps latest per entity-attribute)
-    const deduplicated = new Map<string, Datom>();
-    for (const datom of filtered) {
-      const valueKey = JSON.stringify(datom.value);
-      const key = `${String(datom.entity)}|${String(datom.attribute)}|${valueKey}`;
-      const existing = deduplicated.get(key);
-      if (!existing || datom.tx > existing.tx) {
-        deduplicated.set(key, datom);
-      }
-    }
-    
-    // Filter out retracted datoms (keep only added: true)
-    return Array.from(deduplicated.values()).filter((d) => d.added);
+    // Use implementation-specific method for optimized SQL queries
+    return this.db.executeSinceQuery(options, this.txId);
   }
 }
 
@@ -1625,6 +1577,98 @@ export abstract class DatomDatabase
       ...options,
       added: undefined, // Get all datoms including retracted
     });
+  }
+
+  /**
+   * Execute an asOf query - returns datoms with tx <= txId, deduplicated by (entity, attribute).
+   * This method is called by AsOfDatabaseView to leverage database-native query optimization.
+   * @param options Query options
+   * @param txId Transaction ID to query as-of
+   * @returns Array of matching datoms deduplicated by (entity, attribute)
+   * @internal
+   */
+  public async executeAsOfQuery(
+    options: QueryOptions,
+    txId: TransactionId
+  ): Promise<Datom[]> {
+    // Default implementation: use getRawDatoms and filter/deduplicate in JavaScript
+    // SQL implementations should override this for better performance
+    const allDatoms = await this.getRawDatoms({
+      ...options,
+      tx: undefined, // Remove tx filter, we'll apply our own
+    });
+
+    // Filter to only datoms with tx <= txId
+    // If options.tx is specified, use the minimum of both
+    const maxTx =
+      options.tx !== undefined ? Math.min(options.tx, txId) : txId;
+    const filtered = allDatoms.filter((d) => d.tx <= maxTx);
+
+    // Deduplicate by (entity, attribute) keeping the latest tx
+    const deduplicated = new Map<string, Datom>();
+    for (const datom of filtered) {
+      const key = `${String(datom.entity)}|${String(datom.attribute)}`;
+      const existing = deduplicated.get(key);
+      if (!existing || datom.tx > existing.tx) {
+        deduplicated.set(key, datom);
+      }
+    }
+
+    // Filter out retracted datoms (keep only added: true)
+    return Array.from(deduplicated.values()).filter((d) => d.added);
+  }
+
+  /**
+   * Execute a history query - returns all datoms including retracted, without deduplication.
+   * This method is called by HistoryDatabaseView to leverage database-native query optimization.
+   * @param options Query options
+   * @returns Array of all matching datoms (including retracted)
+   * @internal
+   */
+  public async executeHistoryQuery(options: QueryOptions): Promise<Datom[]> {
+    // Default implementation: use getRawDatoms
+    // SQL implementations should override this for better performance
+    return this.getRawDatoms({
+      ...options,
+      added: undefined, // Don't filter by added/retracted
+    });
+  }
+
+  /**
+   * Execute a since query - returns datoms with tx > txId, deduplicated by (entity, attribute, value).
+   * This method is called by SinceDatabaseView to leverage database-native query optimization.
+   * @param options Query options
+   * @param txId Transaction ID - only changes after this will be included
+   * @returns Array of matching datoms deduplicated by (entity, attribute, value)
+   * @internal
+   */
+  public async executeSinceQuery(
+    options: QueryOptions,
+    txId: TransactionId
+  ): Promise<Datom[]> {
+    // Default implementation: use getRawDatoms and filter/deduplicate in JavaScript
+    // SQL implementations should override this for better performance
+    const allDatoms = await this.getRawDatoms({
+      ...options,
+      tx: undefined, // Remove tx filter if present
+    });
+
+    // Filter to only datoms with tx > txId
+    const filtered = allDatoms.filter((d) => d.tx > txId);
+
+    // Deduplicate by (entity, attribute, value) keeping the latest tx
+    const deduplicated = new Map<string, Datom>();
+    for (const datom of filtered) {
+      const valueKey = JSON.stringify(datom.value);
+      const key = `${String(datom.entity)}|${String(datom.attribute)}|${valueKey}`;
+      const existing = deduplicated.get(key);
+      if (!existing || datom.tx > existing.tx) {
+        deduplicated.set(key, datom);
+      }
+    }
+
+    // Filter out retracted datoms (keep only added: true)
+    return Array.from(deduplicated.values()).filter((d) => d.added);
   }
 
   /**
@@ -3310,26 +3354,6 @@ export abstract class DatomDatabase
     }
 
     return filtered;
-  }
-
-  /**
-   * Compare two values for equality, handling Date objects and other special types.
-   * This is more reliable than JSON.stringify for Date objects.
-   * @param a First value
-   * @param b Second value
-   * @returns True if values are equal
-   * @internal
-   */
-  private valuesEqual(a: Value, b: Value): boolean {
-    // Handle Date objects specially
-    if (a instanceof Date && b instanceof Date) {
-      return a.getTime() === b.getTime();
-    }
-    if (a instanceof Date || b instanceof Date) {
-      return false;
-    }
-    // Use JSON.stringify for other types (handles null, undefined, primitives, objects)
-    return JSON.stringify(a) === JSON.stringify(b);
   }
 
   /**

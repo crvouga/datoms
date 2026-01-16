@@ -223,6 +223,134 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return paginated;
   }
 
+  public async executeAsOfQuery(
+    options: QueryOptions,
+    txId: TransactionId
+  ): Promise<Datom[]> {
+    await this.ensureInitialized();
+
+    // Get all matching datoms without tx filter
+    let results = this._datomsArray;
+
+    // Apply filters (except tx, which we'll handle separately)
+    if (options.entity !== undefined) {
+      results = results.filter((d) => d.entity === options.entity);
+    }
+    if (options.attribute !== undefined) {
+      results = results.filter((d) => d.attribute === options.attribute);
+    }
+    if (options.value !== undefined) {
+      results = results.filter((d) => d.value === options.value);
+    }
+
+    // Filter to only datoms with tx <= txId
+    // If options.tx is specified, use the minimum of both
+    const maxTx =
+      options.tx !== undefined ? Math.min(options.tx, txId) : txId;
+    results = results.filter((d) => d.tx <= maxTx);
+
+    // Deduplicate by (entity, attribute) keeping the latest tx
+    const deduplicated = new Map<string, Datom>();
+    for (const datom of results) {
+      const key = `${String(datom.entity)}|${String(datom.attribute)}`;
+      const existing = deduplicated.get(key);
+      if (!existing || datom.tx > existing.tx) {
+        deduplicated.set(key, datom);
+      }
+    }
+
+    // Filter out retracted datoms (keep only added: true)
+    results = Array.from(deduplicated.values()).filter((d) => d.added);
+
+    // Apply pagination
+    const offset = options.offset ?? 0;
+    const limit = options.limit;
+    return results.slice(offset, limit ? offset + limit : undefined);
+  }
+
+  public async executeHistoryQuery(options: QueryOptions): Promise<Datom[]> {
+    await this.ensureInitialized();
+
+    // Get all datoms matching filters without deduplication
+    let results = this._datomsArray;
+
+    // Apply filters
+    if (options.entity !== undefined) {
+      results = results.filter((d) => d.entity === options.entity);
+    }
+    if (options.attribute !== undefined) {
+      results = results.filter((d) => d.attribute === options.attribute);
+    }
+    if (options.value !== undefined) {
+      results = results.filter((d) => d.value === options.value);
+    }
+    if (options.tx !== undefined) {
+      results = results.filter((d) => d.tx === options.tx);
+    }
+
+    // Sort by tx ASC for history
+    results.sort((a, b) => {
+      if (a.tx !== b.tx) {
+        return a.tx - b.tx;
+      }
+      // Secondary sort by entity, then attribute
+      const entityA = String(a.entity);
+      const entityB = String(b.entity);
+      if (entityA !== entityB) {
+        return entityA.localeCompare(entityB);
+      }
+      return String(a.attribute).localeCompare(String(b.attribute));
+    });
+
+    // Apply pagination
+    const offset = options.offset ?? 0;
+    const limit = options.limit;
+    return results.slice(offset, limit ? offset + limit : undefined);
+  }
+
+  public async executeSinceQuery(
+    options: QueryOptions,
+    txId: TransactionId
+  ): Promise<Datom[]> {
+    await this.ensureInitialized();
+
+    // Get all matching datoms without tx filter
+    let results = this._datomsArray;
+
+    // Apply filters (except tx, which we'll handle separately)
+    if (options.entity !== undefined) {
+      results = results.filter((d) => d.entity === options.entity);
+    }
+    if (options.attribute !== undefined) {
+      results = results.filter((d) => d.attribute === options.attribute);
+    }
+    if (options.value !== undefined) {
+      results = results.filter((d) => d.value === options.value);
+    }
+
+    // Filter to only datoms with tx > txId
+    results = results.filter((d) => d.tx > txId);
+
+    // Deduplicate by (entity, attribute, value) keeping the latest tx
+    const deduplicated = new Map<string, Datom>();
+    for (const datom of results) {
+      const valueKey = JSON.stringify(datom.value);
+      const key = `${String(datom.entity)}|${String(datom.attribute)}|${valueKey}`;
+      const existing = deduplicated.get(key);
+      if (!existing || datom.tx > existing.tx) {
+        deduplicated.set(key, datom);
+      }
+    }
+
+    // Filter out retracted datoms (keep only added: true)
+    results = Array.from(deduplicated.values()).filter((d) => d.added);
+
+    // Apply pagination
+    const offset = options.offset ?? 0;
+    const limit = options.limit;
+    return results.slice(offset, limit ? offset + limit : undefined);
+  }
+
   async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
     await this.ensureInitialized();
     const result = await super.explainQuery(options);
