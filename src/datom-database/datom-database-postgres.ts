@@ -28,6 +28,10 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   private connection: SQLDatabase;
   private tableName: string;
   protected initialized = false;
+  private queryCount: number = 0;
+  private transactionCount: number = 0;
+  private queryTimeSum: number = 0;
+  private transactionTimeSum: number = 0;
 
   constructor(connection: SQLDatabase, tableName: string = "datoms") {
     super();
@@ -96,9 +100,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     this.initialized = false;
   }
 
-  async add(datoms: DatomInput[]): Promise<TransactionId> {
-    await this.ensureInitialized();
-    await this.validateDatoms(datoms, true);
+  protected async addDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = await this.getNextTransactionId();
 
     if (
@@ -108,22 +110,20 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     ) {
       await this.connection.beginTransaction();
       try {
-        await this.addDatoms(datoms, tx);
+        await this.addDatomsInternal(datoms, tx);
         await this.connection.commitTransaction();
       } catch (error) {
         await this.connection.rollbackTransaction();
         throw error;
       }
     } else {
-      await this.addDatoms(datoms, tx);
+      await this.addDatomsInternal(datoms, tx);
     }
 
     return tx;
   }
 
-  async retract(datoms: DatomInput[]): Promise<TransactionId> {
-    await this.ensureInitialized();
-    await this.validateDatoms(datoms, false);
+  protected async retractDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = await this.getNextTransactionId();
 
     if (
@@ -133,14 +133,14 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     ) {
       await this.connection.beginTransaction();
       try {
-        await this.retractDatoms(datoms, tx);
+        await this.retractDatomsInternal(datoms, tx);
         await this.connection.commitTransaction();
       } catch (error) {
         await this.connection.rollbackTransaction();
         throw error;
       }
     } else {
-      await this.retractDatoms(datoms, tx);
+      await this.retractDatomsInternal(datoms, tx);
     }
 
     return tx;
@@ -705,7 +705,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return result[0].last_tx;
   }
 
-  protected async addDatoms(
+  private async addDatomsInternal(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -732,7 +732,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     await this.connection.execute(sql, params);
   }
 
-  protected async retractDatoms(
+  private async retractDatomsInternal(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -868,6 +868,67 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       return 0;
     }
     return result[0].last_tx;
+  }
+
+  protected async recordQueryMetrics(duration: number): Promise<void> {
+    this.queryCount++;
+    this.queryTimeSum += duration;
+  }
+
+  protected async recordTransactionMetrics(duration: number): Promise<void> {
+    this.transactionCount++;
+    this.transactionTimeSum += duration;
+  }
+
+  protected async getDetailedStats(): Promise<
+    Partial<Pick<import("../types.js").DatabaseStats, "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics">>
+  > {
+    const stats: any = {};
+
+    // Count total datoms (only added ones, latest version)
+    // PostgreSQL-specific: Use DISTINCT ON for efficient latest-row-per-group
+    const countSql = `
+      WITH latest_datoms AS (
+        SELECT DISTINCT ON (entity, attribute, value)
+          entity, attribute, value, tx, added
+        FROM ${this.tableName}
+        ORDER BY entity, attribute, value, tx DESC
+      )
+      SELECT COUNT(*) as count
+      FROM latest_datoms
+      WHERE added = true
+    `;
+    const countResult = await this.connection.query(countSql);
+    const countValue = countResult[0]?.count ?? 0;
+    stats.totalDatoms = typeof countValue === "string" ? parseInt(countValue, 10) : Number(countValue);
+
+    // Count unique entities
+    const entitySql = `
+      SELECT COUNT(DISTINCT entity) as count
+      FROM ${this.tableName}
+      WHERE added = true
+    `;
+    const entityResult = await this.connection.query(entitySql);
+    const entityCountValue = entityResult[0]?.count ?? 0;
+    stats.totalEntities = typeof entityCountValue === "string" ? parseInt(entityCountValue, 10) : Number(entityCountValue);
+
+    // Add query metrics if available
+    if (this.queryCount > 0) {
+      stats.queryMetrics = {
+        totalQueries: this.queryCount,
+        averageQueryTime: this.queryTimeSum / this.queryCount / 1000, // Convert to seconds
+      };
+    }
+
+    // Add transaction metrics if available
+    if (this.transactionCount > 0) {
+      stats.transactionMetrics = {
+        averageTransactionTime:
+          this.transactionTimeSum / this.transactionCount / 1000, // Convert to seconds
+      };
+    }
+
+    return stats;
   }
 
   /**

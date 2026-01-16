@@ -28,6 +28,10 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   private connection: SQLDatabase;
   private tableName: string;
   protected initialized = false;
+  private queryCount: number = 0;
+  private transactionCount: number = 0;
+  private queryTimeSum: number = 0;
+  private transactionTimeSum: number = 0;
 
   constructor(connection: SQLDatabase, tableName: string = "datoms") {
     super();
@@ -94,19 +98,15 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     this.initialized = false;
   }
 
-  async add(datoms: DatomInput[]): Promise<TransactionId> {
-    await this.ensureInitialized();
-    await this.validateDatoms(datoms, true);
+  protected async addDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = await this.getNextTransactionId();
-    await this.addDatoms(datoms, tx);
+    await this.addDatomsInternal(datoms, tx);
     return tx;
   }
 
-  async retract(datoms: DatomInput[]): Promise<TransactionId> {
-    await this.ensureInitialized();
-    await this.validateDatoms(datoms, false);
+  protected async retractDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = await this.getNextTransactionId();
-    await this.retractDatoms(datoms, tx);
+    await this.retractDatomsInternal(datoms, tx);
     return tx;
   }
 
@@ -990,7 +990,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     return result[0].last_tx;
   }
 
-  private async addDatoms(
+  private async addDatomsInternal(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -1017,7 +1017,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     await this.connection.execute(sql, params);
   }
 
-  private async retractDatoms(
+  private async retractDatomsInternal(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -1153,6 +1153,63 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       return 0;
     }
     return result[0].last_tx;
+  }
+
+  protected async recordQueryMetrics(duration: number): Promise<void> {
+    this.queryCount++;
+    this.queryTimeSum += duration;
+  }
+
+  protected async recordTransactionMetrics(duration: number): Promise<void> {
+    this.transactionCount++;
+    this.transactionTimeSum += duration;
+  }
+
+  protected async getDetailedStats(): Promise<
+    Partial<Pick<import("../types.js").DatabaseStats, "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics">>
+  > {
+    const stats: any = {};
+
+    // Count total datoms (only added ones, latest version)
+    const countSql = `
+      WITH latest_datoms AS (
+        SELECT entity, attribute, value, tx, added,
+               ROW_NUMBER() OVER (PARTITION BY entity, attribute, value ORDER BY tx DESC) as rn
+        FROM ${this.tableName}
+      )
+      SELECT COUNT(*) as count
+      FROM latest_datoms
+      WHERE rn = 1 AND added = 1
+    `;
+    const countResult = await this.connection.query(countSql);
+    stats.totalDatoms = countResult[0]?.count ?? 0;
+
+    // Count unique entities
+    const entitySql = `
+      SELECT COUNT(DISTINCT entity) as count
+      FROM ${this.tableName}
+      WHERE added = 1
+    `;
+    const entityResult = await this.connection.query(entitySql);
+    stats.totalEntities = entityResult[0]?.count ?? 0;
+
+    // Add query metrics if available
+    if (this.queryCount > 0) {
+      stats.queryMetrics = {
+        totalQueries: this.queryCount,
+        averageQueryTime: this.queryTimeSum / this.queryCount / 1000, // Convert to seconds
+      };
+    }
+
+    // Add transaction metrics if available
+    if (this.transactionCount > 0) {
+      stats.transactionMetrics = {
+        averageTransactionTime:
+          this.transactionTimeSum / this.transactionCount / 1000, // Convert to seconds
+      };
+    }
+
+    return stats;
   }
 }
 

@@ -290,20 +290,37 @@ export interface DatomWriter<T = void> {
  * Transaction interface that exposes all database operations
  * scoped to a transaction. Queries within a transaction see
  * uncommitted changes from earlier operations in the same transaction.
+ *
+ * **Transaction ID Behavior:**
+ * - The transaction ID is assigned when the transaction begins, before any operations
+ * - `getTransactionId()` returns the ID that will be used when the transaction commits
+ * - For SQL backends, the ID is generated from a sequence/counter before commit
+ * - For in-memory backends, the ID is assigned immediately
+ * - The ID is stable throughout the transaction lifecycle
+ *
  * @example
  * await db.transaction(async (tx) => {
  *   await tx.add([[123, "score", 10]]);
  *   // all reads see the new datom, but not yet committed to the main db
  *   const current = await tx.getValue(123, "score");
+ *   const txid = tx.getTransactionId(); // Returns the ID that will be used on commit
  * });
  */
 export interface Transaction extends DatomReader, DatomWriter<void> {
   /**
-   * Get the transaction ID for the current transaction
+   * Get the transaction ID for the current transaction.
+   * The transaction ID is assigned when the transaction begins and remains stable
+   * throughout the transaction. It will be the ID used when the transaction commits.
+   *
+   * **Implementation Note:** All implementations assign transaction IDs before commit,
+   * so this method works reliably across all backends (in-memory, SQLite, PostgreSQL).
+   *
+   * @returns The transaction ID that will be used when this transaction commits
    * @example
    * await db.transaction(async (tx) => {
    *   await tx.add([[1, "name", "Test"]]);
-   *   const txid = tx.getTransactionId();
+   *   const txid = tx.getTransactionId(); // e.g., 42
+   *   // This ID will be used when the transaction commits
    * });
    */
   getTransactionId(): TransactionId;
@@ -376,10 +393,6 @@ export abstract class DatomDatabase
     DatabaseEvent["type"],
     Set<DatabaseEventListener>
   > = new Map();
-  private queryCount: number = 0;
-  private transactionCount: number = 0;
-  private queryTimeSum: number = 0;
-  private transactionTimeSum: number = 0;
 
   /**
    * Initialize the database
@@ -397,21 +410,51 @@ export abstract class DatomDatabase
 
   /**
    * Add datoms to the database
+   * Validates datoms before calling the implementation-specific addDatoms method.
    * @param datoms Array of datoms to add
    * @returns The transaction ID
    * @example
    * await db.add([[42, "type", "cat"]]);
    */
-  abstract add(datoms: DatomInput[]): Promise<TransactionId>;
+  async add(datoms: DatomInput[]): Promise<TransactionId> {
+    await this.ensureInitialized();
+    await this.validateDatoms(datoms, true);
+    return this.addDatoms(datoms);
+  }
+
+  /**
+   * Implementation-specific method to add datoms after validation.
+   * Subclasses should override this method instead of add().
+   * @param datoms Array of validated datoms to add
+   * @returns The transaction ID
+   * @internal
+   */
+  protected abstract addDatoms(datoms: DatomInput[]): Promise<TransactionId>;
 
   /**
    * Retract datoms from the database
+   * Validates datoms before calling the implementation-specific retractDatoms method.
    * @param datoms Array of datoms to retract
    * @returns The transaction ID
    * @example
    * await db.retract([[42, "type", "cat"]]);
    */
-  abstract retract(datoms: DatomInput[]): Promise<TransactionId>;
+  async retract(datoms: DatomInput[]): Promise<TransactionId> {
+    await this.ensureInitialized();
+    await this.validateDatoms(datoms, false);
+    return this.retractDatoms(datoms);
+  }
+
+  /**
+   * Implementation-specific method to retract datoms after validation.
+   * Subclasses should override this method instead of retract().
+   * @param datoms Array of validated datoms to retract
+   * @returns The transaction ID
+   * @internal
+   */
+  protected abstract retractDatoms(
+    datoms: DatomInput[]
+  ): Promise<TransactionId>;
 
   /**
    * Retract all datoms for a specific entity
@@ -590,6 +633,14 @@ export abstract class DatomDatabase
   /**
    * Hook for implementations to store transaction metadata.
    * Called after a transaction commits successfully.
+   *
+   * **Optional Implementation:** This method is optional - implementations can override
+   * it to persist metadata if needed. The default implementation is a no-op, meaning
+   * metadata is ignored unless the implementation provides storage.
+   *
+   * **Note:** Metadata is still emitted in transaction events even if not persisted,
+   * so event listeners can access it regardless of whether this method is overridden.
+   *
    * @param txId The transaction ID
    * @param metadata The metadata object provided to transact()
    * @example
@@ -605,8 +656,8 @@ export abstract class DatomDatabase
     txId: TransactionId,
     metadata: Record<string, unknown>
   ): Promise<void> {
-    // Override in implementations if metadata storage is needed
-    // Default: no-op (metadata is ignored)
+    // Optional: Override in implementations if metadata storage is needed
+    // Default: no-op (metadata is ignored but still emitted in events)
   }
 
   /**
@@ -1030,8 +1081,7 @@ export abstract class DatomDatabase
       const results = await this.executeQuery(options);
       const duration = Date.now() - startTime;
 
-      this.queryCount++;
-      this.queryTimeSum += duration;
+      await this.recordQueryMetrics(duration);
 
       await this.emitEvent({
         type: "query",
@@ -1480,6 +1530,11 @@ export abstract class DatomDatabase
    * Execute a batch query for multiple entity-attribute pairs.
    * Implementations can override this method to perform true batching
    * (e.g., a single SQL query with IN clauses) instead of parallel individual queries.
+   *
+   * **Type Safety Note:** The returned map uses string keys in the format "entity|attribute".
+   * Callers should use the same key format when accessing results. For type-safe access,
+   * use the helper method `getBatchQueryKey()` to generate keys consistently.
+   *
    * @param queries Array of {entity, attribute} pairs to query
    * @returns Map keyed by "entity|attribute" to the value (or undefined if not found)
    * @example
@@ -1499,10 +1554,23 @@ export abstract class DatomDatabase
     const results = await Promise.all(
       queries.map(async (q) => {
         const value = await this.getValue(q.entity, q.attribute);
-        return { key: `${String(q.entity)}|${String(q.attribute)}`, value };
+        const key = this.getBatchQueryKey(q.entity, q.attribute);
+        return { key, value };
       })
     );
     return new Map(results.map((r) => [r.key, r.value]));
+  }
+
+  /**
+   * Generate a consistent key for batch query results.
+   * This ensures type-safe key generation for entity-attribute pairs.
+   * @param entity Entity ID
+   * @param attribute Attribute name
+   * @returns String key in format "entity|attribute"
+   * @internal
+   */
+  protected getBatchQueryKey(entity: EntityId, attribute: string): string {
+    return `${String(entity)}|${String(attribute)}`;
   }
 
   /**
@@ -1528,7 +1596,7 @@ export abstract class DatomDatabase
     const batchResults = await this.executeBatchQuery(queries);
     // Return results in the same order as queries
     return queries.map((q) =>
-      batchResults.get(`${String(q.entity)}|${String(q.attribute)}`)
+      batchResults.get(this.getBatchQueryKey(q.entity, q.attribute))
     );
   }
 
@@ -1709,8 +1777,7 @@ export abstract class DatomDatabase
         const result = await this.executeTransaction(callback);
         const duration = Date.now() - startTime;
 
-        this.transactionCount++;
-        this.transactionTimeSum += duration;
+        await this.recordTransactionMetrics(duration);
 
         return result;
       } catch (error) {
@@ -1856,28 +1923,52 @@ export abstract class DatomDatabase
 
   /**
    * Emit an event to all registered listeners
+   * Handles async errors gracefully to prevent one failing listener from breaking others.
    * @param event Event to emit
    * @internal
    */
   protected async emitEvent(event: DatabaseEvent): Promise<void> {
     const listeners = this.eventListeners.get(event.type);
     if (listeners) {
-      await Promise.all(
-        Array.from(listeners).map((listener) => {
+      // Use Promise.allSettled to ensure all listeners are called even if some fail
+      const results = await Promise.allSettled(
+        Array.from(listeners).map(async (listener) => {
           try {
-            return listener(event);
+            return await listener(event);
           } catch (error) {
-            // Emit error event for listener failures
-            this.emitEvent({
-              type: "error",
-              error: error instanceof Error ? error : new Error(String(error)),
-              context: { eventType: event.type },
-            }).catch(() => {
-              // Ignore errors in error event emission
-            });
+            // Wrap sync errors in Promise.reject for allSettled
+            throw error;
           }
         })
       );
+
+      // Emit error events for failed listeners, but don't let that break the flow
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        if (result.status === "rejected") {
+          const listener = Array.from(listeners)[i];
+          try {
+            await this.emitEvent({
+              type: "error",
+              error:
+                result.reason instanceof Error
+                  ? result.reason
+                  : new Error(String(result.reason)),
+              context: {
+                eventType: event.type,
+                listenerError: true,
+              },
+            });
+          } catch (emitError) {
+            // Ignore errors in error event emission to prevent infinite loops
+            // Log to console as last resort (in production, consider using a logger)
+            console.error(
+              "Failed to emit error event for listener failure:",
+              emitError
+            );
+          }
+        }
+      }
     }
   }
 
@@ -1904,21 +1995,8 @@ export abstract class DatomDatabase
     const detailedStats = await this.getDetailedStats();
     Object.assign(stats, detailedStats);
 
-    // Add query metrics if available
-    if (this.queryCount > 0) {
-      stats.queryMetrics = {
-        totalQueries: this.queryCount,
-        averageQueryTime: this.queryTimeSum / this.queryCount / 1000, // Convert to seconds
-      };
-    }
-
-    // Add transaction metrics if available
-    if (this.transactionCount > 0) {
-      stats.transactionMetrics = {
-        averageTransactionTime:
-          this.transactionTimeSum / this.transactionCount / 1000, // Convert to seconds
-      };
-    }
+    // Query and transaction metrics are now tracked by implementations
+    // Implementations can override getDetailedStats() to include these metrics
 
     return stats;
   }
@@ -1932,6 +2010,28 @@ export abstract class DatomDatabase
     Partial<Pick<DatabaseStats, "totalDatoms" | "totalEntities">>
   > {
     return {};
+  }
+
+  /**
+   * Record query metrics for observability.
+   * Implementations can override this to track metrics in a thread-safe manner.
+   * Default implementation is a no-op - implementations should track metrics themselves.
+   * @param duration Query duration in milliseconds
+   * @internal
+   */
+  protected async recordQueryMetrics(duration: number): Promise<void> {
+    // Default: no-op. Implementations should override to track metrics thread-safely.
+  }
+
+  /**
+   * Record transaction metrics for observability.
+   * Implementations can override this to track metrics in a thread-safe manner.
+   * Default implementation is a no-op - implementations should track metrics themselves.
+   * @param duration Transaction duration in milliseconds
+   * @internal
+   */
+  protected async recordTransactionMetrics(duration: number): Promise<void> {
+    // Default: no-op. Implementations should override to track metrics thread-safely.
   }
 
   /**
@@ -2117,6 +2217,7 @@ export abstract class DatomDatabase
   /**
    * Deduplicate a batch of datoms, keeping only the latest occurrence of each (entity, attribute, value) pair.
    * This is useful when importing data that may contain duplicates.
+   * Uses value comparison helper to handle Date objects and other special types correctly.
    */
   private deduplicateBatch(batch: DatomInput[]): DatomInput[] {
     if (batch.length === 0) {
@@ -2124,17 +2225,34 @@ export abstract class DatomDatabase
     }
     const seen = new Map<string, DatomInput>();
     for (const datom of batch) {
-      const key = `${String(datom[0])}|${String(datom[1])}|${JSON.stringify(
-        datom[2]
-      )}`;
+      // Use a key that handles Date objects and other types correctly
+      const valueKey = this.getValueKey(datom[2]);
+      const key = `${String(datom[0])}|${String(datom[1])}|${valueKey}`;
       seen.set(key, datom); // Later occurrences overwrite earlier ones
     }
     return Array.from(seen.values());
   }
 
   /**
+   * Generate a consistent key for a value, handling Date objects and other special types.
+   * This is more reliable than JSON.stringify for Date objects.
+   * @param value Value to generate key for
+   * @returns String key representing the value
+   * @internal
+   */
+  private getValueKey(value: Value): string {
+    // Handle Date objects specially to avoid JSON.stringify issues
+    if (value instanceof Date) {
+      return `__DATE__${value.toISOString()}`;
+    }
+    // Use JSON.stringify for other types
+    return JSON.stringify(value);
+  }
+
+  /**
    * Filter out datoms that already exist in the database with the same value.
    * This makes imports idempotent - re-importing the same data won't cause errors.
+   * Uses batch queries for better performance on large imports.
    */
   private async filterExistingDatoms(
     batch: DatomInput[]
@@ -2142,22 +2260,55 @@ export abstract class DatomDatabase
     if (batch.length === 0) {
       return batch;
     }
+
+    // Batch query for existing values to avoid N+1 queries
+    const queries = batch.map(([entity, attribute]) => ({
+      entity,
+      attribute: String(attribute),
+    }));
+    const existingValuesBatch = await this.getAllValuesBatch(queries);
+
+    // Filter out datoms that already exist with the same value
     const filtered: DatomInput[] = [];
-    for (const datom of batch) {
-      const [entity, attribute, value] = datom;
-      const existingValues = await this.getValues(entity, String(attribute));
+    for (let i = 0; i < batch.length; i++) {
+      const [entity, attribute, value] = batch[i];
+      const existingValues = existingValuesBatch[i];
+
       // Only include if value doesn't exist or is different
       if (existingValues.length === 0) {
-        filtered.push(datom);
+        filtered.push(batch[i]);
       } else {
-        const existingValue = existingValues[0];
-        if (JSON.stringify(existingValue) !== JSON.stringify(value)) {
-          filtered.push(datom);
+        // Check if any existing value matches (using value comparison helper)
+        const valueExists = existingValues.some((existingValue) =>
+          this.valuesEqual(existingValue, value)
+        );
+        if (!valueExists) {
+          filtered.push(batch[i]);
         }
         // If value matches, skip (idempotent)
       }
     }
     return filtered;
+  }
+
+  /**
+   * Compare two values for equality, handling Date objects and other special types.
+   * This is more reliable than JSON.stringify for Date objects.
+   * @param a First value
+   * @param b Second value
+   * @returns True if values are equal
+   * @internal
+   */
+  private valuesEqual(a: Value, b: Value): boolean {
+    // Handle Date objects specially
+    if (a instanceof Date && b instanceof Date) {
+      return a.getTime() === b.getTime();
+    }
+    if (a instanceof Date || b instanceof Date) {
+      return false;
+    }
+    // Use JSON.stringify for other types (handles null, undefined, primitives, objects)
+    return JSON.stringify(a) === JSON.stringify(b);
   }
 
   /**

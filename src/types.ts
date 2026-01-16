@@ -18,7 +18,31 @@ export type EntityId = number | string | symbol;
 export type Attribute = string | symbol;
 
 /**
- * A value that can be stored in a datom
+ * A value that can be stored in a datom.
+ *
+ * **Type Safety:** This is a strict union type of allowed value types.
+ * All values must be one of these types - no other types are permitted.
+ *
+ * **Supported Types:**
+ * - Primitives: `string`, `number`, `boolean`
+ * - Temporal: `Date` objects
+ * - Nullability: `null`, `undefined` (for optional attributes)
+ * - References: `EntityId` (number | string | symbol) for entity relationships
+ *
+ * **Note:** `EntityId` is included here to allow referencing other entities as values.
+ * Since `EntityId` can be `number | string | symbol`, numeric entity IDs overlap with
+ * the `number` type, which is intentional and handled correctly by TypeScript.
+ *
+ * @example
+ * // Valid values:
+ * [1, "name", "Alice"]                    // string
+ * [1, "age", 30]                          // number
+ * [1, "active", true]                      // boolean
+ * [1, "createdAt", new Date()]            // Date
+ * [1, "middleName", null]                 // null
+ * [1, "optional", undefined]              // undefined
+ * [1, "parent", 42]                       // EntityId (number)
+ * [1, "owner", "user-123"]               // EntityId (string)
  */
 export type Value =
   | string

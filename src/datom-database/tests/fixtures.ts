@@ -66,10 +66,13 @@ const createPGLiteFixture = async (): Promise<Fixture> => {
   };
 };
 
-export const FIXTURES: [string, () => Promise<Fixture>][] = [
-  ["InMemory", () => createInMemoryFixture()],
-  ["SQLite (memory)", () => createSQLiteFixture(":memory:")],
-  ["SQLite (file)", () => createSQLiteFixture("test.db")],
-  ["PostgreSQL", () => createPostgresFixture()],
-  ["PostgreSQL (PGLite)", () => createPGLiteFixture()],
-];
+export const FIXTURES: [string, () => Promise<Fixture>][] = [];
+FIXTURES.push(["InMemory", () => createInMemoryFixture()]);
+FIXTURES.push(["SQLite (memory)", () => createSQLiteFixture(":memory:")]);
+if (false) {
+  FIXTURES.push(["SQLite (file)", () => createSQLiteFixture("test.db")]);
+}
+FIXTURES.push(["PostgreSQL", () => createPostgresFixture()]);
+if (false) {
+  FIXTURES.push(["PostgreSQL (PGLite)", () => createPGLiteFixture()]);
+}

@@ -27,6 +27,10 @@ import type {
 export class InMemoryDatomDatabase extends DatomDatabase {
   private datoms: Datom[] = [];
   private nextTx: TransactionId = 1;
+  private queryCount: number = 0;
+  private transactionCount: number = 0;
+  private queryTimeSum: number = 0;
+  private transactionTimeSum: number = 0;
 
   async initialize(): Promise<void> {
     if (!this.initialized) {
@@ -41,9 +45,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     this.initialized = false;
   }
 
-  async add(datoms: DatomInput[]): Promise<TransactionId> {
-    await this.ensureInitialized();
-    await this.validateDatoms(datoms, true);
+  protected async addDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = this.nextTx++;
 
     for (const datom of datoms) {
@@ -59,9 +61,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return tx;
   }
 
-  async retract(datoms: DatomInput[]): Promise<TransactionId> {
-    await this.ensureInitialized();
-    await this.validateDatoms(datoms, false);
+  protected async retractDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = this.nextTx++;
 
     for (const datom of datoms) {
@@ -485,6 +485,64 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     await this.ensureInitialized();
     // nextTx is the next transaction ID to be used, so latest is one less
     return this.nextTx > 1 ? this.nextTx - 1 : 0;
+  }
+
+  protected async recordQueryMetrics(duration: number): Promise<void> {
+    this.queryCount++;
+    this.queryTimeSum += duration;
+  }
+
+  protected async recordTransactionMetrics(duration: number): Promise<void> {
+    this.transactionCount++;
+    this.transactionTimeSum += duration;
+  }
+
+  protected async getDetailedStats(): Promise<
+    Partial<
+      Pick<
+        import("../types.js").DatabaseStats,
+        "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics"
+      >
+    >
+  > {
+    const stats: any = {};
+
+    // Count total datoms (only added ones)
+    const addedDatoms = this.datoms.filter((d) => {
+      // Check if this is the latest version (not retracted)
+      const latestVersion = this.datoms
+        .filter(
+          (other) =>
+            other.entity === d.entity &&
+            other.attribute === d.attribute &&
+            other.value === d.value
+        )
+        .sort((a, b) => b.tx - a.tx)[0];
+      return latestVersion?.added === true && latestVersion.tx === d.tx;
+    });
+    stats.totalDatoms = addedDatoms.length;
+
+    // Count unique entities
+    const uniqueEntities = new Set(addedDatoms.map((d) => String(d.entity)));
+    stats.totalEntities = uniqueEntities.size;
+
+    // Add query metrics if available
+    if (this.queryCount > 0) {
+      stats.queryMetrics = {
+        totalQueries: this.queryCount,
+        averageQueryTime: this.queryTimeSum / this.queryCount / 1000, // Convert to seconds
+      };
+    }
+
+    // Add transaction metrics if available
+    if (this.transactionCount > 0) {
+      stats.transactionMetrics = {
+        averageTransactionTime:
+          this.transactionTimeSum / this.transactionCount / 1000, // Convert to seconds
+      };
+    }
+
+    return stats;
   }
 }
 
