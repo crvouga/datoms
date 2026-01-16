@@ -179,14 +179,24 @@ export interface DatomWriter<T = void> {
   /**
    * Execute bulk operations atomically
    * @param ops Object containing add and/or retract arrays
+   * @param metadata Optional metadata to associate with this transaction
    * @returns The transaction ID (T)
    * @example
    * await db.transact({
    *   add: [[200, "name", "Carol"]],
    *   retract: [[100, "name", "Alice"]]
    * });
+   *
+   * // With metadata
+   * await db.transact(
+   *   { add: [[200, "name", "Carol"]] },
+   *   { userId: "alice", reason: "update" }
+   * );
    */
-  transact(ops: { add?: DatomInput[]; retract?: DatomInput[] }): Promise<T>;
+  transact(
+    ops: { add?: DatomInput[]; retract?: DatomInput[] },
+    metadata?: Record<string, any>
+  ): Promise<T>;
 }
 
 /**
@@ -275,17 +285,27 @@ export abstract class DatomDatabase
   /**
    * Execute bulk operations atomically
    * @param ops Object containing add and/or retract arrays
+   * @param metadata Optional metadata to associate with this transaction (e.g., {userId: "alice", reason: "bulk_update"})
    * @returns The transaction ID
    * @example
    * await db.transact({
    *   add: [[300, "status", "active"]],
    *   retract: [[42, "type", "cat"]]
    * });
+   *
+   * // With metadata
+   * await db.transact(
+   *   { add: [[300, "status", "active"]] },
+   *   { userId: "alice", reason: "status_update" }
+   * );
    */
-  async transact(ops: {
-    add?: DatomInput[];
-    retract?: DatomInput[];
-  }): Promise<TransactionId> {
+  async transact(
+    ops: {
+      add?: DatomInput[];
+      retract?: DatomInput[];
+    },
+    metadata?: Record<string, any>
+  ): Promise<TransactionId> {
     await this.ensureInitialized();
     // Use a transaction to ensure atomicity
     return this.transaction(async (tx) => {
@@ -295,8 +315,35 @@ export abstract class DatomDatabase
       if (ops.retract && ops.retract.length > 0) {
         await tx.retract(ops.retract);
       }
-      return tx.getTransactionId();
+      const txId = tx.getTransactionId();
+      // Store metadata if provided (implementations can override onTransactionMetadata)
+      if (metadata !== undefined) {
+        await this.onTransactionMetadata(txId, metadata);
+      }
+      return txId;
     });
+  }
+
+  /**
+   * Hook for implementations to store transaction metadata.
+   * Called after a transaction commits successfully.
+   * @param txId The transaction ID
+   * @param metadata The metadata object provided to transact()
+   * @example
+   * // Override in your subclass to store metadata:
+   * protected async onTransactionMetadata(
+   *   txId: TransactionId,
+   *   metadata: Record<string, any>
+   * ): Promise<void> {
+   *   await this.metadataTable.insert({ txId, ...metadata });
+   * }
+   */
+  protected async onTransactionMetadata(
+    txId: TransactionId,
+    metadata: Record<string, any>
+  ): Promise<void> {
+    // Override in implementations if metadata storage is needed
+    // Default: no-op (metadata is ignored)
   }
 
   /**
@@ -376,8 +423,114 @@ export abstract class DatomDatabase
       throw new Error(`Attribute "${name}" is not defined`);
     }
     const updated: AttributeDefinition = { ...existing, ...updates };
+
+    // Validate existing data against new constraints
+    await this.validateAttributeModification(name, existing, updated);
+
     this.schema.set(name, updated);
     await this.onAttributeModified(name, existing, updated);
+  }
+
+  /**
+   * Validate that existing data complies with new attribute constraints.
+   * Called before modifying an attribute definition to ensure data integrity.
+   * @param name Attribute name
+   * @param oldDefinition Previous attribute definition
+   * @param newDefinition Updated attribute definition
+   * @throws Error if existing data violates new constraints
+   * @example
+   * // Validates uniqueness, cardinality changes, etc.
+   */
+  protected async validateAttributeModification(
+    name: string,
+    oldDefinition: AttributeDefinition,
+    newDefinition: AttributeDefinition
+  ): Promise<void> {
+    // Check if uniqueness constraint is being added
+    if (!oldDefinition.unique && newDefinition.unique) {
+      // Find all datoms with this attribute
+      const allDatoms = await this.queryInternal({ attribute: name });
+      // Group by value to check for duplicates
+      const valueToEntities = new Map<string, EntityId[]>();
+      for (const datom of allDatoms) {
+        const valueKey = JSON.stringify(datom.value);
+        if (!valueToEntities.has(valueKey)) {
+          valueToEntities.set(valueKey, []);
+        }
+        valueToEntities.get(valueKey)!.push(datom.entity);
+      }
+      // Check for duplicate values across different entities
+      for (const [valueKey, entities] of valueToEntities) {
+        const uniqueEntities = new Set(entities.map((e) => String(e)));
+        if (uniqueEntities.size > 1) {
+          const value = JSON.parse(valueKey);
+          throw new Error(
+            `Cannot add uniqueness constraint to attribute "${name}": duplicate value ${JSON.stringify(
+              value
+            )} exists for entities ${Array.from(uniqueEntities).join(", ")}`
+          );
+        }
+      }
+    }
+
+    // Check if cardinality is being changed from "many" to "one"
+    if (
+      oldDefinition.cardinality === "many" &&
+      newDefinition.cardinality === "one"
+    ) {
+      // Find all entities with multiple values for this attribute
+      const allDatoms = await this.queryInternal({ attribute: name });
+      const entityToValues = new Map<string, Set<string>>();
+      for (const datom of allDatoms) {
+        const entityKey = String(datom.entity);
+        if (!entityToValues.has(entityKey)) {
+          entityToValues.set(entityKey, new Set());
+        }
+        entityToValues.get(entityKey)!.add(JSON.stringify(datom.value));
+      }
+      // Check for entities with multiple values
+      const violations: string[] = [];
+      for (const [entityKey, values] of entityToValues) {
+        if (values.size > 1) {
+          violations.push(entityKey);
+        }
+      }
+      if (violations.length > 0) {
+        throw new Error(
+          `Cannot change cardinality from "many" to "one" for attribute "${name}": entities ${violations.join(
+            ", "
+          )} have multiple values. Retract duplicate values first.`
+        );
+      }
+    }
+
+    // Check if type constraint is being added or made more restrictive
+    if (
+      newDefinition.type !== undefined &&
+      newDefinition.type !== null &&
+      (oldDefinition.type === undefined ||
+        oldDefinition.type === null ||
+        oldDefinition.type !== newDefinition.type)
+    ) {
+      // Validate all existing values match the new type
+      const allDatoms = await this.queryInternal({ attribute: name });
+      for (const datom of allDatoms) {
+        const typeError = this.validateValueType(
+          datom.value,
+          newDefinition.type!,
+          name
+        );
+        if (typeError) {
+          throw new Error(
+            `Cannot change type constraint for attribute "${name}": existing value ${JSON.stringify(
+              datom.value
+            )} for entity "${String(datom.entity)}" does not match new type "${
+              newDefinition.type
+            }". ${typeError.message}`
+          );
+        }
+      }
+    }
   }
 
   /**
@@ -803,6 +956,35 @@ export abstract class DatomDatabase
   }
 
   /**
+   * Execute a batch query for multiple entity-attribute pairs.
+   * Implementations can override this method to perform true batching
+   * (e.g., a single SQL query with IN clauses) instead of parallel individual queries.
+   * @param queries Array of {entity, attribute} pairs to query
+   * @returns Map keyed by "entity|attribute" to the value (or undefined if not found)
+   * @example
+   * // Default implementation uses parallel queries
+   * // Override in SQL implementations for single-query batching:
+   * protected async executeBatchQuery(
+   *   queries: Array<{entity: EntityId, attribute: string}>
+   * ): Promise<Map<string, Value | undefined>> {
+   *   // Single SQL: SELECT entity, attribute, value FROM datoms WHERE ...
+   * }
+   */
+  protected async executeBatchQuery(
+    queries: Array<{ entity: EntityId; attribute: string }>
+  ): Promise<Map<string, Value | undefined>> {
+    // Default implementation: parallel individual queries
+    // Implementations can override for true batching (single SQL query)
+    const results = await Promise.all(
+      queries.map(async (q) => {
+        const value = await this.getValue(q.entity, q.attribute);
+        return { key: `${String(q.entity)}|${String(q.attribute)}`, value };
+      })
+    );
+    return new Map(results.map((r) => [r.key, r.value]));
+  }
+
+  /**
    * Batch get values for multiple entity-attribute pairs
    * @param queries Array of {entity, attribute} pairs to query
    * @returns Array of values in the same order as queries (undefined if not found)
@@ -818,11 +1000,15 @@ export abstract class DatomDatabase
     queries: Array<{ entity: EntityId; attribute: string }>
   ): Promise<(Value | undefined)[]> {
     await this.ensureInitialized();
-    // Execute all queries in parallel for better performance
-    const results = await Promise.all(
-      queries.map((q) => this.getValue(q.entity, q.attribute))
+    if (queries.length === 0) {
+      return [];
+    }
+    // Use batch query method (implementations can override for optimization)
+    const batchResults = await this.executeBatchQuery(queries);
+    // Return results in the same order as queries
+    return queries.map((q) =>
+      batchResults.get(`${String(q.entity)}|${String(q.attribute)}`)
     );
-    return results;
   }
 
   /**
