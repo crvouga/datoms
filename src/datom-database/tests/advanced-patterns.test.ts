@@ -18,14 +18,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should exclude retracted datoms from query results", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
         [3, "name", "Charlie"],
-      ]);
+      ]});
 
       // Retract one datom
-      await db.retract([[2, "name", "Bob"]]);
+      await db.transact({ retract: [[2, "name", "Bob"]]});
 
       const query: DatalogQuery = {
         find: ["?name"],
@@ -43,12 +43,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle self-joins", async () => {
       const { db } = f;
       // Create a graph where nodes can connect to themselves
-      await db.add([
+      await db.transact({ add: [
         [1, "connects", 2],
         [1, "connects", 1], // self-connection
         [2, "connects", 3],
         [3, "connects", 3], // self-connection
-      ]);
+      ]});
 
       // Find all self-connections where entity equals value
       // Note: When same variable appears in entity and value positions,
@@ -82,11 +82,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle circular relationships", async () => {
       const { db } = f;
       // Create a circular graph: 1 -> 2 -> 3 -> 1
-      await db.add([
+      await db.transact({ add: [
         [1, "next", 2],
         [2, "next", 3],
         [3, "next", 1],
-      ]);
+      ]});
 
       // Find all next relationships
       const query: DatalogQuery = {
@@ -106,7 +106,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle variable binding across disconnected clauses", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [1, "age", 30],
         [2, "name", "Bob"],
@@ -115,7 +115,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         [10, "department", "Engineering"],
         [11, "employee", 2],
         [11, "department", "Sales"],
-      ]);
+      ]});
 
       // Find employees and their departments through a join entity
       const query: DatalogQuery = {

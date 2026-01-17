@@ -19,13 +19,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should execute successful transaction", async () => {
       const { db } = f;
 
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
 
       const result = await db.transaction(async (tx) => {
         const initial = await tx.datoms({ entity: 1 });
         expect(initial).toHaveLength(1);
 
-        await tx.add([[1, "status", "pending"]]);
+        await tx.transact({ add: [[1, "status", "pending"]] });
         const updated = await tx.datoms({ entity: 1 });
         expect(updated).toHaveLength(2);
 
@@ -47,11 +47,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should rollback transaction on error", async () => {
       const { db } = f;
 
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
 
       try {
         await db.transaction(async (tx) => {
-          await tx.add([[1, "status", "pending"]]);
+          await tx.transact({ add: [[1, "status", "pending"]] });
           throw new Error("rollback");
         });
         throw new Error("Should have thrown an error");
@@ -71,7 +71,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should see uncommitted changes within transaction", async () => {
       const { db } = f;
 
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
 
       await db.transaction(async (tx) => {
         // Query before adding
@@ -79,7 +79,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         expect(before).toHaveLength(1);
 
         // Add new datom
-        await tx.add([[1, "age", 30]]);
+        await tx.transact({ add: [[1, "age", 30]] });
 
         // Query after adding - should see uncommitted change
         const after = await tx.datoms({ entity: 1 });
@@ -95,14 +95,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle retract within transaction", async () => {
       const { db } = f;
 
-      await db.add([
-        [1, "name", "Alice"],
-        [1, "age", 30],
-      ]);
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+        ],
+      });
 
       await db.transaction(async (tx) => {
         // Retract within transaction
-        await tx.retract([[1, "age", 30]]);
+        await tx.transact({ retract: [[1, "age", 30]] });
 
         // Query should not see retracted datom
         const result = await tx.datoms({ entity: 1 });
@@ -121,14 +123,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle query within transaction", async () => {
       const { db } = f;
 
-      await db.add([
-        [1, "name", "Alice"],
-        [2, "name", "Bob"],
-      ]);
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [2, "name", "Bob"],
+        ],
+      });
 
       await db.transaction(async (tx) => {
         // Add within transaction
-        await tx.add([[3, "name", "Charlie"]]);
+        await tx.transact({ add: [[3, "name", "Charlie"]] });
 
         // Query should see uncommitted change
         const results = await tx.query({
@@ -148,11 +152,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
 
       await db.transaction(async (tx) => {
-        await tx.add([[1, "name", "Alice"]]);
-        await tx.add([[1, "age", 30]]);
-        await tx.add([[2, "name", "Bob"]]);
-        await tx.retract([[1, "age", 30]]);
-        await tx.add([[1, "age", 31]]);
+        await tx.transact({ add: [[1, "name", "Alice"]] });
+        await tx.transact({ add: [[1, "age", 30]] });
+        await tx.transact({ add: [[2, "name", "Bob"]] });
+        await tx.transact({ retract: [[1, "age", 30]] });
+        await tx.transact({ add: [[1, "age", 31]] });
       });
 
       // Verify all operations were applied
@@ -173,13 +177,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should rollback all changes on error", async () => {
       const { db } = f;
 
-      await db.add([[1, "name", "Initial"]]);
+      await db.transact({ add: [[1, "name", "Initial"]] });
 
       try {
         await db.transaction(async (tx) => {
-          await tx.add([[1, "status", "pending"]]);
-          await tx.add([[2, "name", "New"]]);
-          await tx.retract([[1, "name", "Initial"]]);
+          await tx.transact({ add: [[1, "status", "pending"]] });
+          await tx.transact({ add: [[2, "name", "New"]] });
+          await tx.transact({ retract: [[1, "name", "Initial"]] });
           throw new Error("fail");
         });
         throw new Error("Should have thrown");
@@ -201,15 +205,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle getValue within transaction", async () => {
       const { db } = f;
 
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
 
       await db.transaction(async (tx) => {
-        const name = await tx.getValue(1, "name");
-        expect(name).toBe("Alice");
+        const nameResults = await tx.query({ find: ["?v"], where: [[1, "name", "?v"]] });
+        expect(nameResults[0]?.v).toBe("Alice");
 
-        await tx.add([[1, "age", 30]]);
-        const age = await tx.getValue(1, "age");
-        expect(age).toBe(30);
+        await tx.transact({ add: [[1, "age", 30]] });
+        const ageResults = await tx.query({ find: ["?v"], where: [[1, "age", "?v"]] });
+        expect(ageResults[0]?.v).toBe(30);
       });
 
       await db.close();
@@ -218,13 +222,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle datoms query within transaction", async () => {
       const { db } = f;
 
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
 
       await db.transaction(async (tx) => {
         let entity = await tx.datoms({ entity: 1, added: true });
         expect(entity).toHaveLength(1);
 
-        await tx.add([[1, "age", 30]]);
+        await tx.transact({ add: [[1, "age", 30]] });
         entity = await tx.datoms({ entity: 1, added: true });
         expect(entity).toHaveLength(2);
       });
@@ -235,15 +239,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle hasFact within transaction", async () => {
       const { db } = f;
 
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
 
       await db.transaction(async (tx) => {
-        let hasName = await tx.hasFact(1, "name", "Alice");
-        expect(hasName).toBe(true);
+        const nameDatoms = await tx.datoms({ entity: 1, attribute: "name", value: "Alice" });
+        expect(nameDatoms.length).toBeGreaterThan(0);
 
-        await tx.add([[1, "status", "active"]]);
-        const hasStatus = await tx.hasFact(1, "status", "active");
-        expect(hasStatus).toBe(true);
+        await tx.transact({ add: [[1, "status", "active"]] });
+        const statusDatoms = await tx.datoms({ entity: 1, attribute: "status", value: "active" });
+        expect(statusDatoms.length).toBeGreaterThan(0);
       });
 
       await db.close();
@@ -252,19 +256,23 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle complex query within transaction", async () => {
       const { db } = f;
 
-      await db.add([
-        [1, "name", "Alice"],
-        [1, "department", "Engineering"],
-        [2, "name", "Bob"],
-        [2, "department", "Sales"],
-      ]);
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "department", "Engineering"],
+          [2, "name", "Bob"],
+          [2, "department", "Sales"],
+        ],
+      });
 
       await db.transaction(async (tx) => {
         // Add new employee within transaction
-        await tx.add([
-          [3, "name", "Charlie"],
-          [3, "department", "Engineering"],
-        ]);
+        await tx.transact({
+          add: [
+            [3, "name", "Charlie"],
+            [3, "department", "Engineering"],
+          ],
+        });
 
         // Query should see uncommitted change
         const results = await tx.query({
@@ -293,11 +301,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return latest transaction ID after adding datoms", async () => {
       const { db } = f;
-      const tx1 = await db.add([[1, "name", "Alice"]]);
+      const tx1 = await db.transact({ add: [[1, "name", "Alice"]] });
       const latestTx = await db.getLatestTransaction();
       expect(latestTx).toBe(tx1);
 
-      const tx2 = await db.add([[2, "name", "Bob"]]);
+      const tx2 = await db.transact({ add: [[2, "name", "Bob"]] });
       const latestTx2 = await db.getLatestTransaction();
       expect(latestTx2).toBe(tx2);
       expect(latestTx2).toBeGreaterThan(tx1);
@@ -305,15 +313,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return latest transaction after retraction", async () => {
       const { db } = f;
-      await db.add([[1, "name", "Alice"]]);
-      const tx2 = await db.retract([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
+      const tx2 = await db.transact({ retract: [[1, "name", "Alice"]] });
       const latestTx = await db.getLatestTransaction();
       expect(latestTx).toBe(tx2);
     });
 
     test("should return latest transaction after transact", async () => {
       const { db } = f;
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
       const tx2 = await db.transact({
         add: [[2, "name", "Bob"]],
         retract: [[1, "name", "Alice"]],
@@ -324,14 +332,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should work within transactions", async () => {
       const { db } = f;
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
       const beforeTx = await db.getLatestTransaction();
 
       await db.transaction(async (tx) => {
         const txId = tx.getTransactionId();
         expect(txId).toBeGreaterThan(beforeTx);
 
-        await tx.add([[2, "name", "Bob"]]);
+        await tx.transact({ add: [[2, "name", "Bob"]] });
         // Note: getLatestTransaction() may return the transaction ID assigned to this transaction
         // (depending on implementation), or it may return the last committed transaction.
         // The important thing is that after commit, it's updated.
@@ -349,12 +357,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Optimistic Locking", () => {
     test("should succeed when expectedTxId matches", async () => {
       const { db } = f;
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
       const currentTx = await db.getLatestTransaction();
 
       await db.transaction(
         async (tx) => {
-          await tx.add([[2, "name", "Bob"]]);
+          await tx.transact({ add: [[2, "name", "Bob"]] });
         },
         { expectedTxId: currentTx }
       );
@@ -366,16 +374,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should throw TransactionConflictError when expectedTxId doesn't match", async () => {
       const { db } = f;
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
       const initialTx = await db.getLatestTransaction();
 
       // Update database (changes txId)
-      await db.add([[2, "name", "Bob"]]);
+      await db.transact({ add: [[2, "name", "Bob"]] });
 
       try {
         await db.transaction(
           async (tx) => {
-            await tx.add([[3, "name", "Charlie"]]);
+            await tx.transact({ add: [[3, "name", "Charlie"]] });
           },
           { expectedTxId: initialTx }
         );
@@ -393,12 +401,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should retry on conflict when retry options provided", async () => {
       const { db } = f;
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
       const initialTx = await db.getLatestTransaction();
 
       // Simulate concurrent update
       setTimeout(() => {
-        db.add([[2, "name", "Bob"]]).catch(() => {});
+        db.transact({ add: [[2, "name", "Bob"]] }).catch(() => {});
       }, 10);
 
       // This test is tricky because we need actual concurrency
@@ -408,7 +416,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         await db.transaction(
           async (tx) => {
             retryCount++;
-            await tx.add([[3, "name", "Charlie"]]);
+            await tx.transact({ add: [[3, "name", "Charlie"]] });
           },
           {
             expectedTxId: initialTx,
@@ -424,18 +432,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should not retry when maxRetries is 0", async () => {
       const { db } = f;
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
       const initialTx = await db.getLatestTransaction();
 
       // Update database
-      await db.add([[2, "name", "Bob"]]);
+      await db.transact({ add: [[2, "name", "Bob"]] });
 
       let callbackExecuted = false;
       try {
         await db.transaction(
           async (tx) => {
             callbackExecuted = true;
-            await tx.add([[3, "name", "Charlie"]]);
+            await tx.transact({ add: [[3, "name", "Charlie"]] });
           },
           {
             expectedTxId: initialTx,
@@ -456,10 +464,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should work without optimistic locking options", async () => {
       const { db } = f;
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]] });
 
       await db.transaction(async (tx) => {
-        await tx.add([[2, "name", "Bob"]]);
+        await tx.transact({ add: [[2, "name", "Bob"]]});
       });
 
       // Should succeed normally
@@ -473,7 +481,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       const result = await db.transaction(
         async (tx) => {
-          await tx.add([[1, "name", "Alice"]]);
+          await tx.transact({ add: [[1, "name", "Alice"]] });
           return "success";
         },
         { timeoutMs: 5000 }
@@ -491,7 +499,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       try {
         await db.transaction(
           async (tx) => {
-            await tx.add([[1, "name", "Alice"]]);
+            await tx.transact({ add: [[1, "name", "Alice"]] });
             // Add a small delay to potentially trigger timeout
             await new Promise((resolve) => setTimeout(resolve, 10));
           },
@@ -514,7 +522,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       try {
         await db.transaction(
           async (tx) => {
-            await tx.add([[1, "name", "Alice"]]);
+            await tx.transact({ add: [[1, "name", "Alice"]] });
             await new Promise((resolve) => setTimeout(resolve, 10));
           },
           { timeoutMs: 1 }
@@ -541,7 +549,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       const result = await db.transaction(
         async (tx) => {
-          await tx.add([[1, "name", "Alice"]]);
+          await tx.transact({ add: [[1, "name", "Alice"]] });
           return "success";
         },
         {

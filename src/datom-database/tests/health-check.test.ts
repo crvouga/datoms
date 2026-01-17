@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { Fixture, FIXTURES } from "./fixtures.js";
+import { ObservableDatabase } from "../observability/index.js";
 
 describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -17,7 +18,8 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
   describe("healthCheck", () => {
     test("should return health status", async () => {
       const { db } = f;
-      const health = await db.healthCheck();
+      const observableDb = new ObservableDatabase(db);
+      const health = await observableDb.healthCheck();
 
       expect(health).toBeDefined();
       expect(health.status).toBeDefined();
@@ -28,7 +30,8 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
 
     test("should return healthy status for empty database", async () => {
       const { db } = f;
-      const health = await db.healthCheck();
+      const observableDb = new ObservableDatabase(db);
+      const health = await observableDb.healthCheck();
 
       expect(health.status).toBe("healthy");
       expect(health.details).toBeDefined();
@@ -37,11 +40,12 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
     test("should include query performance metrics if available", async () => {
       const { db } = f;
       // Run some queries to generate metrics
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]]});
       await db.datoms({ entity: 1 });
       await db.datoms({ attribute: "name" });
 
-      const health = await db.healthCheck();
+      const observableDb = new ObservableDatabase(db);
+      const health = await observableDb.healthCheck();
       // Query performance may or may not be included depending on implementation
       if (health.queryPerformance) {
         expect(health.queryPerformance.healthy).toBeDefined();
@@ -53,10 +57,11 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
       const { db } = f;
       // Run some transactions to generate metrics
       await db.transaction(async (tx) => {
-        await tx.add([[1, "name", "Alice"]]);
+        await tx.transact({ add: [[1, "name", "Alice"]]});
       });
 
-      const health = await db.healthCheck();
+      const observableDb = new ObservableDatabase(db);
+      const health = await observableDb.healthCheck();
       // Transaction health may or may not be included depending on implementation
       if (health.transactionHealth) {
         expect(health.transactionHealth.healthy).toBeDefined();
@@ -66,7 +71,8 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
 
     test("should include connection pool info for SQL databases", async () => {
       const { db } = f;
-      const health = await db.healthCheck();
+      const observableDb = new ObservableDatabase(db);
+      const health = await observableDb.healthCheck();
 
       // Connection pool info may or may not be available
       if (health.connectionPool) {
@@ -82,8 +88,9 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
 
     test("should return consistent health status", async () => {
       const { db } = f;
-      const health1 = await db.healthCheck();
-      const health2 = await db.healthCheck();
+      const observableDb = new ObservableDatabase(db);
+      const health1 = await observableDb.healthCheck();
+      const health2 = await observableDb.healthCheck();
 
       // Status should be consistent (may vary slightly due to timing)
       expect(health1.status).toBeDefined();

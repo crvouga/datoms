@@ -18,10 +18,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should execute simple query", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
-      ]);
+      ]});
 
       const query: DatalogQuery = {
         find: ["?x"],
@@ -55,11 +55,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should filter by constant in where clause", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "type", "person"],
         [2, "type", "car"],
         [3, "type", "person"],
-      ]);
+      ]});
 
       const query: DatalogQuery = {
         find: ["?x"],
@@ -74,10 +74,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle empty find clause", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
-      ]);
+      ]});
 
       const query: DatalogQuery = {
         find: [],
@@ -94,10 +94,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle find variables not in where clause", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
-      ]);
+      ]});
 
       const query: DatalogQuery = {
         find: ["?x", "?missing"],

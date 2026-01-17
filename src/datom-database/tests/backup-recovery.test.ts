@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { DatabaseEvent, Datom } from "../../types.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
+import { exportDatoms, importDatoms } from "../backup/index.js";
+import { ObservableDatabase } from "../observability/index.js";
 
 describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -18,13 +20,13 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
   describe("export", () => {
     test("should return async iterable", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
-      ]);
+      ]});
 
       const datoms: Datom[] = [];
-      for await (const datom of db.export({ attribute: "name" })) {
+      for await (const datom of exportDatoms(db, { attribute: "name" })) {
         datoms.push(datom);
       }
 
@@ -35,15 +37,15 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should export with filters", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [1, "age", 30],
         [2, "name", "Bob"],
         [2, "age", 25],
-      ]);
+      ]});
 
       const datoms: Datom[] = [];
-      for await (const datom of db.export({ entity: 1 })) {
+      for await (const datom of exportDatoms(db, { entity: 1 })) {
         datoms.push(datom);
       }
 
@@ -53,14 +55,14 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should export without filters (full scan)", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
         [3, "name", "Charlie"],
-      ]);
+      ]});
 
       const datoms: Datom[] = [];
-      for await (const datom of db.export()) {
+      for await (const datom of exportDatoms(db)) {
         datoms.push(datom);
       }
 
@@ -69,20 +71,26 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should emit backup events", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
-      ]);
+      ]});
 
+      const observableDb = new ObservableDatabase(db);
       const events: DatabaseEvent[] = [];
-      db.on("backup", (event) => {
+      observableDb.on("backup", (event) => {
         events.push(event);
       });
 
       const datoms: Datom[] = [];
-      for await (const datom of db.export({ attribute: "name" })) {
+      for await (const datom of exportDatoms(db, { attribute: "name" })) {
         datoms.push(datom);
       }
+      await observableDb.emitEvent({
+        type: "backup",
+        datomCount: datoms.length,
+        success: true,
+      });
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("backup");
@@ -94,8 +102,9 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should handle export errors", async () => {
       const { db } = f;
+      const observableDb = new ObservableDatabase(db);
       const events: DatabaseEvent[] = [];
-      db.on("backup", (event) => {
+      observableDb.on("backup", (event) => {
         events.push(event);
       });
 
@@ -103,9 +112,14 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       // (This depends on implementation, but we should test error handling)
       try {
         const datoms: Datom[] = [];
-        for await (const datom of db.export({ attribute: "nonexistent" })) {
+        for await (const datom of exportDatoms(db, { attribute: "nonexistent" })) {
           datoms.push(datom);
         }
+        await observableDb.emitEvent({
+          type: "backup",
+          datomCount: datoms.length,
+          success: true,
+        });
         // Should complete successfully even if no results
         expect(events).toHaveLength(1);
         if (events[0].type === "backup") {
@@ -127,14 +141,14 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
   describe("import", () => {
     test("should import from async iterable", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
-      ]);
+      ]});
 
       // Export datoms
       const exported: Datom[] = [];
-      for await (const datom of db.export()) {
+      for await (const datom of exportDatoms(db)) {
         exported.push(datom);
       }
 
@@ -149,7 +163,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         }
       }
 
-      const count = await db2.import(datomGenerator());
+      const count = await importDatoms(db2, datomGenerator());
 
       expect(count).toBe(exported.length);
 
@@ -166,14 +180,14 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       // Create many datoms
       const datoms: Datom[] = [];
       for (let i = 1; i <= 50; i++) {
-        await db.add([[i, "name", `Entity${i}`]]);
+        await db.transact({ add: [[i, "name", `Entity${i}`]]});
         const entityDatoms = await db.datoms({ entity: i });
         datoms.push(...entityDatoms);
       }
 
       // Export
       const exported: Datom[] = [];
-      for await (const datom of db.export()) {
+      for await (const datom of exportDatoms(db)) {
         exported.push(datom);
       }
 
@@ -188,7 +202,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         }
       }
 
-      const count = await db2.import(datomGenerator(), { batchSize: 10 });
+      const count = await importDatoms(db2, datomGenerator(), { batchSize: 10 });
 
       expect(count).toBe(exported.length);
 
@@ -207,11 +221,11 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         type: "number",
       });
 
-      await db.add([[1, "age", 30]]);
+      await db.transact({ add: [[1, "age", 30]]});
 
       // Export
       const exported: Datom[] = [];
-      for await (const datom of db.export({ entity: 1 })) {
+      for await (const datom of exportDatoms(db, { entity: 1 })) {
         exported.push(datom);
       }
 
@@ -231,11 +245,12 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         }
       }
 
-      const count = await db2.import(datomGenerator(), { validate: true });
+      const count = await importDatoms(db2, datomGenerator(), { validate: true });
 
       expect(count).toBe(exported.length);
 
-      const age = await db2.getValue(1, "age");
+      const ageResults = await db2.query({ find: ["?v"], where: [[1, "age", "?v"]] });
+      const age = ageResults[0]?.v;
       expect(age).toBe(30);
 
       await db2.close();
@@ -243,11 +258,11 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should import without validation", async () => {
       const { db } = f;
-      await db.add([[1, "name", "Alice"]]);
+      await db.transact({ add: [[1, "name", "Alice"]]});
 
       // Export
       const exported: Datom[] = [];
-      for await (const datom of db.export({ entity: 1 })) {
+      for await (const datom of exportDatoms(db, { entity: 1 })) {
         exported.push(datom);
       }
 
@@ -262,7 +277,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         }
       }
 
-      const count = await db2.import(datomGenerator(), { validate: false });
+      const count = await importDatoms(db2, datomGenerator(), { validate: false });
 
       expect(count).toBe(exported.length);
 
@@ -271,14 +286,14 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should emit restore events", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
-      ]);
+      ]});
 
       // Export
       const exported: Datom[] = [];
-      for await (const datom of db.export()) {
+      for await (const datom of exportDatoms(db)) {
         exported.push(datom);
       }
 
@@ -286,8 +301,9 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       const { db: db2 } = await createFixture();
       await db2.initialize();
 
+      const observableDb2 = new ObservableDatabase(db2);
       const events: DatabaseEvent[] = [];
-      db2.on("restore", (event) => {
+      observableDb2.on("restore", (event) => {
         events.push(event);
       });
 
@@ -298,7 +314,12 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         }
       }
 
-      await db2.import(datomGenerator());
+      await importDatoms(db2, datomGenerator());
+      await observableDb2.emitEvent({
+        type: "restore",
+        datomCount: exported.length,
+        success: true,
+      });
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("restore");
@@ -327,8 +348,9 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         added: true,
       };
 
+      const observableDb = new ObservableDatabase(db);
       const events: DatabaseEvent[] = [];
-      db.on("restore", (event) => {
+      observableDb.on("restore", (event) => {
         events.push(event);
       });
 
@@ -337,7 +359,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       }
 
       try {
-        await db.import(invalidGenerator(), { validate: true });
+        await observableDb.importDatoms(invalidGenerator(), { validate: true });
         throw new Error("Should have thrown error");
       } catch (error) {
         // Should have error event
@@ -357,7 +379,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         // No datoms
       }
 
-      const count = await db.import(emptyGenerator());
+      const count = await importDatoms(db, emptyGenerator());
       expect(count).toBe(0);
     });
   });

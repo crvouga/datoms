@@ -19,7 +19,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle multi-entity relationships (friendships)", async () => {
       const { db } = f;
       // Create people
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
         [3, "name", "Charlie"],
@@ -30,7 +30,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         [11, "from", 2],
         [11, "to", 3],
         [11, "type", "friendship"],
-      ]);
+      ]});
 
       // Find all friendships: who is friends with whom
 
@@ -54,7 +54,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle transitive relationships (friends of friends)", async () => {
       const { db } = f;
       // Create people and friendships
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
         [3, "name", "Charlie"],
@@ -66,7 +66,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         [11, "to", 3],
         [12, "from", 2],
         [12, "to", 4],
-      ]);
+      ]});
 
       // Find friends of Alice's friends (friends of friends)
       const query: DatalogQuery = {
@@ -90,7 +90,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle parent-child relationships", async () => {
       const { db } = f;
       // Create a family tree
-      await db.add([
+      await db.transact({ add: [
         [1, "name", "Alice"],
         [2, "name", "Bob"],
         [3, "name", "Charlie"],
@@ -100,7 +100,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         [1, "child", 3],
         // Bob is parent of Diana
         [2, "child", 4],
-      ]);
+      ]});
 
       // Find all parent-child pairs with names
       const query: DatalogQuery = {
@@ -128,7 +128,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle many-to-many relationships", async () => {
       const { db } = f;
       // Create students and courses with enrollments
-      await db.add([
+      await db.transact({ add: [
         // Students
         [1, "name", "Alice"],
         [2, "name", "Bob"],
@@ -142,7 +142,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         [101, "course", 11],
         [102, "student", 2],
         [102, "course", 10],
-      ]);
+      ]});
 
       // Find all student-course pairs
       const query: DatalogQuery = {
@@ -170,12 +170,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle multi-valued attributes", async () => {
       const { db } = f;
-      await db.add([
+      await db.transact({ add: [
         [1, "tag", "red"],
         [1, "tag", "blue"],
         [1, "tag", "green"],
         [2, "tag", "red"],
-      ]);
+      ]});
 
       const query: DatalogQuery = {
         find: ["?e", "?tag"],

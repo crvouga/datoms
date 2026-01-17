@@ -15,7 +15,6 @@ import type {
   Datom,
   DatomInput,
   EntityId,
-  QueryExplainResult,
   QueryOptions,
   TransactionId,
   Value,
@@ -23,19 +22,6 @@ import type {
 import { DatomDatabase, type Transaction } from "./datom-database.js";
 import { isVariable, stripQuestionMark } from "./shared/datalog-helpers.js";
 import { joinResults, project } from "./shared/query-helpers.js";
-import {
-  getAllValuesBatchHelper,
-  findEntitiesHelper,
-  getLatestValueHelper,
-  getValueHelper,
-  getValuesBatchHelper,
-  getValuesHelper,
-  hasFactHelper,
-  retractAttributeHelper,
-  retractEntityHelper,
-  transactHelper,
-  upsertHelper,
-} from "./shared/transaction-helpers.js";
 
 /**
  * PostgreSQL database implementation
@@ -163,24 +149,6 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return tx;
   }
 
-  async retractEntity(entity: EntityId): Promise<TransactionId> {
-    await this.ensureInitialized();
-    // Get all datoms for this entity
-    const entityDatoms = await this.executeQuery({ entity, added: true });
-
-    // Retract all of them
-    if (entityDatoms.length > 0) {
-      const retractions: DatomInput[] = entityDatoms.map((d) => [
-        d.entity,
-        d.attribute,
-        d.value,
-      ]);
-      return this.retract(retractions);
-    }
-
-    // Return current transaction ID even if nothing to retract
-    return await this.getNextTransactionId();
-  }
 
   public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
@@ -696,145 +664,6 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     });
   }
 
-  async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
-    await this.ensureInitialized();
-    const result = await super.explainQuery(options);
-
-    // Build the same query as executeQuery to explain it
-    const conditions: string[] = [];
-    const params: unknown[] = [];
-
-    if (options.entity !== undefined) {
-      conditions.push("entity = ?");
-      params.push(String(options.entity));
-    }
-    if (options.attribute !== undefined) {
-      conditions.push("attribute = ?");
-      params.push(String(options.attribute));
-    }
-    if (options.value !== undefined) {
-      let value = options.value;
-      if (value === undefined) {
-        value = "__UNDEFINED__";
-      }
-      conditions.push("value = ?::jsonb");
-      params.push(JSON.stringify(value));
-    }
-    if (options.tx !== undefined) {
-      conditions.push("tx = ?");
-      params.push(options.tx);
-    }
-
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-    const distinctOnColumns = "entity, attribute, value";
-    const orderByColumns = "entity, attribute, value, tx DESC";
-    const addedFilterAfter =
-      options.added === true || options.added === undefined
-        ? "WHERE added = true"
-        : options.added === false
-        ? "WHERE added = false"
-        : "";
-
-    const explainSql = `
-      EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
-      WITH latest_datoms AS (
-        SELECT DISTINCT ON (${distinctOnColumns})
-          entity, attribute, value, tx, added
-        FROM ${this.tableName}
-        ${whereClause}
-        ORDER BY ${orderByColumns}
-      )
-      SELECT 
-        entity,
-        attribute,
-        value,
-        tx,
-        added
-      FROM latest_datoms
-      ${addedFilterAfter}
-    `;
-
-    try {
-      const explainRows = await this.connection.query(explainSql, params);
-      result.raw = explainRows;
-
-      // PostgreSQL EXPLAIN ANALYZE returns JSON format
-      // Structure: [{ "Plan": {...}, "Planning Time": ..., "Execution Time": ... }]
-      if (Array.isArray(explainRows) && explainRows.length > 0) {
-        const explainData = explainRows[0] as Record<string, unknown>;
-        const plan = explainData?.Plan as Record<string, unknown> | undefined;
-
-        if (plan) {
-          // Extract cost estimates
-          if (typeof plan["Total Cost"] === "number") {
-            result.estimatedCost = plan["Total Cost"];
-          }
-          if (typeof plan["Plan Rows"] === "number") {
-            result.estimatedRows = plan["Plan Rows"];
-          }
-
-          // Extract scan type and indexes
-          const nodeType = plan["Node Type"];
-          if (typeof nodeType === "string") {
-            if (nodeType.includes("Seq Scan")) {
-              result.scanType = "full-table";
-              result.warnings = result.warnings || [];
-              result.warnings.push(
-                "Query plan indicates sequential scan. Consider adding indexes on frequently queried attributes."
-              );
-            } else if (nodeType.includes("Index Scan")) {
-              result.scanType = "index";
-            } else if (nodeType.includes("Index Only Scan")) {
-              result.scanType = "index-only";
-            }
-          }
-
-          // Extract index names recursively
-          const indexesUsedSet = new Set<string>();
-          const extractIndexes = (node: Record<string, unknown>) => {
-            const indexName = node["Index Name"];
-            if (typeof indexName === "string") {
-              indexesUsedSet.add(indexName);
-            }
-            const plans = node["Plans"];
-            if (Array.isArray(plans)) {
-              for (const subPlan of plans) {
-                if (typeof subPlan === "object" && subPlan !== null) {
-                  extractIndexes(subPlan as Record<string, unknown>);
-                }
-              }
-            }
-          };
-          extractIndexes(plan);
-
-          if (indexesUsedSet.size > 0) {
-            result.indexesUsed = Array.from(indexesUsedSet);
-          }
-
-          // Extract actual execution time if available
-          const executionTime = explainData["Execution Time"];
-          if (typeof executionTime === "number") {
-            // Store in raw for detailed analysis
-            if (!result.raw) {
-              result.raw = {};
-            }
-            (result.raw as Record<string, unknown>).executionTime =
-              executionTime;
-          }
-        }
-      }
-    } catch (error: unknown) {
-      // If EXPLAIN fails, return base result with warning
-      result.warnings = result.warnings || [];
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      result.warnings.push(`Failed to get query plan: ${errorMessage}`);
-    }
-
-    return result;
-  }
 
   async query(query: DatalogQuery): Promise<QueryResult> {
     await this.ensureInitialized();
@@ -1196,134 +1025,51 @@ class PostgreSQLTransaction implements Transaction {
     return pending;
   }
 
-  async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
-    // Delegate to database's explainQuery
-    return this.db.explainQuery(options);
-  }
-
-  async add(datoms: DatomInput[]): Promise<void> {
-    for (const datom of datoms) {
-      const d: Datom = {
-        entity: datom[0],
-        attribute: datom[1],
-        value: datom[2],
-        tx: this.txId,
-        added: true,
-      };
-      this.pendingAdds.push(d);
-    }
-  }
-
-  async retract(datoms: DatomInput[]): Promise<void> {
-    for (const datom of datoms) {
-      const key = `${String(datom[0])}|${String(datom[1])}|${String(datom[2])}`;
-
-      // Remove from pending adds if it was added in this transaction
-      this.pendingAdds = this.pendingAdds.filter((d) => {
-        const dKey = `${String(d.entity)}|${String(d.attribute)}|${String(
-          d.value
-        )}`;
-        return dKey !== key;
-      });
-
-      // Add to pending retracts
-      const d: Datom = {
-        entity: datom[0],
-        attribute: datom[1],
-        value: datom[2],
-        tx: this.txId,
-        added: false,
-      };
-      this.pendingRetracts.push(d);
-    }
-  }
-
-  async retractEntity(entity: EntityId): Promise<void> {
-    return retractEntityHelper(
-      this.datoms.bind(this),
-      this.retract.bind(this),
-      entity
-    );
-  }
-
-  async retractAttribute(entity: EntityId, attribute: string): Promise<void> {
-    return retractAttributeHelper(
-      this.datoms.bind(this),
-      this.retract.bind(this),
-      entity,
-      attribute
-    );
-  }
-
-  async upsert(
-    entity: EntityId,
-    attribute: string,
-    value: Value
-  ): Promise<void> {
-    return upsertHelper(
-      this.datoms.bind(this),
-      (attr: string) => this.db.getAttributeDefinition(attr),
-      this.retract.bind(this),
-      this.add.bind(this),
-      entity,
-      attribute,
-      value
-    );
-  }
-
-  async getLatestValue(
-    entity: EntityId,
-    attribute: string
-  ): Promise<Value | undefined> {
-    return getLatestValueHelper(this.datoms.bind(this), entity, attribute);
-  }
-
-  async transact(ops: {
-    add?: DatomInput[];
-    retract?: DatomInput[];
-  }): Promise<void> {
-    return transactHelper(this.add.bind(this), this.retract.bind(this), ops);
-  }
-
   async query(query: DatalogQuery): Promise<QueryResult> {
     // Use the database's query but with transaction-aware query
     // We need to override executeClause to use transaction-aware query
     return this.executeDatalogWithTransaction(query);
   }
 
-  async getValue(
-    entity: EntityId,
-    attribute: string
-  ): Promise<Value | undefined> {
-    return getValueHelper(this.datoms.bind(this), entity, attribute);
-  }
+  async transact(ops: {
+    add?: DatomInput[];
+    retract?: DatomInput[];
+  }): Promise<void> {
+    if (ops.add && ops.add.length > 0) {
+      for (const datom of ops.add) {
+        const d: Datom = {
+          entity: datom[0],
+          attribute: datom[1],
+          value: datom[2],
+          tx: this.txId,
+          added: true,
+        };
+        this.pendingAdds.push(d);
+      }
+    }
+    if (ops.retract && ops.retract.length > 0) {
+      for (const datom of ops.retract) {
+        const key = `${String(datom[0])}|${String(datom[1])}|${String(datom[2])}`;
 
-  async getValues(entity: EntityId, attribute: string): Promise<Value[]> {
-    return getValuesHelper(this.datoms.bind(this), entity, attribute);
-  }
+        // Remove from pending adds if it was added in this transaction
+        this.pendingAdds = this.pendingAdds.filter((d) => {
+          const dKey = `${String(d.entity)}|${String(d.attribute)}|${String(
+            d.value
+          )}`;
+          return dKey !== key;
+        });
 
-  async hasFact(
-    entity: EntityId,
-    attribute: string,
-    value: Value
-  ): Promise<boolean> {
-    return hasFactHelper(this.datoms.bind(this), entity, attribute, value);
-  }
-
-  async getValuesBatch(
-    queries: Array<{ entity: EntityId; attribute: string }>
-  ): Promise<(Value | undefined)[]> {
-    return getValuesBatchHelper(this.datoms.bind(this), queries);
-  }
-
-  async getAllValuesBatch(
-    queries: Array<{ entity: EntityId; attribute: string }>
-  ): Promise<Value[][]> {
-    return getAllValuesBatchHelper(this.datoms.bind(this), queries);
-  }
-
-  async findEntities(attribute: string, value: Value): Promise<EntityId[]> {
-    return findEntitiesHelper(this.datoms.bind(this), attribute, value);
+        // Add to pending retracts
+        const d: Datom = {
+          entity: datom[0],
+          attribute: datom[1],
+          value: datom[2],
+          tx: this.txId,
+          added: false,
+        };
+        this.pendingRetracts.push(d);
+      }
+    }
   }
 
   async commit(): Promise<void> {

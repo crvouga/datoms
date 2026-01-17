@@ -10,7 +10,6 @@ import type {
   Datom,
   DatomInput,
   EntityId,
-  QueryExplainResult,
   QueryOptions,
   TransactionId,
   Value,
@@ -22,19 +21,6 @@ import type {
 } from "../datalog/datalog.js";
 import { isVariable, stripQuestionMark } from "./shared/datalog-helpers.js";
 import { joinResults, project } from "./shared/query-helpers.js";
-import {
-  getAllValuesBatchHelper,
-  findEntitiesHelper,
-  getLatestValueHelper,
-  getValueHelper,
-  getValuesBatchHelper,
-  getValuesHelper,
-  hasFactHelper,
-  retractAttributeHelper,
-  retractEntityHelper,
-  transactHelper,
-  upsertHelper,
-} from "./shared/transaction-helpers.js";
 
 /**
  * In-memory database implementation
@@ -94,30 +80,6 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return tx;
   }
 
-  async retractEntity(entity: EntityId): Promise<TransactionId> {
-    await this.ensureInitialized();
-    const tx = this.nextTx++;
-
-    // Get all datoms for this entity
-    const entityDatoms = this._datomsArray.filter((d) => d.entity === entity);
-
-    // Retract all of them
-    for (const datom of entityDatoms) {
-      // Only retract if it's currently added (not already retracted)
-      const isCurrentlyAdded = this.isCurrentlyAdded(datom);
-      if (isCurrentlyAdded) {
-        this._datomsArray.push({
-          entity: datom.entity,
-          attribute: datom.attribute,
-          value: datom.value,
-          tx,
-          added: false,
-        });
-      }
-    }
-
-    return tx;
-  }
 
   /**
    * Check if a datom is currently added (not retracted)
@@ -351,58 +313,6 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return results.slice(offset, limit ? offset + limit : undefined);
   }
 
-  async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
-    await this.ensureInitialized();
-    const result = await super.explainQuery(options);
-
-    // Estimate result size based on filters and current data
-    let estimatedRows = this._datomsArray.length;
-
-    // Apply filters to estimate result size
-    if (options.entity !== undefined) {
-      const entityCount = this._datomsArray.filter(
-        (d) => d.entity === options.entity
-      ).length;
-      estimatedRows = Math.min(estimatedRows, entityCount);
-    }
-    if (options.attribute !== undefined) {
-      const attributeCount = this._datomsArray.filter(
-        (d) => d.attribute === options.attribute
-      ).length;
-      estimatedRows = Math.min(estimatedRows, attributeCount);
-    }
-    if (options.value !== undefined) {
-      const valueCount = this._datomsArray.filter(
-        (d) => d.value === options.value
-      ).length;
-      estimatedRows = Math.min(estimatedRows, valueCount);
-    }
-    if (options.tx !== undefined) {
-      const txCount = this._datomsArray.filter(
-        (d) => d.tx === options.tx
-      ).length;
-      estimatedRows = Math.min(estimatedRows, txCount);
-    }
-
-    // Apply limit if present
-    if (options.limit !== undefined) {
-      estimatedRows = Math.min(estimatedRows, options.limit);
-    }
-
-    // Normal queries deduplicate, so estimate is lower
-    // Rough estimate: assume 50% reduction from deduplication
-    result.estimatedRows = Math.floor(estimatedRows * 0.5);
-
-    // Set scan type based on filters
-    if (result.scanType === "full-table") {
-      result.warnings = result.warnings || [];
-      result.warnings.push(
-        `In-memory database will scan all ${this._datomsArray.length} datoms. Consider adding filters.`
-      );
-    }
-
-    return result;
-  }
 
   async query(query: DatalogQuery): Promise<QueryResult> {
     await this.ensureInitialized();
@@ -670,133 +580,50 @@ class InMemoryTransaction implements Transaction {
     return paginated;
   }
 
-  async explainQuery(options: QueryOptions): Promise<QueryExplainResult> {
-    // Delegate to database's explainQuery
-    return this.db.explainQuery(options);
-  }
-
-  async getValue(
-    entity: EntityId,
-    attribute: string
-  ): Promise<Value | undefined> {
-    return getValueHelper(this.datoms.bind(this), entity, attribute);
-  }
-
-  async getLatestValue(
-    entity: EntityId,
-    attribute: string
-  ): Promise<Value | undefined> {
-    return getLatestValueHelper(this.datoms.bind(this), entity, attribute);
-  }
-
-  async getValues(entity: EntityId, attribute: string): Promise<Value[]> {
-    return getValuesHelper(this.datoms.bind(this), entity, attribute);
-  }
-
-  async hasFact(
-    entity: EntityId,
-    attribute: string,
-    value: Value
-  ): Promise<boolean> {
-    return hasFactHelper(this.datoms.bind(this), entity, attribute, value);
-  }
-
-  async getValuesBatch(
-    queries: Array<{ entity: EntityId; attribute: string }>
-  ): Promise<(Value | undefined)[]> {
-    return getValuesBatchHelper(this.datoms.bind(this), queries);
-  }
-
-  async getAllValuesBatch(
-    queries: Array<{ entity: EntityId; attribute: string }>
-  ): Promise<Value[][]> {
-    return getAllValuesBatchHelper(this.datoms.bind(this), queries);
-  }
-
-  async findEntities(attribute: string, value: Value): Promise<EntityId[]> {
-    return findEntitiesHelper(this.datoms.bind(this), attribute, value);
-  }
-
-  async add(datoms: DatomInput[]): Promise<void> {
-    for (const datom of datoms) {
-      this._datomsArray.push({
-        entity: datom[0],
-        attribute: datom[1],
-        value: datom[2],
-        tx: this.txId,
-        added: true,
-      });
-    }
-  }
-
-  async retract(datoms: DatomInput[]): Promise<void> {
-    for (const datom of datoms) {
-      // Remove any pending adds for this exact datom (same entity, attribute, value)
-      // that were added in this transaction
-      const key = `${String(datom[0])}|${String(datom[1])}|${String(datom[2])}`;
-
-      // Find and remove matching pending adds (modify array in place)
-      for (let i = this._datomsArray.length - 1; i >= 0; i--) {
-        const d = this._datomsArray[i];
-        if (d.tx === this.txId && d.added) {
-          const dKey = `${String(d.entity)}|${String(d.attribute)}|${String(
-            d.value
-          )}`;
-          if (dKey === key) {
-            this._datomsArray.splice(i, 1);
-          }
-        }
-      }
-
-      // Add retraction datom
-      this._datomsArray.push({
-        entity: datom[0],
-        attribute: datom[1],
-        value: datom[2],
-        tx: this.txId,
-        added: false,
-      });
-    }
-  }
-
-  async retractEntity(entity: EntityId): Promise<void> {
-    return retractEntityHelper(
-      this.datoms.bind(this),
-      this.retract.bind(this),
-      entity
-    );
-  }
-
-  async retractAttribute(entity: EntityId, attribute: string): Promise<void> {
-    return retractAttributeHelper(
-      this.datoms.bind(this),
-      this.retract.bind(this),
-      entity,
-      attribute
-    );
-  }
-
-  async upsert(
-    entity: EntityId,
-    attribute: string,
-    value: Value
-  ): Promise<void> {
-    return upsertHelper(
-      this.datoms.bind(this),
-      (attr: string) => this.db.getAttributeDefinition(attr),
-      this.retract.bind(this),
-      this.add.bind(this),
-      entity,
-      attribute,
-      value
-    );
-  }
-
   async transact(ops: {
     add?: DatomInput[];
     retract?: DatomInput[];
   }): Promise<void> {
-    return transactHelper(this.add.bind(this), this.retract.bind(this), ops);
+    if (ops.add && ops.add.length > 0) {
+      for (const datom of ops.add) {
+        this._datomsArray.push({
+          entity: datom[0],
+          attribute: datom[1],
+          value: datom[2],
+          tx: this.txId,
+          added: true,
+        });
+      }
+    }
+    if (ops.retract && ops.retract.length > 0) {
+      for (const datom of ops.retract) {
+        // Remove any pending adds for this exact datom (same entity, attribute, value)
+        // that were added in this transaction
+        const key = `${String(datom[0])}|${String(datom[1])}|${String(datom[2])}`;
+
+        // Find and remove matching pending adds (modify array in place)
+        for (let i = this._datomsArray.length - 1; i >= 0; i--) {
+          const d = this._datomsArray[i];
+          if (d.tx === this.txId && d.added) {
+            const dKey = `${String(d.entity)}|${String(d.attribute)}|${String(
+              d.value
+            )}`;
+            if (dKey === key) {
+              this._datomsArray.splice(i, 1);
+            }
+          }
+        }
+
+        // Add retraction datom
+        this._datomsArray.push({
+          entity: datom[0],
+          attribute: datom[1],
+          value: datom[2],
+          tx: this.txId,
+          added: false,
+        });
+      }
+    }
   }
 
   async query(query: DatalogQuery): Promise<QueryResult> {

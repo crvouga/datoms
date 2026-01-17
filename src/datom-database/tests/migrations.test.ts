@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { MigrationError, MigrationRollbackError } from "../errors.js";
 import type { DatabaseEvent, Migration } from "../../types.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
+import { ObservableDatabase } from "../observability/index.js";
 
 describe.each(FIXTURES)("Migrations (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -76,11 +77,12 @@ describe.each(FIXTURES)("Migrations (%s)", (_name, createFixture) => {
       const { db } = f;
       const events: DatabaseEvent[] = [];
 
-      const unsubscribe = db.on("migration", (event) => {
+      const observableDb = new ObservableDatabase(db);
+      const unsubscribe = observableDb.on("migration", (event) => {
         events.push(event);
       });
 
-      await db.migrate(2);
+      await observableDb.migrate(2);
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("migration");
@@ -98,12 +100,13 @@ describe.each(FIXTURES)("Migrations (%s)", (_name, createFixture) => {
       await db.migrate(5);
 
       const events: DatabaseEvent[] = [];
-      const unsubscribe = db.on("migration", (event) => {
+      const observableDb = new ObservableDatabase(db);
+      const unsubscribe = observableDb.on("migration", (event) => {
         events.push(event);
       });
 
       try {
-        await db.migrate(3); // Backward migration
+        await observableDb.migrate(3); // Backward migration
       } catch (error) {
         // Expected
       }
