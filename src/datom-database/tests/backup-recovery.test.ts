@@ -256,7 +256,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       expect(count).toBe(exported.length);
 
       const ageResults = await db2.query({
-        find: { v: "?v" },
+        find: { v: ["?v"] },
         where: [{ e: 1, a: "age", v: "?v" }],
       });
       const age = ageResults[0]?.v;

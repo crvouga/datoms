@@ -25,7 +25,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { total: "count(?age)" },
+        find: { total: ["count", "?age"] },
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
@@ -39,7 +39,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should return 0 for empty results", async () => {
       const { db } = f;
       const query: DatalogQuery = {
-        find: { total: "count(?age)" },
+        find: { total: ["count", "?age"] },
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
@@ -55,7 +55,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const query: DatalogQuery = {
-        find: { total: "count(?name)" },
+        find: { total: ["count", "?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
@@ -75,7 +75,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { total: "count(?e)" },
+        find: { total: ["count", "?e"] },
         where: [{ e: "?e", a: "type", v: "person" }],
       };
 
@@ -96,7 +96,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { total: "count(?e)" },
+        find: { total: ["count", "?e"] },
         where: [
           { e: "?e", a: "name", v: "?name" },
           { e: "?e", a: "age", v: "?age" },
@@ -119,7 +119,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { total: "count(?value)" },
+        find: { total: ["count", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 

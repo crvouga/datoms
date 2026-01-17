@@ -28,7 +28,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "retract", e: 2, a: "name", v: "Bob" }]);
 
       const query: DatalogQuery = {
-        find: { name: "?name" },
+        find: { name: ["?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
@@ -55,7 +55,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // the current implementation binds it to the value (last assignment)
       // To properly test self-joins, we use a workaround with two clauses
       const query: DatalogQuery = {
-        find: { node: "?node" },
+        find: { node: ["?node"] },
         where: [
           { e: "?node", a: "connects", v: "?target" },
           { e: "?node", a: "connects", v: "?node" },
@@ -65,7 +65,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Actually, a simpler approach: query all connections and filter manually
       // Or test that we can query connections and verify self-connections exist
       const simpleQuery: DatalogQuery = {
-        find: { from: "?from", to: "?to" },
+        find: { from: ["?from"], to: ["?to"] },
         where: [{ e: "?from", a: "connects", v: "?to" }],
       };
 
@@ -90,7 +90,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find all next relationships
       const query: DatalogQuery = {
-        find: { from: "?from", to: "?to" },
+        find: { from: ["?from"], to: ["?to"] },
         where: [{ e: "?from", a: "next", v: "?to" }],
       };
 
@@ -119,7 +119,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find employees and their departments through a join entity
       const query: DatalogQuery = {
-        find: { name: "?name", dept: "?dept" },
+        find: { name: ["?name"], dept: ["?dept"] },
         where: [
           { e: "?e", a: "name", v: "?name" },
           { e: "?j", a: "employee", v: "?e" },

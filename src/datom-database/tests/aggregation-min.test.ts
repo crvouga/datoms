@@ -25,7 +25,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { minimum: "min(?age)" },
+        find: { minimum: ["min", "?age"] },
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
@@ -39,7 +39,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should return null or undefined for empty results", async () => {
       const { db } = f;
       const query: DatalogQuery = {
-        find: { minimum: "min(?age)" },
+        find: { minimum: ["min", "?age"] },
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
@@ -57,7 +57,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "add", e: 1, a: "price", v: 100 }]);
 
       const query: DatalogQuery = {
-        find: { minimum: "min(?price)" },
+        find: { minimum: ["min", "?price"] },
         where: [{ e: "?e", a: "price", v: "?price" }],
       };
 
@@ -77,7 +77,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { minimum: "min(?value)" },
+        find: { minimum: ["min", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -97,7 +97,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { minimum: "min(?price)" },
+        find: { minimum: ["min", "?price"] },
         where: [{ e: "?e", a: "price", v: "?price" }],
       };
 
@@ -117,7 +117,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { minimum: "min(?name)" },
+        find: { minimum: ["min", "?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
@@ -140,7 +140,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { minimum: "min(?price)" },
+        find: { minimum: ["min", "?price"] },
         where: [
           { e: "?e", a: "type", v: "product" },
           { e: "?e", a: "price", v: "?price" },
@@ -163,7 +163,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { minimum: "min(?value)" },
+        find: { minimum: ["min", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 

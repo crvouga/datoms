@@ -25,7 +25,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { e: "?e" },
+        find: { e: ["?e"] },
         where: [{ e: "?e", a: "active", v: true }],
       };
 
@@ -50,7 +50,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { e: "?e", d: "?d" },
+        find: { e: ["?e"], d: ["?d"] },
         where: [{ e: "?e", a: "created", v: "?d" }],
       };
 
@@ -74,7 +74,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { e: "?e" },
+        find: { e: ["?e"] },
         where: [{ e: "?e", a: "middleName", v: null }],
       };
 
@@ -97,7 +97,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Querying for undefined doesn't filter properly due to how undefined is handled in queries
       // Instead, test that we can retrieve all optional values and filter in the query
       const query: DatalogQuery = {
-        find: { e: "?e", v: "?v" },
+        find: { e: ["?e"], v: ["?v"] },
         where: [{ e: "?e", a: "optional", v: "?v" }],
       };
       const results = await db.query(query);
@@ -123,7 +123,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const results = await db.query({
-        find: { e: "?e", v: "?v" },
+        find: { e: ["?e"], v: ["?v"] },
         where: [{ e: "?e", a: "data", v: "?v" }],
       });
       expect(results.length).toBeGreaterThanOrEqual(2);

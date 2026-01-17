@@ -25,7 +25,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { sample: 'sample("seed123", ?value)' },
+        find: { sample: ["sample", "seed123", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -42,7 +42,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should return null or undefined for empty results", async () => {
       const { db } = f;
       const query: DatalogQuery = {
-        find: { sample: 'sample("seed123", ?value)' },
+        find: { sample: ["sample", "seed123", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -60,7 +60,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "add", e: 1, a: "value", v: 42 }]);
 
       const query: DatalogQuery = {
-        find: { sample: 'sample("seed123", ?value)' },
+        find: { sample: ["sample", "seed123", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -80,7 +80,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { sample: 'sample("seed456", ?value)' },
+        find: { sample: ["sample", "seed456", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -102,12 +102,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query1: DatalogQuery = {
-        find: { sample: 'sample("seed1", ?value)' },
+        find: { sample: ["sample", "seed1", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
       const query2: DatalogQuery = {
-        find: { sample: 'sample("seed2", ?value)' },
+        find: { sample: ["sample", "seed2", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -134,7 +134,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { sample: 'sample("seed789", ?name)' },
+        find: { sample: ["sample", "seed789", "?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
@@ -159,7 +159,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { sample: 'sample("seed999", ?price)' },
+        find: { sample: ["sample", "seed999", "?price"] },
         where: [
           { e: "?e", a: "type", v: "product" },
           { e: "?e", a: "price", v: "?price" },

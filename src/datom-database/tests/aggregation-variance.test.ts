@@ -25,7 +25,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { variance: "variance(?value)" },
+        find: { variance: ["variance", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -40,7 +40,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should return null or undefined for empty results", async () => {
       const { db } = f;
       const query: DatalogQuery = {
-        find: { variance: "variance(?value)" },
+        find: { variance: ["variance", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -58,7 +58,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "add", e: 1, a: "value", v: 10 }]);
 
       const query: DatalogQuery = {
-        find: { variance: "variance(?value)" },
+        find: { variance: ["variance", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -83,7 +83,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { variance: "variance(?value)" },
+        find: { variance: ["variance", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -104,7 +104,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { variance: "variance(?value)" },
+        find: { variance: ["variance", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -125,7 +125,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { variance: "variance(?value)" },
+        find: { variance: ["variance", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -151,7 +151,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { variance: "variance(?score)" },
+        find: { variance: ["variance", "?score"] },
         where: [
           { e: "?e", a: "type", v: "group1" },
           { e: "?e", a: "score", v: "?score" },
@@ -177,7 +177,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { variance: "variance(?value)" },
+        find: { variance: ["variance", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 

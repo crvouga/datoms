@@ -25,7 +25,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { distinctNames: "distinct(?name)" },
+        find: { distinctNames: ["distinct", "?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
@@ -48,7 +48,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should return empty array or null for empty results", async () => {
       const { db } = f;
       const query: DatalogQuery = {
-        find: { distinctNames: "distinct(?name)" },
+        find: { distinctNames: ["distinct", "?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
@@ -69,7 +69,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const query: DatalogQuery = {
-        find: { distinctNames: "distinct(?name)" },
+        find: { distinctNames: ["distinct", "?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
@@ -96,7 +96,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { distinctAges: "distinct(?age)" },
+        find: { distinctAges: ["distinct", "?age"] },
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
@@ -126,7 +126,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { distinctCities: "distinct(?city)" },
+        find: { distinctCities: ["distinct", "?city"] },
         where: [
           { e: "?e", a: "type", v: "person" },
           { e: "?e", a: "city", v: "?city" },
@@ -155,7 +155,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { distinctValues: "distinct(?value)" },
+        find: { distinctValues: ["distinct", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 

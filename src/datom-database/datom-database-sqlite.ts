@@ -906,47 +906,28 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const rows = await this.connection.query(sql, params);
 
     // Convert SQL results back to QueryResult format
-    const results: QueryResult = rows.map((row: Record<string, unknown>) => {
-      const result: Record<string, Value | Attribute> = {};
-      for (const key of Object.keys(row)) {
-        let value: unknown = row[key];
-        // Parse JSON values - values are stored as JSON strings in SQLite
-        if (typeof value === "string") {
-          try {
-            // Try parsing as JSON first (handles numbers, booleans, objects, arrays, etc.)
-            value = JSON.parse(value);
-          } catch {
-            // Not valid JSON, keep as string
+    const results: Record<string, Value | Attribute>[] = rows.map(
+      (row: Record<string, unknown>) => {
+        const result: Record<string, Value | Attribute> = {};
+        for (const key of Object.keys(row)) {
+          let value: unknown = row[key];
+          // Parse JSON values - values are stored as JSON strings in SQLite
+          if (typeof value === "string") {
+            try {
+              // Try parsing as JSON first (handles numbers, booleans, objects, arrays, etc.)
+              value = JSON.parse(value);
+            } catch {
+              // Not valid JSON, keep as string
+            }
           }
+          result[key] = this.reviveValue(value) as Value | Attribute;
         }
-        result[key] = this.reviveValue(value) as Value | Attribute;
+        return result;
       }
-      return result;
-    });
+    );
 
-    // Apply projection if needed
-    const findKeys = Object.keys(query.find);
-    if (findKeys.length > 0) {
-      return results.map((row) => {
-        const projected: Record<string, Value | Attribute> = {};
-        for (const outputKey of findKeys) {
-          const varName = query.find[outputKey];
-          if (varName in row) {
-            projected[outputKey] = row[varName];
-          }
-        }
-        return projected;
-      });
-    }
-
-    // Strip ? from all keys when find is empty
-    return results.map((row) => {
-      const projected: Record<string, Value | Attribute> = {};
-      for (const key of Object.keys(row)) {
-        projected[stripQuestionMark(key)] = row[key];
-      }
-      return projected;
-    });
+    // Use the shared project function which handles aggregations
+    return project(results, query.find, query.where);
   }
 
   private escapeColumnName(name: string): string {

@@ -25,7 +25,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { average: "avg(?age)" },
+        find: { average: ["avg", "?age"] },
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
@@ -39,7 +39,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should return null or 0 for empty results", async () => {
       const { db } = f;
       const query: DatalogQuery = {
-        find: { average: "avg(?age)" },
+        find: { average: ["avg", "?age"] },
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
@@ -60,7 +60,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "add", e: 1, a: "score", v: 85 }]);
 
       const query: DatalogQuery = {
-        find: { average: "avg(?score)" },
+        find: { average: ["avg", "?score"] },
         where: [{ e: "?e", a: "score", v: "?score" }],
       };
 
@@ -80,7 +80,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { average: "avg(?price)" },
+        find: { average: ["avg", "?price"] },
         where: [{ e: "?e", a: "price", v: "?price" }],
       };
 
@@ -100,7 +100,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { average: "avg(?value)" },
+        find: { average: ["avg", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -123,7 +123,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { average: "avg(?score)" },
+        find: { average: ["avg", "?score"] },
         where: [
           { e: "?e", a: "type", v: "student" },
           { e: "?e", a: "score", v: "?score" },
@@ -146,7 +146,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { average: "avg(?value)" },
+        find: { average: ["avg", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 

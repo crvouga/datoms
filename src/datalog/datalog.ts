@@ -7,21 +7,21 @@ import type { Attribute, EntityId, Value } from "../types.js";
 export type DatalogQueryVariable = `?${string}`;
 
 export type DatalogQueryFindVariable =
-  | `?${string}`
-  | `count(?${string})`
-  | `count-distinct(?${string})`
-  | `sum(?${string})`
-  | `avg(?${string})`
-  | `min(?${string})`
-  | `max(?${string})`
-  | `median(?${string})`
-  | `variance(?${string})`
-  | `stddev(?${string})`
-  | `rand(${string}, ?${string})`
-  | `sample(${string}, ?${string})`
-  | `distinct(?${string})`
-  | `min(${string}, ?${string})`
-  | `max(${string}, ?${string})`;
+  | [DatalogQueryVariable]
+  | ["count", DatalogQueryVariable]
+  | ["count-distinct", DatalogQueryVariable]
+  | ["sum", DatalogQueryVariable]
+  | ["avg", DatalogQueryVariable]
+  | ["min", DatalogQueryVariable]
+  | ["min", string | number, DatalogQueryVariable]
+  | ["max", DatalogQueryVariable]
+  | ["max", string | number, DatalogQueryVariable]
+  | ["median", DatalogQueryVariable]
+  | ["variance", DatalogQueryVariable]
+  | ["stddev", DatalogQueryVariable]
+  | ["rand", string | number, DatalogQueryVariable]
+  | ["sample", string | number, DatalogQueryVariable]
+  | ["distinct", DatalogQueryVariable];
 
 /**
  * Basic query pattern
@@ -34,21 +34,21 @@ export type QueryPattern = {
 };
 
 /**
- * Predicate expression
+ * Predicate expression (as tuples)
  */
 export type QueryPredicate =
-  | `> ${number} ?${string}`
-  | `>= ?${string} ${number}`
-  | `< ${number} ?${string}`
-  | `= ?${string} ${string}`
-  | `!= ?${string} ${string}`
-  | `>= ?${string} ${string}`
-  | `<= ?${string} ${string}`
-  | `ground ?${string} ${string}`
-  | `get-else ?${string} ${string}`
-  | `missing? ?${string} ${string}`
-  | `tuple ?${string} ${string}`
-  | `untuple ?${string} ${string}`;
+  | [">", DatalogQueryVariable, number]
+  | [">=", DatalogQueryVariable, number]
+  | ["<", DatalogQueryVariable, number]
+  | ["=", DatalogQueryVariable, DatalogQueryVariable | Value]
+  | ["!=", DatalogQueryVariable, DatalogQueryVariable | Value]
+  | [">=", DatalogQueryVariable, DatalogQueryVariable | Value]
+  | ["<=", DatalogQueryVariable, DatalogQueryVariable | Value]
+  | ["ground", DatalogQueryVariable, DatalogQueryVariable | Value]
+  | ["get-else", DatalogQueryVariable, DatalogQueryVariable | Value]
+  | ["missing?", DatalogQueryVariable, DatalogQueryVariable | Value]
+  | ["tuple", DatalogQueryVariable, DatalogQueryVariable | Value]
+  | ["untuple", DatalogQueryVariable, DatalogQueryVariable | Value];
 
 /**
  * Or clause
@@ -90,8 +90,8 @@ export type QueryResult = Array<Record<string, Value | Attribute | EntityId>>;
 
 export const d: DatalogQuery = {
   find: {
-    id: "?e",
-    count: "count(?name)",
+    id: ["?e"],
+    count: ["count", "?name"],
   },
   where: [{ e: "?e", a: "name", v: "?name" }],
 };

@@ -35,7 +35,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Find all friendships: who is friends with whom
 
       const results = await db.query({
-        find: { from: "?from", to: "?to" },
+        find: { from: ["?from"], to: ["?to"] },
         where: [
           { e: "?f", a: "from", v: "?from" },
           { e: "?f", a: "to", v: "?to" },
@@ -70,7 +70,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find friends of Alice's friends (friends of friends)
       const query: DatalogQuery = {
-        find: { friendOfFriend: "?friendOfFriend" },
+        find: { friendOfFriend: ["?friendOfFriend"] },
         where: [
           { e: "?f1", a: "from", v: 1 },
           { e: "?f1", a: "to", v: "?friend" },
@@ -104,7 +104,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find all parent-child pairs with names
       const query: DatalogQuery = {
-        find: { parentName: "?parentName", childName: "?childName" },
+        find: { parentName: ["?parentName"], childName: ["?childName"] },
         where: [
           { e: "?parent", a: "name", v: "?parentName" },
           { e: "?parent", a: "child", v: "?child" },
@@ -146,7 +146,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find all student-course pairs
       const query: DatalogQuery = {
-        find: { studentName: "?studentName", courseTitle: "?courseTitle" },
+        find: { studentName: ["?studentName"], courseTitle: ["?courseTitle"] },
         where: [
           { e: "?enrollment", a: "student", v: "?student" },
           { e: "?enrollment", a: "course", v: "?course" },
@@ -178,7 +178,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { e: "?e", tag: "?tag" },
+        find: { e: ["?e"], tag: ["?tag"] },
         where: [{ e: "?e", a: "tag", v: "?tag" }],
       };
 

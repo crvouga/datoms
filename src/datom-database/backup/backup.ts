@@ -66,19 +66,19 @@ export async function importDatoms(
   const validate = options?.validate ?? true;
   let datomCount = 0;
   let batch: DatomInput[] = [];
-  let batchadd: boolean[] = []; // Track which datoms in batch are add vs retract
+  let batchAdd: boolean[] = []; // Track which datoms in batch are add vs retract
 
   for await (const datom of source) {
     // Convert Datom to DatomInput
     batch.push({ e: datom.e, a: datom.a, v: datom.v });
-    batchadd.push(datom.op === "add");
+    batchAdd.push(datom.op === "add");
 
     if (batch.length >= batchSize) {
       // Process batch: separate add and retract datoms
       const addBatch: DatomInput[] = [];
       const retractBatch: DatomInput[] = [];
       for (let i = 0; i < batch.length; i++) {
-        if (batchadd[i]) {
+        if (batchAdd[i]) {
           addBatch.push(batch[i]);
         } else {
           retractBatch.push(batch[i]);
@@ -127,7 +127,7 @@ export async function importDatoms(
 
       datomCount += batch.length;
       batch = [];
-      batchadd = [];
+      batchAdd = [];
     }
   }
 
@@ -137,7 +137,7 @@ export async function importDatoms(
     const addBatch: DatomInput[] = [];
     const retractBatch: DatomInput[] = [];
     for (let i = 0; i < batch.length; i++) {
-      if (batchadd[i]) {
+      if (batchAdd[i]) {
         addBatch.push(batch[i]);
       } else {
         retractBatch.push(batch[i]);

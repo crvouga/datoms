@@ -25,7 +25,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { median: "median(?age)" },
+        find: { median: ["median", "?age"] },
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
@@ -46,7 +46,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { median: "median(?age)" },
+        find: { median: ["median", "?age"] },
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
@@ -61,7 +61,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should return null or undefined for empty results", async () => {
       const { db } = f;
       const query: DatalogQuery = {
-        find: { median: "median(?age)" },
+        find: { median: ["median", "?age"] },
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
@@ -79,7 +79,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "add", e: 1, a: "score", v: 85 }]);
 
       const query: DatalogQuery = {
-        find: { median: "median(?score)" },
+        find: { median: ["median", "?score"] },
         where: [{ e: "?e", a: "score", v: "?score" }],
       };
 
@@ -101,7 +101,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { median: "median(?value)" },
+        find: { median: ["median", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -123,7 +123,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { median: "median(?value)" },
+        find: { median: ["median", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -149,7 +149,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { median: "median(?score)" },
+        find: { median: ["median", "?score"] },
         where: [
           { e: "?e", a: "type", v: "student" },
           { e: "?e", a: "score", v: "?score" },
@@ -174,7 +174,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { median: "median(?price)" },
+        find: { median: ["median", "?price"] },
         where: [{ e: "?e", a: "price", v: "?price" }],
       };
 

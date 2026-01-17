@@ -25,7 +25,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { total: "count-distinct(?name)" },
+        find: { total: ["count-distinct", "?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
@@ -39,7 +39,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should return 0 for empty results", async () => {
       const { db } = f;
       const query: DatalogQuery = {
-        find: { total: "count-distinct(?name)" },
+        find: { total: ["count-distinct", "?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
@@ -55,7 +55,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const query: DatalogQuery = {
-        find: { total: "count-distinct(?name)" },
+        find: { total: ["count-distinct", "?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
@@ -77,7 +77,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { total: "count-distinct(?age)" },
+        find: { total: ["count-distinct", "?age"] },
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
@@ -100,7 +100,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { total: "count-distinct(?city)" },
+        find: { total: ["count-distinct", "?city"] },
         where: [
           { e: "?e", a: "type", v: "person" },
           { e: "?e", a: "city", v: "?city" },
@@ -124,7 +124,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { total: "count-distinct(?value)" },
+        find: { total: ["count-distinct", "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
