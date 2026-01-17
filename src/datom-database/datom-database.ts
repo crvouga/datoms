@@ -108,7 +108,7 @@ export interface TransactResult {
  * Provides common functionality for AsOf, History, and Since views
  */
 abstract class BaseDatabaseView implements DatabaseView {
-  constructor(protected db: DatomDatabase) {}
+  constructor(protected db: DatomDatabase) { }
 
   abstract datoms(options: QueryOptions): Promise<Datom[]>;
 
@@ -442,8 +442,7 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
  * Array of operations, each specifying whether to add or retract a datom
  */
 export type TransactOperations = Array<
-  | { op: "add"; e: EntityId; a: Attribute; v: Value }
-  | { op: "retract"; e: EntityId; a: Attribute; v: Value }
+  { op: "add" | "retract"; e: EntityId; a: Attribute; v: Value }
 >;
 
 /**
@@ -639,32 +638,25 @@ export abstract class DatomDatabase implements DatomReader {
   ): Promise<TransactionId> {
     await this.ensureInitialized();
 
-    // Separate operations by type
+    // Process operations sequentially
     const adds: DatomInput[] = [];
     const retracts: DatomInput[] = [];
 
     for (const op of ops) {
+      const datom = { e: op.e, a: op.a, v: op.v };
+
       if (op.op === "add") {
-        adds.push({ e: op.e, a: op.a, v: op.v });
+        // Validate add, accounting for retracts already processed
+        await this.validateDatoms([datom], true, retracts);
+        adds.push(datom);
       } else {
-        retracts.push({ e: op.e, a: op.a, v: op.v });
+        // Validate retract
+        await this.validateDatoms([datom], false);
+        retracts.push(datom);
       }
     }
 
-    // Validate transaction data
-    // Apply retracts first, then adds, so validation can see retract values
-    if (retracts.length > 0) {
-      await this.validateDatoms(retracts, false);
-    }
-    if (adds.length > 0) {
-      // Validate adds, but account for retracts in the same transaction
-      await this.validateDatoms(adds, true, retracts);
-    }
-
     // Apply retracts first, then adds
-    // Note: If both retracts and adds are present, they may get different transaction IDs
-    // depending on the implementation. For atomicity, implementations should ensure
-    // they use the same transaction ID when called sequentially.
     let txId: TransactionId;
     if (retracts.length > 0) {
       txId = await this.retractDatoms(retracts);
@@ -673,14 +665,12 @@ export abstract class DatomDatabase implements DatomReader {
       txId = await this.addDatoms(adds);
     } else if (retracts.length === 0) {
       // If there are no operations, still create a new transaction ID
-      // This ensures that even empty transactions get a unique ID (useful for metadata tracking)
       txId = await this.addDatoms([]);
     } else {
-      // txId was set by retractDatoms above
       txId = txId!;
     }
 
-    // Store metadata if provided (implementations can override onTransactionMetadata)
+    // Store metadata if provided
     if (metadata !== undefined) {
       await this.onTransactionMetadata(txId, metadata);
     }
@@ -896,8 +886,7 @@ export abstract class DatomDatabase implements DatomReader {
           throw new Error(
             `Cannot change type constraint for attribute "${name}": existing value ${JSON.stringify(
               datom.v
-            )} for entity "${String(datom.e)}" does not match new type "${
-              newDefinition.type
+            )} for entity "${String(datom.e)}" does not match new type "${newDefinition.type
             }". ${typeError.message}`
           );
         }
@@ -1837,8 +1826,7 @@ export abstract class DatomDatabase implements DatomReader {
         await this.migrate(migration.version);
       } catch (error) {
         const migrationError = new MigrationError(
-          `Migration ${migration.version} (${migration.name}) failed: ${
-            error instanceof Error ? error.message : String(error)
+          `Migration ${migration.version} (${migration.name}) failed: ${error instanceof Error ? error.message : String(error)
           }`,
           migration.version,
           error instanceof Error ? error : undefined
@@ -1897,8 +1885,7 @@ export abstract class DatomDatabase implements DatomReader {
         this.schemaVersion = migration.version - 1;
       } catch (error) {
         const rollbackError = new MigrationRollbackError(
-          `Rollback of migration ${migration.version} (${
-            migration.name
+          `Rollback of migration ${migration.version} (${migration.name
           }) failed: ${error instanceof Error ? error.message : String(error)}`,
           migration.version,
           error instanceof Error ? error : undefined
@@ -1944,8 +1931,7 @@ export abstract class DatomDatabase implements DatomReader {
       }
       // For other errors during onMigrate, wrap in MigrationError
       throw new MigrationError(
-        `Migration to version ${targetVersion} failed: ${
-          error instanceof Error ? error.message : String(error)
+        `Migration to version ${targetVersion} failed: ${error instanceof Error ? error.message : String(error)
         }`,
         targetVersion,
         error instanceof Error ? error : undefined
