@@ -97,18 +97,16 @@ describe.each(FIXTURES)("EntityId Validation (%s)", (_name, createFixture) => {
   describe("EntityId usage", () => {
     test("should work with number EntityIds", async () => {
       const { db } = f;
-      await db.transact([{ op: "added", e: 123, a: "name", v: "Alice" }]);
-      const entity = await db.datoms({ e: 123, added: true });
+      await db.transact([{ op: "add", e: 123, a: "name", v: "Alice" }]);
+      const entity = await db.datoms({ e: 123, add: true });
       expect(entity).toHaveLength(1);
       expect(entity[0].e).toBe(123);
     });
 
     test("should work with string EntityIds", async () => {
       const { db } = f;
-      await db.transact([
-        { op: "added", e: "user-123", a: "name", v: "Alice" },
-      ]);
-      const entity = await db.datoms({ e: "user-123", added: true });
+      await db.transact([{ op: "add", e: "user-123", a: "name", v: "Alice" }]);
+      const entity = await db.datoms({ e: "user-123", add: true });
       expect(entity).toHaveLength(1);
       expect(entity[0].e).toBe("user-123");
     });

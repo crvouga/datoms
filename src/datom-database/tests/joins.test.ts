@@ -19,10 +19,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle multiple where clauses (join)", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 1, a: "age", v: 30 },
-        { op: "added", e: 2, a: "name", v: "Bob" },
-        { op: "added", e: 2, a: "age", v: 40 },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 1, a: "age", v: 30 },
+        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 2, a: "age", v: 40 },
       ]);
 
       const query: DatalogQuery = {
@@ -47,21 +47,21 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Create a company structure: employees, departments, and their relationships
       await db.transact([
         // Employees
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 1, a: "role", v: "engineer" },
-        { op: "added", e: 2, a: "name", v: "Bob" },
-        { op: "added", e: 2, a: "role", v: "manager" },
-        { op: "added", e: 3, a: "name", v: "Charlie" },
-        { op: "added", e: 3, a: "role", v: "engineer" },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 1, a: "role", v: "engineer" },
+        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 2, a: "role", v: "manager" },
+        { op: "add", e: 3, a: "name", v: "Charlie" },
+        { op: "add", e: 3, a: "role", v: "engineer" },
         // Departments
-        { op: "added", e: 10, a: "name", v: "Engineering" },
-        { op: "added", e: 10, a: "budget", v: "100_000" },
-        { op: "added", e: 11, a: "name", v: "Sales" },
-        { op: "added", e: 11, a: "budget", v: "50_000" },
+        { op: "add", e: 10, a: "name", v: "Engineering" },
+        { op: "add", e: 10, a: "budget", v: "100_000" },
+        { op: "add", e: 11, a: "name", v: "Sales" },
+        { op: "add", e: 11, a: "budget", v: "50_000" },
         // Employee-Department relationships
-        { op: "added", e: 1, a: "department", v: 10 },
-        { op: "added", e: 2, a: "department", v: 10 },
-        { op: "added", e: 3, a: "department", v: 10 },
+        { op: "add", e: 1, a: "department", v: 10 },
+        { op: "add", e: 2, a: "department", v: 10 },
+        { op: "add", e: 3, a: "department", v: 10 },
       ]);
 
       // Find all engineers in the Engineering department with the department budget
@@ -91,15 +91,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle queries with multiple constraints on same entity", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 1, a: "age", v: 30 },
-        { op: "added", e: 1, a: "city", v: "NYC" },
-        { op: "added", e: 2, a: "name", v: "Bob" },
-        { op: "added", e: 2, a: "age", v: 25 },
-        { op: "added", e: 2, a: "city", v: "NYC" },
-        { op: "added", e: 3, a: "name", v: "Charlie" },
-        { op: "added", e: 3, a: "age", v: 30 },
-        { op: "added", e: 3, a: "city", v: "LA" },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 1, a: "age", v: 30 },
+        { op: "add", e: 1, a: "city", v: "NYC" },
+        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 2, a: "age", v: 25 },
+        { op: "add", e: 2, a: "city", v: "NYC" },
+        { op: "add", e: 3, a: "name", v: "Charlie" },
+        { op: "add", e: 3, a: "age", v: 30 },
+        { op: "add", e: 3, a: "city", v: "LA" },
       ]);
 
       // Find people in NYC who are 30 years old
@@ -123,15 +123,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       // Create a network of connections
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Node1" },
-        { op: "added", e: 2, a: "name", v: "Node2" },
-        { op: "added", e: 3, a: "name", v: "Node3" },
-        { op: "added", e: 4, a: "name", v: "Node4" },
+        { op: "add", e: 1, a: "name", v: "Node1" },
+        { op: "add", e: 2, a: "name", v: "Node2" },
+        { op: "add", e: 3, a: "name", v: "Node3" },
+        { op: "add", e: 4, a: "name", v: "Node4" },
         // Connections: 1->2, 2->3, 3->4, 1->4
-        { op: "added", e: 1, a: "connects", v: 2 },
-        { op: "added", e: 2, a: "connects", v: 3 },
-        { op: "added", e: 3, a: "connects", v: 4 },
-        { op: "added", e: 1, a: "connects", v: 4 },
+        { op: "add", e: 1, a: "connects", v: 2 },
+        { op: "add", e: 2, a: "connects", v: 3 },
+        { op: "add", e: 3, a: "connects", v: 4 },
+        { op: "add", e: 1, a: "connects", v: 4 },
       ]);
 
       // Find all paths of length 2: A -> B -> C
@@ -155,9 +155,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle join with no matching results", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 2, a: "name", v: "Bob" },
-        { op: "added", e: 3, a: "age", v: 30 },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 3, a: "age", v: 30 },
       ]);
 
       const query: DatalogQuery = {
@@ -179,13 +179,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle join with incompatible variable bindings", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 1, a: "age", v: 30 },
-        { op: "added", e: 2, a: "name", v: "Bob" },
-        { op: "added", e: 2, a: "age", v: 25 },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 1, a: "age", v: 30 },
+        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 2, a: "age", v: 25 },
         // Entity 3 has name "Alice" but age 25 (different from entity 1)
-        { op: "added", e: 3, a: "name", v: "Alice" },
-        { op: "added", e: 3, a: "age", v: 25 },
+        { op: "add", e: 3, a: "name", v: "Alice" },
+        { op: "add", e: 3, a: "age", v: 25 },
       ]);
 
       // Find entities where name is Alice AND age is 25
@@ -207,12 +207,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle join with multiple common variables", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 1, a: "age", v: 30 },
-        { op: "added", e: 1, a: "city", v: "NYC" },
-        { op: "added", e: 2, a: "name", v: "Bob" },
-        { op: "added", e: 2, a: "age", v: 30 },
-        { op: "added", e: 2, a: "city", v: "LA" },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 1, a: "age", v: 30 },
+        { op: "add", e: 1, a: "city", v: "NYC" },
+        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 2, a: "age", v: 30 },
+        { op: "add", e: 2, a: "city", v: "LA" },
       ]);
 
       const query: DatalogQuery = {
@@ -237,14 +237,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle variable binding across disconnected clauses", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 1, a: "age", v: 30 },
-        { op: "added", e: 2, a: "name", v: "Bob" },
-        { op: "added", e: 2, a: "age", v: 25 },
-        { op: "added", e: 10, a: "employee", v: 1 },
-        { op: "added", e: 10, a: "department", v: "Engineering" },
-        { op: "added", e: 11, a: "employee", v: 2 },
-        { op: "added", e: 11, a: "department", v: "Sales" },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 1, a: "age", v: 30 },
+        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 2, a: "age", v: 25 },
+        { op: "add", e: 10, a: "employee", v: 1 },
+        { op: "add", e: 10, a: "department", v: "Engineering" },
+        { op: "add", e: 11, a: "employee", v: 2 },
+        { op: "add", e: 11, a: "department", v: "Sales" },
       ]);
 
       // Find employees and their departments through a join entity

@@ -45,12 +45,12 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     if (!this.initialized) {
       const createTableSql = `
         CREATE TABLE IF NOT EXISTS ${this.tableName} (
-          entity TEXT NOT NULL,
-          attribute TEXT NOT NULL,
-          value TEXT NOT NULL,
+          e TEXT NOT NULL,
+          a TEXT NOT NULL,
+          v TEXT NOT NULL,
           tx INTEGER NOT NULL,
-          added INTEGER NOT NULL,
-          PRIMARY KEY (entity, attribute, value, tx, added)
+          op TEXT NOT NULL CHECK(op IN ('add', 'retract')),
+          PRIMARY KEY (e, a, v, tx, op)
         )
       `;
 
@@ -58,13 +58,13 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       const indexes = [
         // Composite index for entity+attribute queries (most common pattern)
         // SQLite doesn't support DESC in index definition, but this helps with filtering
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_entity_attr_tx ON ${this.tableName}(entity, attribute, tx)`,
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_e_a_tx ON ${this.tableName}(e, a, tx)`,
         // Composite index for attribute+value queries
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_attr_value_tx ON ${this.tableName}(attribute, value, tx)`,
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_v_tx ON ${this.tableName}(a, v, tx)`,
         // Index on tx for transaction-based queries (DESC ordering handled in query)
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx)`,
         // Covering index for entity lookups
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_entity ON ${this.tableName}(entity)`,
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_e ON ${this.tableName}(e)`,
       ];
 
       await this.connection.execute(createTableSql);
@@ -118,15 +118,15 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const params: unknown[] = [];
 
     if (options.e !== undefined) {
-      conditions.push("entity = ?");
+      conditions.push("e = ?");
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("attribute = ?");
+      conditions.push("a = ?");
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
-      conditions.push("value = ?");
+      conditions.push("v = ?");
       let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
@@ -144,14 +144,14 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     // Query without deduplication - return all matching datoms
     const sql = `
       SELECT 
-        entity,
-        attribute,
-        value,
+        e,
+        a,
+        v,
         tx,
-        added
+        op
       FROM ${this.tableName}
       ${whereClause}
-      ORDER BY tx ASC, entity ASC, attribute ASC
+      ORDER BY tx ASC, e ASC, a ASC
     `;
 
     const rows = await this.connection.query(sql, params);
@@ -186,22 +186,22 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     };
 
     return rows.map((row: Record<string, unknown>) => {
-      let entity: EntityId = row.entity as EntityId;
+      let entity: EntityId = row.e as EntityId;
       if (typeof entity === "string") {
         if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
       }
 
-      const parsedValue: unknown = JSON.parse(String(row.value));
+      const parsedValue: unknown = JSON.parse(String(row.v));
       const revivedValue = reviveValue(parsedValue) as Value;
 
       return {
         e: entity,
-        a: String(row.attribute),
+        a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        added: Boolean(row.added),
+        op: row.op as "add" | "retract",
       };
     });
   }
@@ -212,15 +212,15 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const params: unknown[] = [];
 
     if (options.e !== undefined) {
-      conditions.push("entity = ?");
+      conditions.push("e = ?");
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("attribute = ?");
+      conditions.push("a = ?");
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
-      conditions.push("value = ?");
+      conditions.push("v = ?");
       let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
@@ -236,15 +236,15 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     // Use SQL-level deduplication with ROW_NUMBER() window function
-    // Deduplicate by (entity, attribute, value) to support multi-valued attributes
-    const partitionByColumns = "entity, attribute, value";
+    // Deduplicate by (e, a, v) to support multi-valued attributes
+    const partitionByColumns = "e, a, v";
 
-    // Build the added filter
-    let addedFilter = "";
-    if (options.added === true || options.added === undefined) {
-      addedFilter = "AND added = 1";
-    } else if (options.added === false) {
-      addedFilter = "AND added = 0";
+    // Build the op filter
+    let opFilter = "";
+    if (options.add === true || options.add === undefined) {
+      opFilter = "AND op = 'add'";
+    } else if (options.add === false) {
+      opFilter = "AND op = 'retract'";
     }
 
     const limitClause = options.limit ? "LIMIT ?" : "";
@@ -253,11 +253,11 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const sql = `
       WITH ranked_datoms AS (
         SELECT 
-          entity,
-          attribute,
-          value,
+          e,
+          a,
+          v,
           tx,
-          added,
+          op,
           ROW_NUMBER() OVER (
             PARTITION BY ${partitionByColumns}
             ORDER BY tx DESC
@@ -266,20 +266,20 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         ${whereClause}
       )
       SELECT 
-        entity,
-        attribute,
-        value,
+        e,
+        a,
+        v,
         tx,
-        added
+        op
       FROM ranked_datoms
       WHERE rn = 1
-      ${addedFilter}
+      ${opFilter}
       ORDER BY
         CASE 
-          WHEN entity GLOB '-[0-9]*' OR entity GLOB '[0-9]*' THEN CAST(entity AS INTEGER)
+          WHEN e GLOB '-[0-9]*' OR e GLOB '[0-9]*' THEN CAST(e AS INTEGER)
           ELSE 0
         END,
-        attribute
+        a
       ${limitClause}
       ${offsetClause}
     `;
@@ -323,22 +323,22 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     };
 
     return rows.map((row: Record<string, unknown>) => {
-      let entity: EntityId = row.entity as EntityId;
+      let entity: EntityId = row.e as EntityId;
       if (typeof entity === "string") {
         if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
       }
 
-      const parsedValue: unknown = JSON.parse(String(row.value));
+      const parsedValue: unknown = JSON.parse(String(row.v));
       const revivedValue = reviveValue(parsedValue) as Value;
 
       return {
         e: entity,
-        a: String(row.attribute),
+        a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        added: Boolean(row.added),
+        op: row.op as "add" | "retract",
       };
     });
   }
@@ -354,15 +354,15 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("entity = ?");
+      conditions.push("e = ?");
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("attribute = ?");
+      conditions.push("a = ?");
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
-      conditions.push("value = ?");
+      conditions.push("v = ?");
       let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
@@ -381,37 +381,37 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // Use ROW_NUMBER() OVER to deduplicate by (entity, attribute)
+    // Use ROW_NUMBER() OVER to deduplicate by (e, a)
     // This keeps the latest value per attribute (asOf semantics)
     const sql = `
       WITH ranked_datoms AS (
         SELECT 
-          entity,
-          attribute,
-          value,
+          e,
+          a,
+          v,
           tx,
-          added,
+          op,
           ROW_NUMBER() OVER (
-            PARTITION BY entity, attribute
+            PARTITION BY e, a
             ORDER BY tx DESC
           ) AS rn
         FROM ${this.tableName}
         ${whereClause}
       )
       SELECT 
-        entity,
-        attribute,
-        value,
+        e,
+        a,
+        v,
         tx,
-        added
+        op
       FROM ranked_datoms
-      WHERE rn = 1 AND added = 1
+      WHERE rn = 1 AND op = 'add'
       ORDER BY
         CASE 
-          WHEN entity GLOB '-[0-9]*' OR entity GLOB '[0-9]*' THEN CAST(entity AS INTEGER)
+          WHEN e GLOB '-[0-9]*' OR e GLOB '[0-9]*' THEN CAST(e AS INTEGER)
           ELSE 0
         END,
-        attribute
+        a
       ${limitClause}
       ${offsetClause}
     `;
@@ -435,15 +435,15 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("entity = ?");
+      conditions.push("e = ?");
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("attribute = ?");
+      conditions.push("a = ?");
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
-      conditions.push("value = ?");
+      conditions.push("v = ?");
       let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
@@ -461,17 +461,17 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // History query: no deduplication, include all datoms including retracted
+    // History query: no deduplication, include all datoms including retract
     const sql = `
       SELECT 
-        entity,
-        attribute,
-        value,
+        e,
+        a,
+        v,
         tx,
-        added
+        op
       FROM ${this.tableName}
       ${whereClause}
-      ORDER BY tx ASC, entity ASC, attribute ASC
+      ORDER BY tx ASC, e ASC, a ASC
       ${limitClause}
       ${offsetClause}
     `;
@@ -498,15 +498,15 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("entity = ?");
+      conditions.push("e = ?");
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("attribute = ?");
+      conditions.push("a = ?");
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
-      conditions.push("value = ?");
+      conditions.push("v = ?");
       let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
@@ -524,36 +524,36 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // Use ROW_NUMBER() OVER to deduplicate by (entity, attribute, value)
+    // Use ROW_NUMBER() OVER to deduplicate by (e, a, v)
     const sql = `
       WITH ranked_datoms AS (
         SELECT 
-          entity,
-          attribute,
-          value,
+          e,
+          a,
+          v,
           tx,
-          added,
+          op,
           ROW_NUMBER() OVER (
-            PARTITION BY entity, attribute, value
+            PARTITION BY e, a, v
             ORDER BY tx DESC
           ) AS rn
         FROM ${this.tableName}
         ${whereClause}
       )
       SELECT 
-        entity,
-        attribute,
-        value,
+        e,
+        a,
+        v,
         tx,
-        added
+        op
       FROM ranked_datoms
-      WHERE rn = 1 AND added = 1
+      WHERE rn = 1 AND op = 'add'
       ORDER BY
         CASE 
-          WHEN entity GLOB '-[0-9]*' OR entity GLOB '[0-9]*' THEN CAST(entity AS INTEGER)
+          WHEN e GLOB '-[0-9]*' OR e GLOB '[0-9]*' THEN CAST(e AS INTEGER)
           ELSE 0
         END,
-        attribute
+        a
       ${limitClause}
       ${offsetClause}
     `;
@@ -604,22 +604,22 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     };
 
     return rows.map((row: Record<string, unknown>) => {
-      let entity: EntityId = row.entity as EntityId;
+      let entity: EntityId = row.e as EntityId;
       if (typeof entity === "string") {
         if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
       }
 
-      const parsedValue: unknown = JSON.parse(String(row.value));
+      const parsedValue: unknown = JSON.parse(String(row.v));
       const revivedValue = reviveValue(parsedValue) as Value;
 
       return {
         e: entity,
-        a: String(row.attribute),
+        a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        added: Boolean(row.added),
+        op: row.op as "add" | "retract",
       };
     });
   }
@@ -646,7 +646,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         e: entity,
         a: attribute,
         v: value,
-        added: true,
+        add: true,
       });
 
       const results = datoms.map((datom) => {
@@ -690,11 +690,11 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
       // Add filters for bound values
       if (!isVariable(entityVal)) {
-        conditions.push(`entity = ?`);
+        conditions.push(`e = ?`);
         params.push(String(entityVal));
       }
       if (!isVariable(attributeVal)) {
-        conditions.push(`attribute = ?`);
+        conditions.push(`a = ?`);
         params.push(String(attributeVal));
       }
       if (!isVariable(valueVal)) {
@@ -702,7 +702,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         if (value === undefined) {
           value = "__UNDEFINED__";
         }
-        conditions.push(`value = ?`);
+        conditions.push(`v = ?`);
         params.push(JSON.stringify(value));
       }
 
@@ -710,16 +710,16 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
       // Use ROW_NUMBER for deduplication
-      const partitionBy = "entity, attribute, value";
+      const partitionBy = "e, a, v";
 
       const rankedCte = `
         ${alias}_ranked AS (
           SELECT 
-            entity,
-            attribute,
-            value,
+            e,
+            a,
+            v,
             tx,
-            added,
+            op,
             ROW_NUMBER() OVER (
               PARTITION BY ${partitionBy}
               ORDER BY tx DESC
@@ -730,9 +730,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
       const cte = `
         ${alias} AS (
-          SELECT entity, attribute, value, tx
+          SELECT e, a, v, tx
           FROM ${alias}_ranked
-          WHERE rn = 1 AND added = 1
+          WHERE rn = 1 AND op = 'add'
         )`;
 
       // Store ranked CTE separately, then the final CTE
@@ -742,19 +742,17 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       // Build SELECT columns for variables
       if (isVariable(entityVal)) {
         selectColumns.push(
-          `${alias}.entity AS ${this.escapeColumnName(entityVal as string)}`
+          `${alias}.e AS ${this.escapeColumnName(entityVal as string)}`
         );
       }
       if (isVariable(attributeVal)) {
         selectColumns.push(
-          `${alias}.attribute AS ${this.escapeColumnName(
-            attributeVal as string
-          )}`
+          `${alias}.a AS ${this.escapeColumnName(attributeVal as string)}`
         );
       }
       if (isVariable(valueVal)) {
         selectColumns.push(
-          `${alias}.value AS ${this.escapeColumnName(valueVal as string)}`
+          `${alias}.v AS ${this.escapeColumnName(valueVal as string)}`
         );
       }
     }
@@ -774,25 +772,21 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         if (!variableToClause.has(varName)) {
           variableToClause.set(varName, []);
         }
-        variableToClause
-          .get(varName)!
-          .push({ clauseIndex: i, field: "entity" });
+        variableToClause.get(varName)!.push({ clauseIndex: i, field: "e" });
       }
       if (isVariable(attributeVal)) {
         const varName = attributeVal as string;
         if (!variableToClause.has(varName)) {
           variableToClause.set(varName, []);
         }
-        variableToClause
-          .get(varName)!
-          .push({ clauseIndex: i, field: "attribute" });
+        variableToClause.get(varName)!.push({ clauseIndex: i, field: "a" });
       }
       if (isVariable(valueVal)) {
         const varName = valueVal as string;
         if (!variableToClause.has(varName)) {
           variableToClause.set(varName, []);
         }
-        variableToClause.get(varName)!.push({ clauseIndex: i, field: "value" });
+        variableToClause.get(varName)!.push({ clauseIndex: i, field: "v" });
       }
     }
 
@@ -858,13 +852,13 @@ export class SQLiteDatomDatabase extends DatomDatabase {
             const clause = clauses[i];
             const [entityVal, attributeVal, valueVal] = clause;
             if (entityVal === variable) {
-              return `d${i}.entity ${direction.toUpperCase()}`;
+              return `d${i}.e ${direction.toUpperCase()}`;
             }
             if (attributeVal === variable) {
-              return `d${i}.attribute ${direction.toUpperCase()}`;
+              return `d${i}.a ${direction.toUpperCase()}`;
             }
             if (valueVal === variable) {
-              return `d${i}.value ${direction.toUpperCase()}`;
+              return `d${i}.v ${direction.toUpperCase()}`;
             }
           }
           return "";
@@ -1042,7 +1036,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     const placeholders = datoms.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const sql = `
-      INSERT INTO ${this.tableName} (entity, attribute, value, tx, added)
+      INSERT INTO ${this.tableName} (e, a, v, tx, op)
       VALUES ${placeholders}
       ON CONFLICT DO NOTHING
     `;
@@ -1052,7 +1046,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, true];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, "add"];
     });
 
     await this.connection.execute(sql, params);
@@ -1066,7 +1060,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     const placeholders = datoms.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const sql = `
-      INSERT INTO ${this.tableName} (entity, attribute, value, tx, added)
+      INSERT INTO ${this.tableName} (e, a, v, tx, op)
       VALUES ${placeholders}
       ON CONFLICT DO NOTHING
     `;
@@ -1076,7 +1070,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, false];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, "retract"];
     });
 
     await this.connection.execute(sql, params);
@@ -1160,16 +1154,16 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   > {
     const stats: Partial<import("../types.js").DatabaseStats> = {};
 
-    // Count total datoms (only added ones, latest version)
+    // Count total datoms (only add ones, latest version)
     const countSql = `
       WITH latest_datoms AS (
-        SELECT entity, attribute, value, tx, added,
-               ROW_NUMBER() OVER (PARTITION BY entity, attribute, value ORDER BY tx DESC) as rn
+        SELECT e, a, v, tx, op,
+               ROW_NUMBER() OVER (PARTITION BY e, a, v ORDER BY tx DESC) as rn
         FROM ${this.tableName}
       )
       SELECT COUNT(*) as count
       FROM latest_datoms
-      WHERE rn = 1 AND added = 1
+      WHERE rn = 1 AND op = 'add'
     `;
     const countResult = await this.connection.query(countSql);
     const countRow = countResult[0] as Record<string, unknown> | undefined;
@@ -1178,9 +1172,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     // Count unique entities
     const entitySql = `
-      SELECT COUNT(DISTINCT entity) as count
+      SELECT COUNT(DISTINCT e) as count
       FROM ${this.tableName}
-      WHERE added = 1
+      WHERE op = 'add'
     `;
     const entityResult = await this.connection.query(entitySql);
     const entityRow = entityResult[0] as Record<string, unknown> | undefined;

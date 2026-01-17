@@ -44,14 +44,24 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
   async initialize(): Promise<void> {
     if (!this.initialized) {
+      // Create enum type for op column (handle error if already exists)
+      try {
+        await this.connection.execute(`
+          CREATE TYPE datom_op AS ENUM ('add', 'retract')
+        `);
+      } catch (error) {
+        // Type already exists, ignore error
+        // PostgreSQL doesn't support IF NOT EXISTS for CREATE TYPE
+      }
+
       const createTableSql = `
         CREATE TABLE IF NOT EXISTS ${this.tableName} (
-          entity TEXT NOT NULL,
-          attribute TEXT NOT NULL,
-          value JSONB NOT NULL,
+          e TEXT NOT NULL,
+          a TEXT NOT NULL,
+          v JSONB NOT NULL,
           tx BIGINT NOT NULL,
-          added BOOLEAN NOT NULL,
-          PRIMARY KEY (entity, attribute, value, tx, added)
+          op datom_op NOT NULL,
+          PRIMARY KEY (e, a, v, tx, op)
         )
       `;
 
@@ -59,13 +69,13 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       // Note: INCLUDE clause not used for PGLite compatibility (requires PostgreSQL 11+)
       const indexes = [
         // Composite index for entity+attribute queries (most common pattern)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_entity_attr_tx ON ${this.tableName}(entity, attribute, tx DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_e_a_tx ON ${this.tableName}(e, a, tx DESC)`,
         // Composite index for attribute+value queries
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_attr_value_tx ON ${this.tableName}(attribute, value, tx DESC)`,
-        // Partial index for added=true (most common case - only active datoms)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(entity, attribute, tx DESC) WHERE added = true`,
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_v_tx ON ${this.tableName}(a, v, tx DESC)`,
+        // Partial index for op='add' (most common case - only active datoms)
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(e, a, tx DESC) WHERE op = 'add'`,
         // GIN index for JSONB value queries (containment, key existence, etc.)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_value_gin ON ${this.tableName} USING GIN (value)`,
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_v_gin ON ${this.tableName} USING GIN (v)`,
         // Index on tx for transaction-based queries
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx DESC)`,
       ];
@@ -157,11 +167,11 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
     // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
     if (options.e !== undefined) {
-      conditions.push("entity = ?");
+      conditions.push("e = ?");
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("attribute = ?");
+      conditions.push("a = ?");
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
@@ -169,7 +179,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      conditions.push("value = ?::jsonb");
+      conditions.push("v = ?::jsonb");
       params.push(JSON.stringify(value));
     }
     if (options.tx !== undefined) {
@@ -183,14 +193,14 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     // Query without deduplication - return all matching datoms
     const sql = `
       SELECT 
-        entity,
-        attribute,
-        value,
+        e,
+        a,
+        v,
         tx,
-        added
+        op
       FROM ${this.tableName}
       ${whereClause}
-      ORDER BY tx ASC, entity ASC, attribute ASC
+      ORDER BY tx ASC, e ASC, a ASC
     `;
 
     const rows = await this.connection.query(sql, params);
@@ -225,23 +235,34 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     };
 
     return rows.map((row: DatabaseRow) => {
-      let entity: EntityId = row.entity as EntityId;
+      let entity: EntityId = row.e as EntityId;
       if (typeof entity === "string") {
         if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
       }
 
-      const parsedValue: unknown =
-        typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+      // PostgreSQL JSONB returns as parsed object, but connection adapter may stringify it
+      // Handle both cases: already parsed or string that needs parsing
+      let parsedValue: unknown = row.v;
+      if (typeof row.v === "string") {
+        // Try to parse as JSON, but if it fails, use the string as-is
+        // This handles cases where JSONB returns simple strings directly
+        try {
+          parsedValue = JSON.parse(row.v);
+        } catch {
+          // Not valid JSON, use as plain string
+          parsedValue = row.v;
+        }
+      }
       const revivedValue = reviveValue(parsedValue) as Value;
 
       return {
         e: entity,
-        a: String(row.attribute),
+        a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        added: Boolean(row.added),
+        op: row.op as "add" | "retract",
       };
     });
   }
@@ -256,11 +277,11 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
     // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
     if (options.e !== undefined) {
-      conditions.push("entity = ?");
+      conditions.push("e = ?");
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("attribute = ?");
+      conditions.push("a = ?");
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
@@ -268,7 +289,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      conditions.push("value = ?::jsonb");
+      conditions.push("v = ?::jsonb");
       params.push(JSON.stringify(value));
     }
     if (options.tx !== undefined) {
@@ -276,52 +297,52 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       params.push(options.tx);
     }
 
-    // Use DISTINCT ON to get latest datom per (entity, attribute, value) in SQL
+    // Use DISTINCT ON to get latest datom per (e, a, v) in SQL
     // This supports multi-valued attributes (multiple values per attribute)
     // PostgreSQL-specific: DISTINCT ON with ORDER BY for efficient latest-row-per-group
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
     // We need to include retractions in DISTINCT ON to correctly determine the latest state.
-    // We filter by added AFTER DISTINCT ON. This ensures that if a datom was added then retracted, the retraction wins.
+    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was add then retract, the retraction wins.
     const combinedWhereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    // Use DISTINCT ON (entity, attribute, value) to support multi-valued attributes
-    const distinctOnColumns = "entity, attribute, value";
-    const orderByColumns = "entity, attribute, value, tx DESC";
+    // Use DISTINCT ON (e, a, v) to support multi-valued attributes
+    const distinctOnColumns = "e, a, v";
+    const orderByColumns = "e, a, v, tx DESC";
 
-    // Build the added filter for after DISTINCT ON
-    // Default behavior: filter to only added datoms (exclude retracted)
-    let addedFilterAfter = "";
-    if (options.added === true || options.added === undefined) {
-      addedFilterAfter = "WHERE added = true";
-    } else if (options.added === false) {
-      addedFilterAfter = "WHERE added = false";
+    // Build the op filter for after DISTINCT ON
+    // Default behavior: filter to only add datoms (exclude retract)
+    let opFilterAfter = "";
+    if (options.add === true || options.add === undefined) {
+      opFilterAfter = "WHERE op = 'add'";
+    } else if (options.add === false) {
+      opFilterAfter = "WHERE op = 'retract'";
     }
 
     const sql = `
       WITH latest_datoms AS (
         SELECT DISTINCT ON (${distinctOnColumns})
-          entity, attribute, value, tx, added
+          e, a, v, tx, op
         FROM ${this.tableName}
         ${combinedWhereClause}
         ORDER BY ${orderByColumns}
       )
       SELECT 
-        entity,
-        attribute,
-        value,
+        e,
+        a,
+        v,
         tx,
-        added
+        op
       FROM latest_datoms
-      ${addedFilterAfter}
+      ${opFilterAfter}
       ORDER BY
         CASE 
-          WHEN entity ~ '^-{0,1}[0-9]+$' THEN entity::BIGINT 
+          WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
           ELSE 0 
         END,
-        attribute
+        a
       ${limitClause}
       ${offsetClause}
     `;
@@ -365,25 +386,34 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     };
 
     return rows.map((row: DatabaseRow) => {
-      let entity: EntityId = row.entity as EntityId;
+      let entity: EntityId = row.e as EntityId;
       if (typeof entity === "string") {
         if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
       }
 
-      // PostgreSQL JSONB returns as parsed object, but connection adapter stringifies it
-      // So we still need to parse
-      const parsedValue: unknown =
-        typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+      // PostgreSQL JSONB returns as parsed object, but connection adapter may stringify it
+      // Handle both cases: already parsed or string that needs parsing
+      let parsedValue: unknown = row.v;
+      if (typeof row.v === "string") {
+        // Try to parse as JSON, but if it fails, use the string as-is
+        // This handles cases where JSONB returns simple strings directly
+        try {
+          parsedValue = JSON.parse(row.v);
+        } catch {
+          // Not valid JSON, use as plain string
+          parsedValue = row.v;
+        }
+      }
       const revivedValue = reviveValue(parsedValue) as Value;
 
       return {
         e: entity,
-        a: String(row.attribute),
+        a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        added: Boolean(row.added),
+        op: row.op as "add" | "retract",
       };
     });
   }
@@ -399,11 +429,11 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("entity = ?");
+      conditions.push("e = ?");
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("attribute = ?");
+      conditions.push("a = ?");
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
@@ -411,7 +441,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      conditions.push("value = ?::jsonb");
+      conditions.push("v = ?::jsonb");
       params.push(JSON.stringify(value));
     }
 
@@ -426,33 +456,33 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // Use DISTINCT ON (entity, attribute) to deduplicate by entity-attribute pair
+    // Use DISTINCT ON (e, a) to deduplicate by entity-attribute pair
     // This keeps the latest value per attribute (asOf semantics)
     const sql = `
-      SELECT DISTINCT ON (entity, attribute)
-        entity, attribute, value, tx, added
+      SELECT DISTINCT ON (e, a)
+        e, a, v, tx, op
       FROM ${this.tableName}
       ${whereClause}
-      ORDER BY entity, attribute, tx DESC
+      ORDER BY e, a, tx DESC
     `;
 
-    // Filter to only added datoms after DISTINCT ON
+    // Filter to only add datoms after DISTINCT ON
     const finalSql = `
       WITH latest_datoms AS (${sql})
       SELECT 
-        entity,
-        attribute,
-        value,
+        e,
+        a,
+        v,
         tx,
-        added
+        op
       FROM latest_datoms
-      WHERE added = true
+      WHERE op = 'add'
       ORDER BY
         CASE 
-          WHEN entity ~ '^-{0,1}[0-9]+$' THEN entity::BIGINT 
+          WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
           ELSE 0 
         END,
-        attribute
+        a
       ${limitClause}
       ${offsetClause}
     `;
@@ -476,11 +506,11 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("entity = ?");
+      conditions.push("e = ?");
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("attribute = ?");
+      conditions.push("a = ?");
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
@@ -488,7 +518,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      conditions.push("value = ?::jsonb");
+      conditions.push("v = ?::jsonb");
       params.push(JSON.stringify(value));
     }
     if (options.tx !== undefined) {
@@ -502,17 +532,17 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // History query: no deduplication, include all datoms including retracted
+    // History query: no deduplication, include all datoms including retract
     const sql = `
       SELECT 
-        entity,
-        attribute,
-        value,
+        e,
+        a,
+        v,
         tx,
-        added
+        op
       FROM ${this.tableName}
       ${whereClause}
-      ORDER BY tx ASC, entity ASC, attribute ASC
+      ORDER BY tx ASC, e ASC, a ASC
       ${limitClause}
       ${offsetClause}
     `;
@@ -539,11 +569,11 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("entity = ?");
+      conditions.push("e = ?");
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("attribute = ?");
+      conditions.push("a = ?");
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
@@ -551,7 +581,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      conditions.push("value = ?::jsonb");
+      conditions.push("v = ?::jsonb");
       params.push(JSON.stringify(value));
     }
 
@@ -565,32 +595,32 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // Use DISTINCT ON (entity, attribute, value) for normal deduplication
+    // Use DISTINCT ON (e, a, v) for normal deduplication
     const sql = `
-      SELECT DISTINCT ON (entity, attribute, value)
-        entity, attribute, value, tx, added
+      SELECT DISTINCT ON (e, a, v)
+        e, a, v, tx, op
       FROM ${this.tableName}
       ${whereClause}
-      ORDER BY entity, attribute, value, tx DESC
+      ORDER BY e, a, v, tx DESC
     `;
 
-    // Filter to only added datoms after DISTINCT ON
+    // Filter to only add datoms after DISTINCT ON
     const finalSql = `
       WITH latest_datoms AS (${sql})
       SELECT 
-        entity,
-        attribute,
-        value,
+        e,
+        a,
+        v,
         tx,
-        added
+        op
       FROM latest_datoms
-      WHERE added = true
+      WHERE op = 'add'
       ORDER BY
         CASE 
-          WHEN entity ~ '^-{0,1}[0-9]+$' THEN entity::BIGINT 
+          WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
           ELSE 0 
         END,
-        attribute
+        a
       ${limitClause}
       ${offsetClause}
     `;
@@ -641,23 +671,34 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     };
 
     return rows.map((row: DatabaseRow) => {
-      let entity: EntityId = row.entity as EntityId;
+      let entity: EntityId = row.e as EntityId;
       if (typeof entity === "string") {
         if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
       }
 
-      const parsedValue: unknown =
-        typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+      // PostgreSQL JSONB returns as parsed object, but connection adapter may stringify it
+      // Handle both cases: already parsed or string that needs parsing
+      let parsedValue: unknown = row.v;
+      if (typeof row.v === "string") {
+        // Try to parse as JSON, but if it fails, use the string as-is
+        // This handles cases where JSONB returns simple strings directly
+        try {
+          parsedValue = JSON.parse(row.v);
+        } catch {
+          // Not valid JSON, use as plain string
+          parsedValue = row.v;
+        }
+      }
       const revivedValue = reviveValue(parsedValue) as Value;
 
       return {
         e: entity,
-        a: String(row.attribute),
+        a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        added: Boolean(row.added),
+        op: row.op as "add" | "retract",
       };
     });
   }
@@ -762,7 +803,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
     const placeholders = datoms.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const sql = `
-      INSERT INTO ${this.tableName} (entity, attribute, value, tx, added)
+      INSERT INTO ${this.tableName} (e, a, v, tx, op)
       VALUES ${placeholders}
       ON CONFLICT DO NOTHING
     `;
@@ -772,7 +813,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, true];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, "add"];
     });
 
     await this.connection.execute(sql, params);
@@ -786,7 +827,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
     const placeholders = datoms.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const sql = `
-      INSERT INTO ${this.tableName} (entity, attribute, value, tx, added)
+      INSERT INTO ${this.tableName} (e, a, v, tx, op)
       VALUES ${placeholders}
       ON CONFLICT DO NOTHING
     `;
@@ -796,7 +837,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, false];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, "retract"];
     });
 
     await this.connection.execute(sql, params);
@@ -880,18 +921,18 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   > {
     const stats: Partial<import("../types.js").DatabaseStats> = {};
 
-    // Count total datoms (only added ones, latest version)
+    // Count total datoms (only add ones, latest version)
     // PostgreSQL-specific: Use DISTINCT ON for efficient latest-row-per-group
     const countSql = `
       WITH latest_datoms AS (
-        SELECT DISTINCT ON (entity, attribute, value)
-          entity, attribute, value, tx, added
+        SELECT DISTINCT ON (e, a, v)
+          e, a, v, tx, op
         FROM ${this.tableName}
-        ORDER BY entity, attribute, value, tx DESC
+        ORDER BY e, a, v, tx DESC
       )
       SELECT COUNT(*) as count
       FROM latest_datoms
-      WHERE added = true
+      WHERE op = 'add'
     `;
     const countResult = await this.connection.query(countSql);
     const countRow = countResult[0] as Record<string, unknown> | undefined;
@@ -903,9 +944,9 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
     // Count unique entities
     const entitySql = `
-      SELECT COUNT(DISTINCT entity) as count
+      SELECT COUNT(DISTINCT e) as count
       FROM ${this.tableName}
-      WHERE added = true
+      WHERE op = 'add'
     `;
     const entityResult = await this.connection.query(entitySql);
     const entityRow = entityResult[0] as Record<string, unknown> | undefined;

@@ -21,8 +21,8 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
     test("should return async iterable", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 2, a: "name", v: "Bob" },
       ]);
 
       const datoms: Datom[] = [];
@@ -38,10 +38,10 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
     test("should export with filters", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 1, a: "age", v: 30 },
-        { op: "added", e: 2, a: "name", v: "Bob" },
-        { op: "added", e: 2, a: "age", v: 25 },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 1, a: "age", v: 30 },
+        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 2, a: "age", v: 25 },
       ]);
 
       const datoms: Datom[] = [];
@@ -56,9 +56,9 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
     test("should export without filters (full scan)", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 2, a: "name", v: "Bob" },
-        { op: "added", e: 3, a: "name", v: "Charlie" },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 3, a: "name", v: "Charlie" },
       ]);
 
       const datoms: Datom[] = [];
@@ -72,8 +72,8 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
     test("should emit backup events", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 2, a: "name", v: "Bob" },
       ]);
 
       const observableDb = new ObservableDatabase(db);
@@ -144,8 +144,8 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
     test("should import from async iterable", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 2, a: "name", v: "Bob" },
       ]);
 
       // Export datoms
@@ -182,7 +182,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       // Create many datoms
       const datoms: Datom[] = [];
       for (let i = 1; i <= 50; i++) {
-        await db.transact([{ op: "added", e: i, a: "name", v: `Entity${i}` }]);
+        await db.transact([{ op: "add", e: i, a: "name", v: `Entity${i}` }]);
         const entityDatoms = await db.datoms({ e: i });
         datoms.push(...entityDatoms);
       }
@@ -225,7 +225,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         type: "number",
       });
 
-      await db.transact([{ op: "added", e: 1, a: "age", v: 30 }]);
+      await db.transact([{ op: "add", e: 1, a: "age", v: 30 }]);
 
       // Export
       const exported: Datom[] = [];
@@ -267,7 +267,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should import without validation", async () => {
       const { db } = f;
-      await db.transact([{ op: "added", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       // Export
       const exported: Datom[] = [];
@@ -298,8 +298,8 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
     test("should emit restore events", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 2, a: "name", v: "Bob" },
       ]);
 
       // Export
@@ -356,7 +356,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         a: "age",
         v: "not-a-number",
         tx: 1,
-        added: true,
+        op: "add",
       };
 
       const observableDb = new ObservableDatabase(db);

@@ -30,7 +30,7 @@
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
     "docker:ps": "docker-compose ps",
-    "docker:clean": "docker-compose down -v",
+    "docker:destroy": "docker-compose down -v",
     "psql": "docker-compose exec postgres psql -U datoms -d datoms_test"
   },
   "keywords": [],

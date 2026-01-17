@@ -16,16 +16,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   });
 
   describe("Database query (Datalog)", () => {
-    test("should exclude retracted datoms from query results", async () => {
+    test("should exclude retract datoms from query results", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 2, a: "name", v: "Bob" },
-        { op: "added", e: 3, a: "name", v: "Charlie" },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 3, a: "name", v: "Charlie" },
       ]);
 
       // Retract one datom
-      await db.transact([{ op: "retracted", e: 2, a: "name", v: "Bob" }]);
+      await db.transact([{ op: "retract", e: 2, a: "name", v: "Bob" }]);
 
       const query: DatalogQuery = {
         find: ["?name"],
@@ -44,10 +44,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       // Create a graph where nodes can connect to themselves
       await db.transact([
-        { op: "added", e: 1, a: "connects", v: 2 },
-        { op: "added", e: 1, a: "connects", v: 1 }, // self-connection
-        { op: "added", e: 2, a: "connects", v: 3 },
-        { op: "added", e: 3, a: "connects", v: 3 }, // self-connection
+        { op: "add", e: 1, a: "connects", v: 2 },
+        { op: "add", e: 1, a: "connects", v: 1 }, // self-connection
+        { op: "add", e: 2, a: "connects", v: 3 },
+        { op: "add", e: 3, a: "connects", v: 3 }, // self-connection
       ]);
 
       // Find all self-connections where entity equals value
@@ -83,9 +83,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       // Create a circular graph: 1 -> 2 -> 3 -> 1
       await db.transact([
-        { op: "added", e: 1, a: "next", v: 2 },
-        { op: "added", e: 2, a: "next", v: 3 },
-        { op: "added", e: 3, a: "next", v: 1 },
+        { op: "add", e: 1, a: "next", v: 2 },
+        { op: "add", e: 2, a: "next", v: 3 },
+        { op: "add", e: 3, a: "next", v: 1 },
       ]);
 
       // Find all next relationships
@@ -107,14 +107,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle variable binding across disconnected clauses", async () => {
       const { db } = f;
       await db.transact([
-        { op: "added", e: 1, a: "name", v: "Alice" },
-        { op: "added", e: 1, a: "age", v: 30 },
-        { op: "added", e: 2, a: "name", v: "Bob" },
-        { op: "added", e: 2, a: "age", v: 25 },
-        { op: "added", e: 10, a: "employee", v: 1 },
-        { op: "added", e: 10, a: "department", v: "Engineering" },
-        { op: "added", e: 11, a: "employee", v: 2 },
-        { op: "added", e: 11, a: "department", v: "Sales" },
+        { op: "add", e: 1, a: "name", v: "Alice" },
+        { op: "add", e: 1, a: "age", v: 30 },
+        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "add", e: 2, a: "age", v: 25 },
+        { op: "add", e: 10, a: "employee", v: 1 },
+        { op: "add", e: 10, a: "department", v: "Engineering" },
+        { op: "add", e: 11, a: "employee", v: 2 },
+        { op: "add", e: 11, a: "department", v: "Sales" },
       ]);
 
       // Find employees and their departments through a join entity

@@ -59,8 +59,8 @@ export class ObservableDatabase {
     ops: TransactOperations,
     metadata?: Record<string, unknown>
   ): Promise<TransactionId> {
-    const addedCount = ops.filter((op) => op.op === "added").length;
-    const retractedCount = ops.filter((op) => op.op === "retracted").length;
+    const addCount = ops.filter((op) => op.op === "add").length;
+    const retractCount = ops.filter((op) => op.op === "retract").length;
     const startTime = Date.now();
 
     try {
@@ -75,8 +75,8 @@ export class ObservableDatabase {
       await this.emitEvent({
         type: "transaction",
         txId,
-        addedCount,
-        retractedCount,
+        addCount,
+        retractCount,
         metadata,
       });
 
@@ -88,8 +88,8 @@ export class ObservableDatabase {
         error: error instanceof Error ? error : new Error(String(error)),
         context: {
           operation: "transact",
-          addedCount,
-          retractedCount,
+          addCount,
+          retractCount,
         },
       });
       throw error;
@@ -328,8 +328,8 @@ export class ObservableDatabase {
 
       if (event.type === "transaction") {
         logMeta.txId = event.txId;
-        logMeta.addedCount = event.addedCount;
-        logMeta.retractedCount = event.retractedCount;
+        logMeta.addCount = event.addCount;
+        logMeta.retractCount = event.retractCount;
       } else if (event.type === "query") {
         logMeta.resultCount = event.resultCount;
         logMeta.duration = event.duration;

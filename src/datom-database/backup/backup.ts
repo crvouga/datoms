@@ -66,58 +66,58 @@ export async function importDatoms(
   const validate = options?.validate ?? true;
   let datomCount = 0;
   let batch: DatomInput[] = [];
-  let batchAdded: boolean[] = []; // Track which datoms in batch are added vs retracted
+  let batchadd: boolean[] = []; // Track which datoms in batch are add vs retract
 
   for await (const datom of source) {
     // Convert Datom to DatomInput
     batch.push({ e: datom.e, a: datom.a, v: datom.v });
-    batchAdded.push(datom.added);
+    batchadd.push(datom.op === "add");
 
     if (batch.length >= batchSize) {
-      // Process batch: separate added and retracted datoms
-      const addedBatch: DatomInput[] = [];
-      const retractedBatch: DatomInput[] = [];
+      // Process batch: separate add and retract datoms
+      const addBatch: DatomInput[] = [];
+      const retractBatch: DatomInput[] = [];
       for (let i = 0; i < batch.length; i++) {
-        if (batchAdded[i]) {
-          addedBatch.push(batch[i]);
+        if (batchadd[i]) {
+          addBatch.push(batch[i]);
         } else {
-          retractedBatch.push(batch[i]);
+          retractBatch.push(batch[i]);
         }
       }
 
       // Deduplicate batches: keep only the latest occurrence of each (entity, attribute, value) pair
-      const dedupeAdded = deduplicateBatch(addedBatch);
-      const dedupeRetracted = deduplicateBatch(retractedBatch);
+      const dedupeadd = deduplicateBatch(addBatch);
+      const deduperetract = deduplicateBatch(retractBatch);
 
       if (validate) {
-        if (dedupeAdded.length > 0) {
+        if (dedupeadd.length > 0) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          await (db as any).validateDatoms(dedupeAdded, true);
+          await (db as any).validateDatoms(dedupeadd, true);
         }
-        if (dedupeRetracted.length > 0) {
+        if (deduperetract.length > 0) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          await (db as any).validateDatoms(dedupeRetracted, false);
+          await (db as any).validateDatoms(deduperetract, false);
         }
       }
 
       // Filter out datoms that already exist with the same value (idempotent import)
-      const filteredAdded = await filterExistingDatoms(db, dedupeAdded);
-      const filteredRetracted = await filterExistingDatoms(db, dedupeRetracted);
+      const filteredadd = await filterExistingDatoms(db, dedupeadd);
+      const filteredretract = await filterExistingDatoms(db, deduperetract);
 
-      if (filteredAdded.length > 0) {
+      if (filteredadd.length > 0) {
         await db.transact(
-          filteredAdded.map((d) => ({
-            op: "added" as const,
+          filteredadd.map((d) => ({
+            op: "add" as const,
             e: d.e,
             a: d.a,
             v: d.v,
           }))
         );
       }
-      if (filteredRetracted.length > 0) {
+      if (filteredretract.length > 0) {
         await db.transact(
-          filteredRetracted.map((d) => ({
-            op: "retracted" as const,
+          filteredretract.map((d) => ({
+            op: "retract" as const,
             e: d.e,
             a: d.a,
             v: d.v,
@@ -127,56 +127,56 @@ export async function importDatoms(
 
       datomCount += batch.length;
       batch = [];
-      batchAdded = [];
+      batchadd = [];
     }
   }
 
   // Process remaining batch
   if (batch.length > 0) {
-    // Separate added and retracted datoms
-    const addedBatch: DatomInput[] = [];
-    const retractedBatch: DatomInput[] = [];
+    // Separate add and retract datoms
+    const addBatch: DatomInput[] = [];
+    const retractBatch: DatomInput[] = [];
     for (let i = 0; i < batch.length; i++) {
-      if (batchAdded[i]) {
-        addedBatch.push(batch[i]);
+      if (batchadd[i]) {
+        addBatch.push(batch[i]);
       } else {
-        retractedBatch.push(batch[i]);
+        retractBatch.push(batch[i]);
       }
     }
 
     // Deduplicate batches: keep only the latest occurrence of each (entity, attribute, value) pair
-    const dedupeAdded = deduplicateBatch(addedBatch);
-    const dedupeRetracted = deduplicateBatch(retractedBatch);
+    const dedupeadd = deduplicateBatch(addBatch);
+    const deduperetract = deduplicateBatch(retractBatch);
 
     if (validate) {
-      if (dedupeAdded.length > 0) {
+      if (dedupeadd.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        await (db as any).validateDatoms(dedupeAdded, true);
+        await (db as any).validateDatoms(dedupeadd, true);
       }
-      if (dedupeRetracted.length > 0) {
+      if (deduperetract.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        await (db as any).validateDatoms(dedupeRetracted, false);
+        await (db as any).validateDatoms(deduperetract, false);
       }
     }
 
     // Filter out datoms that already exist with the same value (idempotent import)
-    const filteredAdded = await filterExistingDatoms(db, dedupeAdded);
-    const filteredRetracted = await filterExistingDatoms(db, dedupeRetracted);
+    const filteredadd = await filterExistingDatoms(db, dedupeadd);
+    const filteredretract = await filterExistingDatoms(db, deduperetract);
 
-    if (filteredAdded.length > 0) {
+    if (filteredadd.length > 0) {
       await db.transact(
-        filteredAdded.map((d) => ({
-          op: "added" as const,
+        filteredadd.map((d) => ({
+          op: "add" as const,
           e: d.e,
           a: d.a,
           v: d.v,
         }))
       );
     }
-    if (filteredRetracted.length > 0) {
+    if (filteredretract.length > 0) {
       await db.transact(
-        filteredRetracted.map((d) => ({
-          op: "retracted" as const,
+        filteredretract.map((d) => ({
+          op: "retract" as const,
           e: d.e,
           a: d.a,
           v: d.v,

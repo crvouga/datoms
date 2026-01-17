@@ -56,7 +56,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
         a: datom.a,
         v: datom.v,
         tx,
-        added: true,
+        op: "add",
       });
     }
 
@@ -73,7 +73,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
         a: datom.a,
         v: datom.v,
         tx,
-        added: false,
+        op: "retract",
       });
     }
 
@@ -81,9 +81,9 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   }
 
   /**
-   * Check if a datom is currently added (not retracted)
+   * Check if a datom is currently add (not retract)
    */
-  private isCurrentlyAdded(datom: Datom): boolean {
+  private isCurrentlyadd(datom: Datom): boolean {
     // Find the latest transaction for this (entity, attribute, value)
     let latest: Datom | null = null;
     for (const d of this._datomsArray) {
@@ -93,7 +93,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
         }
       }
     }
-    return latest !== null && latest.added;
+    return latest !== null && latest.op === "add";
   }
 
   async datoms(options: QueryOptions): Promise<Datom[]> {
@@ -119,7 +119,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       results = results.filter((d) => d.tx === options.tx);
     }
 
-    // Don't filter by added - return all datoms including retracted
+    // Don't filter by add - return all datoms including retract
     // The view will handle filtering and deduplication
 
     return results;
@@ -144,9 +144,9 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Handle retractions: for each unique (entity, attribute, value) combination,
     // keep only the most recent transaction
-    // This ensures that retracted datoms are not returned when querying
+    // This ensures that retract datoms are not returned when querying
     // and supports multi-valued attributes (multiple values per attribute)
-    // Always deduplicate first, then apply added filter
+    // Always deduplicate first, then apply add filter
 
     // Normal query: deduplicate and filter
     // Deduplicate by (entity, attribute, value) to support multi-valued attributes
@@ -163,13 +163,13 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     }
     results = Array.from(latestDatoms.values());
 
-    // Apply added filter after deduplication
+    // Apply add filter after deduplication
     // Default behavior: filter to only added datoms (exclude retracted)
-    if (options.added === undefined || options.added === true) {
-      results = results.filter((d) => d.added === true);
-    } else if (options.added === false) {
-      // If explicitly requesting retractions, filter by added: false
-      results = results.filter((d) => d.added === false);
+    if (options.add === undefined || options.add === true) {
+      results = results.filter((d) => d.op === "add");
+    } else if (options.add === false) {
+      // If explicitly requesting retractions, filter by op: "retract"
+      results = results.filter((d) => d.op === "retract");
     }
 
     // Apply pagination
@@ -215,8 +215,8 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       }
     }
 
-    // Filter out retracted datoms (keep only added: true)
-    results = Array.from(deduplicated.values()).filter((d) => d.added);
+    // Filter out retract datoms (keep only add: true)
+    results = Array.from(deduplicated.values()).filter((d) => d.op === "add");
 
     // Apply pagination
     const offset = options.offset ?? 0;
@@ -298,8 +298,8 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       }
     }
 
-    // Filter out retracted datoms (keep only added: true)
-    results = Array.from(deduplicated.values()).filter((d) => d.added);
+    // Filter out retract datoms (keep only add: true)
+    results = Array.from(deduplicated.values()).filter((d) => d.op === "add");
 
     // Apply pagination
     const offset = options.offset ?? 0;
@@ -436,20 +436,20 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   > {
     const stats: Partial<import("../types.js").DatabaseStats> = {};
 
-    // Count total datoms (only added ones)
-    const addedDatoms = this._datomsArray.filter((d) => {
-      // Check if this is the latest version (not retracted)
+    // Count total datoms (only add ones)
+    const addDatoms = this._datomsArray.filter((d) => {
+      // Check if this is the latest version (not retract)
       const latestVersion = this._datomsArray
         .filter(
           (other) => other.e === d.e && other.a === d.a && other.v === d.v
         )
         .sort((a, b) => b.tx - a.tx)[0];
-      return latestVersion?.added === true && latestVersion.tx === d.tx;
+      return latestVersion?.op === "add" && latestVersion.tx === d.tx;
     });
-    stats.totalDatoms = addedDatoms.length;
+    stats.totalDatoms = addDatoms.length;
 
     // Count unique entities
-    const uniqueEntities = new Set(addedDatoms.map((d) => String(d.e)));
+    const uniqueEntities = new Set(addDatoms.map((d) => String(d.e)));
     stats.totalEntities = uniqueEntities.size;
 
     // Add query metrics if available

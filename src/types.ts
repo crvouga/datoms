@@ -54,7 +54,7 @@ export type Value =
 export type TransactionId = number;
 
 /**
- * A datom represents a fact: { e: entity, a: attribute, v: value, tx: transaction, added: boolean }
+ * A datom represents a fact: { e: entity, a: attribute, v: value, tx: transaction, op: "add" | "retract" }
  * This is the fundamental unit of data in a datalog database
  */
 export type Datom = {
@@ -64,15 +64,14 @@ export type Datom = {
   a: Attribute;
   /** The value of the attribute */
   v: Value;
-  /** The transaction ID when this datom was added */
+  /** The transaction ID when this datom was add */
   tx: TransactionId;
   /** The operation type (add or retract) */
-  // replace the following with op: "added" | "retracted"
-  added: boolean;
+  op: "add" | "retract";
 };
 
 /**
- * A partial datom for adding/retracting facts (without tx and added)
+ * A partial datom for adding/retracting facts (without tx and add)
  * Tuple format: [entity, attribute, value]
  * This is more efficient and aligns with the fixed EAV structure
  */
@@ -97,8 +96,8 @@ export interface QueryOptions {
   v?: Value;
   /** Filter by transaction ID */
   tx?: TransactionId;
-  /** Only return added datoms (default: true) */
-  added?: boolean;
+  /** Only return add datoms (default: true) */
+  add?: boolean;
   /** Limit the number of results */
   limit?: number;
   /** Offset for pagination */
@@ -178,8 +177,8 @@ export type DatabaseEventType =
 export interface TransactionEvent {
   type: "transaction";
   txId: TransactionId;
-  addedCount: number;
-  retractedCount: number;
+  addCount: number;
+  retractCount: number;
   metadata?: Record<string, unknown>;
 }
 

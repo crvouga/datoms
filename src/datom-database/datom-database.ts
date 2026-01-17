@@ -97,10 +97,10 @@ export interface DatabaseView {
 export interface TransactResult {
   /** The transaction ID */
   txId: TransactionId;
-  /** Number of datoms added */
-  addedCount: number;
-  /** Number of datoms retracted */
-  retractedCount: number;
+  /** Number of datoms add */
+  addCount: number;
+  /** Number of datoms retract */
+  retractCount: number;
 }
 
 /**
@@ -108,7 +108,7 @@ export interface TransactResult {
  * Provides common functionality for AsOf, History, and Since views
  */
 abstract class BaseDatabaseView implements DatabaseView {
-  constructor(protected db: DatomDatabase) { }
+  constructor(protected db: DatomDatabase) {}
 
   abstract datoms(options: QueryOptions): Promise<Datom[]>;
 
@@ -263,7 +263,7 @@ class AsOfDatabaseView extends BaseDatabaseView {
 }
 
 /**
- * Database view showing full history (all datoms, including retracted)
+ * Database view showing full history (all datoms, including retract)
  * No deduplication, includes all historical changes
  */
 class HistoryDatabaseView extends BaseDatabaseView {
@@ -417,11 +417,11 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
       results = results.filter((d) => d.tx === options.tx);
     }
 
-    // Apply added filter
-    if (options.added === undefined || options.added === true) {
-      results = results.filter((d) => d.added);
-    } else if (options.added === false) {
-      results = results.filter((d) => !d.added);
+    // Apply add filter
+    if (options.add === undefined || options.add === true) {
+      results = results.filter((d) => d.op === "add");
+    } else if (options.add === false) {
+      results = results.filter((d) => d.op === "retract");
     }
 
     // Apply pagination
@@ -442,8 +442,8 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
  * Array of operations, each specifying whether to add or retract a datom
  */
 export type TransactOperations = Array<
-  | { op: "added"; e: EntityId; a: Attribute; v: Value }
-  | { op: "retracted"; e: EntityId; a: Attribute; v: Value }
+  | { op: "add"; e: EntityId; a: Attribute; v: Value }
+  | { op: "retract"; e: EntityId; a: Attribute; v: Value }
 >;
 
 /**
@@ -623,13 +623,13 @@ export abstract class DatomDatabase implements DatomReader {
    * @returns The transaction ID
    * @example
    * await db.transact([
-   *   { op: "added", e: 300, a: "status", v: "active" },
-   *   { op: "retracted", e: 42, a: "type", v: "cat" }
+   *   { op: "add", e: 300, a: "status", v: "active" },
+   *   { op: "retract", e: 42, a: "type", v: "cat" }
    * ]);
    *
    * // With metadata
    * await db.transact(
-   *   [{ op: "added", e: 300, a: "status", v: "active" }],
+   *   [{ op: "add", e: 300, a: "status", v: "active" }],
    *   { userId: "alice", reason: "status_update" }
    * );
    */
@@ -644,7 +644,7 @@ export abstract class DatomDatabase implements DatomReader {
     const retracts: DatomInput[] = [];
 
     for (const op of ops) {
-      if (op.op === "added") {
+      if (op.op === "add") {
         adds.push({ e: op.e, a: op.a, v: op.v });
       } else {
         retracts.push({ e: op.e, a: op.a, v: op.v });
@@ -652,7 +652,7 @@ export abstract class DatomDatabase implements DatomReader {
     }
 
     // Validate transaction data
-    // Apply retracts first, then adds, so validation can see retracted values
+    // Apply retracts first, then adds, so validation can see retract values
     if (retracts.length > 0) {
       await this.validateDatoms(retracts, false);
     }
@@ -818,7 +818,7 @@ export abstract class DatomDatabase implements DatomReader {
     oldDefinition: AttributeDefinition,
     newDefinition: AttributeDefinition
   ): Promise<void> {
-    // Check if uniqueness constraint is being added
+    // Check if uniqueness constraint is being add
     if (!oldDefinition.unique && newDefinition.unique) {
       // Find all datoms with this attribute
       const allDatoms = await this.queryInternal({ a: name });
@@ -876,7 +876,7 @@ export abstract class DatomDatabase implements DatomReader {
       }
     }
 
-    // Check if type constraint is being added or made more restrictive
+    // Check if type constraint is being add or made more restrictive
     if (
       newDefinition.type !== undefined &&
       newDefinition.type !== null &&
@@ -896,7 +896,8 @@ export abstract class DatomDatabase implements DatomReader {
           throw new Error(
             `Cannot change type constraint for attribute "${name}": existing value ${JSON.stringify(
               datom.v
-            )} for entity "${String(datom.e)}" does not match new type "${newDefinition.type
+            )} for entity "${String(datom.e)}" does not match new type "${
+              newDefinition.type
             }". ${typeError.message}`
           );
         }
@@ -1189,11 +1190,11 @@ export abstract class DatomDatabase implements DatomReader {
    */
   public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
     // Default implementation: use executeQuery but implementations can override
-    // to provide undeduplicated results. For now, we'll use executeQuery with added: undefined
-    // to get all datoms including retracted ones, then the view will handle deduplication.
+    // to provide undeduplicated results. For now, we'll use executeQuery with add: undefined
+    // to get all datoms including retract ones, then the view will handle deduplication.
     return this.executeQuery({
       ...options,
-      added: undefined, // Get all datoms including retracted
+      add: undefined, // Get all datoms including retract
     });
   }
 
@@ -1231,15 +1232,15 @@ export abstract class DatomDatabase implements DatomReader {
       }
     }
 
-    // Filter out retracted datoms (keep only added: true)
-    return Array.from(deduplicated.values()).filter((d) => d.added);
+    // Filter out retract datoms (keep only add: true)
+    return Array.from(deduplicated.values()).filter((d) => d.op === "add");
   }
 
   /**
-   * Execute a history query - returns all datoms including retracted, without deduplication.
+   * Execute a history query - returns all datoms including retract, without deduplication.
    * This method is called by HistoryDatabaseView to leverage database-native query optimization.
    * @param options Query options
-   * @returns Array of all matching datoms (including retracted)
+   * @returns Array of all matching datoms (including retract)
    * @internal
    */
   public async executeHistoryQuery(options: QueryOptions): Promise<Datom[]> {
@@ -1247,7 +1248,7 @@ export abstract class DatomDatabase implements DatomReader {
     // SQL implementations should override this for better performance
     return this.getRawDatoms({
       ...options,
-      added: undefined, // Don't filter by added/retracted
+      add: undefined, // Don't filter by add/retract
     });
   }
 
@@ -1284,8 +1285,8 @@ export abstract class DatomDatabase implements DatomReader {
       }
     }
 
-    // Filter out retracted datoms (keep only added: true)
-    return Array.from(deduplicated.values()).filter((d) => d.added);
+    // Filter out retract datoms (keep only add: true)
+    return Array.from(deduplicated.values()).filter((d) => d.op === "add");
   }
 
   /**
@@ -1301,7 +1302,7 @@ export abstract class DatomDatabase implements DatomReader {
    * all pending changes at once, or they may defer validation to the base class methods.
    *
    * @param datoms Array of datoms to validate
-   * @param isAdd Whether these datoms are being added (true) or retracted (false)
+   * @param isAdd Whether these datoms are being add (true) or retract (false)
    * @throws Error if validation fails (type mismatch, cardinality violation, uniqueness violation)
    * @example
    * // Typical usage in add() implementation:
@@ -1382,16 +1383,16 @@ export abstract class DatomDatabase implements DatomReader {
           const attribute = datom.a;
           const newValue = datom.v;
 
-          // Check if this value is being retracted in the same transaction
-          const isBeingRetracted = retractsInSameTransaction?.some(
+          // Check if this value is being retract in the same transaction
+          const isBeingretract = retractsInSameTransaction?.some(
             (r) =>
               r.e === entity &&
               String(r.a) === String(attribute) &&
               JSON.stringify(r.v) === JSON.stringify(newValue)
           );
 
-          // If being retracted, skip validation (it's a replace operation)
-          if (isBeingRetracted) {
+          // If being retract, skip validation (it's a replace operation)
+          if (isBeingretract) {
             continue;
           }
 
@@ -1404,15 +1405,15 @@ export abstract class DatomDatabase implements DatomReader {
             // This is useful for imports where the same datom might appear multiple times
             const existingValue = existingDatoms[0].v;
             if (JSON.stringify(existingValue) !== JSON.stringify(newValue)) {
-              // Check if the existing value is being retracted
-              const existingIsBeingRetracted = retractsInSameTransaction?.some(
+              // Check if the existing value is being retract
+              const existingIsBeingretract = retractsInSameTransaction?.some(
                 (r) =>
                   r.e === entity &&
                   String(r.a) === String(attribute) &&
                   JSON.stringify(r.v) === JSON.stringify(existingValue)
               );
 
-              if (!existingIsBeingRetracted) {
+              if (!existingIsBeingretract) {
                 throw new CardinalityError(
                   String(attribute),
                   String(entity),
@@ -1569,13 +1570,13 @@ export abstract class DatomDatabase implements DatomReader {
   }
 
   /**
-   * Create a database view showing full history (all datoms, including retracted)
+   * Create a database view showing full history (all datoms, including retract)
    * Returns a read-only view that includes all historical changes without deduplication
    * @returns Read-only database view showing full history
    * @example
    * const dbHistory = db.history();
    * const allChanges = await dbHistory.datoms({ entity: 42 });
-   * // Includes both added and retracted datoms
+   * // Includes both add and retract datoms
    */
   history(): DatabaseView {
     return new HistoryDatabaseView(this);
@@ -1617,8 +1618,8 @@ export abstract class DatomDatabase implements DatomReader {
    * @example
    * // Speculate on a transaction
    * const result = await db.with([
-   *   { op: "added", e: 1, a: "name", v: "Alice" },
-   *   { op: "retracted", e: 1, a: "oldName", v: "Bob" }
+   *   { op: "add", e: 1, a: "name", v: "Alice" },
+   *   { op: "retract", e: 1, a: "oldName", v: "Bob" }
    * ]);
    *
    * // Query the speculative state
@@ -1627,17 +1628,17 @@ export abstract class DatomDatabase implements DatomReader {
    * console.log(result.txData);
    *
    * // To actually commit, use transact()
-   * await db.transact([{ op: "added", e: 1, a: "name", v: "Alice" }]);
+   * await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
    */
   async with(ops: TransactOperations): Promise<WithResult> {
     await this.ensureInitialized();
 
-    // Separate added and retracted operations
+    // Separate add and retract operations
     const adds: DatomInput[] = [];
     const retracts: DatomInput[] = [];
 
     for (const op of ops) {
-      if (op.op === "added") {
+      if (op.op === "add") {
         adds.push({ e: op.e, a: op.a, v: op.v });
       } else {
         retracts.push({ e: op.e, a: op.a, v: op.v });
@@ -1665,7 +1666,7 @@ export abstract class DatomDatabase implements DatomReader {
         a: datom.a,
         v: datom.v,
         tx: speculativeTxId,
-        added: false,
+        op: "retract",
       });
     }
 
@@ -1675,7 +1676,7 @@ export abstract class DatomDatabase implements DatomReader {
         a: datom.a,
         v: datom.v,
         tx: speculativeTxId,
-        added: true,
+        op: "add",
       });
     }
 
@@ -1836,7 +1837,8 @@ export abstract class DatomDatabase implements DatomReader {
         await this.migrate(migration.version);
       } catch (error) {
         const migrationError = new MigrationError(
-          `Migration ${migration.version} (${migration.name}) failed: ${error instanceof Error ? error.message : String(error)
+          `Migration ${migration.version} (${migration.name}) failed: ${
+            error instanceof Error ? error.message : String(error)
           }`,
           migration.version,
           error instanceof Error ? error : undefined
@@ -1895,7 +1897,8 @@ export abstract class DatomDatabase implements DatomReader {
         this.schemaVersion = migration.version - 1;
       } catch (error) {
         const rollbackError = new MigrationRollbackError(
-          `Rollback of migration ${migration.version} (${migration.name
+          `Rollback of migration ${migration.version} (${
+            migration.name
           }) failed: ${error instanceof Error ? error.message : String(error)}`,
           migration.version,
           error instanceof Error ? error : undefined
@@ -1941,7 +1944,8 @@ export abstract class DatomDatabase implements DatomReader {
       }
       // For other errors during onMigrate, wrap in MigrationError
       throw new MigrationError(
-        `Migration to version ${targetVersion} failed: ${error instanceof Error ? error.message : String(error)
+        `Migration to version ${targetVersion} failed: ${
+          error instanceof Error ? error.message : String(error)
         }`,
         targetVersion,
         error instanceof Error ? error : undefined
