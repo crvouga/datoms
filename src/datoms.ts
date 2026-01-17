@@ -8,7 +8,7 @@
 export type EntityId = number | string;
 
 /**
- * An attribute name (e.g., "name", "age", "email")
+ * An attribute name (e.g., "name", "age", "email", "user/type", "user/email", "user/name")
  */
 export type Attribute = string;
 

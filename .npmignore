@@ -1,5 +1,6 @@
 # Exclude test files and directories from npm package
-**/__tests__/**
+**/*.npm-ignore.ts
+**/*.npm-ignore.js
 **/*.test.ts
 **/*.test.js
 **/*.spec.ts

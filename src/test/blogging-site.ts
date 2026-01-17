@@ -175,32 +175,24 @@ export const POST_VALIDATOR: Interceptor = {
       const finalHasAuthor = hasAuthor || existingHasAuthor;
       const finalHasStatus = hasStatus || existingHasStatus;
 
-      if (!finalHasTitle) {
-        validator.assert(
-          false,
-          "Post must have a title",
-          "MISSING_TITLE",
-          postDatoms.find((d) => d.e === postId)
-        );
-      }
-
-      if (!finalHasAuthor) {
-        validator.assert(
-          false,
-          "Post must have an author",
-          "MISSING_AUTHOR",
-          postDatoms.find((d) => d.e === postId)
-        );
-      }
-
-      if (!finalHasStatus) {
-        validator.assert(
-          false,
-          "Post must have a status",
-          "MISSING_STATUS",
-          postDatoms.find((d) => d.e === postId)
-        );
-      }
+      validator.assert(
+        finalHasTitle,
+        "Post must have a title",
+        "MISSING_TITLE",
+        postDatoms.find((d) => d.e === postId)
+      );
+      validator.assert(
+        finalHasAuthor,
+        "Post must have an author",
+        "MISSING_AUTHOR",
+        postDatoms.find((d) => d.e === postId)
+      );
+      validator.assert(
+        finalHasStatus,
+        "Post must have a status",
+        "MISSING_STATUS",
+        postDatoms.find((d) => d.e === postId)
+      );
     }
 
     if (validator.hasErrors()) {
@@ -232,14 +224,12 @@ export const AUTHOR_VALIDATOR: Interceptor = {
         const isAuthor = userType === USER_TYPE_AUTHOR;
         const isAdmin = userType === USER_TYPE_ADMIN;
 
-        if (!isAuthor && !isAdmin) {
-          validator.assert(
-            false,
-            `User ${authorId} is not an author or admin`,
-            "INVALID_AUTHOR",
-            datom
-          );
-        }
+        validator.assert(
+          isAuthor || isAdmin,
+          `User ${authorId} is not an author or admin`,
+          "INVALID_AUTHOR",
+          datom
+        );
       }
     }
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { TransactionError } from "../datom-database/datom-database.js";
-import { Fixture, FIXTURES } from "../datom-database/tests/fixtures.js";
+import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
 import { datoms } from "../datoms.js";
 import {
   AUTHOR_VALIDATOR,
