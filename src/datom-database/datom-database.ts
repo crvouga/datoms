@@ -108,7 +108,7 @@ export interface TransactResult {
  * Provides common functionality for AsOf, History, and Since views
  */
 abstract class BaseDatabaseView implements DatabaseView {
-  constructor(protected db: DatomDatabase) { }
+  constructor(protected db: DatomDatabase) {}
 
   abstract datoms(options: QueryOptions): Promise<Datom[]>;
 
@@ -441,9 +441,12 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
  * Transaction operations format for transact() method
  * Array of operations, each specifying whether to add or retract a datom
  */
-export type TransactOperations = Array<
-  { op: "add" | "retract"; e: EntityId; a: Attribute; v: Value }
->;
+export type TransactOperations = Array<{
+  op: "add" | "retract";
+  e: EntityId;
+  a: Attribute;
+  v: Value;
+}>;
 
 /**
  * Abstract datom database class that provides a high-level interface
@@ -646,6 +649,40 @@ export abstract class DatomDatabase implements DatomReader {
       const datom = { e: op.e, a: op.a, v: op.v };
 
       if (op.op === "add") {
+        // Check for duplicates within the same transaction batch
+        const definition = this.getAttributeDefinition(String(datom.a));
+        if (definition?.cardinality === "one") {
+          const key = `${String(datom.e)}|${String(datom.a)}`;
+          const duplicate = adds.find(
+            (a) => `${String(a.e)}|${String(a.a)}` === key
+          );
+          if (duplicate) {
+            throw new CardinalityError(
+              String(datom.a),
+              String(datom.e),
+              "multiple_values_in_batch"
+            );
+          }
+        }
+
+        // Check for uniqueness violations within the same transaction batch
+        if (definition?.unique) {
+          const valueKey = JSON.stringify(datom.v);
+          const duplicate = adds.find(
+            (a) =>
+              String(a.a) === String(datom.a) &&
+              JSON.stringify(a.v) === valueKey &&
+              String(a.e) !== String(datom.e)
+          );
+          if (duplicate) {
+            throw new UniqueConstraintError(
+              String(datom.a),
+              datom.v,
+              duplicate.e
+            );
+          }
+        }
+
         // Validate add, accounting for retracts already processed
         await this.validateDatoms([datom], true, retracts);
         adds.push(datom);
@@ -886,7 +923,8 @@ export abstract class DatomDatabase implements DatomReader {
           throw new Error(
             `Cannot change type constraint for attribute "${name}": existing value ${JSON.stringify(
               datom.v
-            )} for entity "${String(datom.e)}" does not match new type "${newDefinition.type
+            )} for entity "${String(datom.e)}" does not match new type "${
+              newDefinition.type
             }". ${typeError.message}`
           );
         }
@@ -1826,7 +1864,8 @@ export abstract class DatomDatabase implements DatomReader {
         await this.migrate(migration.version);
       } catch (error) {
         const migrationError = new MigrationError(
-          `Migration ${migration.version} (${migration.name}) failed: ${error instanceof Error ? error.message : String(error)
+          `Migration ${migration.version} (${migration.name}) failed: ${
+            error instanceof Error ? error.message : String(error)
           }`,
           migration.version,
           error instanceof Error ? error : undefined
@@ -1885,7 +1924,8 @@ export abstract class DatomDatabase implements DatomReader {
         this.schemaVersion = migration.version - 1;
       } catch (error) {
         const rollbackError = new MigrationRollbackError(
-          `Rollback of migration ${migration.version} (${migration.name
+          `Rollback of migration ${migration.version} (${
+            migration.name
           }) failed: ${error instanceof Error ? error.message : String(error)}`,
           migration.version,
           error instanceof Error ? error : undefined
@@ -1931,7 +1971,8 @@ export abstract class DatomDatabase implements DatomReader {
       }
       // For other errors during onMigrate, wrap in MigrationError
       throw new MigrationError(
-        `Migration to version ${targetVersion} failed: ${error instanceof Error ? error.message : String(error)
+        `Migration to version ${targetVersion} failed: ${
+          error instanceof Error ? error.message : String(error)
         }`,
         targetVersion,
         error instanceof Error ? error : undefined
