@@ -26,10 +26,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: ["?x", "?a"],
+        find: { x: "?x", a: "?a" },
         where: [
-          ["?x", "name", "?n"],
-          ["?x", "age", "?a"],
+          { e: "?x", a: "name", v: "?n" },
+          { e: "?x", a: "age", v: "?a" },
         ],
       };
 
@@ -66,12 +66,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find all engineers in the Engineering department with the department budget
       const query: DatalogQuery = {
-        find: ["?emp", "?dept", "?budget"],
+        find: { emp: "?emp", dept: "?dept", budget: "?budget" },
         where: [
-          ["?emp", "role", "engineer"],
-          ["?emp", "department", "?dept"],
-          ["?dept", "name", "Engineering"],
-          ["?dept", "budget", "?budget"],
+          { e: "?emp", a: "role", v: "engineer" },
+          { e: "?emp", a: "department", v: "?dept" },
+          { e: "?dept", a: "name", v: "Engineering" },
+          { e: "?dept", a: "budget", v: "?budget" },
         ],
       };
 
@@ -104,11 +104,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find people in NYC who are 30 years old
       const query: DatalogQuery = {
-        find: ["?name"],
+        find: { name: "?name" },
         where: [
-          ["?person", "name", "?name"],
-          ["?person", "age", 30],
-          ["?person", "city", "NYC"],
+          { e: "?person", a: "name", v: "?name" },
+          { e: "?person", a: "age", v: 30 },
+          { e: "?person", a: "city", v: "NYC" },
         ],
       };
 
@@ -136,10 +136,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find all paths of length 2: A -> B -> C
       const query: DatalogQuery = {
-        find: ["?a", "?b", "?c"],
+        find: { a: "?a", b: "?b", c: "?c" },
         where: [
-          ["?a", "connects", "?b"],
-          ["?b", "connects", "?c"],
+          { e: "?a", a: "connects", v: "?b" },
+          { e: "?b", a: "connects", v: "?c" },
         ],
       };
 
@@ -161,10 +161,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: ["?name", "?age"],
+        find: { name: "?name", age: "?age" },
         where: [
-          ["?e", "name", "?name"],
-          ["?e", "age", "?age"],
+          { e: "?e", a: "name", v: "?name" },
+          { e: "?e", a: "age", v: "?age" },
         ],
       };
 
@@ -190,10 +190,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find entities where name is Alice AND age is 25
       const query: DatalogQuery = {
-        find: ["?e"],
+        find: { e: "?e" },
         where: [
-          ["?e", "name", "Alice"],
-          ["?e", "age", 25],
+          { e: "?e", a: "name", v: "Alice" },
+          { e: "?e", a: "age", v: 25 },
         ],
       };
 
@@ -216,11 +216,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: ["?name", "?age", "?city"],
+        find: { name: "?name", age: "?age", city: "?city" },
         where: [
-          ["?e", "name", "?name"],
-          ["?e", "age", "?age"],
-          ["?e", "city", "?city"],
+          { e: "?e", a: "name", v: "?name" },
+          { e: "?e", a: "age", v: "?age" },
+          { e: "?e", a: "city", v: "?city" },
         ],
       };
 
@@ -249,11 +249,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find employees and their departments through a join entity
       const query: DatalogQuery = {
-        find: ["?name", "?dept"],
+        find: { name: "?name", dept: "?dept" },
         where: [
-          ["?e", "name", "?name"],
-          ["?j", "employee", "?e"],
-          ["?j", "department", "?dept"],
+          { e: "?e", a: "name", v: "?name" },
+          { e: "?j", a: "employee", v: "?e" },
+          { e: "?j", a: "department", v: "?dept" },
         ],
       };
 

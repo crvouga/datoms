@@ -46,16 +46,17 @@ export function joinResults(
  * Project results to only include find variables
  * Strips the question mark prefix from variable names in the result keys
  * @param results Query results with variable names as keys
- * @param find Array of variable names to include in the projection
+ * @param find Object mapping output keys to variable names (e.g., { x: "?x", name: "?name" })
  * @param _clauses Query clauses (unused, kept for compatibility)
  * @returns Projected results with question mark prefix stripped from keys
  */
 export function project(
   results: Record<string, Value | Attribute>[],
-  find: string[],
+  find: { [key: string]: string },
   _clauses: QueryClause[]
 ): QueryResult {
-  if (find.length === 0) {
+  const findKeys = Object.keys(find);
+  if (findKeys.length === 0) {
     // Strip ? from all keys when find is empty
     return results.map((row) => {
       const projected: Record<string, Value | Attribute> = {};
@@ -66,13 +67,14 @@ export function project(
     });
   }
 
-  // Results already have variable names as keys, so just extract the find variables
-  // Strip ? from keys in the projected result
+  // Results already have variable names as keys, so map them to output keys
+  // The find object maps output keys to variable names
   return results.map((row) => {
     const projected: Record<string, Value | Attribute> = {};
-    for (const varName of find) {
+    for (const outputKey of findKeys) {
+      const varName = find[outputKey];
       if (varName in row) {
-        projected[stripQuestionMark(varName)] = row[varName];
+        projected[outputKey] = row[varName];
       }
     }
     return projected;

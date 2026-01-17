@@ -131,7 +131,7 @@ abstract class BaseDatabaseView implements DatabaseView {
 
     // Execute first clause using view's datoms() method
     const firstClause = query.where[0];
-    const [entityVal, attributeVal, valueVal] = firstClause;
+    const { e: entityVal, a: attributeVal, v: valueVal } = firstClause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
     const attribute = isVariable(attributeVal)
       ? undefined
@@ -163,7 +163,7 @@ abstract class BaseDatabaseView implements DatabaseView {
     let results = firstResults;
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
-      const [entityVal, attributeVal, valueVal] = clause;
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
       const entity = isVariable(entityVal)
         ? undefined
         : (entityVal as EntityId);

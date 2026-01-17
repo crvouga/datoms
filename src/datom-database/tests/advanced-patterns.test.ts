@@ -28,8 +28,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "retract", e: 2, a: "name", v: "Bob" }]);
 
       const query: DatalogQuery = {
-        find: ["?name"],
-        where: [["?e", "name", "?name"]],
+        find: { name: "?name" },
+        where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
       const results = await db.query(query);
@@ -55,18 +55,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // the current implementation binds it to the value (last assignment)
       // To properly test self-joins, we use a workaround with two clauses
       const query: DatalogQuery = {
-        find: ["?node"],
+        find: { node: "?node" },
         where: [
-          ["?node", "connects", "?target"],
-          ["?node", "connects", "?node"],
+          { e: "?node", a: "connects", v: "?target" },
+          { e: "?node", a: "connects", v: "?node" },
         ],
       };
 
       // Actually, a simpler approach: query all connections and filter manually
       // Or test that we can query connections and verify self-connections exist
       const simpleQuery: DatalogQuery = {
-        find: ["?from", "?to"],
-        where: [["?from", "connects", "?to"]],
+        find: { from: "?from", to: "?to" },
+        where: [{ e: "?from", a: "connects", v: "?to" }],
       };
 
       const allResults = await db.query(simpleQuery);
@@ -90,8 +90,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find all next relationships
       const query: DatalogQuery = {
-        find: ["?from", "?to"],
-        where: [["?from", "next", "?to"]],
+        find: { from: "?from", to: "?to" },
+        where: [{ e: "?from", a: "next", v: "?to" }],
       };
 
       const results = await db.query(query);
@@ -119,11 +119,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find employees and their departments through a join entity
       const query: DatalogQuery = {
-        find: ["?name", "?dept"],
+        find: { name: "?name", dept: "?dept" },
         where: [
-          ["?e", "name", "?name"],
-          ["?j", "employee", "?e"],
-          ["?j", "department", "?dept"],
+          { e: "?e", a: "name", v: "?name" },
+          { e: "?j", a: "employee", v: "?e" },
+          { e: "?j", a: "department", v: "?dept" },
         ],
       };
 

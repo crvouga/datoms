@@ -368,7 +368,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   private async executeClause(
     clause: QueryClause
   ): Promise<Record<string, Value | Attribute>[]> {
-    const [entityVal, attributeVal, valueVal] = clause;
+    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
     const attribute = isVariable(attributeVal)
       ? undefined

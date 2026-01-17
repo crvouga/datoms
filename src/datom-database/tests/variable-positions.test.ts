@@ -25,8 +25,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: ["?e", "?v"],
-        where: [["?e", "name", "?v"]],
+        find: { e: "?e", v: "?v" },
+        where: [{ e: "?e", a: "name", v: "?v" }],
       };
 
       const results = await db.query(query);
@@ -49,8 +49,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: ["?attr", "?v"],
-        where: [[1, "?attr", "?v"]],
+        find: { attr: "?attr", v: "?v" },
+        where: [{ e: 1, a: "?attr", v: "?v" }],
       };
 
       const results = await db.query(query);
@@ -73,8 +73,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: ["?e", "?attr", "?v"],
-        where: [["?e", "?attr", "?v"]],
+        find: { e: "?e", attr: "?attr", v: "?v" },
+        where: [{ e: "?e", a: "?attr", v: "?v" }],
       };
 
       const results = await db.query(query);
@@ -102,10 +102,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: ["?e", "?n"],
+        find: { e: "?e", n: "?n" },
         where: [
-          ["?e", "name", "?n"],
-          ["?e", "age", "?a"],
+          { e: "?e", a: "name", v: "?n" },
+          { e: "?e", a: "age", v: "?a" },
         ],
       };
 

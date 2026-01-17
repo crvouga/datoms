@@ -633,7 +633,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     // For single clause queries, use the optimized query method
     if (query.where.length === 1) {
       const clause = query.where[0];
-      const [entityVal, attributeVal, valueVal] = clause;
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
       const entity = isVariable(entityVal)
         ? undefined
         : (entityVal as EntityId);
@@ -683,7 +683,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     // Build CTEs for each clause with deduplication
     for (let i = 0; i < clauses.length; i++) {
       const clause = clauses[i];
-      const [entityVal, attributeVal, valueVal] = clause;
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
       const alias = `d${i}`;
 
       const conditions: string[] = [];
@@ -765,7 +765,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     for (let i = 0; i < clauses.length; i++) {
       const clause = clauses[i];
-      const [entityVal, attributeVal, valueVal] = clause;
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
 
       if (isVariable(entityVal)) {
         const varName = entityVal as string;
@@ -850,7 +850,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
           // Find which clause/alias has this variable
           for (let i = 0; i < clauses.length; i++) {
             const clause = clauses[i];
-            const [entityVal, attributeVal, valueVal] = clause;
+            const { e: entityVal, a: attributeVal, v: valueVal } = clause;
             if (entityVal === variable) {
               return `d${i}.e ${direction.toUpperCase()}`;
             }
@@ -905,12 +905,14 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     });
 
     // Apply projection if needed
-    if (query.find.length > 0) {
+    const findKeys = Object.keys(query.find);
+    if (findKeys.length > 0) {
       return results.map((row) => {
         const projected: Record<string, Value | Attribute> = {};
-        for (const varName of query.find) {
+        for (const outputKey of findKeys) {
+          const varName = query.find[outputKey];
           if (varName in row) {
-            projected[stripQuestionMark(varName)] = row[varName];
+            projected[outputKey] = row[varName];
           }
         }
         return projected;
@@ -1079,7 +1081,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   private async executeClause(
     clause: QueryClause
   ): Promise<Record<string, Value | Attribute>[]> {
-    const [entityVal, attributeVal, valueVal] = clause;
+    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
     const attribute = isVariable(attributeVal)
       ? undefined

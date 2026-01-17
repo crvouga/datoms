@@ -25,8 +25,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: ["?e"],
-        where: [["?e", "active", true]],
+        find: { e: "?e" },
+        where: [{ e: "?e", a: "active", v: true }],
       };
 
       const results = await db.query(query);
@@ -50,8 +50,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: ["?e", "?d"],
-        where: [["?e", "created", "?d"]],
+        find: { e: "?e", d: "?d" },
+        where: [{ e: "?e", a: "created", v: "?d" }],
       };
 
       const results = await db.query(query);
@@ -74,8 +74,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: ["?e"],
-        where: [["?e", "middleName", null]],
+        find: { e: "?e" },
+        where: [{ e: "?e", a: "middleName", v: null }],
       };
 
       const results = await db.query(query);
@@ -97,10 +97,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Querying for undefined doesn't filter properly due to how undefined is handled in queries
       // Instead, test that we can retrieve all optional values and filter in the query
       const query: DatalogQuery = {
-        find: ["?e", "?v"],
-        where: [["?e", "optional", "?v"]],
+        find: { e: "?e", v: "?v" },
+        where: [{ e: "?e", a: "optional", v: "?v" }],
       };
-
       const results = await db.query(query);
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Verify undefined values are stored and can be retrieved
@@ -124,8 +123,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const results = await db.query({
-        find: ["?e", "?v"],
-        where: [["?e", "data", "?v"]],
+        find: { e: "?e", v: "?v" },
+        where: [{ e: "?e", a: "data", v: "?v" }],
       });
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Verify we can query across different types

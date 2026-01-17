@@ -4,26 +4,47 @@
 
 import type { Attribute, EntityId, Value } from "../types.js";
 
+export type DatalogQueryVariable = `?${string}`;
+
 /**
  * A datalog query clause
  * Tuple format: [entity, attribute, value]
  */
-export type QueryClause = [
-  entity: string | EntityId,
-  attribute: string,
-  value: string | Value,
-];
+// export type QueryClause = [
+//   entity: string | EntityId,
+//   attribute: string,
+//   value: string | Value,
+// ];
+
+export type QueryClause = {
+  e: DatalogQueryVariable | EntityId;
+  a: DatalogQueryVariable | string;
+  v: DatalogQueryVariable | Value;
+};
 
 /**
  * A parsed datalog query
  */
+// export interface DatalogQuery {
+//   /** Find clause - what variables to return */
+//   find: string[];
+//   /** Where clause - the query patterns */
+//   where: QueryClause[];
+//   /** Optional ordering */
+//   orderBy?: [variable: string, direction: "asc" | "desc"][];
+//   /** Optional limit */
+//   limit?: number;
+// }
+
 export interface DatalogQuery {
   /** Find clause - what variables to return */
-  find: string[];
+  find: {
+    [key: string]: DatalogQueryVariable;
+  };
   /** Where clause - the query patterns */
   where: QueryClause[];
   /** Optional ordering */
-  orderBy?: [variable: string, direction: "asc" | "desc"][];
+  orderBy?: [variable: DatalogQueryVariable, direction: "asc" | "desc"][];
   /** Optional limit */
   limit?: number;
 }
