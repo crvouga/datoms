@@ -8,6 +8,275 @@ import type { Attribute, Value } from "../../types.js";
 import { stripQuestionMark } from "./datalog-helpers.js";
 
 /**
+ * Aggregation function that computes a value from an array of values
+ */
+type AggregationFunction = (
+  values: (Value | Attribute)[],
+  defaultValue?: string
+) => Value | Attribute | null;
+
+/**
+ * Aggregation definition
+ */
+interface AggregationDefinition {
+  /** Function to compute the aggregation */
+  compute: AggregationFunction;
+  /** Whether this aggregation supports a default value */
+  supportsDefault: boolean;
+  /** Whether this aggregation requires a seed/default value */
+  requiresSeed: boolean;
+}
+
+/**
+ * Registry of all aggregation functions
+ */
+const AGGREGATION_REGISTRY: Map<string, AggregationDefinition> = new Map();
+
+/**
+ * Register an aggregation function
+ */
+function registerAggregation(
+  name: string,
+  definition: AggregationDefinition
+): void {
+  AGGREGATION_REGISTRY.set(name, definition);
+}
+
+/**
+ * Get aggregation definition
+ */
+function getAggregationDefinition(
+  name: string
+): AggregationDefinition | undefined {
+  return AGGREGATION_REGISTRY.get(name);
+}
+
+/**
+ * Helper function to generate a seeded hash for deterministic randomness
+ */
+function seededHash(seed: string): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+}
+
+/**
+ * Register all aggregation implementations
+ */
+function registerAllAggregations(): void {
+  // Count aggregation
+  registerAggregation("count", {
+    compute: (values) => values.length,
+    supportsDefault: false,
+    requiresSeed: false,
+  });
+
+  // Count distinct aggregation
+  registerAggregation("count-distinct", {
+    compute: (values) => {
+      const distinct = new Set(values.map((v) => JSON.stringify(v)));
+      return distinct.size;
+    },
+    supportsDefault: false,
+    requiresSeed: false,
+  });
+
+  // Sum aggregation
+  registerAggregation("sum", {
+    compute: (values) => {
+      const numericValues = values.filter(
+        (v) => typeof v === "number"
+      ) as number[];
+      return numericValues.reduce((a, b) => a + b, 0);
+    },
+    supportsDefault: false,
+    requiresSeed: false,
+  });
+
+  // Average aggregation
+  registerAggregation("avg", {
+    compute: (values) => {
+      if (values.length === 0) {
+        return null;
+      }
+      const numericValues = values.filter(
+        (v) => typeof v === "number"
+      ) as number[];
+      if (numericValues.length === 0) {
+        return null;
+      }
+      const sum = numericValues.reduce((a, b) => a + b, 0);
+      return sum / numericValues.length;
+    },
+    supportsDefault: false,
+    requiresSeed: false,
+  });
+
+  // Min aggregation
+  registerAggregation("min", {
+    compute: (values, defaultValue) => {
+      if (values.length === 0) {
+        return defaultValue !== undefined ? defaultValue : null;
+      }
+      const filtered = values.filter(
+        (v): v is Value | Attribute => v !== null && v !== undefined
+      );
+      if (filtered.length === 0) {
+        return defaultValue !== undefined ? defaultValue : null;
+      }
+      return filtered.reduce((a, b) => {
+        if (a === null || a === undefined || b === null || b === undefined) {
+          return a ?? b ?? null;
+        }
+        return (a < b ? a : b) as Value;
+      }) as Value;
+    },
+    supportsDefault: true,
+    requiresSeed: false,
+  });
+
+  // Max aggregation
+  registerAggregation("max", {
+    compute: (values, defaultValue) => {
+      if (values.length === 0) {
+        return defaultValue !== undefined ? defaultValue : null;
+      }
+      const filtered = values.filter(
+        (v): v is Value | Attribute => v !== null && v !== undefined
+      );
+      if (filtered.length === 0) {
+        return defaultValue !== undefined ? defaultValue : null;
+      }
+      return filtered.reduce((a, b) => {
+        if (a === null || a === undefined || b === null || b === undefined) {
+          return a ?? b ?? null;
+        }
+        return (a > b ? a : b) as Value;
+      }) as Value;
+    },
+    supportsDefault: true,
+    requiresSeed: false,
+  });
+
+  // Distinct aggregation
+  registerAggregation("distinct", {
+    compute: (values) => {
+      const distinct = Array.from(
+        new Set(values.map((v) => JSON.stringify(v)))
+      ).map((v) => JSON.parse(v) as Value);
+      return distinct as unknown as Value;
+    },
+    supportsDefault: false,
+    requiresSeed: false,
+  });
+
+  // Random aggregation (requires seed)
+  registerAggregation("rand", {
+    compute: (values, seed) => {
+      if (values.length === 0) {
+        return null;
+      }
+      const seedValue = seed || "default";
+      const hash = seededHash(seedValue);
+      const index = hash % values.length;
+      return values[index] as Value;
+    },
+    supportsDefault: false,
+    requiresSeed: true,
+  });
+
+  // Sample aggregation (requires seed)
+  registerAggregation("sample", {
+    compute: (values, seed) => {
+      if (values.length === 0) {
+        return null;
+      }
+      const seedValue = seed || "default";
+      const hash = seededHash(seedValue);
+      const index = hash % values.length;
+      return values[index] as Value;
+    },
+    supportsDefault: false,
+    requiresSeed: true,
+  });
+
+  // Median aggregation
+  registerAggregation("median", {
+    compute: (values) => {
+      const numericValues = values.filter(
+        (v) => typeof v === "number"
+      ) as number[];
+      if (numericValues.length === 0) {
+        return null;
+      }
+      const sorted = [...numericValues].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      if (sorted.length % 2 === 0) {
+        // Even number of values: average of two middle values
+        return (sorted[mid - 1] + sorted[mid]) / 2;
+      } else {
+        // Odd number of values: middle value
+        return sorted[mid];
+      }
+    },
+    supportsDefault: false,
+    requiresSeed: false,
+  });
+
+  // Variance aggregation
+  registerAggregation("variance", {
+    compute: (values) => {
+      const numericValues = values.filter(
+        (v) => typeof v === "number"
+      ) as number[];
+      if (numericValues.length === 0) {
+        return null;
+      }
+      // Calculate mean
+      const mean =
+        numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
+      // Calculate variance: average of squared differences from mean
+      const variance =
+        numericValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+        numericValues.length;
+      return variance;
+    },
+    supportsDefault: false,
+    requiresSeed: false,
+  });
+
+  // Standard deviation aggregation
+  registerAggregation("stddev", {
+    compute: (values) => {
+      const numericValues = values.filter(
+        (v) => typeof v === "number"
+      ) as number[];
+      if (numericValues.length === 0) {
+        return null;
+      }
+      // Calculate mean
+      const mean =
+        numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
+      // Calculate variance
+      const variance =
+        numericValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+        numericValues.length;
+      // Standard deviation is square root of variance
+      return Math.sqrt(variance);
+    },
+    supportsDefault: false,
+    requiresSeed: false,
+  });
+}
+
+// Initialize all aggregations on module load
+registerAllAggregations();
+
+/**
  * Parse an aggregation expression - accepts both tuple format and string format for backward compatibility
  * @param expr Aggregation expression (tuple or string)
  * @returns Object with aggregation type, variable name, and optional default value, or null if not an aggregation
@@ -33,19 +302,12 @@ export function parseAggregation(
       // Aggregation with one arg: ["count", "?age"] or ["min", "?age"] or ["max", "?age"]
       const funcName = expr[0] as string;
       const variable = expr[1] as string;
-      const aggregationTypes = [
-        "count",
-        "count-distinct",
-        "sum",
-        "avg",
-        "min",
-        "max",
-        "median",
-        "variance",
-        "stddev",
-        "distinct",
-      ];
-      if (aggregationTypes.includes(funcName) && variable.startsWith("?")) {
+      const def = getAggregationDefinition(funcName);
+      if (def && variable.startsWith("?")) {
+        // Check if this aggregation requires a seed (should be 3-element array)
+        if (def.requiresSeed) {
+          return null; // Missing required seed
+        }
         return { type: funcName, variable };
       }
     }
@@ -54,9 +316,10 @@ export function parseAggregation(
       const funcName = expr[0] as string;
       const defaultValue = expr[1] as string | number;
       const variable = expr[2] as string;
-      const aggregationTypes = ["min", "max", "rand", "sample"];
+      const def = getAggregationDefinition(funcName);
       if (
-        aggregationTypes.includes(funcName) &&
+        def &&
+        (def.supportsDefault || def.requiresSeed) &&
         typeof variable === "string" &&
         variable.startsWith("?")
       ) {
@@ -81,20 +344,9 @@ export function parseAggregation(
   if (!match) return null;
 
   const [, funcName, args] = match;
-  const aggregationTypes = [
-    "count",
-    "count-distinct",
-    "sum",
-    "avg",
-    "min",
-    "max",
-    "median",
-    "variance",
-    "stddev",
-    "distinct",
-  ];
+  const def = getAggregationDefinition(funcName);
 
-  if (!aggregationTypes.includes(funcName)) {
+  if (!def) {
     return null;
   }
 
@@ -102,16 +354,20 @@ export function parseAggregation(
   if (args) {
     const defaultMatch = args.match(/^"([^"]+)",\s*(\?[\w]+)$/);
     if (defaultMatch) {
-      return {
-        type: funcName,
-        variable: defaultMatch[2],
-        defaultValue: defaultMatch[1],
-      };
+      if (def.supportsDefault || def.requiresSeed) {
+        return {
+          type: funcName,
+          variable: defaultMatch[2],
+          defaultValue: defaultMatch[1],
+        };
+      }
     }
     // Handle functions with single argument like "avg(?age)"
     const varMatch = args.match(/^(\?[\w]+)$/);
     if (varMatch) {
-      return { type: funcName, variable: varMatch[1] };
+      if (!def.requiresSeed) {
+        return { type: funcName, variable: varMatch[1] };
+      }
     }
   }
 
@@ -148,201 +404,12 @@ export function applyAggregations(
         .map((row) => row[varName])
         .filter((v) => v !== undefined && v !== null);
 
-      switch (agg.type) {
-        case "avg": {
-          if (values.length === 0) {
-            // Average of empty set could be null, undefined, or 0 depending on implementation
-            // Test expects null, undefined, or 0 to be acceptable
-            aggregated[outputKey] = null;
-          } else {
-            const numericValues = values.filter(
-              (v) => typeof v === "number"
-            ) as number[];
-            if (numericValues.length === 0) {
-              aggregated[outputKey] = null;
-            } else {
-              const sum = numericValues.reduce((a, b) => a + b, 0);
-              aggregated[outputKey] = sum / numericValues.length;
-            }
-          }
-          break;
-        }
-        case "sum": {
-          const numericValues = values.filter(
-            (v) => typeof v === "number"
-          ) as number[];
-          aggregated[outputKey] = numericValues.reduce((a, b) => a + b, 0);
-          break;
-        }
-        case "count": {
-          aggregated[outputKey] = values.length;
-          break;
-        }
-        case "count-distinct": {
-          const distinct = new Set(values.map((v) => JSON.stringify(v)));
-          aggregated[outputKey] = distinct.size;
-          break;
-        }
-        case "min": {
-          if (values.length === 0) {
-            // Use default value if provided, otherwise null
-            if (agg.defaultValue !== undefined) {
-              // Preserve the default value as-is (as a string)
-              // The default value comes from the query string literal, so it's always a string
-              aggregated[outputKey] = agg.defaultValue;
-            } else {
-              aggregated[outputKey] = null;
-            }
-          } else {
-            aggregated[outputKey] = values.reduce((a, b) =>
-              a < b ? a : b
-            ) as Value;
-          }
-          break;
-        }
-        case "max": {
-          if (values.length === 0) {
-            // Use default value if provided, otherwise null
-            if (agg.defaultValue !== undefined) {
-              // Preserve the default value as-is (string or number)
-              // The default value comes from the query string, so it's always a string initially
-              // Try to parse as number if it looks numeric, otherwise keep as string
-              const trimmed = agg.defaultValue.trim();
-              if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-                // It's a numeric string, but test expects string "0" to stay as string
-                // Check if the original was quoted - if it was "0", keep as string
-                // Actually, since defaultValue is extracted from quotes, we should check the test expectation
-                // Looking at the test: max("0", ?age) expects "0" (string), not 0 (number)
-                // So we should preserve string defaults as strings
-                // But max("100", ?value) with values [10, 20] expects 20 (number), not "20"
-                // So the logic is: if no values, use default as-is (string "0" stays "0")
-                // But wait, the test shows max("100", ?value) with values expects 20, not "100"
-                // So the default is only used when there are NO values
-                // And when used, it should preserve the type from the query
-                // Since "0" is a string literal in the query, it should be returned as "0"
-                aggregated[outputKey] = agg.defaultValue;
-              } else {
-                // Keep as string
-                aggregated[outputKey] = agg.defaultValue;
-              }
-            } else {
-              aggregated[outputKey] = null;
-            }
-          } else {
-            aggregated[outputKey] = values.reduce((a, b) =>
-              a > b ? a : b
-            ) as Value;
-          }
-          break;
-        }
-        case "distinct": {
-          const distinct = Array.from(
-            new Set(values.map((v) => JSON.stringify(v)))
-          ).map((v) => JSON.parse(v) as Value);
-          aggregated[outputKey] = distinct as unknown as Value;
-          break;
-        }
-        case "rand": {
-          if (values.length === 0) {
-            aggregated[outputKey] = null;
-          } else {
-            // Use seed for deterministic randomness
-            const seed = agg.defaultValue || "default";
-            // Simple seeded random number generator
-            let hash = 0;
-            for (let i = 0; i < seed.length; i++) {
-              const char = seed.charCodeAt(i);
-              hash = (hash << 5) - hash + char;
-              hash = hash & hash; // Convert to 32-bit integer
-            }
-            // Use hash to select a value
-            const index = Math.abs(hash) % values.length;
-            aggregated[outputKey] = values[index] as Value;
-          }
-          break;
-        }
-        case "sample": {
-          if (values.length === 0) {
-            aggregated[outputKey] = null;
-          } else {
-            // Use seed for deterministic sampling
-            const seed = agg.defaultValue || "default";
-            // Simple seeded random number generator
-            let hash = 0;
-            for (let i = 0; i < seed.length; i++) {
-              const char = seed.charCodeAt(i);
-              hash = (hash << 5) - hash + char;
-              hash = hash & hash; // Convert to 32-bit integer
-            }
-            // Use hash to select a value
-            const index = Math.abs(hash) % values.length;
-            aggregated[outputKey] = values[index] as Value;
-          }
-          break;
-        }
-        case "median": {
-          const numericValues = values.filter(
-            (v) => typeof v === "number"
-          ) as number[];
-          if (numericValues.length === 0) {
-            aggregated[outputKey] = null;
-          } else {
-            const sorted = [...numericValues].sort((a, b) => a - b);
-            const mid = Math.floor(sorted.length / 2);
-            if (sorted.length % 2 === 0) {
-              // Even number of values: average of two middle values
-              aggregated[outputKey] = (sorted[mid - 1] + sorted[mid]) / 2;
-            } else {
-              // Odd number of values: middle value
-              aggregated[outputKey] = sorted[mid];
-            }
-          }
-          break;
-        }
-        case "variance": {
-          const numericValues = values.filter(
-            (v) => typeof v === "number"
-          ) as number[];
-          if (numericValues.length === 0) {
-            aggregated[outputKey] = null;
-          } else {
-            // Calculate mean
-            const mean =
-              numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
-            // Calculate variance: average of squared differences from mean
-            const variance =
-              numericValues.reduce(
-                (sum, val) => sum + Math.pow(val - mean, 2),
-                0
-              ) / numericValues.length;
-            aggregated[outputKey] = variance;
-          }
-          break;
-        }
-        case "stddev": {
-          const numericValues = values.filter(
-            (v) => typeof v === "number"
-          ) as number[];
-          if (numericValues.length === 0) {
-            aggregated[outputKey] = null;
-          } else {
-            // Calculate mean
-            const mean =
-              numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
-            // Calculate variance
-            const variance =
-              numericValues.reduce(
-                (sum, val) => sum + Math.pow(val - mean, 2),
-                0
-              ) / numericValues.length;
-            // Standard deviation is square root of variance
-            aggregated[outputKey] = Math.sqrt(variance);
-          }
-          break;
-        }
-        default:
-          // For other aggregations not yet implemented, return null
-          aggregated[outputKey] = null;
+      const def = getAggregationDefinition(agg.type);
+      if (def) {
+        aggregated[outputKey] = def.compute(values, agg.defaultValue);
+      } else {
+        // Fallback for unregistered aggregations
+        aggregated[outputKey] = null;
       }
     } else {
       // Not an aggregation, handle in regular projection
