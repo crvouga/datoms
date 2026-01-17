@@ -20,10 +20,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [1, "age", 30],
-          [2, "name", "Bob"],
-          [2, "age", 40],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "age", v: 30 },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "age", v: 40 },
         ],
       });
 
@@ -50,21 +50,21 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact({
         add: [
           // Employees
-          [1, "name", "Alice"],
-          [1, "role", "engineer"],
-          [2, "name", "Bob"],
-          [2, "role", "manager"],
-          [3, "name", "Charlie"],
-          [3, "role", "engineer"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "role", v: "engineer" },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "role", v: "manager" },
+          { e: 3, a: "name", v: "Charlie" },
+          { e: 3, a: "role", v: "engineer" },
           // Departments
-          [10, "name", "Engineering"],
-          [10, "budget", 100_000],
-          [11, "name", "Sales"],
-          [11, "budget", 50_000],
+          { e: 10, a: "name", v: "Engineering" },
+          { e: 10, a: "budget", v: "100_000" },
+          { e: 11, a: "name", v: "Sales" },
+          { e: 11, a: "budget", v: "50_000" },
           // Employee-Department relationships
-          [1, "department", 10],
-          [2, "department", 10],
-          [3, "department", 10],
+          { e: 1, a: "department", v: 10 },
+          { e: 2, a: "department", v: 10 },
+          { e: 3, a: "department", v: 10 },
         ],
       });
 
@@ -86,7 +86,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Both should be in Engineering with budget 100000
       results.forEach((r) => {
         expect(r["dept"]).toBe(10);
-        expect(r["budget"]).toBe(100000);
+        expect(r["budget"]).toBe("100_000");
       });
 
       await db.close();
@@ -96,15 +96,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [1, "age", 30],
-          [1, "city", "NYC"],
-          [2, "name", "Bob"],
-          [2, "age", 25],
-          [2, "city", "NYC"],
-          [3, "name", "Charlie"],
-          [3, "age", 30],
-          [3, "city", "LA"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "age", v: 30 },
+          { e: 1, a: "city", v: "NYC" },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "age", v: 25 },
+          { e: 2, a: "city", v: "NYC" },
+          { e: 3, a: "name", v: "Charlie" },
+          { e: 3, a: "age", v: 30 },
+          { e: 3, a: "city", v: "LA" },
         ],
       });
 
@@ -120,7 +120,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["name"]).toBe("Alice");
+      expect(results[0].name).toBe("Alice");
 
       await db.close();
     });
@@ -130,15 +130,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Create a network of connections
       await db.transact({
         add: [
-          [1, "name", "Node1"],
-          [2, "name", "Node2"],
-          [3, "name", "Node3"],
-          [4, "name", "Node4"],
+          { e: 1, a: "name", v: "Node1" },
+          { e: 2, a: "name", v: "Node2" },
+          { e: 3, a: "name", v: "Node3" },
+          { e: 4, a: "name", v: "Node4" },
           // Connections: 1->2, 2->3, 3->4, 1->4
-          [1, "connects", 2],
-          [2, "connects", 3],
-          [3, "connects", 4],
-          [1, "connects", 4],
+          { e: 1, a: "connects", v: 2 },
+          { e: 2, a: "connects", v: 3 },
+          { e: 3, a: "connects", v: 4 },
+          { e: 1, a: "connects", v: 4 },
         ],
       });
 
@@ -164,9 +164,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
-          [3, "age", 30],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 3, a: "age", v: 30 },
         ],
       });
 
@@ -190,13 +190,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [1, "age", 30],
-          [2, "name", "Bob"],
-          [2, "age", 25],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "age", v: 30 },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "age", v: 25 },
           // Entity 3 has name "Alice" but age 25 (different from entity 1)
-          [3, "name", "Alice"],
-          [3, "age", 25],
+          { e: 3, a: "name", v: "Alice" },
+          { e: 3, a: "age", v: 25 },
         ],
       });
 
@@ -211,7 +211,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["e"]).toBe(3);
+      expect(results[0].e).toBe(3);
 
       await db.close();
     });
@@ -220,12 +220,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [1, "age", 30],
-          [1, "city", "NYC"],
-          [2, "name", "Bob"],
-          [2, "age", 30],
-          [2, "city", "LA"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "age", v: 30 },
+          { e: 1, a: "city", v: "NYC" },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "age", v: 30 },
+          { e: 2, a: "city", v: "LA" },
         ],
       });
 
@@ -252,14 +252,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [1, "age", 30],
-          [2, "name", "Bob"],
-          [2, "age", 25],
-          [10, "employee", 1],
-          [10, "department", "Engineering"],
-          [11, "employee", 2],
-          [11, "department", "Sales"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "age", v: 30 },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "age", v: 25 },
+          { e: 10, a: "employee", v: 1 },
+          { e: 10, a: "department", v: "Engineering" },
+          { e: 11, a: "employee", v: 2 },
+          { e: 11, a: "department", v: "Sales" },
         ],
       });
 

@@ -20,8 +20,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
         ],
       });
 
@@ -59,9 +59,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "type", "person"],
-          [2, "type", "car"],
-          [3, "type", "person"],
+          { e: 1, a: "type", v: "person" },
+          { e: 2, a: "type", v: "car" },
+          { e: 3, a: "type", v: "person" },
         ],
       });
 
@@ -80,8 +80,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
         ],
       });
 
@@ -102,8 +102,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
         ],
       });
 
@@ -117,8 +117,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Missing variable should be undefined
       expect(results[0]["x"]).toBeDefined();
       expect(results[0]["missing"]).toBeUndefined();
-      expect(results[1]["x"]).toBeDefined();
-      expect(results[1]["missing"]).toBeUndefined();
+      expect(results[1]?.["x"]).toBeDefined();
+      expect(results[1]?.["missing"]).toBeUndefined();
 
       await db.close();
     });

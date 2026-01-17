@@ -20,9 +20,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "score", 100],
-          [2, "score", 400],
-          [3, "score", 250],
+          { e: 1, a: "score", v: 100 },
+          { e: 2, a: "score", v: 400 },
+          { e: 3, a: "score", v: 250 },
         ],
       });
 
@@ -45,15 +45,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [1, "score", 100],
-          [1, "age", 30],
-          [2, "name", "Bob"],
-          [2, "score", 100],
-          [2, "age", 25],
-          [3, "name", "Charlie"],
-          [3, "score", 200],
-          [3, "age", 30],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "score", v: 100 },
+          { e: 1, a: "age", v: 30 },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "score", v: 100 },
+          { e: 2, a: "age", v: 25 },
+          { e: 3, a: "name", v: "Charlie" },
+          { e: 3, a: "score", v: 200 },
+          { e: 3, a: "age", v: 30 },
         ],
       });
 
@@ -73,11 +73,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(3);
-      expect(results[0]["score"]).toBe(200); // Charlie first (highest score)
-      expect(results[1]["score"]).toBe(100); // Bob second (same score, younger)
-      expect(results[1]["age"]).toBe(25);
-      expect(results[2]["score"]).toBe(100); // Alice third (same score, older)
-      expect(results[2]["age"]).toBe(30);
+      expect(results[0].score).toBe(200); // Charlie first (highest score)
+      expect(results[1].score).toBe(100); // Bob second (same score, younger)
+      expect(results[1].age).toBe(25);
+      expect(results[2].score).toBe(100); // Alice third (same score, older)
+      expect(results[2].age).toBe(30);
 
       await db.close();
     });
@@ -86,9 +86,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "score", 100],
-          [2, "score", 200],
-          [3, "score", 300],
+          { e: 1, a: "score", v: 100 },
+          { e: 2, a: "score", v: 200 },
+          { e: 3, a: "score", v: 300 },
         ],
       });
 
@@ -111,8 +111,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "score", 100],
-          [2, "score", 200],
+          { e: 1, a: "score", v: 100 },
+          { e: 2, a: "score", v: 200 },
         ],
       });
 
@@ -132,10 +132,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "score", 100],
-          [2, "score", 400],
-          [3, "score", 250],
-          [4, "score", 300],
+          { e: 1, a: "score", v: 100 },
+          { e: 2, a: "score", v: 400 },
+          { e: 3, a: "score", v: 250 },
+          { e: 4, a: "score", v: 300 },
         ],
       });
 
@@ -158,10 +158,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [1, "score", 100],
-          [2, "name", "Bob"],
-          [2, "score", 200],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "score", v: 100 },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "score", v: 200 },
         ],
       });
 
@@ -194,10 +194,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const resultsWithScore = await db.query(queryWithScoreInFind);
       expect(resultsWithScore).toHaveLength(2);
-      expect(resultsWithScore[0]["name"]).toBe("Bob");
-      expect(resultsWithScore[0]["score"]).toBe(200);
-      expect(resultsWithScore[1]["name"]).toBe("Alice");
-      expect(resultsWithScore[1]["score"]).toBe(100);
+      expect(resultsWithScore[0].name).toBe("Bob");
+      expect(resultsWithScore[0].score).toBe(200);
+      expect(resultsWithScore[1].name).toBe("Alice");
+      expect(resultsWithScore[1].score).toBe(100);
 
       await db.close();
     });
@@ -206,10 +206,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "score", 100],
-          [2, "score", null],
-          [3, "score", 200],
-          [4, "score", null],
+          { e: 1, a: "score", v: 100 },
+          { e: 2, a: "score", v: null },
+          { e: 3, a: "score", v: 200 },
+          { e: 4, a: "score", v: null },
         ],
       });
 
@@ -233,10 +233,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "value", "zebra"],
-          [2, "value", 100],
-          [3, "value", "apple"],
-          [4, "value", 50],
+          { e: 1, a: "value", v: "zebra" },
+          { e: 2, a: "value", v: 100 },
+          { e: 3, a: "value", v: "apple" },
+          { e: 4, a: "value", v: 50 },
         ],
       });
 

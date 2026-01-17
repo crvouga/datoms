@@ -21,16 +21,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Create people
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
-          [3, "name", "Charlie"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 3, a: "name", v: "Charlie" },
           // Friendships: Alice -> Bob, Bob -> Charlie
-          [10, "from", 1],
-          [10, "to", 2],
-          [10, "type", "friendship"],
-          [11, "from", 2],
-          [11, "to", 3],
-          [11, "type", "friendship"],
+          { e: 10, a: "from", v: 1 },
+          { e: 10, a: "to", v: 2 },
+          { e: 10, a: "type", v: "friendship" },
+          { e: 11, a: "from", v: 2 },
+          { e: 11, a: "to", v: 3 },
+          { e: 11, a: "type", v: "friendship" },
         ],
       });
 
@@ -58,17 +58,17 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Create people and friendships
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
-          [3, "name", "Charlie"],
-          [4, "name", "Diana"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 3, a: "name", v: "Charlie" },
+          { e: 4, a: "name", v: "Diana" },
           // Friendships: Alice -> Bob, Bob -> Charlie, Bob -> Diana
-          [10, "from", 1],
-          [10, "to", 2],
-          [11, "from", 2],
-          [11, "to", 3],
-          [12, "from", 2],
-          [12, "to", 4],
+          { e: 10, a: "from", v: 1 },
+          { e: 10, a: "to", v: 2 },
+          { e: 11, a: "from", v: 2 },
+          { e: 11, a: "to", v: 3 },
+          { e: 12, a: "from", v: 2 },
+          { e: 12, a: "to", v: 4 },
         ],
       });
 
@@ -96,15 +96,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Create a family tree
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
-          [3, "name", "Charlie"],
-          [4, "name", "Diana"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 3, a: "name", v: "Charlie" },
+          { e: 4, a: "name", v: "Diana" },
           // Alice is parent of Bob and Charlie
-          [1, "child", 2],
-          [1, "child", 3],
+          { e: 1, a: "child", v: 2 },
+          { e: 1, a: "child", v: 3 },
           // Bob is parent of Diana
-          [2, "child", 4],
+          { e: 2, a: "child", v: 4 },
         ],
       });
 
@@ -137,18 +137,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact({
         add: [
           // Students
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
           // Courses
-          [10, "title", "Math 101"],
-          [11, "title", "CS 101"],
+          { e: 10, a: "title", v: "Math 101" },
+          { e: 11, a: "title", v: "CS 101" },
           // Enrollments (many-to-many)
-          [100, "student", 1],
-          [100, "course", 10],
-          [101, "student", 1],
-          [101, "course", 11],
-          [102, "student", 2],
-          [102, "course", 10],
+          { e: 100, a: "student", v: 1 },
+          { e: 100, a: "course", v: 10 },
+          { e: 101, a: "student", v: 1 },
+          { e: 101, a: "course", v: 11 },
+          { e: 102, a: "student", v: 2 },
+          { e: 102, a: "course", v: 10 },
         ],
       });
 
@@ -180,10 +180,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "tag", "red"],
-          [1, "tag", "blue"],
-          [1, "tag", "green"],
-          [2, "tag", "red"],
+          { e: 1, a: "tag", v: "red" },
+          { e: 1, a: "tag", v: "blue" },
+          { e: 1, a: "tag", v: "green" },
+          { e: 2, a: "tag", v: "red" },
         ],
       });
 

@@ -20,14 +20,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
-          [3, "name", "Charlie"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 3, a: "name", v: "Charlie" },
         ],
       });
 
       // Retract one datom
-      await db.transact({ retract: [[2, "name", "Bob"]] });
+      await db.transact({ retract: [{ e: 2, a: "name", v: "Bob" }] });
 
       const query: DatalogQuery = {
         find: ["?name"],
@@ -47,10 +47,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Create a graph where nodes can connect to themselves
       await db.transact({
         add: [
-          [1, "connects", 2],
-          [1, "connects", 1], // self-connection
-          [2, "connects", 3],
-          [3, "connects", 3], // self-connection
+          { e: 1, a: "connects", v: 2 },
+          { e: 1, a: "connects", v: 1 }, // self-connection
+          { e: 2, a: "connects", v: 3 },
+          { e: 3, a: "connects", v: 3 }, // self-connection
         ],
       });
 
@@ -88,9 +88,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Create a circular graph: 1 -> 2 -> 3 -> 1
       await db.transact({
         add: [
-          [1, "next", 2],
-          [2, "next", 3],
-          [3, "next", 1],
+          { e: 1, a: "next", v: 2 },
+          { e: 2, a: "next", v: 3 },
+          { e: 3, a: "next", v: 1 },
         ],
       });
 
@@ -114,14 +114,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [1, "age", 30],
-          [2, "name", "Bob"],
-          [2, "age", 25],
-          [10, "employee", 1],
-          [10, "department", "Engineering"],
-          [11, "employee", 2],
-          [11, "department", "Sales"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "age", v: 30 },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "age", v: 25 },
+          { e: 10, a: "employee", v: 1 },
+          { e: 10, a: "department", v: "Engineering" },
+          { e: 11, a: "employee", v: 2 },
+          { e: 11, a: "department", v: "Sales" },
         ],
       });
 

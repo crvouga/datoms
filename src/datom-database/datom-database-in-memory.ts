@@ -52,9 +52,9 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     for (const datom of datoms) {
       this._datomsArray.push({
-        e: datom[0],
-        a: datom[1],
-        v: datom[2],
+        e: datom.e,
+        a: datom.a,
+        v: datom.v,
         tx,
         added: true,
       });
@@ -69,9 +69,9 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     for (const datom of datoms) {
       // Add retraction datom
       this._datomsArray.push({
-        e: datom[0],
-        a: datom[1],
-        v: datom[2],
+        e: datom.e,
+        a: datom.a,
+        v: datom.v,
         tx,
         added: false,
       });

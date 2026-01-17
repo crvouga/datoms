@@ -70,7 +70,7 @@ export async function importDatoms(
 
   for await (const datom of source) {
     // Convert Datom to DatomInput
-    batch.push([datom.e, datom.a, datom.v]);
+    batch.push({ e: datom.e, a: datom.a, v: datom.v });
     batchAdded.push(datom.added);
 
     if (batch.length >= batchSize) {
@@ -186,8 +186,8 @@ function deduplicateBatch(batch: DatomInput[]): DatomInput[] {
   const seen = new Map<string, DatomInput>();
   for (const datom of batch) {
     // Use a key that handles Date objects and other types correctly
-    const valueKey = getValueKey(datom[2]);
-    const key = `${String(datom[0])}|${String(datom[1])}|${valueKey}`;
+    const valueKey = getValueKey(datom.v);
+    const key = `${String(datom.e)}|${String(datom.a)}|${valueKey}`;
     seen.set(key, datom); // Later occurrences overwrite earlier ones
   }
   return Array.from(seen.values());
@@ -229,7 +229,7 @@ async function filterExistingDatoms(
     const chunk = batch.slice(chunkStart, chunkStart + CHUNK_SIZE);
 
     // Batch query for existing values to avoid N+1 queries
-    const queries = chunk.map(([entity, attribute]) => ({
+    const queries = chunk.map(({ e: entity, a: attribute }) => ({
       entity,
       attribute: String(attribute),
     }));
@@ -247,7 +247,7 @@ async function filterExistingDatoms(
     // Build Map for O(1) lookups: key is entity|attribute, value is Set of values
     const existingValuesMap = new Map<string, Set<string>>();
     for (let i = 0; i < chunk.length; i++) {
-      const [entity, attribute] = chunk[i];
+      const { e: entity, a: attribute } = chunk[i];
       const key = `${String(entity)}|${String(attribute)}`;
       const existingValues = existingValuesBatch[i];
 
@@ -263,7 +263,7 @@ async function filterExistingDatoms(
 
     // Filter chunk using Map-based lookups
     for (let i = 0; i < chunk.length; i++) {
-      const [entity, attribute, value] = chunk[i];
+      const { e: entity, a: attribute, v: value } = chunk[i];
       const key = `${String(entity)}|${String(attribute)}`;
       const existingValueSet = existingValuesMap.get(key);
 

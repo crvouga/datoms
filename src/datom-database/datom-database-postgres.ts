@@ -768,11 +768,11 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     `;
 
     const params = datoms.flatMap((d) => {
-      let value = d[2];
+      let value = d.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, true];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, true];
     });
 
     await this.connection.execute(sql, params);
@@ -792,11 +792,11 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     `;
 
     const params = datoms.flatMap((d) => {
-      let value = d[2];
+      let value = d.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, false];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, false];
     });
 
     await this.connection.execute(sql, params);

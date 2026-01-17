@@ -438,6 +438,15 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
 }
 
 /**
+ * Transaction operations format for transact() method
+ * Supports object format { e, a, v } for DatomInput
+ */
+export type TransactOperations = {
+  add?: DatomInput[];
+  retract?: DatomInput[];
+};
+
+/**
  * Abstract datom database class that provides a high-level interface
  * for working with datoms and datalog queries
  * Concrete implementations: InMemoryDatabase, SQLiteDatabase, PostgreSQLDatabase
@@ -598,21 +607,18 @@ export abstract class DatomDatabase implements DatomReader {
    * @returns The transaction ID
    * @example
    * await db.transact({
-   *   add: [[300, "status", "active"]],
-   *   retract: [[42, "type", "cat"]]
+   *   add: [{ e: 300, a: "status", v: "active" }],
+   *   retract: [{ e: 42, a: "type", v: "cat" }]
    * });
    *
    * // With metadata
    * await db.transact(
-   *   { add: [[300, "status", "active"]] },
+   *   { add: [{ e: 300, a: "status", v: "active" }] },
    *   { userId: "alice", reason: "status_update" }
    * );
    */
   async transact(
-    ops: {
-      add?: DatomInput[];
-      retract?: DatomInput[];
-    },
+    ops: TransactOperations,
     metadata?: Record<string, unknown>
   ): Promise<TransactionId> {
     await this.ensureInitialized();
@@ -1290,7 +1296,7 @@ export abstract class DatomDatabase implements DatomReader {
     // Group datoms by attribute for efficient validation
     const byAttribute = new Map<string, DatomInput[]>();
     for (const datom of datoms) {
-      const attrKey = String(datom[1]);
+      const attrKey = String(datom.a);
       if (!byAttribute.has(attrKey)) {
         byAttribute.set(attrKey, []);
       }
@@ -1308,7 +1314,7 @@ export abstract class DatomDatabase implements DatomReader {
       // Type validation (only for adds)
       if (isAdd && definition.type !== undefined && definition.type !== null) {
         for (const datom of attrDatoms) {
-          const [, attribute, value] = datom;
+          const { a: attribute, v: value } = datom;
           const typeError = this.validateValueType(
             value,
             definition.type,
@@ -1329,12 +1335,12 @@ export abstract class DatomDatabase implements DatomReader {
       if (isAdd && definition.cardinality === "one") {
         const entityAttributePairs = new Map<string, DatomInput>();
         for (const datom of attrDatoms) {
-          const key = `${String(datom[0])}|${String(datom[1])}`;
+          const key = `${String(datom.e)}|${String(datom.a)}`;
           if (entityAttributePairs.has(key)) {
             // Multiple values for same entity-attribute pair in this batch
             throw new CardinalityError(
-              String(datom[1]),
-              String(datom[0]),
+              String(datom.a),
+              String(datom.e),
               "multiple_values_in_batch"
             );
           }
@@ -1345,16 +1351,16 @@ export abstract class DatomDatabase implements DatomReader {
         for (const datom of entityAttributePairs.values()) {
           // Use the original datom entity/attribute instead of splitting the key
           // to preserve the original types (number vs string)
-          const entity = datom[0];
-          const attribute = datom[1];
-          const newValue = datom[2];
+          const entity = datom.e;
+          const attribute = datom.a;
+          const newValue = datom.v;
 
           // Check if this value is being retracted in the same transaction
           const isBeingRetracted = retractsInSameTransaction?.some(
             (r) =>
-              r[0] === entity &&
-              String(r[1]) === String(attribute) &&
-              JSON.stringify(r[2]) === JSON.stringify(newValue)
+              r.e === entity &&
+              String(r.a) === String(attribute) &&
+              JSON.stringify(r.v) === JSON.stringify(newValue)
           );
 
           // If being retracted, skip validation (it's a replace operation)
@@ -1374,9 +1380,9 @@ export abstract class DatomDatabase implements DatomReader {
               // Check if the existing value is being retracted
               const existingIsBeingRetracted = retractsInSameTransaction?.some(
                 (r) =>
-                  r[0] === entity &&
-                  String(r[1]) === String(attribute) &&
-                  JSON.stringify(r[2]) === JSON.stringify(existingValue)
+                  r.e === entity &&
+                  String(r.a) === String(attribute) &&
+                  JSON.stringify(r.v) === JSON.stringify(existingValue)
               );
 
               if (!existingIsBeingRetracted) {
@@ -1395,7 +1401,7 @@ export abstract class DatomDatabase implements DatomReader {
       if (isAdd && definition.unique) {
         const valueGroups = new Map<string, DatomInput[]>();
         for (const datom of attrDatoms) {
-          const valueKey = JSON.stringify(datom[2]);
+          const valueKey = JSON.stringify(datom.v);
           if (!valueGroups.has(valueKey)) {
             valueGroups.set(valueKey, []);
           }
@@ -1416,7 +1422,7 @@ export abstract class DatomDatabase implements DatomReader {
             for (const datom of valueDatoms) {
               if (
                 existingEntity !== undefined &&
-                String(datom[0]) !== String(existingEntity)
+                String(datom.e) !== String(existingEntity)
               ) {
                 throw new UniqueConstraintError(attrKey, value, existingEntity);
               }
@@ -1620,9 +1626,9 @@ export abstract class DatomDatabase implements DatomReader {
     if (ops.retract && ops.retract.length > 0) {
       for (const datom of ops.retract) {
         speculativeRetracts.push({
-          e: datom[0],
-          a: datom[1],
-          v: datom[2],
+          e: datom.e,
+          a: datom.a,
+          v: datom.v,
           tx: speculativeTxId,
           added: false,
         });
@@ -1632,9 +1638,9 @@ export abstract class DatomDatabase implements DatomReader {
     if (ops.add && ops.add.length > 0) {
       for (const datom of ops.add) {
         speculativeAdds.push({
-          e: datom[0],
-          a: datom[1],
-          v: datom[2],
+          e: datom.e,
+          a: datom.a,
+          v: datom.v,
           tx: speculativeTxId,
           added: true,
         });

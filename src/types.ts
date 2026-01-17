@@ -75,7 +75,14 @@ export type Datom = {
  * Tuple format: [entity, attribute, value]
  * This is more efficient and aligns with the fixed EAV structure
  */
-export type DatomInput = [EntityId, Attribute, Value];
+export type DatomInput = {
+  /** The entity this datom describes */
+  e: EntityId;
+  /** The attribute being asserted */
+  a: Attribute;
+  /** The value of the attribute */
+  v: Value;
+};
 
 /**
  * Options for querying datoms

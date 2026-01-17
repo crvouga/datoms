@@ -21,7 +21,7 @@ describe.each(FIXTURES)(
       test("should allow queries within limit", async () => {
         const { db } = f;
         for (let i = 1; i <= 5; i++) {
-          await db.transact({ add: [[i, "tag", `tag-${i}`]] });
+          await db.transact({ add: [{ e: i, a: "tag", v: `tag-${i}` }] });
         }
 
         const results = await db.datoms({
@@ -35,7 +35,7 @@ describe.each(FIXTURES)(
         const { db } = f;
         // Add more datoms than the limit
         for (let i = 1; i <= 10; i++) {
-          await db.transact({ add: [[i, "tag", `tag-${i}`]] });
+          await db.transact({ add: [{ e: i, a: "tag", v: `tag-${i}` }] });
         }
 
         try {
@@ -53,7 +53,7 @@ describe.each(FIXTURES)(
       test("should work with limit option", async () => {
         const { db } = f;
         for (let i = 1; i <= 10; i++) {
-          await db.transact({ add: [[i, "tag", `tag-${i}`]] });
+          await db.transact({ add: [{ e: i, a: "tag", v: `tag-${i}` }] });
         }
 
         // limit should be applied first, then maxResultSize check
@@ -67,7 +67,7 @@ describe.each(FIXTURES)(
 
       test("should work with filters", async () => {
         const { db } = f;
-        await db.transact({ add: [[1, "name", "Alice"]] });
+        await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
         const results = await db.datoms({
           e: 1,

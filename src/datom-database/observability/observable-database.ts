@@ -3,14 +3,13 @@
  * Provides event system, statistics, health checks, and metrics tracking
  */
 
-import type { DatomDatabase } from "../datom-database.js";
+import type { DatomDatabase, TransactOperations } from "../datom-database.js";
 import type {
   DatabaseEvent,
   DatabaseEventListener,
   DatabaseHealth,
   DatabaseStats,
   Datom,
-  DatomInput,
   Logger,
   QueryOptions,
   TransactionId,
@@ -57,10 +56,7 @@ export class ObservableDatabase {
    * This wraps the underlying database's transact method to add observability
    */
   async transact(
-    ops: {
-      add?: DatomInput[];
-      retract?: DatomInput[];
-    },
+    ops: TransactOperations,
     metadata?: Record<string, unknown>
   ): Promise<TransactionId> {
     const addedCount = ops.add?.length ?? 0;

@@ -120,7 +120,11 @@ export async function retractEntityHelper(
   const entityDatoms = await datoms({ e: entity, added: true });
 
   // Retract all of them
-  const retractions: DatomInput[] = entityDatoms.map((d) => [d.e, d.a, d.v]);
+  const retractions: DatomInput[] = entityDatoms.map((d) => ({
+    e: d.e,
+    a: d.a,
+    v: d.v,
+  }));
   await retract(retractions);
 }
 
@@ -139,7 +143,11 @@ export async function retractAttributeHelper(
     return;
   }
   // Retract all existing values
-  const toRetract: DatomInput[] = datomsResult.map((d) => [d.e, d.a, d.v]);
+  const toRetract: DatomInput[] = datomsResult.map((d) => ({
+    e: d.e,
+    a: d.a,
+    v: d.v,
+  }));
   await retract(toRetract);
 }
 
@@ -163,18 +171,18 @@ export async function upsertHelper(
   // If cardinality is "one", retract existing value first
   if (definition?.cardinality === "one") {
     const existingValues = await getValuesHelper(datoms, entity, attribute);
-    const toRetract: DatomInput[] = existingValues.map((v) => [
-      entity,
-      attribute,
-      v,
-    ]);
+    const toRetract: DatomInput[] = existingValues.map((v) => ({
+      e: entity,
+      a: attribute,
+      v: v,
+    }));
     if (toRetract.length > 0) {
       await retract(toRetract);
     }
   }
 
   // Add the new value
-  await add([[entity, attribute, value]]);
+  await add([{ e: entity, a: attribute, v: value }]);
 }
 
 /**

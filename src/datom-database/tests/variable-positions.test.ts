@@ -20,9 +20,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
-          [3, "age", 30],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 3, a: "age", v: 30 },
         ],
       });
 
@@ -45,10 +45,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [1, "age", 30],
-          [2, "name", "Bob"],
-          [2, "city", "NYC"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "age", v: 30 },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "city", v: "NYC" },
         ],
       });
 
@@ -71,10 +71,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [1, "age", 30],
-          [2, "name", "Bob"],
-          [2, "age", 25],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "age", v: 30 },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "age", v: 25 },
         ],
       });
 
@@ -86,11 +86,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(4);
       // Verify we get all entity-attribute-value combinations
-      const combinations = results.map((r) => [r["e"], r["attr"], r["v"]]);
-      expect(combinations).toContainEqual([1, "name", "Alice"]);
-      expect(combinations).toContainEqual([1, "age", 30]);
-      expect(combinations).toContainEqual([2, "name", "Bob"]);
-      expect(combinations).toContainEqual([2, "age", 25]);
+      const combinations = results.map((r) => ({
+        e: r["e"],
+        a: r["attr"],
+        v: r["v"],
+      }));
+      expect(combinations).toContainEqual({ e: 1, a: "name", v: "Alice" });
+      expect(combinations).toContainEqual({ e: 1, a: "age", v: 30 });
+      expect(combinations).toContainEqual({ e: 2, a: "name", v: "Bob" });
+      expect(combinations).toContainEqual({ e: 2, a: "age", v: 25 });
 
       await db.close();
     });
@@ -99,9 +103,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          ["user-1", "name", "Alice"],
-          ["user-2", "name", "Bob"],
-          ["user-1", "age", 30],
+          { e: "user-1", a: "name", v: "Alice" },
+          { e: "user-2", a: "name", v: "Bob" },
+          { e: "user-1", a: "age", v: 30 },
         ],
       });
 

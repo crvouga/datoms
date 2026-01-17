@@ -36,10 +36,14 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
         unique: true,
       });
 
-      await db.transact({ add: [[1, "email", "alice@example.com"]] });
+      await db.transact({
+        add: [{ e: 1, a: "email", v: "alice@example.com" }],
+      });
 
       try {
-        await db.transact({ add: [[2, "email", "alice@example.com"]] });
+        await db.transact({
+          add: [{ e: 2, a: "email", v: "alice@example.com" }],
+        });
         throw new Error("Should have thrown UniqueConstraintError");
       } catch (error) {
         expect(error).toBeInstanceOf(UniqueConstraintError);
@@ -61,14 +65,16 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
         unique: true,
       });
 
-      await db.transact({ add: [[1, "email", "alice@example.com"]] });
+      await db.transact({
+        add: [{ e: 1, a: "email", v: "alice@example.com" }],
+      });
 
       try {
         // Use add() directly which validates - this tests batch uniqueness checking
         await db.transact({
           add: [
-            [2, "email", "alice@example.com"], // Duplicate - should fail
-            [3, "email", "bob@example.com"],
+            { e: 2, a: "email", v: "alice@example.com" }, // Duplicate - should fail
+            { e: 3, a: "email", v: "bob@example.com" },
           ],
         });
         throw new Error("Should have thrown UniqueConstraintError");
@@ -94,8 +100,8 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       try {
         await db.transact({
           add: [
-            [1, "email", "alice@example.com"],
-            [1, "email", "alice2@example.com"],
+            { e: 1, a: "email", v: "alice@example.com" },
+            { e: 1, a: "email", v: "alice2@example.com" },
           ],
         });
         throw new Error("Should have thrown CardinalityError");
@@ -118,10 +124,14 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
         type: "string",
       });
 
-      await db.transact({ add: [[1, "email", "alice@example.com"]] });
+      await db.transact({
+        add: [{ e: 1, a: "email", v: "alice@example.com" }],
+      });
 
       try {
-        await db.transact({ add: [[1, "email", "alice2@example.com"]] });
+        await db.transact({
+          add: [{ e: 1, a: "email", v: "alice2@example.com" }],
+        });
         throw new Error("Should have thrown CardinalityError");
       } catch (error) {
         expect(error).toBeInstanceOf(CardinalityError);
@@ -144,7 +154,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       });
 
       try {
-        await db.transact({ add: [[1, "name", 123]] });
+        await db.transact({ add: [{ e: 1, a: "name", v: 123 }] });
         throw new Error("Should have thrown DatomTypeError");
       } catch (error) {
         expect(error).toBeInstanceOf(DatomTypeError);
@@ -167,7 +177,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       });
 
       try {
-        await db.transact({ add: [[1, "age", "not-a-number"]] });
+        await db.transact({ add: [{ e: 1, a: "age", v: "not-a-number" }] });
         throw new Error("Should have thrown DatomTypeError");
       } catch (error) {
         expect(error).toBeInstanceOf(DatomTypeError);
@@ -188,7 +198,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       });
 
       try {
-        await db.transact({ add: [[1, "active", "true"]] });
+        await db.transact({ add: [{ e: 1, a: "active", v: "true" }] });
         throw new Error("Should have thrown DatomTypeError");
       } catch (error) {
         expect(error).toBeInstanceOf(DatomTypeError);
@@ -208,7 +218,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       });
 
       try {
-        await db.transact({ add: [[1, "created", 12345]] });
+        await db.transact({ add: [{ e: 1, a: "created", v: 12345 }] });
         throw new Error("Should have thrown DatomTypeError");
       } catch (error) {
         expect(error).toBeInstanceOf(DatomTypeError);
@@ -228,7 +238,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       });
 
       try {
-        await db.transact({ add: [[1, "created", "not-a-date"]] });
+        await db.transact({ add: [{ e: 1, a: "created", v: "not-a-date" }] });
         throw new Error("Should have thrown DatomTypeError");
       } catch (error) {
         expect(error).toBeInstanceOf(DatomTypeError);
@@ -248,7 +258,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
 
       try {
         // Use null as invalid ref (ref should be EntityId: number or string)
-        await db.transact({ add: [[1, "parent", null as any]] });
+        await db.transact({ add: [{ e: 1, a: "parent", v: null as any }] });
         throw new Error("Should have thrown DatomTypeError");
       } catch (error) {
         expect(error).toBeInstanceOf(DatomTypeError);
@@ -263,7 +273,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
   describe("QuerySafetyError", () => {
     test("should throw QuerySafetyError for query without filters or limits", async () => {
       const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]] });
+      await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
       try {
         await db.datoms({});
@@ -279,7 +289,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
 
     test("should throw QuerySafetyError for history query without filters or limits", async () => {
       const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]] });
+      await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
       try {
         await db.history().datoms({});
@@ -296,11 +306,11 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
   describe("TransactionConflictError", () => {
     test("should throw TransactionConflictError when optimistic lock fails", async () => {
       const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]] });
+      await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
       const initialTx = await db.getLatestTransaction();
 
       // First transaction updates the database
-      await db.transact({ add: [[2, "name", "Bob"]] });
+      await db.transact({ add: [{ e: 2, a: "name", v: "Bob" }] });
 
       // Note: Optimistic locking is not supported with with() or transact()
       // This test is removed as it tested transaction() callback behavior
@@ -334,7 +344,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
   describe("QueryTimeoutError", () => {
     test("should throw QueryTimeoutError when query exceeds timeout", async () => {
       const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]] });
+      await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
       try {
         // Use a very short timeout that will definitely be exceeded
@@ -363,7 +373,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       const { db } = f;
       // Add multiple datoms
       for (let i = 1; i <= 10; i++) {
-        await db.transact({ add: [[i, "tag", `tag-${i}`]] });
+        await db.transact({ add: [{ e: i, a: "tag", v: `tag-${i}` }] });
       }
 
       try {
@@ -382,7 +392,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
 
     test("should not throw when result is within maxResultSize", async () => {
       const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]] });
+      await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
       const results = await db.datoms({
         e: 1,

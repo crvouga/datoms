@@ -22,8 +22,8 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
         ],
       });
 
@@ -41,10 +41,10 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [1, "age", 30],
-          [2, "name", "Bob"],
-          [2, "age", 25],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 1, a: "age", v: 30 },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 2, a: "age", v: 25 },
         ],
       });
 
@@ -61,9 +61,9 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
-          [3, "name", "Charlie"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
+          { e: 3, a: "name", v: "Charlie" },
         ],
       });
 
@@ -79,8 +79,8 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
         ],
       });
 
@@ -153,8 +153,8 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
         ],
       });
 
@@ -192,7 +192,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       // Create many datoms
       const datoms: Datom[] = [];
       for (let i = 1; i <= 50; i++) {
-        await db.transact({ add: [[i, "name", `Entity${i}`]] });
+        await db.transact({ add: [{ e: i, a: "name", v: `Entity${i}` }] });
         const entityDatoms = await db.datoms({ e: i });
         datoms.push(...entityDatoms);
       }
@@ -235,7 +235,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         type: "number",
       });
 
-      await db.transact({ add: [[1, "age", 30]] });
+      await db.transact({ add: [{ e: 1, a: "age", v: 30 }] });
 
       // Export
       const exported: Datom[] = [];
@@ -277,7 +277,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should import without validation", async () => {
       const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]] });
+      await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
       // Export
       const exported: Datom[] = [];
@@ -309,8 +309,8 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
         ],
       });
 

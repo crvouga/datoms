@@ -20,9 +20,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "active", true],
-          [2, "active", false],
-          [3, "active", true],
+          { e: 1, a: "active", v: true },
+          { e: 2, a: "active", v: false },
+          { e: 3, a: "active", v: true },
         ],
       });
 
@@ -47,9 +47,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.transact({
         add: [
-          [1, "created", date1],
-          [2, "created", date2],
-          [3, "created", date3],
+          { e: 1, a: "created", v: date1 },
+          { e: 2, a: "created", v: date2 },
+          { e: 3, a: "created", v: date3 },
         ],
       });
 
@@ -73,9 +73,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "middleName", null],
-          [2, "middleName", "Smith"],
-          [3, "middleName", null],
+          { e: 1, a: "middleName", v: null },
+          { e: 2, a: "middleName", v: "Smith" },
+          { e: 3, a: "middleName", v: null },
         ],
       });
 
@@ -96,9 +96,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "optional", undefined],
-          [2, "optional", "value"],
-          [3, "optional", undefined],
+          { e: 1, a: "optional", v: undefined },
+          { e: 2, a: "optional", v: "value" },
+          { e: 3, a: "optional", v: undefined },
         ],
       });
 
@@ -125,20 +125,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({
         add: [
-          [1, "data", "string"],
-          [1, "data", 42],
-          [1, "data", true],
-          [2, "data", "string"],
-          [2, "data", 100],
+          { e: 1, a: "data", v: "string" },
+          { e: 1, a: "data", v: 42 },
+          { e: 1, a: "data", v: true },
+          { e: 2, a: "data", v: "string" },
+          { e: 2, a: "data", v: 100 },
         ],
       });
 
-      const query: DatalogQuery = {
+      const results = await db.query({
         find: ["?e", "?v"],
         where: [["?e", "data", "?v"]],
-      };
-
-      const results = await db.query(query);
+      });
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Verify we can query across different types
       const values = results.map((r) => r["v"]);

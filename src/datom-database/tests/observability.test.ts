@@ -29,7 +29,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       });
 
       // Use observableDb.transact() which emits transaction events
-      await observableDb.transact({ add: [[1, "name", "Alice"]] });
+      await observableDb.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("transaction");
@@ -37,7 +37,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       // Unsubscribe
       unsubscribe();
 
-      await observableDb.transact({ add: [[2, "name", "Bob"]] });
+      await observableDb.transact({ add: [{ e: 2, a: "name", v: "Bob" }] });
       // Should not have new event
       expect(events).toHaveLength(1);
     });
@@ -51,7 +51,9 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       });
 
       // Use observableDb.transact() which emits transaction events
-      const txId = await observableDb.transact({ add: [[1, "name", "Alice"]] });
+      const txId = await observableDb.transact({
+        add: [{ e: 1, a: "name", v: "Alice" }],
+      });
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("transaction");
@@ -71,7 +73,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       });
 
       await observableDb.transact(
-        { add: [[1, "name", "Alice"]] },
+        { add: [{ e: 1, a: "name", v: "Alice" }] },
         { userId: "alice", reason: "test" }
       );
 
@@ -83,7 +85,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should emit query events", async () => {
       const { db } = f;
-      await observableDb.transact({ add: [[1, "name", "Alice"]] });
+      await observableDb.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
       const events: DatabaseEvent[] = [];
       observableDb.on("query", (event) => {
@@ -145,8 +147,8 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       const { db } = f;
       await observableDb.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
         ],
       });
 
@@ -172,7 +174,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should emit restore events", async () => {
       const { db } = f;
-      await observableDb.transact({ add: [[1, "name", "Alice"]] });
+      await observableDb.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
       const events: DatabaseEvent[] = [];
       observableDb.on("backup", (event) => {
@@ -228,7 +230,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       });
 
       // Use observableDb.transact() which emits transaction events
-      await observableDb.transact({ add: [[1, "name", "Alice"]] });
+      await observableDb.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
       // Should have error event from listener failure
       expect(errorEvents.length).toBeGreaterThan(0);
@@ -257,7 +259,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       });
 
       // Use observableDb.transact() which emits transaction events
-      await observableDb.transact({ add: [[1, "name", "Alice"]] });
+      await observableDb.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
       expect(events1).toHaveLength(1);
       expect(events2).toHaveLength(1);
@@ -267,7 +269,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
   describe("Stats", () => {
     test("should return basic stats", async () => {
       const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]] });
+      await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
 
       const stats = await observableDb.getStats();
 
@@ -299,8 +301,8 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       const { db } = f;
       await observableDb.transact({
         add: [
-          [1, "name", "Alice"],
-          [2, "name", "Bob"],
+          { e: 1, a: "name", v: "Alice" },
+          { e: 2, a: "name", v: "Bob" },
         ],
       });
 
@@ -318,11 +320,11 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should track transaction metrics", async () => {
       const { db } = f;
-      await observableDb.transact({ add: [[1, "name", "Alice"]] });
-      await observableDb.transact({ add: [[2, "name", "Bob"]] });
+      await observableDb.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
+      await observableDb.transact({ add: [{ e: 2, a: "name", v: "Bob" }] });
       await observableDb.transact({
-        add: [[3, "name", "Charlie"]],
-        retract: [[1, "name", "Alice"]],
+        add: [{ e: 3, a: "name", v: "Charlie" }],
+        retract: [{ e: 1, a: "name", v: "Alice" }],
       });
 
       const stats = await observableDb.getStats();
@@ -335,8 +337,8 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should include latest transaction in stats", async () => {
       const { db } = f;
-      const tx1 = await db.transact({ add: [[1, "name", "Alice"]] });
-      const tx2 = await db.transact({ add: [[2, "name", "Bob"]] });
+      const tx1 = await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
+      const tx2 = await db.transact({ add: [{ e: 2, a: "name", v: "Bob" }] });
 
       const stats = await observableDb.getStats();
 
@@ -371,7 +373,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       observableDb.setLogger(logger);
 
-      await observableDb.transact({ add: [[1, "name", "Alice"]] });
+      await observableDb.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
       await observableDb.datoms({ e: 1 });
 
       // Should have logged transaction and query events
@@ -430,7 +432,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       };
 
       observableDb.setLogger(logger);
-      await observableDb.transact({ add: [[1, "name", "Alice"]] });
+      await observableDb.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
       await observableDb.datoms({ e: 1 });
 
       // Should have logged query event at debug level
@@ -444,7 +446,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
     test("should work without logger", async () => {
       const { db } = f;
       // Should not throw when no logger is set
-      await db.transact({ add: [[1, "name", "Alice"]] });
+      await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
       await db.datoms({ e: 1 });
     });
   });

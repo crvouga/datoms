@@ -828,9 +828,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
           // Extract the condition that connects this alias to a previous one
           const parts = joinCond.split(" = ");
           if (parts.length === 2) {
-            if (parts[1].startsWith(`${alias}.`)) {
+            if (parts[0].startsWith(`${alias}.`)) {
               conditions.push(joinCond);
-            } else if (parts[0].startsWith(`${alias}.`)) {
+            } else if (parts[1].startsWith(`${alias}.`)) {
               // Reverse the condition
               conditions.push(`${parts[1]} = ${parts[0]}`);
             }
@@ -1048,11 +1048,11 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     `;
 
     const params = datoms.flatMap((d) => {
-      let value = d[2];
+      let value = d.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, true];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, true];
     });
 
     await this.connection.execute(sql, params);
@@ -1072,11 +1072,11 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     `;
 
     const params = datoms.flatMap((d) => {
-      let value = d[2];
+      let value = d.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d[0]), String(d[1]), JSON.stringify(value), tx, false];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, false];
     });
 
     await this.connection.execute(sql, params);
