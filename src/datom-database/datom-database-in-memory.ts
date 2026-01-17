@@ -51,13 +51,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     const tx = this.nextTx++;
 
     for (const datom of datoms) {
-      this._datomsArray.push({
-        entity: datom[0],
-        attribute: datom[1],
-        value: datom[2],
-        tx,
-        added: true,
-      });
+      this._datomsArray.push([datom[0], datom[1], datom[2], tx, true] as Datom);
     }
 
     return tx;
@@ -68,13 +62,13 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     for (const datom of datoms) {
       // Add retraction datom
-      this._datomsArray.push({
-        entity: datom[0],
-        attribute: datom[1],
-        value: datom[2],
+      this._datomsArray.push([
+        datom[0],
+        datom[1],
+        datom[2],
         tx,
-        added: false,
-      });
+        false,
+      ] as Datom);
     }
 
     return tx;
@@ -87,17 +81,13 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     // Find the latest transaction for this (entity, attribute, value)
     let latest: Datom | null = null;
     for (const d of this._datomsArray) {
-      if (
-        d.entity === datom.entity &&
-        d.attribute === datom.attribute &&
-        d.value === datom.value
-      ) {
-        if (!latest || d.tx > latest.tx) {
+      if (d[0] === datom[0] && d[1] === datom[1] && d[2] === datom[2]) {
+        if (!latest || d[3] > latest[3]) {
           latest = d;
         }
       }
     }
-    return latest !== null && latest.added;
+    return latest !== null && latest[4];
   }
 
   async datoms(options: QueryOptions): Promise<Datom[]> {
@@ -111,16 +101,16 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Apply filters
     if (options.entity !== undefined) {
-      results = results.filter((d) => d.entity === options.entity);
+      results = results.filter((d) => d[0] === options.entity);
     }
     if (options.attribute !== undefined) {
-      results = results.filter((d) => d.attribute === options.attribute);
+      results = results.filter((d) => d[1] === options.attribute);
     }
     if (options.value !== undefined) {
-      results = results.filter((d) => d.value === options.value);
+      results = results.filter((d) => d[2] === options.value);
     }
     if (options.tx !== undefined) {
-      results = results.filter((d) => d.tx === options.tx);
+      results = results.filter((d) => d[3] === options.tx);
     }
 
     // Don't filter by added - return all datoms including retracted
@@ -134,16 +124,16 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Apply filters
     if (options.entity !== undefined) {
-      results = results.filter((d) => d.entity === options.entity);
+      results = results.filter((d) => d[0] === options.entity);
     }
     if (options.attribute !== undefined) {
-      results = results.filter((d) => d.attribute === options.attribute);
+      results = results.filter((d) => d[1] === options.attribute);
     }
     if (options.value !== undefined) {
-      results = results.filter((d) => d.value === options.value);
+      results = results.filter((d) => d[2] === options.value);
     }
     if (options.tx !== undefined) {
-      results = results.filter((d) => d.tx === options.tx);
+      results = results.filter((d) => d[3] === options.tx);
     }
 
     // Handle retractions: for each unique (entity, attribute, value) combination,
@@ -157,11 +147,11 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     const latestDatoms = new Map<string, Datom>();
     for (const datom of results) {
       // Use (entity, attribute, value) key for regular queries to support multi-valued attributes
-      const key = `${String(datom.entity)}|${String(
-        datom.attribute
-      )}|${JSON.stringify(datom.value)}`;
+      const key = `${String(datom[0])}|${String(
+        datom[1]
+      )}|${JSON.stringify(datom[2])}`;
       const existing = latestDatoms.get(key);
-      if (!existing || datom.tx > existing.tx) {
+      if (!existing || datom[3] > existing[3]) {
         latestDatoms.set(key, datom);
       }
     }
@@ -170,10 +160,10 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     // Apply added filter after deduplication
     // Default behavior: filter to only added datoms (exclude retracted)
     if (options.added === undefined || options.added === true) {
-      results = results.filter((d) => d.added === true);
+      results = results.filter((d) => d[4] === true);
     } else if (options.added === false) {
       // If explicitly requesting retractions, filter by added: false
-      results = results.filter((d) => d.added === false);
+      results = results.filter((d) => d[4] === false);
     }
 
     // Apply pagination
@@ -195,32 +185,32 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Apply filters (except tx, which we'll handle separately)
     if (options.entity !== undefined) {
-      results = results.filter((d) => d.entity === options.entity);
+      results = results.filter((d) => d[0] === options.entity);
     }
     if (options.attribute !== undefined) {
-      results = results.filter((d) => d.attribute === options.attribute);
+      results = results.filter((d) => d[1] === options.attribute);
     }
     if (options.value !== undefined) {
-      results = results.filter((d) => d.value === options.value);
+      results = results.filter((d) => d[2] === options.value);
     }
 
     // Filter to only datoms with tx <= txId
     // If options.tx is specified, use the minimum of both
     const maxTx = options.tx !== undefined ? Math.min(options.tx, txId) : txId;
-    results = results.filter((d) => d.tx <= maxTx);
+    results = results.filter((d) => d[3] <= maxTx);
 
     // Deduplicate by (entity, attribute) keeping the latest tx
     const deduplicated = new Map<string, Datom>();
     for (const datom of results) {
-      const key = `${String(datom.entity)}|${String(datom.attribute)}`;
+      const key = `${String(datom[0])}|${String(datom[1])}`;
       const existing = deduplicated.get(key);
-      if (!existing || datom.tx > existing.tx) {
+      if (!existing || datom[3] > existing[3]) {
         deduplicated.set(key, datom);
       }
     }
 
     // Filter out retracted datoms (keep only added: true)
-    results = Array.from(deduplicated.values()).filter((d) => d.added);
+    results = Array.from(deduplicated.values()).filter((d) => d[4]);
 
     // Apply pagination
     const offset = options.offset ?? 0;
@@ -236,30 +226,30 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Apply filters
     if (options.entity !== undefined) {
-      results = results.filter((d) => d.entity === options.entity);
+      results = results.filter((d) => d[0] === options.entity);
     }
     if (options.attribute !== undefined) {
-      results = results.filter((d) => d.attribute === options.attribute);
+      results = results.filter((d) => d[1] === options.attribute);
     }
     if (options.value !== undefined) {
-      results = results.filter((d) => d.value === options.value);
+      results = results.filter((d) => d[2] === options.value);
     }
     if (options.tx !== undefined) {
-      results = results.filter((d) => d.tx === options.tx);
+      results = results.filter((d) => d[3] === options.tx);
     }
 
     // Sort by tx ASC for history
     results.sort((a, b) => {
-      if (a.tx !== b.tx) {
-        return a.tx - b.tx;
+      if (a[3] !== b[3]) {
+        return a[3] - b[3];
       }
       // Secondary sort by entity, then attribute
-      const entityA = String(a.entity);
-      const entityB = String(b.entity);
+      const entityA = String(a[0]);
+      const entityB = String(b[0]);
       if (entityA !== entityB) {
         return entityA.localeCompare(entityB);
       }
-      return String(a.attribute).localeCompare(String(b.attribute));
+      return String(a[1]).localeCompare(String(b[1]));
     });
 
     // Apply pagination
@@ -279,31 +269,31 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Apply filters (except tx, which we'll handle separately)
     if (options.entity !== undefined) {
-      results = results.filter((d) => d.entity === options.entity);
+      results = results.filter((d) => d[0] === options.entity);
     }
     if (options.attribute !== undefined) {
-      results = results.filter((d) => d.attribute === options.attribute);
+      results = results.filter((d) => d[1] === options.attribute);
     }
     if (options.value !== undefined) {
-      results = results.filter((d) => d.value === options.value);
+      results = results.filter((d) => d[2] === options.value);
     }
 
     // Filter to only datoms with tx > txId
-    results = results.filter((d) => d.tx > txId);
+    results = results.filter((d) => d[3] > txId);
 
     // Deduplicate by (entity, attribute, value) keeping the latest tx
     const deduplicated = new Map<string, Datom>();
     for (const datom of results) {
-      const valueKey = JSON.stringify(datom.value);
-      const key = `${String(datom.entity)}|${String(datom.attribute)}|${valueKey}`;
+      const valueKey = JSON.stringify(datom[2]);
+      const key = `${String(datom[0])}|${String(datom[1])}|${valueKey}`;
       const existing = deduplicated.get(key);
-      if (!existing || datom.tx > existing.tx) {
+      if (!existing || datom[3] > existing[3]) {
         deduplicated.set(key, datom);
       }
     }
 
     // Filter out retracted datoms (keep only added: true)
-    results = Array.from(deduplicated.values()).filter((d) => d.added);
+    results = Array.from(deduplicated.values()).filter((d) => d[4]);
 
     // Apply pagination
     const offset = options.offset ?? 0;
@@ -417,13 +407,13 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return datoms.map((datom) => {
       const result: Record<string, Value | Attribute> = {};
       if (isVariable(entityVal)) {
-        result[entityVal as string] = datom.entity;
+        result[entityVal as string] = datom[0];
       }
       if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom.attribute;
+        result[attributeVal as string] = datom[1];
       }
       if (isVariable(valueVal)) {
-        result[valueVal as string] = datom.value;
+        result[valueVal as string] = datom[2];
       }
       return result;
     });
@@ -472,18 +462,15 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       // Check if this is the latest version (not retracted)
       const latestVersion = this._datomsArray
         .filter(
-          (other) =>
-            other.entity === d.entity &&
-            other.attribute === d.attribute &&
-            other.value === d.value
+          (other) => other[0] === d[0] && other[1] === d[1] && other[2] === d[2]
         )
-        .sort((a, b) => b.tx - a.tx)[0];
-      return latestVersion?.added === true && latestVersion.tx === d.tx;
+        .sort((a, b) => b[3] - a[3])[0];
+      return latestVersion?.[4] === true && latestVersion[3] === d[3];
     });
     stats.totalDatoms = addedDatoms.length;
 
     // Count unique entities
-    const uniqueEntities = new Set(addedDatoms.map((d) => String(d.entity)));
+    const uniqueEntities = new Set(addedDatoms.map((d) => String(d[0])));
     stats.totalEntities = uniqueEntities.size;
 
     // Add query metrics if available
@@ -531,16 +518,16 @@ class InMemoryTransaction implements Transaction {
 
     // Apply filters
     if (options.entity !== undefined) {
-      results = results.filter((d) => d.entity === options.entity);
+      results = results.filter((d) => d[0] === options.entity);
     }
     if (options.attribute !== undefined) {
-      results = results.filter((d) => d.attribute === options.attribute);
+      results = results.filter((d) => d[1] === options.attribute);
     }
     if (options.value !== undefined) {
-      results = results.filter((d) => d.value === options.value);
+      results = results.filter((d) => d[2] === options.value);
     }
     if (options.tx !== undefined) {
-      results = results.filter((d) => d.tx === options.tx);
+      results = results.filter((d) => d[3] === options.tx);
     }
 
     // Normal query: deduplicate and filter
@@ -550,11 +537,9 @@ class InMemoryTransaction implements Transaction {
     // Always deduplicate first, then apply added filter
     const latestDatoms = new Map<string, Datom>();
     for (const datom of results) {
-      const key = `${String(datom.entity)}|${String(
-        datom.attribute
-      )}|${String(datom.value)}`;
+      const key = `${String(datom[0])}|${String(datom[1])}|${String(datom[2])}`;
       const existing = latestDatoms.get(key);
-      if (!existing || datom.tx > existing.tx) {
+      if (!existing || datom[3] > existing[3]) {
         latestDatoms.set(key, datom);
       }
     }
@@ -563,10 +548,10 @@ class InMemoryTransaction implements Transaction {
     // Apply added filter after deduplication
     if (options.added === undefined || options.added === true) {
       // Filter to only added datoms (exclude retractions)
-      results = results.filter((d) => d.added);
+      results = results.filter((d) => d[4]);
     } else if (options.added === false) {
       // For retractions, filter by added: false
-      results = results.filter((d) => !d.added);
+      results = results.filter((d) => !d[4]);
     }
 
     // Apply pagination
@@ -583,13 +568,13 @@ class InMemoryTransaction implements Transaction {
   }): Promise<void> {
     if (ops.add && ops.add.length > 0) {
       for (const datom of ops.add) {
-        this._datomsArray.push({
-          entity: datom[0],
-          attribute: datom[1],
-          value: datom[2],
-          tx: this.txId,
-          added: true,
-        });
+        this._datomsArray.push([
+          datom[0],
+          datom[1],
+          datom[2],
+          this.txId,
+          true,
+        ] as Datom);
       }
     }
     if (ops.retract && ops.retract.length > 0) {
@@ -601,10 +586,8 @@ class InMemoryTransaction implements Transaction {
         // Find and remove matching pending adds (modify array in place)
         for (let i = this._datomsArray.length - 1; i >= 0; i--) {
           const d = this._datomsArray[i];
-          if (d.tx === this.txId && d.added) {
-            const dKey = `${String(d.entity)}|${String(d.attribute)}|${String(
-              d.value
-            )}`;
+          if (d[3] === this.txId && d[4]) {
+            const dKey = `${String(d[0])}|${String(d[1])}|${String(d[2])}`;
             if (dKey === key) {
               this._datomsArray.splice(i, 1);
             }
@@ -612,13 +595,13 @@ class InMemoryTransaction implements Transaction {
         }
 
         // Add retraction datom
-        this._datomsArray.push({
-          entity: datom[0],
-          attribute: datom[1],
-          value: datom[2],
-          tx: this.txId,
-          added: false,
-        });
+        this._datomsArray.push([
+          datom[0],
+          datom[1],
+          datom[2],
+          this.txId,
+          false,
+        ] as Datom);
       }
     }
   }
@@ -691,13 +674,13 @@ class InMemoryTransaction implements Transaction {
     return datoms.map((datom: Datom) => {
       const result: Record<string, Value | Attribute> = {};
       if (isVariable(entityVal)) {
-        result[entityVal as string] = datom.entity;
+        result[entityVal as string] = datom[0];
       }
       if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom.attribute;
+        result[attributeVal as string] = datom[1];
       }
       if (isVariable(valueVal)) {
-        result[valueVal as string] = datom.value;
+        result[valueVal as string] = datom[2];
       }
       return result;
     });

@@ -33,7 +33,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     const entity = await db.datoms({ entity: 1, added: true });
     expect(entity).toHaveLength(2);
-    const values = entity.map((d) => d.value);
+    const values = entity.map((d) => d[2]);
     expect(values).toContain("Alice");
     expect(values).toContain(30);
   });
@@ -72,7 +72,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const nameDatoms = await db.datoms({ entity: 1, attribute: "name" });
       await db.transact({
-        retract: nameDatoms.map((d) => [d.entity, d.attribute, d.value]),
+        retract: nameDatoms.map((d) => [d[0], d[1], d[2]]),
       });
 
       const nameResults = await db.query({
@@ -101,7 +101,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const tagDatoms = await db.datoms({ entity: 1, attribute: "tag" });
       await db.transact({
-        retract: tagDatoms.map((d) => [d.entity, d.attribute, d.value]),
+        retract: tagDatoms.map((d) => [d[0], d[1], d[2]]),
       });
 
       const tags = await db.datoms({ entity: 1, attribute: "tag" });
@@ -124,7 +124,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         attribute: "nonexistent",
       });
       const tx = await db.transact({
-        retract: nonexistentDatoms.map((d) => [d.entity, d.attribute, d.value]),
+        retract: nonexistentDatoms.map((d) => [d[0], d[1], d[2]]),
       });
       expect(tx).toBeGreaterThan(0);
     });
@@ -141,7 +141,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transaction(async (tx) => {
         const tagDatoms = await tx.datoms({ entity: 1, attribute: "tag" });
         await tx.transact({
-          retract: tagDatoms.map((d) => [d.entity, d.attribute, d.value]),
+          retract: tagDatoms.map((d) => [d[0], d[1], d[2]]),
         });
 
         // Should see retraction within transaction
@@ -167,7 +167,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const tag1Datoms = await db.datoms({ entity: 1, attribute: "tag" });
       await db.transact({
-        retract: tag1Datoms.map((d) => [d.entity, d.attribute, d.value]),
+        retract: tag1Datoms.map((d) => [d[0], d[1], d[2]]),
       });
 
       const tags1 = await db.datoms({ entity: 1, attribute: "tag" });
@@ -175,7 +175,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const tags2 = await db.datoms({ entity: 2, attribute: "tag" });
       expect(tags2).toHaveLength(2);
-      const values2 = tags2.map((d) => d.value);
+      const values2 = tags2.map((d) => d[2]);
       expect(values2).toContain("red");
       expect(values2).toContain("green");
     });
@@ -204,7 +204,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact({ add: [[1, "status", "pending"]] });
       const existing = await db.datoms({ entity: 1, attribute: "status" });
       await db.transact({
-        retract: existing.map((d) => [d.entity, d.attribute, d.value]),
+        retract: existing.map((d) => [d[0], d[1], d[2]]),
         add: [[1, "status", "active"]],
       });
 
@@ -216,7 +216,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const allStatuses = await db.datoms({ entity: 1, attribute: "status" });
       expect(allStatuses).toHaveLength(1);
-      expect(allStatuses[0].value).toBe("active");
+      expect(allStatuses[0][2]).toBe("active");
     });
 
     test("should add value for cardinality:many attribute without retracting", async () => {
@@ -238,7 +238,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const tags = await db.datoms({ entity: 1, attribute: "tag" });
       expect(tags).toHaveLength(3);
-      const values = tags.map((d) => d.value);
+      const values = tags.map((d) => d[2]);
       expect(values).toContain("red");
       expect(values).toContain("blue");
       expect(values).toContain("green");
@@ -252,7 +252,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const tags = await db.datoms({ entity: 1, attribute: "tag" });
       expect(tags).toHaveLength(2);
-      const values = tags.map((d) => d.value);
+      const values = tags.map((d) => d[2]);
       expect(values).toContain("red");
       expect(values).toContain("blue");
     });
@@ -270,7 +270,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transaction(async (tx) => {
         const existing = await tx.datoms({ entity: 1, attribute: "status" });
         await tx.transact({
-          retract: existing.map((d) => [d.entity, d.attribute, d.value]),
+          retract: existing.map((d) => [d[0], d[1], d[2]]),
           add: [[1, "status", "active"]],
         });
 
@@ -301,12 +301,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact({ add: [[1, "status", "pending"]] });
       const existing1 = await db.datoms({ entity: 1, attribute: "status" });
       await db.transact({
-        retract: existing1.map((d) => [d.entity, d.attribute, d.value]),
+        retract: existing1.map((d) => [d[0], d[1], d[2]]),
         add: [[1, "status", "processing"]],
       });
       const existing2 = await db.datoms({ entity: 1, attribute: "status" });
       await db.transact({
-        retract: existing2.map((d) => [d.entity, d.attribute, d.value]),
+        retract: existing2.map((d) => [d[0], d[1], d[2]]),
         add: [[1, "status", "completed"]],
       });
 
@@ -384,8 +384,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Should return the value with highest tx
       const datoms = await db.datoms({ entity: 1, attribute: "tag" });
-      const sorted = datoms.sort((a, b) => b.tx - a.tx);
-      expect(sorted[0].value).toBe("green");
+      const sorted = datoms.sort((a, b) => b[3] - a[3]);
+      expect(sorted[0][2]).toBe("green");
     });
 
     test("should return most recent value after retraction", async () => {
@@ -400,8 +400,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Latest should be "red" since "blue" was retracted
       const datoms = await db.datoms({ entity: 1, attribute: "tag" });
-      const sorted = datoms.sort((a, b) => b.tx - a.tx);
-      expect(sorted[0].value).toBe("red");
+      const sorted = datoms.sort((a, b) => b[3] - a[3]);
+      expect(sorted[0][2]).toBe("red");
     });
 
     test("should work within transactions", async () => {
@@ -413,14 +413,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
         // Should see latest value within transaction
         const datoms = await tx.datoms({ entity: 1, attribute: "tag" });
-        const sorted = datoms.sort((a, b) => b.tx - a.tx);
-        expect(sorted[0].value).toBe("blue");
+        const sorted = datoms.sort((a, b) => b[3] - a[3]);
+        expect(sorted[0][2]).toBe("blue");
       });
 
       // After commit, should still be blue
       const datoms = await db.datoms({ entity: 1, attribute: "tag" });
-      const sorted = datoms.sort((a, b) => b.tx - a.tx);
-      expect(sorted[0].value).toBe("blue");
+      const sorted = datoms.sort((a, b) => b[3] - a[3]);
+      expect(sorted[0][2]).toBe("blue");
     });
 
     test("should handle time-travel queries correctly", async () => {
@@ -431,22 +431,22 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Current latest should be green
       const currentDatoms = await db.datoms({ entity: 1, attribute: "tag" });
-      const currentSorted = currentDatoms.sort((a, b) => b.tx - a.tx);
-      expect(currentSorted[0].value).toBe("green");
+      const currentSorted = currentDatoms.sort((a, b) => b[3] - a[3]);
+      expect(currentSorted[0][2]).toBe("green");
 
       // At tx2, latest should be blue
       const atTx2Datoms = await db
         .asOf(tx2)
         .datoms({ entity: 1, attribute: "tag" });
-      const atTx2Sorted = atTx2Datoms.sort((a, b) => b.tx - a.tx);
-      expect(atTx2Sorted[0].value).toBe("blue");
+      const atTx2Sorted = atTx2Datoms.sort((a, b) => b[3] - a[3]);
+      expect(atTx2Sorted[0][2]).toBe("blue");
 
       // At tx1, latest should be red
       const atTx1Datoms = await db
         .asOf(tx1)
         .datoms({ entity: 1, attribute: "tag" });
-      const atTx1Sorted = atTx1Datoms.sort((a, b) => b.tx - a.tx);
-      expect(atTx1Sorted[0].value).toBe("red");
+      const atTx1Sorted = atTx1Datoms.sort((a, b) => b[3] - a[3]);
+      expect(atTx1Sorted[0][2]).toBe("red");
     });
 
     test("should be equivalent to getValue", async () => {
@@ -463,9 +463,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(nameResults[0]?.v).toBe("Alice");
 
       const tagDatoms = await db.datoms({ entity: 1, attribute: "tag" });
-      const tagSorted = tagDatoms.sort((a, b) => b.tx - a.tx);
+      const tagSorted = tagDatoms.sort((a, b) => b[3] - a[3]);
       // Should return the latest value (blue, added last)
-      expect(tagSorted[0].value).toBe("blue");
+      expect(tagSorted[0][2]).toBe("blue");
     });
   });
 
@@ -550,7 +550,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact({ add: [[1, "status", "old-status"]] });
       const existing = await db.datoms({ entity: 1, attribute: "status" });
       await db.transact({
-        retract: existing.map((d) => [d.entity, d.attribute, d.value]),
+        retract: existing.map((d) => [d[0], d[1], d[2]]),
         add: [[1, "status", "new-status"]],
       });
 
@@ -583,7 +583,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const tags = await db.datoms({ entity: 1, attribute: "tag" });
       expect(tags).toHaveLength(3);
-      const values = tags.map((d) => d.value);
+      const values = tags.map((d) => d[2]);
       expect(values).toContain("red");
       expect(values).toContain("blue");
       expect(values).toContain("green");
@@ -620,7 +620,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         attribute: "status",
       });
       await db.transact({
-        retract: statusExisting.map((d) => [d.entity, d.attribute, d.value]),
+        retract: statusExisting.map((d) => [d[0], d[1], d[2]]),
         add: [
           [1, "status", "new"],
           [1, "tag", "blue"],
@@ -635,7 +635,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const tags = await db.datoms({ entity: 1, attribute: "tag" });
       expect(tags).toHaveLength(2);
-      const values = tags.map((d) => d.value);
+      const values = tags.map((d) => d[2]);
       expect(values).toContain("red");
       expect(values).toContain("blue");
     });
@@ -653,21 +653,21 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Upsert initial value
       await db.transact({ add: [[1, "status", "pending"]] });
       const pendingDatoms = await db.datoms({ entity: 1, attribute: "status" });
-      expect(pendingDatoms[0]?.value).toBe("pending");
+      expect(pendingDatoms[0]?.[2]).toBe("pending");
 
       // Upsert new value
       const existing1 = await db.datoms({ entity: 1, attribute: "status" });
       await db.transact({
-        retract: existing1.map((d) => [d.entity, d.attribute, d.value]),
+        retract: existing1.map((d) => [d[0], d[1], d[2]]),
         add: [[1, "status", "active"]],
       });
       const activeDatoms = await db.datoms({ entity: 1, attribute: "status" });
-      expect(activeDatoms[0]?.value).toBe("active");
+      expect(activeDatoms[0]?.[2]).toBe("active");
 
       // Retract attribute
       const statusDatoms = await db.datoms({ entity: 1, attribute: "status" });
       await db.transact({
-        retract: statusDatoms.map((d) => [d.entity, d.attribute, d.value]),
+        retract: statusDatoms.map((d) => [d[0], d[1], d[2]]),
       });
       const afterRetract = await db.datoms({ entity: 1, attribute: "status" });
       expect(afterRetract.length).toBe(0);
@@ -678,7 +678,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         entity: 1,
         attribute: "status",
       });
-      expect(completedDatoms[0]?.value).toBe("completed");
+      expect(completedDatoms[0]?.[2]).toBe("completed");
     });
 
     test("should track transaction IDs correctly with new methods", async () => {
@@ -690,7 +690,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const nameDatoms = await db.datoms({ entity: 1, attribute: "name" });
       const tx2 = await db.transact({
-        retract: nameDatoms.map((d) => [d.entity, d.attribute, d.value]),
+        retract: nameDatoms.map((d) => [d[0], d[1], d[2]]),
       });
       expect(tx2).toBeGreaterThan(tx1);
 

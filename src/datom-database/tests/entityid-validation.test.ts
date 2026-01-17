@@ -100,7 +100,7 @@ describe.each(FIXTURES)("EntityId Validation (%s)", (_name, createFixture) => {
       await db.transact({ add: [[123, "name", "Alice"]] });
       const entity = await db.datoms({ entity: 123, added: true });
       expect(entity).toHaveLength(1);
-      expect(entity[0].entity).toBe(123);
+      expect(entity[0][0]).toBe(123);
     });
 
     test("should work with string EntityIds", async () => {
@@ -108,7 +108,7 @@ describe.each(FIXTURES)("EntityId Validation (%s)", (_name, createFixture) => {
       await db.transact({ add: [["user-123", "name", "Alice"]] });
       const entity = await db.datoms({ entity: "user-123", added: true });
       expect(entity).toHaveLength(1);
-      expect(entity[0].entity).toBe("user-123");
+      expect(entity[0][0]).toBe("user-123");
     });
   });
 });

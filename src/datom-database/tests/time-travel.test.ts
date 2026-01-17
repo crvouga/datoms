@@ -26,21 +26,21 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query at tx1 - should only see name
       const atTx1 = await db.asOf(tx1).datoms({ entity: 1 });
       expect(atTx1).toHaveLength(1);
-      expect(atTx1[0].attribute).toBe("name");
-      expect(atTx1[0].value).toBe("Alice");
+      expect(atTx1[0][1]).toBe("name");
+      expect(atTx1[0][2]).toBe("Alice");
 
       // Query at tx2 - should see name and age
       const atTx2 = await db.asOf(tx2).datoms({ entity: 1 });
       expect(atTx2).toHaveLength(2);
-      const valuesAtTx2 = atTx2.map((d) => d.value).sort();
+      const valuesAtTx2 = atTx2.map((d) => d[2]).sort();
       expect(valuesAtTx2).toContain("Alice");
       expect(valuesAtTx2).toContain(30);
 
       // Query at tx3 - should see updated name and age
       const atTx3 = await db.asOf(tx3).datoms({ entity: 1 });
       expect(atTx3).toHaveLength(2);
-      const nameAtTx3 = atTx3.find((d) => d.attribute === "name");
-      expect(nameAtTx3?.value).toBe("Alice Updated");
+      const nameAtTx3 = atTx3.find((d) => d[1] === "name");
+      expect(nameAtTx3?.[2]).toBe("Alice Updated");
 
       await db.close();
     });
@@ -58,7 +58,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query at tx3 - should only see name (age was retracted)
       const atTx3 = await db.asOf(tx3).datoms({ entity: 1 });
       expect(atTx3).toHaveLength(1);
-      expect(atTx3[0].attribute).toBe("name");
+      expect(atTx3[0][1]).toBe("name");
 
       await db.close();
     });
@@ -76,7 +76,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       });
       expect(history.length).toBeGreaterThanOrEqual(2);
       // Should include both the original and updated name
-      const names = history.map((d) => d.value);
+      const names = history.map((d) => d[2]);
       expect(names).toContain("Alice");
       expect(names).toContain("Alice Updated");
 
@@ -90,7 +90,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const entityAtTx1 = await db.asOf(tx1).datoms({ entity: 1 });
       expect(entityAtTx1).toHaveLength(1);
-      expect(entityAtTx1[0].attribute).toBe("name");
+      expect(entityAtTx1[0][1]).toBe("name");
 
       const entityAtTx2 = await db.asOf(tx2).datoms({ entity: 1 });
       expect(entityAtTx2).toHaveLength(2);
@@ -160,7 +160,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         // Note: Transactions don't support asOf views directly, but we can test via the database
         const atTx1 = await db.asOf(tx1).datoms({ entity: 1 });
         expect(atTx1).toHaveLength(1);
-        expect(atTx1[0].attribute).toBe("name");
+        expect(atTx1[0][1]).toBe("name");
       });
 
       await db.close();
@@ -206,8 +206,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Current state should also be failed
       // Use datoms() to get the latest value (query returns all values)
       const currentDatoms = await db.datoms({ entity: 1, attribute: "status" });
-      const currentSorted = currentDatoms.sort((a, b) => b.tx - a.tx);
-      expect(currentSorted[0]?.value).toBe("failed");
+      const currentSorted = currentDatoms.sort((a, b) => b[3] - a[3]);
+      expect(currentSorted[0]?.[2]).toBe("failed");
 
       await db.close();
     });
@@ -227,7 +227,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const entityDatoms = await db.datoms({ entity: 1 });
       const tx = await db.transact({
-        retract: entityDatoms.map((d) => [d.entity, d.attribute, d.value]),
+        retract: entityDatoms.map((d) => [d[0], d[1], d[2]]),
       });
 
       const after = await db.datoms({ entity: 1, added: true });
@@ -252,7 +252,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transaction(async (tx) => {
         const entityDatoms = await tx.datoms({ entity: 1 });
         await tx.transact({
-          retract: entityDatoms.map((d) => [d.entity, d.attribute, d.value]),
+          retract: entityDatoms.map((d) => [d[0], d[1], d[2]]),
         });
         const during = await tx.datoms({ entity: 1, added: true });
         expect(during).toHaveLength(0);
@@ -279,11 +279,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const alice = await db.datoms({ entity: 1, added: true });
       expect(alice).toHaveLength(1);
-      expect(alice[0].value).toBe("Alice");
+      expect(alice[0][2]).toBe("Alice");
 
       const bob = await db.datoms({ entity: 2, added: true });
       expect(bob).toHaveLength(1);
-      expect(bob[0].value).toBe("Bob");
+      expect(bob[0][2]).toBe("Bob");
 
       // Charlie should not exist (or was retracted if existed)
       const charlie = await db.datoms({ entity: 3, added: true });
@@ -345,11 +345,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(history.length).toBeGreaterThanOrEqual(3);
 
       // History should include all changes, ordered by transaction
-      const txs = history.map((d) => d.tx);
+      const txs = history.map((d) => d[3]);
       expect(txs).toEqual([...txs].sort((a, b) => a - b));
 
       // Should include retractions
-      const retractions = history.filter((d) => !d.added);
+      const retractions = history.filter((d) => !d[4]);
       expect(retractions.length).toBeGreaterThan(0);
 
       await db.close();
@@ -389,15 +389,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Query changes since tx2 - should see Bob and updated name
       const sinceTx2 = await db.since(tx2).datoms({ limit: 100 });
-      const entitiesSinceTx2 = new Set(sinceTx2.map((d) => d.entity));
+      const entitiesSinceTx2 = new Set(sinceTx2.map((d) => d[0]));
       expect(entitiesSinceTx2.has(2)).toBe(true); // Bob
       expect(entitiesSinceTx2.has(1)).toBe(true); // Updated name
 
       // Query changes since tx3 - should only see updated name
       const sinceTx3 = await db.since(tx3).datoms({ entity: 1 });
       expect(sinceTx3).toHaveLength(1);
-      expect(sinceTx3[0].attribute).toBe("name");
-      expect(sinceTx3[0].value).toBe("Alice Updated");
+      expect(sinceTx3[0][1]).toBe("name");
+      expect(sinceTx3[0][2]).toBe("Alice Updated");
 
       await db.close();
     });
@@ -414,7 +414,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query changes since tx1 - should see age, retraction, and email
       const sinceTx1 = await db.since(tx1).datoms({ entity: 1 });
       // Should only see email (age was retracted, so it's filtered out)
-      const attributes = sinceTx1.map((d) => d.attribute);
+      const attributes = sinceTx1.map((d) => d[1]);
       expect(attributes).toContain("email");
       // Age should not be present (it was retracted)
       expect(attributes).not.toContain("age");
@@ -466,7 +466,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query changes since tx1 for entity 1 only
       const sinceTx1Entity1 = await db.since(tx1).datoms({ entity: 1 });
       expect(sinceTx1Entity1.length).toBeGreaterThanOrEqual(2);
-      const attributes = sinceTx1Entity1.map((d) => d.attribute);
+      const attributes = sinceTx1Entity1.map((d) => d[1]);
       expect(attributes).toContain("age");
       expect(attributes).toContain("name");
 
@@ -476,7 +476,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         attribute: "name",
       });
       expect(sinceTx2Name).toHaveLength(1);
-      expect(sinceTx2Name[0].value).toBe("Alice Updated");
+      expect(sinceTx2Name[0][2]).toBe("Alice Updated");
 
       await db.close();
     });
@@ -545,7 +545,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         limit: 2,
       });
       expect(limited).toHaveLength(2);
-      expect(limited[0].value).toBe("Alice"); // First change
+      expect(limited[0][2]).toBe("Alice"); // First change
 
       // Test offset
       const offset = await db.history().datoms({
@@ -606,12 +606,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query at tx2 - should see "blue" (latest tag value at tx2)
       const atTx2 = await db.asOf(tx2).datoms({ entity: 1, attribute: "tag" });
       expect(atTx2.length).toBeGreaterThanOrEqual(1);
-      const valuesAtTx2 = atTx2.map((d) => d.value);
+      const valuesAtTx2 = atTx2.map((d) => d[2]);
       expect(valuesAtTx2).toContain("blue");
 
       // Query at tx3 - should see green (latest value at tx3)
       const atTx3 = await db.asOf(tx3).datoms({ entity: 1, attribute: "tag" });
-      const valuesAtTx3 = atTx3.map((d) => d.value);
+      const valuesAtTx3 = atTx3.map((d) => d[2]);
       expect(valuesAtTx3).toContain("green");
 
       // Query at tx4 - should see green (latest added value before or at tx4)
@@ -620,7 +620,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // it might be picked during deduplication, then filtered out, resulting in empty.
       // This tests the edge case where a retraction happens at the query tx.
       const atTx4 = await db.asOf(tx4).datoms({ entity: 1, attribute: "tag" });
-      const valuesAtTx4 = atTx4.map((d) => d.value);
+      const valuesAtTx4 = atTx4.map((d) => d[2]);
       // The implementation should handle this correctly - green (tx3) should be visible
       // as it's the latest added value. If empty, verify green is visible at tx3.
       if (valuesAtTx4.length > 0) {
@@ -632,7 +632,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
           .asOf(tx3)
           .datoms({ entity: 1, attribute: "tag" });
         expect(atTx3Check.length).toBeGreaterThanOrEqual(1);
-        expect(atTx3Check[0].value).toBe("green");
+        expect(atTx3Check[0][2]).toBe("green");
       }
 
       // Query changes since tx2 - should see green (added after tx2)
@@ -640,7 +640,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         entity: 1,
         attribute: "tag",
       });
-      const valuesSinceTx2 = sinceTx2.map((d) => d.value);
+      const valuesSinceTx2 = sinceTx2.map((d) => d[2]);
       expect(valuesSinceTx2).toContain("green");
       // Should not include red or blue (they were before tx2)
 
@@ -650,8 +650,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         attribute: "tag",
       });
       const historyValuesAtTx2 = historyAtTx2
-        .filter((d) => d.tx <= tx2 && d.added)
-        .map((d) => d.value);
+        .filter((d) => d[3] <= tx2 && d[4])
+        .map((d) => d[2]);
       expect(historyValuesAtTx2).toContain("red");
       expect(historyValuesAtTx2).toContain("blue");
 
@@ -709,7 +709,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         attribute: "parent",
       });
       expect(sinceTx1.length).toBeGreaterThanOrEqual(1);
-      expect(sinceTx1[0].value).toBe(20);
+      expect(sinceTx1[0][2]).toBe(20);
 
       // Query changes since tx1 for all entities
       const allSinceTx1 = await db.since(tx1).datoms({ attribute: "parent" });
@@ -739,7 +739,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query changes since tx1 - should see age
       const sinceTx1 = await db.since(tx1).datoms({ entity: 1 });
       expect(sinceTx1.length).toBeGreaterThanOrEqual(1);
-      expect(sinceTx1[0].attribute).toBe("age");
+      expect(sinceTx1[0][1]).toBe("age");
 
       await db.close();
     });
@@ -765,7 +765,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Query changes since tx2
       const sinceTx2 = await db.since(tx2).datoms({ attribute: "status" });
-      const entitiesSinceTx2 = new Set(sinceTx2.map((d) => d.entity));
+      const entitiesSinceTx2 = new Set(sinceTx2.map((d) => d[0]));
       expect(entitiesSinceTx2.has(1)).toBe(true); // Entity 1 changed
       expect(entitiesSinceTx2.has(3)).toBe(false); // Entity 3 didn't change after tx2
 
@@ -776,7 +776,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       });
       // Should see failed (completed was retracted, so filtered out)
       expect(sinceTx3.length).toBeGreaterThanOrEqual(1);
-      const values = sinceTx3.map((d) => d.value);
+      const values = sinceTx3.map((d) => d[2]);
       expect(values).toContain("failed");
 
       await db.close();

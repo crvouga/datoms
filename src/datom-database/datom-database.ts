@@ -192,13 +192,13 @@ abstract class BaseDatabaseView implements DatabaseView {
     const firstResults = firstDatoms.map((datom) => {
       const result: Record<string, Value | Attribute> = {};
       if (isVariable(entityVal)) {
-        result[entityVal as string] = datom.entity;
+        result[entityVal as string] = datom[0];
       }
       if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom.attribute;
+        result[attributeVal as string] = datom[1];
       }
       if (isVariable(valueVal)) {
-        result[valueVal as string] = datom.value;
+        result[valueVal as string] = datom[2];
       }
       return result;
     });
@@ -225,13 +225,13 @@ abstract class BaseDatabaseView implements DatabaseView {
       const clauseResults = clauseDatoms.map((datom) => {
         const result: Record<string, Value | Attribute> = {};
         if (isVariable(entityVal)) {
-          result[entityVal as string] = datom.entity;
+          result[entityVal as string] = datom[0];
         }
         if (isVariable(attributeVal)) {
-          result[attributeVal as string] = datom.attribute;
+          result[attributeVal as string] = datom[1];
         }
         if (isVariable(valueVal)) {
-          result[valueVal as string] = datom.value;
+          result[valueVal as string] = datom[2];
         }
         return result;
       });
@@ -699,11 +699,11 @@ export abstract class DatomDatabase implements DatomReader {
       // Group by value to check for duplicates
       const valueToEntities = new Map<string, EntityId[]>();
       for (const datom of allDatoms) {
-        const valueKey = JSON.stringify(datom.value);
+        const valueKey = JSON.stringify(datom[2]);
         if (!valueToEntities.has(valueKey)) {
           valueToEntities.set(valueKey, []);
         }
-        valueToEntities.get(valueKey)!.push(datom.entity);
+        valueToEntities.get(valueKey)!.push(datom[0]);
       }
       // Check for duplicate values across different entities
       for (const [valueKey, entities] of valueToEntities) {
@@ -728,11 +728,11 @@ export abstract class DatomDatabase implements DatomReader {
       const allDatoms = await this.queryInternal({ attribute: name });
       const entityToValues = new Map<string, Set<string>>();
       for (const datom of allDatoms) {
-        const entityKey = String(datom.entity);
+        const entityKey = String(datom[0]);
         if (!entityToValues.has(entityKey)) {
           entityToValues.set(entityKey, new Set());
         }
-        entityToValues.get(entityKey)!.add(JSON.stringify(datom.value));
+        entityToValues.get(entityKey)!.add(JSON.stringify(datom[2]));
       }
       // Check for entities with multiple values
       const violations: string[] = [];
@@ -762,15 +762,15 @@ export abstract class DatomDatabase implements DatomReader {
       const allDatoms = await this.queryInternal({ attribute: name });
       for (const datom of allDatoms) {
         const typeError = this.validateValueType(
-          datom.value,
+          datom[2],
           newDefinition.type!,
           name
         );
         if (typeError) {
           throw new Error(
             `Cannot change type constraint for attribute "${name}": existing value ${JSON.stringify(
-              datom.value
-            )} for entity "${String(datom.entity)}" does not match new type "${
+              datom[2]
+            )} for entity "${String(datom[0])}" does not match new type "${
               newDefinition.type
             }". ${typeError.message}`
           );
@@ -1094,20 +1094,20 @@ export abstract class DatomDatabase implements DatomReader {
     // Filter to only datoms with tx <= txId
     // If options.tx is specified, use the minimum of both
     const maxTx = options.tx !== undefined ? Math.min(options.tx, txId) : txId;
-    const filtered = allDatoms.filter((d) => d.tx <= maxTx);
+    const filtered = allDatoms.filter((d) => d[3] <= maxTx);
 
     // Deduplicate by (entity, attribute) keeping the latest tx
     const deduplicated = new Map<string, Datom>();
     for (const datom of filtered) {
-      const key = `${String(datom.entity)}|${String(datom.attribute)}`;
+      const key = `${String(datom[0])}|${String(datom[1])}`;
       const existing = deduplicated.get(key);
-      if (!existing || datom.tx > existing.tx) {
+      if (!existing || datom[3] > existing[3]) {
         deduplicated.set(key, datom);
       }
     }
 
     // Filter out retracted datoms (keep only added: true)
-    return Array.from(deduplicated.values()).filter((d) => d.added);
+    return Array.from(deduplicated.values()).filter((d) => d[4]);
   }
 
   /**
@@ -1146,21 +1146,21 @@ export abstract class DatomDatabase implements DatomReader {
     });
 
     // Filter to only datoms with tx > txId
-    const filtered = allDatoms.filter((d) => d.tx > txId);
+    const filtered = allDatoms.filter((d) => d[3] > txId);
 
     // Deduplicate by (entity, attribute, value) keeping the latest tx
     const deduplicated = new Map<string, Datom>();
     for (const datom of filtered) {
-      const valueKey = JSON.stringify(datom.value);
-      const key = `${String(datom.entity)}|${String(datom.attribute)}|${valueKey}`;
+      const valueKey = JSON.stringify(datom[2]);
+      const key = `${String(datom[0])}|${String(datom[1])}|${valueKey}`;
       const existing = deduplicated.get(key);
-      if (!existing || datom.tx > existing.tx) {
+      if (!existing || datom[3] > existing[3]) {
         deduplicated.set(key, datom);
       }
     }
 
     // Filter out retracted datoms (keep only added: true)
-    return Array.from(deduplicated.values()).filter((d) => d.added);
+    return Array.from(deduplicated.values()).filter((d) => d[4]);
   }
 
   /**
@@ -1277,7 +1277,7 @@ export abstract class DatomDatabase implements DatomReader {
           if (existingDatoms.length > 0) {
             // If the existing value is the same as what we're trying to add, allow it (idempotent)
             // This is useful for imports where the same datom might appear multiple times
-            const existingValue = existingDatoms[0].value;
+            const existingValue = existingDatoms[0][2];
             if (JSON.stringify(existingValue) !== JSON.stringify(newValue)) {
               // Check if the existing value is being retracted
               const existingIsBeingRetracted = retractsInSameTransaction?.some(
@@ -1319,7 +1319,7 @@ export abstract class DatomDatabase implements DatomReader {
           });
 
           if (existingDatoms.length > 0) {
-            const existingEntity = existingDatoms[0]?.entity;
+            const existingEntity = existingDatoms[0]?.[0];
             // Check if any of the new datoms have a different entity
             for (const datom of valueDatoms) {
               if (

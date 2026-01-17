@@ -236,13 +236,13 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         typeof row.value === "string" ? JSON.parse(row.value) : row.value;
       const revivedValue = reviveValue(parsedValue) as Value;
 
-      return {
+      return [
         entity,
-        attribute: String(row.attribute),
-        value: revivedValue,
-        tx: Number(row.tx),
-        added: Boolean(row.added),
-      };
+        String(row.attribute),
+        revivedValue,
+        Number(row.tx),
+        Boolean(row.added),
+      ] as Datom;
     });
   }
 
@@ -378,13 +378,13 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         typeof row.value === "string" ? JSON.parse(row.value) : row.value;
       const revivedValue = reviveValue(parsedValue) as Value;
 
-      return {
+      return [
         entity,
-        attribute: String(row.attribute),
-        value: revivedValue,
-        tx: Number(row.tx),
-        added: Boolean(row.added),
-      };
+        String(row.attribute),
+        revivedValue,
+        Number(row.tx),
+        Boolean(row.added),
+      ] as Datom;
     });
   }
 
@@ -652,13 +652,13 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         typeof row.value === "string" ? JSON.parse(row.value) : row.value;
       const revivedValue = reviveValue(parsedValue) as Value;
 
-      return {
+      return [
         entity,
-        attribute: String(row.attribute),
-        value: revivedValue,
-        tx: Number(row.tx),
-        added: Boolean(row.added),
-      };
+        String(row.attribute),
+        revivedValue,
+        Number(row.tx),
+        Boolean(row.added),
+      ] as Datom;
     });
   }
 
@@ -861,13 +861,13 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return datoms.map((datom: Datom) => {
       const result: Record<string, Value | Attribute> = {};
       if (isVariable(entityVal)) {
-        result[entityVal as string] = datom.entity;
+        result[entityVal as string] = datom[0];
       }
       if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom.attribute;
+        result[attributeVal as string] = datom[1];
       }
       if (isVariable(valueVal)) {
-        result[valueVal as string] = datom.value;
+        result[valueVal as string] = datom[2];
       }
       return result;
     });
@@ -1034,13 +1034,7 @@ class PostgreSQLTransaction implements Transaction {
   }): Promise<void> {
     if (ops.add && ops.add.length > 0) {
       for (const datom of ops.add) {
-        const d: Datom = {
-          entity: datom[0],
-          attribute: datom[1],
-          value: datom[2],
-          tx: this.txId,
-          added: true,
-        };
+        const d: Datom = [datom[0], datom[1], datom[2], this.txId, true];
         this.pendingAdds.push(d);
       }
     }
@@ -1050,20 +1044,12 @@ class PostgreSQLTransaction implements Transaction {
 
         // Remove from pending adds if it was added in this transaction
         this.pendingAdds = this.pendingAdds.filter((d) => {
-          const dKey = `${String(d.entity)}|${String(d.attribute)}|${String(
-            d.value
-          )}`;
+          const dKey = `${String(d[0])}|${String(d[1])}|${String(d[2])}`;
           return dKey !== key;
         });
 
         // Add to pending retracts
-        const d: Datom = {
-          entity: datom[0],
-          attribute: datom[1],
-          value: datom[2],
-          tx: this.txId,
-          added: false,
-        };
+        const d: Datom = [datom[0], datom[1], datom[2], this.txId, false];
         this.pendingRetracts.push(d);
       }
     }
@@ -1083,13 +1069,13 @@ class PostgreSQLTransaction implements Transaction {
       `;
 
       const params = this.pendingAdds.flatMap((d) => {
-        let value = d.value;
+        let value = d[2];
         if (value === undefined) {
           value = "__UNDEFINED__";
         }
         return [
-          String(d.entity),
-          String(d.attribute),
+          String(d[0]),
+          String(d[1]),
           JSON.stringify(value),
           this.txId,
           true,
@@ -1109,13 +1095,13 @@ class PostgreSQLTransaction implements Transaction {
       `;
 
       const params = this.pendingRetracts.flatMap((d) => {
-        let value = d.value;
+        let value = d[2];
         if (value === undefined) {
           value = "__UNDEFINED__";
         }
         return [
-          String(d.entity),
-          String(d.attribute),
+          String(d[0]),
+          String(d[1]),
           JSON.stringify(value),
           this.txId,
           false,
@@ -1133,28 +1119,24 @@ class PostgreSQLTransaction implements Transaction {
     // Create a map of committed datoms by (entity, attribute, value)
     const committedMap = new Map<string, Datom>();
     for (const datom of committed) {
-      const key = `${String(datom.entity)}|${String(datom.attribute)}|${String(
-        datom.value
-      )}`;
+      const key = `${String(datom[0])}|${String(datom[1])}|${String(datom[2])}`;
       const existing = committedMap.get(key);
-      if (!existing || datom.tx > existing.tx) {
+      if (!existing || datom[3] > existing[3]) {
         committedMap.set(key, datom);
       }
     }
 
     // Apply pending retracts (remove matching datoms)
     for (const retract of this.pendingRetracts) {
-      const key = `${String(retract.entity)}|${String(
-        retract.attribute
-      )}|${String(retract.value)}`;
+      const key = `${String(retract[0])}|${String(
+        retract[1]
+      )}|${String(retract[2])}`;
       committedMap.delete(key);
     }
 
     // Apply pending adds (add or update datoms)
     for (const add of this.pendingAdds) {
-      const key = `${String(add.entity)}|${String(add.attribute)}|${String(
-        add.value
-      )}`;
+      const key = `${String(add[0])}|${String(add[1])}|${String(add[2])}`;
       committedMap.set(key, add);
     }
 
@@ -1162,47 +1144,47 @@ class PostgreSQLTransaction implements Transaction {
 
     // Apply filters from options
     if (options.entity !== undefined) {
-      results = results.filter((d) => d.entity === options.entity);
+      results = results.filter((d) => d[0] === options.entity);
     }
     if (options.attribute !== undefined) {
-      results = results.filter((d) => d.attribute === options.attribute);
+      results = results.filter((d) => d[1] === options.attribute);
     }
     if (options.value !== undefined) {
-      results = results.filter((d) => d.value === options.value);
+      results = results.filter((d) => d[2] === options.value);
     }
     if (options.tx !== undefined) {
-      results = results.filter((d) => d.tx === options.tx);
+      results = results.filter((d) => d[3] === options.tx);
     }
 
     // Handle added filter
     if (options.added === undefined || options.added === true) {
-      results = results.filter((d) => d.added);
+      results = results.filter((d) => d[4]);
     } else if (options.added === false) {
-      results = results.filter((d) => !d.added);
+      results = results.filter((d) => !d[4]);
     }
 
     // Sort by entity, then attribute
     results.sort((a, b) => {
       let entityA: number;
-      if (typeof a.entity === "number") {
-        entityA = a.entity;
+      if (typeof a[0] === "number") {
+        entityA = a[0];
       } else {
-        const entityStr = String(a.entity);
+        const entityStr = String(a[0]);
         entityA = /^-?\d+$/.test(entityStr) ? parseInt(entityStr, 10) : 0;
       }
 
       let entityB: number;
-      if (typeof b.entity === "number") {
-        entityB = b.entity;
+      if (typeof b[0] === "number") {
+        entityB = b[0];
       } else {
-        const entityStr = String(b.entity);
+        const entityStr = String(b[0]);
         entityB = /^-?\d+$/.test(entityStr) ? parseInt(entityStr, 10) : 0;
       }
 
       if (entityA !== entityB) {
         return entityA - entityB;
       }
-      return String(a.attribute).localeCompare(String(b.attribute));
+      return String(a[1]).localeCompare(String(b[1]));
     });
 
     // Apply pagination
@@ -1284,13 +1266,13 @@ class PostgreSQLTransaction implements Transaction {
     return datoms.map((datom: Datom) => {
       const result: Record<string, Value | Attribute> = {};
       if (isVariable(entityVal)) {
-        result[entityVal as string] = datom.entity;
+        result[entityVal as string] = datom[0];
       }
       if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom.attribute;
+        result[attributeVal as string] = datom[1];
       }
       if (isVariable(valueVal)) {
-        result[valueVal as string] = datom.value;
+        result[valueVal as string] = datom[2];
       }
       return result;
     });

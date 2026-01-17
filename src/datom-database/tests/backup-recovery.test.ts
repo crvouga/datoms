@@ -33,8 +33,8 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       }
 
       expect(datoms).toHaveLength(2);
-      expect(datoms.some((d) => d.value === "Alice")).toBe(true);
-      expect(datoms.some((d) => d.value === "Bob")).toBe(true);
+      expect(datoms.some((d) => d[2] === "Alice")).toBe(true);
+      expect(datoms.some((d) => d[2] === "Bob")).toBe(true);
     });
 
     test("should export with filters", async () => {
@@ -54,7 +54,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       }
 
       expect(datoms).toHaveLength(2);
-      expect(datoms.every((d) => d.entity === 1)).toBe(true);
+      expect(datoms.every((d) => d[0] === 1)).toBe(true);
     });
 
     test("should export without filters (full scan)", async () => {
@@ -182,7 +182,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       // Verify imported data
       const alice = await db2.datoms({ entity: 1 });
       expect(alice.length).toBeGreaterThan(0);
-      expect(alice.some((d) => d.value === "Alice")).toBe(true);
+      expect(alice.some((d) => d[2] === "Alice")).toBe(true);
 
       await db2.close();
     });
@@ -363,13 +363,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       });
 
       // Create invalid datom (wrong type)
-      const invalidDatom: Datom = {
-        entity: 1,
-        attribute: "age",
-        value: "not-a-number",
-        tx: 1,
-        added: true,
-      };
+      const invalidDatom: Datom = [1, "age", "not-a-number", 1, true];
 
       const observableDb = new ObservableDatabase(db);
       const events: DatabaseEvent[] = [];

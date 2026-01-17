@@ -54,21 +54,21 @@ export type Value =
 export type TransactionId = number;
 
 /**
- * A datom represents a fact: (entity, attribute, value, transaction)
+ * A datom represents a fact: [entity, attribute, value, transaction, added]
  * This is the fundamental unit of data in a datalog database
  */
-export interface Datom {
+export type Datom = [
   /** The entity this datom describes */
-  entity: EntityId;
+  entity: EntityId,
   /** The attribute being asserted */
-  attribute: Attribute;
+  attribute: Attribute,
   /** The value of the attribute */
-  value: Value;
+  value: Value,
   /** The transaction ID when this datom was added */
-  tx: TransactionId;
+  tx: TransactionId,
   /** Whether this datom is an addition (true) or retraction (false) */
-  added: boolean;
-}
+  added: boolean,
+];
 
 /**
  * A partial datom for adding/retracting facts (without tx and added)
@@ -83,6 +83,8 @@ export type DatomInput = [EntityId, Attribute, Value];
 export const DATOM_ENTITY = 0;
 export const DATOM_ATTRIBUTE = 1;
 export const DATOM_VALUE = 2;
+export const DATOM_TX = 3;
+export const DATOM_ADDED = 4;
 
 /**
  * Options for querying datoms
