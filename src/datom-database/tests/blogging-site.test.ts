@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { datoms, type Datom } from "../../datoms.js";
+import { datoms, EntityId, type Datom } from "../../datoms.js";
 import { TransactionError } from "../datom-database.js";
 import type { Interceptor } from "../interceptor/engine";
 import { InterceptorValidator } from "../interceptor/validator.js";
@@ -72,9 +72,9 @@ const POST_ACCESS_CONTROL: Interceptor = {
     );
 
     // Build a map of post entities and their attributes
-    const postEntities = new Set<number>();
+    const postEntities = new Set<EntityId>();
     const postData = new Map<
-      number,
+      EntityId,
       {
         author?: number;
         status?: string;
@@ -84,9 +84,9 @@ const POST_ACCESS_CONTROL: Interceptor = {
     >();
 
     for (const datom of postDatoms) {
-      postEntities.add(datom.e as number);
-      if (!postData.has(datom.e as number)) {
-        postData.set(datom.e as number, {});
+      postEntities.add(datom.e);
+      if (!postData.has(datom.e)) {
+        postData.set(datom.e, {});
       }
       const data = postData.get(datom.e as number)!;
       if (datom.a === POST_AUTHOR) {
@@ -116,7 +116,7 @@ const POST_ACCESS_CONTROL: Interceptor = {
     }
 
     // Filter posts based on access rules
-    const allowedPosts = new Set<number>();
+    const allowedPosts = new Set<EntityId>();
     for (const [postId, data] of postData.entries()) {
       const author = data.author;
       const status = data.status;
@@ -146,9 +146,7 @@ const POST_ACCESS_CONTROL: Interceptor = {
     }
 
     // Filter datoms to only include allowed posts
-    const filteredPostDatoms = postDatoms.filter((d) =>
-      allowedPosts.has(d.e as number)
-    );
+    const filteredPostDatoms = postDatoms.filter((d) => allowedPosts.has(d.e));
 
     return [...nonPostDatoms, ...filteredPostDatoms];
   },
