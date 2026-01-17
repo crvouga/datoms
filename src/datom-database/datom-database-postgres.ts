@@ -53,7 +53,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       // Create enum type for op column (handle error if already exists)
       try {
         await this.connection.execute(`
-          CREATE TYPE datom_op AS ENUM ('add', 'retract')
+          CREATE TYPE datom_op AS ENUM ('add', 'sub')
         `);
       } catch (error) {
         // Type already exists, ignore error
@@ -142,7 +142,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return tx;
   }
 
-  protected async retractDatoms(datoms: DatomInput[]): Promise<TransactionId> {
+  protected async subDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = await this.getNextTransactionId();
 
     if (
@@ -152,14 +152,14 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     ) {
       await this.connection.beginTransaction();
       try {
-        await this.retractDatomsInternal(datoms, tx);
+        await this.subDatomsInternal(datoms, tx);
         await this.connection.commitTransaction();
       } catch (error) {
         await this.connection.rollbackTransaction();
         throw error;
       }
     } else {
-      await this.retractDatomsInternal(datoms, tx);
+      await this.subDatomsInternal(datoms, tx);
     }
 
     return tx;
@@ -268,7 +268,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: row.op as "add" | "retract",
+        op: row.op as "add" | "sub",
       };
     });
   }
@@ -309,8 +309,8 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // We need to include retractions in DISTINCT ON to correctly determine the latest state.
-    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was add then retract, the retraction wins.
+    // We need to include subions in DISTINCT ON to correctly determine the latest state.
+    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was add then sub, the subion wins.
     const combinedWhereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
@@ -319,12 +319,12 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const orderByColumns = "e, a, v, tx DESC";
 
     // Build the op filter for after DISTINCT ON
-    // Default behavior: filter to only add datoms (exclude retract)
+    // Default behavior: filter to only add datoms (exclude sub)
     let opFilterAfter = "";
     if (options.op === undefined || options.op === "add") {
       opFilterAfter = "WHERE op = 'add'";
-    } else if (options.op === "retract") {
-      opFilterAfter = "WHERE op = 'retract'";
+    } else if (options.op === "sub") {
+      opFilterAfter = "WHERE op = 'sub'";
     }
 
     const sql = `
@@ -419,7 +419,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: row.op as "add" | "retract",
+        op: row.op as "add" | "sub",
       };
     });
   }
@@ -538,7 +538,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // History query: no deduplication, include all datoms including retract
+    // History query: no deduplication, include all datoms including sub
     const sql = `
       SELECT 
         e,
@@ -704,7 +704,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: row.op as "add" | "retract",
+        op: row.op as "add" | "sub",
       };
     });
   }
@@ -938,7 +938,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     await this.connection.execute(sql, params);
   }
 
-  private async retractDatomsInternal(
+  private async subDatomsInternal(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -956,7 +956,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, "retract"];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, "sub"];
     });
 
     await this.connection.execute(sql, params);

@@ -416,7 +416,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       // Publish the post
       const now = new Date().toISOString();
       await db.transact([
-        { op: "retract", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
+        { op: "sub", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
         { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_PUBLISHED },
         { op: "add", e: 100, a: POST_UPDATED_AT, v: now },
       ]);
@@ -454,9 +454,9 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       // Edit the post
       const now = new Date().toISOString();
       await db.transact([
-        { op: "retract", e: 100, a: POST_TITLE, v: "Original Title" },
+        { op: "sub", e: 100, a: POST_TITLE, v: "Original Title" },
         { op: "add", e: 100, a: POST_TITLE, v: "Updated Title" },
-        { op: "retract", e: 100, a: POST_CONTENT, v: "Original Content" },
+        { op: "sub", e: 100, a: POST_CONTENT, v: "Original Content" },
         { op: "add", e: 100, a: POST_CONTENT, v: "Updated Content" },
         { op: "add", e: 100, a: POST_UPDATED_AT, v: now },
       ]);
@@ -883,7 +883,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       // Edit post
       await db.transact([
-        { op: "retract", e: 100, a: POST_CONTENT, v: "Initial content" },
+        { op: "sub", e: 100, a: POST_CONTENT, v: "Initial content" },
         { op: "add", e: 100, a: POST_CONTENT, v: "Updated content" },
       ]);
 
@@ -901,7 +901,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       // Publish post
       await db.transact([
-        { op: "retract", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
+        { op: "sub", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
         { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_PUBLISHED },
       ]);
 

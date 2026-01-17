@@ -60,7 +60,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       if (events[0].type === "transaction") {
         expect(events[0].txId).toBe(txId);
         expect(events[0].addCount).toBe(1);
-        expect(events[0].retractCount).toBe(0);
+        expect(events[0].subCount).toBe(0);
       }
     });
 
@@ -283,7 +283,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       await observableDb.transact([{ op: "add", e: 2, a: "name", v: "Bob" }]);
       await observableDb.transact([
         { op: "add", e: 3, a: "name", v: "Charlie" },
-        { op: "retract", e: 1, a: "name", v: "Alice" },
+        { op: "sub", e: 1, a: "name", v: "Alice" },
       ]);
 
       const stats = await observableDb.getStats();

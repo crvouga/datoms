@@ -88,7 +88,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should handle retract with with()", async () => {
+    test("should handle sub with with()", async () => {
       const { db } = f;
 
       await db.transact([
@@ -96,20 +96,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "add", e: 1, a: "age", v: 30 },
       ]);
 
-      // Use with() to see what retraction would look like
-      const withResult = await db.with([
-        { op: "retract", e: 1, a: "age", v: 30 },
-      ]);
+      // Use with() to see what subion would look like
+      const withResult = await db.with([{ op: "sub", e: 1, a: "age", v: 30 }]);
 
-      // Query dbAfter should not see retract datom
+      // Query dbAfter should not see sub datom
       const result = await withResult.dbAfter.datoms({ e: 1 });
       expect(result).toHaveLength(1);
       expect(result[0].v).toBe("Alice");
 
-      // Now commit the retraction
-      await db.transact([{ op: "retract", e: 1, a: "age", v: 30 }]);
+      // Now commit the subion
+      await db.transact([{ op: "sub", e: 1, a: "age", v: 30 }]);
 
-      // Verify retraction is committed
+      // Verify subion is committed
       const final = await db.datoms({ e: 1 });
       expect(final).toHaveLength(1);
       expect(final[0].v).toBe("Alice");
@@ -152,11 +150,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "add", e: 1, a: "age", v: 30 },
       ]);
 
-      // Then update in a single transaction: retract old age, add new age, add Bob
+      // Then update in a single transaction: sub old age, add new age, add Bob
       await db.transact([
         { op: "add", e: 1, a: "age", v: 31 },
         { op: "add", e: 2, a: "name", v: "Bob" },
-        { op: "retract", e: 1, a: "age", v: 30 },
+        { op: "sub", e: 1, a: "age", v: 30 },
       ]);
 
       // Verify all operations were applied
@@ -183,7 +181,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const withResult = await db.with([
         { op: "add", e: 1, a: "status", v: "pending" },
         { op: "add", e: 2, a: "name", v: "New" },
-        { op: "retract", e: 1, a: "name", v: "Initial" },
+        { op: "sub", e: 1, a: "name", v: "Initial" },
       ]);
 
       // Query dbAfter to see speculative state
@@ -319,11 +317,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(latestTx2).toBeGreaterThan(tx1);
     });
 
-    test("should return latest transaction after retraction", async () => {
+    test("should return latest transaction after subion", async () => {
       const { db } = f;
       await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
       const tx2 = await db.transact([
-        { op: "retract", e: 1, a: "name", v: "Alice" },
+        { op: "sub", e: 1, a: "name", v: "Alice" },
       ]);
       const latestTx = await db.getLatestTransaction();
       expect(latestTx).toBe(tx2);
@@ -334,7 +332,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
       const tx2 = await db.transact([
         { op: "add", e: 2, a: "name", v: "Bob" },
-        { op: "retract", e: 1, a: "name", v: "Alice" },
+        { op: "sub", e: 1, a: "name", v: "Alice" },
       ]);
       const latestTx = await db.getLatestTransaction();
       expect(latestTx).toBe(tx2);
@@ -384,7 +382,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const withResult = await db.with([
         { op: "add", e: 1, a: "age", v: 30 },
-        { op: "retract", e: 1, a: "name", v: "Alice" },
+        { op: "sub", e: 1, a: "name", v: "Alice" },
       ]);
 
       // txData should contain the datoms that would be applied
@@ -393,11 +391,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         (d) => d.e === 1 && d.a === "age" && d.v === 30 && d.op === "add"
       );
       expect(hasAdd).toBe(true);
-      const hasRetract = withResult.txData.some(
-        (d) =>
-          d.e === 1 && d.a === "name" && d.v === "Alice" && d.op === "retract"
+      const hassub = withResult.txData.some(
+        (d) => d.e === 1 && d.a === "name" && d.v === "Alice" && d.op === "sub"
       );
-      expect(hasRetract).toBe(true);
+      expect(hassub).toBe(true);
     });
 
     test("should return tempIds (empty for now)", async () => {

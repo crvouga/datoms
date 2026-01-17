@@ -60,7 +60,7 @@ export class ObservableDatabase {
     metadata?: Record<string, unknown>
   ): Promise<TransactionId> {
     const addCount = ops.filter((op) => op.op === "add").length;
-    const retractCount = ops.filter((op) => op.op === "retract").length;
+    const subCount = ops.filter((op) => op.op === "sub").length;
     const startTime = Date.now();
 
     try {
@@ -76,7 +76,7 @@ export class ObservableDatabase {
         type: "transaction",
         txId,
         addCount,
-        retractCount,
+        subCount,
         metadata,
       });
 
@@ -89,7 +89,7 @@ export class ObservableDatabase {
         context: {
           operation: "transact",
           addCount,
-          retractCount,
+          subCount,
         },
       });
       throw error;
@@ -292,7 +292,7 @@ export class ObservableDatabase {
       if (event.type === "transaction") {
         logMeta.txId = event.txId;
         logMeta.addCount = event.addCount;
-        logMeta.retractCount = event.retractCount;
+        logMeta.subCount = event.subCount;
       } else if (event.type === "query") {
         logMeta.resultCount = event.resultCount;
         logMeta.duration = event.duration;

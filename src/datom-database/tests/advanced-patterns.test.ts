@@ -16,7 +16,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   });
 
   describe("Database query (Datalog)", () => {
-    test("should exclude retract datoms from query results", async () => {
+    test("should exclude sub datoms from query results", async () => {
       const { db } = f;
       await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
@@ -24,8 +24,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "add", e: 3, a: "name", v: "Charlie" },
       ]);
 
-      // Retract one datom
-      await db.transact([{ op: "retract", e: 2, a: "name", v: "Bob" }]);
+      // sub one datom
+      await db.transact([{ op: "sub", e: 2, a: "name", v: "Bob" }]);
 
       const query: DatalogQuery = {
         find: { name: ["?name"] },

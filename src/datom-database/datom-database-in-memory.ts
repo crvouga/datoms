@@ -70,17 +70,17 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return tx;
   }
 
-  protected async retractDatoms(datoms: DatomInput[]): Promise<TransactionId> {
+  protected async subDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = this.nextTx++;
 
     for (const datom of datoms) {
-      // Add retraction datom
+      // Add subion datom
       this._datomsArray.push({
         e: datom.e,
         a: datom.a,
         v: datom.v,
         tx,
-        op: "retract",
+        op: "sub",
       });
     }
 
@@ -110,7 +110,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       results = results.filter((d) => d.tx === options.tx);
     }
 
-    // Don't filter by add - return all datoms including retract
+    // Don't filter by add - return all datoms including sub
     // The view will handle filtering and deduplication
 
     return results;
@@ -133,9 +133,9 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       results = results.filter((d) => d.tx === options.tx);
     }
 
-    // Handle retractions: for each unique (entity, attribute, value) combination,
+    // Handle subions: for each unique (entity, attribute, value) combination,
     // keep only the most recent transaction
-    // This ensures that retract datoms are not returned when querying
+    // This ensures that sub datoms are not returned when querying
     // and supports multi-valued attributes (multiple values per attribute)
     // Always deduplicate first, then apply add filter
 
@@ -155,12 +155,12 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     results = Array.from(latestDatoms.values());
 
     // Apply op filter after deduplication
-    // Default behavior: filter to only added datoms (exclude retracted)
+    // Default behavior: filter to only added datoms (exclude subed)
     if (options.op === undefined || options.op === "add") {
       results = results.filter((d) => d.op === "add");
-    } else if (options.op === "retract") {
-      // If explicitly requesting retractions, filter by op: "retract"
-      results = results.filter((d) => d.op === "retract");
+    } else if (options.op === "sub") {
+      // If explicitly requesting subions, filter by op: "sub"
+      results = results.filter((d) => d.op === "sub");
     }
 
     // Apply pagination
@@ -206,7 +206,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       }
     }
 
-    // Filter out retract datoms (keep only op: "add")
+    // Filter out sub datoms (keep only op: "add")
     results = Array.from(deduplicated.values()).filter((d) => d.op === "add");
 
     // Apply pagination
@@ -289,7 +289,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       }
     }
 
-    // Filter out retract datoms (keep only op: "add")
+    // Filter out sub datoms (keep only op: "add")
     results = Array.from(deduplicated.values()).filter((d) => d.op === "add");
 
     // Apply pagination
@@ -543,7 +543,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Count total datoms (only add ones)
     const addDatoms = this._datomsArray.filter((d) => {
-      // Check if this is the latest version (not retract)
+      // Check if this is the latest version (not sub)
       const latestVersion = this._datomsArray
         .filter(
           (other) => other.e === d.e && other.a === d.a && other.v === d.v

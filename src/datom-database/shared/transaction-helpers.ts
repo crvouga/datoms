@@ -109,31 +109,31 @@ export async function findEntitiesHelper(
 }
 
 /**
- * Retract all datoms for an entity
+ * sub all datoms for an entity
  */
-export async function retractEntityHelper(
+export async function subEntityHelper(
   datoms: DatomsProvider,
-  retract: (datoms: DatomInput[]) => Promise<void>,
+  sub: (datoms: DatomInput[]) => Promise<void>,
   entity: EntityId
 ): Promise<void> {
   // Get all datoms for this entity that are currently visible
   const entityDatoms = await datoms({ e: entity, op: "add" }); // QueryOptions.op filters by operation type
 
-  // Retract all of them
-  const retractions: DatomInput[] = entityDatoms.map((d) => ({
+  // sub all of them
+  const subions: DatomInput[] = entityDatoms.map((d) => ({
     e: d.e,
     a: d.a,
     v: d.v,
   }));
-  await retract(retractions);
+  await sub(subions);
 }
 
 /**
- * Retract all values for an entity-attribute pair
+ * sub all values for an entity-attribute pair
  */
-export async function retractAttributeHelper(
+export async function subAttributeHelper(
   datoms: DatomsProvider,
-  retract: (datoms: DatomInput[]) => Promise<void>,
+  sub: (datoms: DatomInput[]) => Promise<void>,
   entity: EntityId,
   attribute: string
 ): Promise<void> {
@@ -142,36 +142,36 @@ export async function retractAttributeHelper(
   if (datomsResult.length === 0) {
     return;
   }
-  // Retract all existing values
-  const toRetract: DatomInput[] = datomsResult.map((d) => ({
+  // sub all existing values
+  const tosub: DatomInput[] = datomsResult.map((d) => ({
     e: d.e,
     a: d.a,
     v: d.v,
   }));
-  await retract(toRetract);
+  await sub(tosub);
 }
 
 /**
  * Upsert a value for an entity-attribute pair
- * Retracts existing values first, then adds the new value
+ * subs existing values first, then adds the new value
  */
 export async function upsertHelper(
   datoms: DatomsProvider,
-  retract: (datoms: DatomInput[]) => Promise<void>,
+  sub: (datoms: DatomInput[]) => Promise<void>,
   add: (datoms: DatomInput[]) => Promise<void>,
   entity: EntityId,
   attribute: string,
   value: Value
 ): Promise<void> {
-  // Retract existing values first
+  // sub existing values first
   const existingValues = await getValuesHelper(datoms, entity, attribute);
-  const toRetract: DatomInput[] = existingValues.map((v) => ({
+  const tosub: DatomInput[] = existingValues.map((v) => ({
     e: entity,
     a: attribute,
     v: v,
   }));
-  if (toRetract.length > 0) {
-    await retract(toRetract);
+  if (tosub.length > 0) {
+    await sub(tosub);
   }
 
   // Add the new value
@@ -179,20 +179,20 @@ export async function upsertHelper(
 }
 
 /**
- * Execute a transact operation (add and/or retract)
+ * Execute a transact operation (add and/or sub)
  */
 export async function transactHelper(
   add: (datoms: DatomInput[]) => Promise<void>,
-  retract: (datoms: DatomInput[]) => Promise<void>,
+  sub: (datoms: DatomInput[]) => Promise<void>,
   ops: {
     add?: DatomInput[];
-    retract?: DatomInput[];
+    sub?: DatomInput[];
   }
 ): Promise<void> {
   if (ops.add && ops.add.length > 0) {
     await add(ops.add);
   }
-  if (ops.retract && ops.retract.length > 0) {
-    await retract(ops.retract);
+  if (ops.sub && ops.sub.length > 0) {
+    await sub(ops.sub);
   }
 }

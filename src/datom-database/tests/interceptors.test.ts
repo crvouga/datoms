@@ -911,7 +911,7 @@ describe.each(FIXTURES)(
         await db.close();
       });
 
-      test("should handle retract operations with interceptors", async () => {
+      test("should handle sub operations with interceptors", async () => {
         const { db } = f;
 
         await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
@@ -919,18 +919,18 @@ describe.each(FIXTURES)(
         let called = false;
         const interceptor: BeforeWriteInterceptor = {
           type: "beforeWrite",
-          name: "retract-handler",
+          name: "sub-handler",
           execute: async (tx) => {
             called = true;
-            const retracts = tx.datoms.filter((d) => d.op === "retract");
-            expect(retracts.length).toBeGreaterThan(0);
+            const subs = tx.datoms.filter((d) => d.op === "sub");
+            expect(subs.length).toBeGreaterThan(0);
             return { tx };
           },
         };
 
         db.interceptors.register(interceptor);
 
-        await db.transact([{ op: "retract", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
 
         expect(called).toBe(true);
         const datoms = await db.datoms({ e: 1 });

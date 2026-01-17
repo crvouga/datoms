@@ -55,7 +55,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
           a TEXT NOT NULL,
           v TEXT NOT NULL,
           tx INTEGER NOT NULL,
-          op TEXT NOT NULL CHECK(op IN ('add', 'retract')),
+          op TEXT NOT NULL CHECK(op IN ('add', 'sub')),
           PRIMARY KEY (e, a, v, tx, op)
         )
       `;
@@ -112,9 +112,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     return tx;
   }
 
-  protected async retractDatoms(datoms: DatomInput[]): Promise<TransactionId> {
+  protected async subDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = await this.getNextTransactionId();
-    await this.retractDatomsInternal(datoms, tx);
+    await this.subDatomsInternal(datoms, tx);
     return tx;
   }
 
@@ -207,7 +207,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: row.op as "add" | "retract",
+        op: row.op as "add" | "sub",
       };
     });
   }
@@ -249,8 +249,8 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     let opFilter = "";
     if (options.op === undefined || options.op === "add") {
       opFilter = "AND op = 'add'";
-    } else if (options.op === "retract") {
-      opFilter = "AND op = 'retract'";
+    } else if (options.op === "sub") {
+      opFilter = "AND op = 'sub'";
     }
 
     const limitClause = options.limit ? "LIMIT ?" : "";
@@ -344,7 +344,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: row.op as "add" | "retract",
+        op: row.op as "add" | "sub",
       };
     });
   }
@@ -467,7 +467,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // History query: no deduplication, include all datoms including retract
+    // History query: no deduplication, include all datoms including sub
     const sql = `
       SELECT 
         e,
@@ -625,7 +625,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: row.op as "add" | "retract",
+        op: row.op as "add" | "sub",
       };
     });
   }
@@ -1274,7 +1274,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     await this.connection.execute(sql, params);
   }
 
-  private async retractDatomsInternal(
+  private async subDatomsInternal(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -1292,7 +1292,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, "retract"];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, "sub"];
     });
 
     await this.connection.execute(sql, params);

@@ -271,7 +271,7 @@ class AsOfDatabaseView extends BaseDatabaseView {
 }
 
 /**
- * Database view showing full history (all datoms, including retract)
+ * Database view showing full history (all datoms, including sub)
  * No deduplication, includes all historical changes
  */
 class HistoryDatabaseView extends BaseDatabaseView {
@@ -354,14 +354,14 @@ class CurrentDatabaseView extends BaseDatabaseView {
 
 /**
  * Database view showing speculative state with pending changes applied
- * Merges base database state with speculative adds and retracts
+ * Merges base database state with speculative adds and subs
  * Used by the `with()` method for speculative transactions
  */
 class SpeculativeDatabaseView extends BaseDatabaseView {
   constructor(
     db: DatomDatabase,
     private speculativeAdds: Datom[],
-    private speculativeRetracts: Datom[]
+    private speculativesubs: Datom[]
   ) {
     super(db);
   }
@@ -394,9 +394,9 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
       }
     }
 
-    // Apply retracts first (remove matching datoms)
-    for (const retract of this.speculativeRetracts) {
-      const key = `${String(retract.e)}|${String(retract.a)}|${JSON.stringify(retract.v)}`;
+    // Apply subs first (remove matching datoms)
+    for (const sub of this.speculativesubs) {
+      const key = `${String(sub.e)}|${String(sub.a)}|${JSON.stringify(sub.v)}`;
       baseMap.delete(key);
     }
 
@@ -428,8 +428,8 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
     // Apply op filter
     if (options.op === undefined || options.op === "add") {
       results = results.filter((d) => d.op === "add");
-    } else if (options.op === "retract") {
-      results = results.filter((d) => d.op === "retract");
+    } else if (options.op === "sub") {
+      results = results.filter((d) => d.op === "sub");
     }
 
     // Apply pagination
@@ -447,10 +447,10 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
 
 /**
  * Transaction operations format for transact() method
- * Array of operations, each specifying whether to add or retract a datom
+ * Array of operations, each specifying whether to add or sub a datom
  */
 export type TransactOperations = Array<{
-  op: "add" | "retract";
+  op: "add" | "sub";
   e: EntityId;
   a: Attribute;
   v: Value;
@@ -606,26 +606,24 @@ export abstract class DatomDatabase implements DatomReader {
   protected abstract addDatoms(datoms: DatomInput[]): Promise<TransactionId>;
 
   /**
-   * Implementation-specific method to retract datoms after validation.
+   * Implementation-specific method to sub datoms after validation.
    * Subclasses should override this method.
-   * @param datoms Array of validated datoms to retract
+   * @param datoms Array of validated datoms to sub
    * @returns The transaction ID
    * @internal
    */
-  protected abstract retractDatoms(
-    datoms: DatomInput[]
-  ): Promise<TransactionId>;
+  protected abstract subDatoms(datoms: DatomInput[]): Promise<TransactionId>;
 
   /**
    * Execute bulk operations atomically (Datomic-like transact)
-   * @param ops Array of operations, each specifying whether to add or retract a datom
+   * @param ops Array of operations, each specifying whether to add or sub a datom
    * @param metadata Optional metadata to associate with this transaction
    * @param context Optional context object for interceptors (can contain any data)
    * @returns The transaction ID
    * @example
    * await db.transact([
    *   { op: "add", e: 300, a: "status", v: "active" },
-   *   { op: "retract", e: 42, a: "type", v: "cat" }
+   *   { op: "sub", e: 42, a: "type", v: "cat" }
    * ]);
    *
    * // With metadata and context
@@ -651,19 +649,19 @@ export abstract class DatomDatabase implements DatomReader {
 
     // Process operations sequentially
     const adds: DatomInput[] = [];
-    const retracts: DatomInput[] = [];
+    const subs: DatomInput[] = [];
 
     for (const op of ops) {
       const datom = { e: op.e, a: op.a, v: op.v };
 
       if (op.op === "add") {
-        // Validate add, accounting for retracts already processed
-        await this.validateDatoms([datom], true, retracts);
+        // Validate add, accounting for subs already processed
+        await this.validateDatoms([datom], true, subs);
         adds.push(datom);
       } else {
-        // Validate retract
+        // Validate sub
         await this.validateDatoms([datom], false);
-        retracts.push(datom);
+        subs.push(datom);
       }
     }
 
@@ -672,13 +670,13 @@ export abstract class DatomDatabase implements DatomReader {
     const latestTx = await this.getLatestTransaction();
     const txId = latestTx + 1;
 
-    for (const retract of retracts) {
+    for (const sub of subs) {
       allDatoms.push({
-        e: retract.e,
-        a: retract.a,
-        v: retract.v,
+        e: sub.e,
+        a: sub.a,
+        v: sub.v,
         tx: txId,
-        op: "retract",
+        op: "sub",
       });
     }
 
@@ -708,22 +706,22 @@ export abstract class DatomDatabase implements DatomReader {
       );
     }
 
-    // Apply retracts first, then adds (using the modified transaction from interceptors)
+    // Apply subs first, then adds (using the modified transaction from interceptors)
     const finalTx = beforeResult.tx;
-    const finalRetracts = finalTx.datoms.filter((d) => d.op === "retract");
+    const finalsubs = finalTx.datoms.filter((d) => d.op === "sub");
     const finalAdds = finalTx.datoms.filter((d) => d.op === "add");
 
     let committedTxId: TransactionId;
-    if (finalRetracts.length > 0) {
-      committedTxId = await this.retractDatoms(
-        finalRetracts.map((d) => ({ e: d.e, a: d.a, v: d.v }))
+    if (finalsubs.length > 0) {
+      committedTxId = await this.subDatoms(
+        finalsubs.map((d) => ({ e: d.e, a: d.a, v: d.v }))
       );
     }
     if (finalAdds.length > 0) {
       committedTxId = await this.addDatoms(
         finalAdds.map((d) => ({ e: d.e, a: d.a, v: d.v }))
       );
-    } else if (finalRetracts.length === 0) {
+    } else if (finalsubs.length === 0) {
       // If there are no operations, still create a new transaction ID
       committedTxId = await this.addDatoms([]);
     } else {
@@ -894,10 +892,10 @@ export abstract class DatomDatabase implements DatomReader {
   public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
     // Default implementation: use executeQuery but implementations can override
     // to provide undeduplicated results. For now, we'll use executeQuery with op: undefined
-    // to get all datoms including retract ones, then the view will handle deduplication.
+    // to get all datoms including sub ones, then the view will handle deduplication.
     return this.executeQuery({
       ...options,
-      op: undefined, // Get all datoms including retract
+      op: undefined, // Get all datoms including sub
     });
   }
 
@@ -935,15 +933,15 @@ export abstract class DatomDatabase implements DatomReader {
       }
     }
 
-    // Filter out retract datoms (keep only op: "add")
+    // Filter out sub datoms (keep only op: "add")
     return Array.from(deduplicated.values()).filter((d) => d.op === "add");
   }
 
   /**
-   * Execute a history query - returns all datoms including retract, without deduplication.
+   * Execute a history query - returns all datoms including sub, without deduplication.
    * This method is called by HistoryDatabaseView to leverage database-native query optimization.
    * @param options Query options
-   * @returns Array of all matching datoms (including retract)
+   * @returns Array of all matching datoms (including sub)
    * @internal
    */
   public async executeHistoryQuery(options: QueryOptions): Promise<Datom[]> {
@@ -951,7 +949,7 @@ export abstract class DatomDatabase implements DatomReader {
     // SQL implementations should override this for better performance
     return this.getRawDatoms({
       ...options,
-      op: undefined, // Don't filter by add/retract
+      op: undefined, // Don't filter by add/sub
     });
   }
 
@@ -988,7 +986,7 @@ export abstract class DatomDatabase implements DatomReader {
       }
     }
 
-    // Filter out retract datoms (keep only op: "add")
+    // Filter out sub datoms (keep only op: "add")
     return Array.from(deduplicated.values()).filter((d) => d.op === "add");
   }
 
@@ -996,13 +994,13 @@ export abstract class DatomDatabase implements DatomReader {
    * Validate datoms - basic runtime checks for null/undefined (defensive programming)
    * TypeScript guarantees types, but runtime checks catch cases where types are bypassed (e.g., `as any`)
    * @param datoms Array of datoms to validate
-   * @param _isAdd Whether these datoms are being add (true) or retract (false)
-   * @param _retractsInSameTransaction Optional retracts in the same transaction
+   * @param _isAdd Whether these datoms are being add (true) or sub (false)
+   * @param _subsInSameTransaction Optional subs in the same transaction
    */
   protected async validateDatoms(
     datoms: DatomInput[],
     _isAdd: boolean,
-    _retractsInSameTransaction?: DatomInput[]
+    _subsInSameTransaction?: DatomInput[]
   ): Promise<void> {
     // Basic runtime validation for cases where TypeScript types are bypassed
     for (const datom of datoms) {
@@ -1101,13 +1099,13 @@ export abstract class DatomDatabase implements DatomReader {
   }
 
   /**
-   * Create a database view showing full history (all datoms, including retract)
+   * Create a database view showing full history (all datoms, including sub)
    * Returns a read-only view that includes all historical changes without deduplication
    * @returns Read-only database view showing full history
    * @example
    * const dbHistory = db.history();
    * const allChanges = await dbHistory.datoms({ entity: 42 });
-   * // Includes both add and retract datoms
+   * // Includes both add and sub datoms
    */
   history(): DatabaseView {
     return new HistoryDatabaseView(this);
@@ -1150,7 +1148,7 @@ export abstract class DatomDatabase implements DatomReader {
    * // Speculate on a transaction
    * const result = await db.with([
    *   { op: "add", e: 1, a: "name", v: "Alice" },
-   *   { op: "retract", e: 1, a: "oldName", v: "Bob" }
+   *   { op: "sub", e: 1, a: "oldName", v: "Bob" }
    * ]);
    *
    * // Query the speculative state
@@ -1169,7 +1167,7 @@ export abstract class DatomDatabase implements DatomReader {
 
     // Process operations in sequence, creating speculative datoms directly
     const speculativeAdds: Datom[] = [];
-    const speculativeRetracts: Datom[] = [];
+    const speculativesubs: Datom[] = [];
 
     for (const op of ops) {
       const speculativeDatom: Datom = {
@@ -1183,7 +1181,7 @@ export abstract class DatomDatabase implements DatomReader {
       if (op.op === "add") {
         speculativeAdds.push(speculativeDatom);
       } else {
-        speculativeRetracts.push(speculativeDatom);
+        speculativesubs.push(speculativeDatom);
       }
     }
 
@@ -1194,11 +1192,11 @@ export abstract class DatomDatabase implements DatomReader {
     const dbAfter = new SpeculativeDatabaseView(
       this,
       speculativeAdds,
-      speculativeRetracts
+      speculativesubs
     );
 
     // Generate txData (all datoms that would be applied)
-    const txData: Datom[] = [...speculativeRetracts, ...speculativeAdds];
+    const txData: Datom[] = [...speculativesubs, ...speculativeAdds];
 
     return {
       dbBefore,

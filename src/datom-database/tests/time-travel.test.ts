@@ -49,19 +49,19 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should handle retractions in time-travel queries", async () => {
+    test("should handle subions in time-travel queries", async () => {
       const { db } = f;
       const tx1 = await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
       ]);
       const tx2 = await db.transact([{ op: "add", e: 1, a: "age", v: 30 }]);
-      const tx3 = await db.transact([{ op: "retract", e: 1, a: "age", v: 30 }]);
+      const tx3 = await db.transact([{ op: "sub", e: 1, a: "age", v: 30 }]);
 
       // Query at tx2 - should see both name and age
       const atTx2 = await db.asOf(tx2).datoms({ e: 1 });
       expect(atTx2).toHaveLength(2);
 
-      // Query at tx3 - should only see name (age was retract)
+      // Query at tx3 - should only see name (age was sub)
       const atTx3 = await db.asOf(tx3).datoms({ e: 1 });
       expect(atTx3).toHaveLength(1);
       expect(atTx3[0].a).toBe("name");
@@ -189,7 +189,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "add", e: 1, a: "status", v: "completed" },
       ]);
       const tx4 = await db.transact([
-        { op: "retract", e: 1, a: "status", v: "completed" },
+        { op: "sub", e: 1, a: "status", v: "completed" },
       ]);
       const tx5 = await db.transact([
         { op: "add", e: 1, a: "status", v: "failed" },
@@ -214,7 +214,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       });
       expect(atTx3Results[0]?.v).toBe("completed");
 
-      // At tx4, status was retract, so should return undefined
+      // At tx4, status was sub, so should return undefined
       const atTx4Results = await db.asOf(tx4).query({
         find: { v: ["?v"] },
         where: [{ e: 1, a: "status", v: "?v" }],
@@ -237,7 +237,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should retract all datoms for an entity", async () => {
+    test("should sub all datoms for an entity", async () => {
       const { db } = f;
       await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
@@ -251,7 +251,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const entityDatoms = await db.datoms({ e: 1 });
       const tx = await db.transact(
         entityDatoms.map((d) => ({
-          op: "retract" as const,
+          op: "sub" as const,
           e: d.e,
           a: d.a,
           v: d.v,
@@ -268,7 +268,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should retract entity within transaction", async () => {
+    test("should sub entity within transaction", async () => {
       const { db } = f;
       await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
@@ -277,10 +277,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const entityDatoms = await db.datoms({ e: 1 });
 
-      // Use with() to see what retraction would look like
+      // Use with() to see what subion would look like
       const withResult = await db.with(
         entityDatoms.map((d) => ({
-          op: "retract" as const,
+          op: "sub" as const,
           e: d.e,
           a: d.a,
           v: d.v,
@@ -292,10 +292,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       });
       expect(during).toHaveLength(0);
 
-      // Now commit the retraction
+      // Now commit the subion
       await db.transact(
         entityDatoms.map((d) => ({
-          op: "retract" as const,
+          op: "sub" as const,
           e: d.e,
           a: d.a,
           v: d.v,
@@ -313,7 +313,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const tx = await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
-        { op: "retract", e: 3, a: "name", v: "Charlie" },
+        { op: "sub", e: 3, a: "name", v: "Charlie" },
       ]);
 
       expect(typeof tx).toBe("number");
@@ -327,7 +327,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(bob).toHaveLength(1);
       expect(bob[0].v).toBe("Bob");
 
-      // Charlie should not exist (or was retract if existed)
+      // Charlie should not exist (or was sub if existed)
       const charlie = await db.datoms({ e: 3, op: "add" });
       expect(charlie).toHaveLength(0);
 
@@ -364,7 +364,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
       const tx2 = await db.transact([{ op: "add", e: 1, a: "name", v: "Bob" }]);
-      await db.transact([{ op: "retract", e: 1, a: "name", v: "Bob" }]);
+      await db.transact([{ op: "sub", e: 1, a: "name", v: "Bob" }]);
       const tx4 = await db.transact([
         { op: "add", e: 1, a: "name", v: "Charlie" },
       ]);
@@ -379,9 +379,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const txs = history.map((d) => d.tx);
       expect(txs).toEqual([...txs].sort((a, b) => a - b));
 
-      // Should include retractions
-      const retractions = history.filter((d) => d.op === "retract");
-      expect(retractions.length).toBeGreaterThan(0);
+      // Should include subions
+      const subions = history.filter((d) => d.op === "sub");
+      expect(subions.length).toBeGreaterThan(0);
 
       await db.close();
     });
@@ -437,23 +437,23 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should handle retractions in since queries", async () => {
+    test("should handle subions in since queries", async () => {
       const { db } = f;
       const tx1 = await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
       ]);
       const tx2 = await db.transact([{ op: "add", e: 1, a: "age", v: 30 }]);
-      const tx3 = await db.transact([{ op: "retract", e: 1, a: "age", v: 30 }]);
+      const tx3 = await db.transact([{ op: "sub", e: 1, a: "age", v: 30 }]);
       const tx4 = await db.transact([
         { op: "add", e: 1, a: "email", v: "alice@example.com" },
       ]);
 
-      // Query changes since tx1 - should see age, retraction, and email
+      // Query changes since tx1 - should see age, subion, and email
       const sinceTx1 = await db.since(tx1).datoms({ e: 1 });
-      // Should only see email (age was retract, so it's filtered out)
+      // Should only see email (age was sub, so it's filtered out)
       const attributes = sinceTx1.map((d) => d.a);
       expect(attributes).toContain("email");
-      // Age should not be present (it was retract)
+      // Age should not be present (it was sub)
       expect(attributes).not.toContain("age");
 
       await db.close();
@@ -659,9 +659,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const tx3 = await db.transact([
         { op: "add", e: 1, a: "tag", v: "green" },
       ]);
-      const tx4 = await db.transact([
-        { op: "retract", e: 1, a: "tag", v: "blue" },
-      ]);
+      const tx4 = await db.transact([{ op: "sub", e: 1, a: "tag", v: "blue" }]);
 
       // Note: asOf deduplicates by (entity, attribute), returning the latest value per attribute
       // Query at tx2 - should see "blue" (latest tag value at tx2)
@@ -676,10 +674,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(valuesAtTx3).toContain("green");
 
       // Query at tx4 - should see green (latest add value before or at tx4)
-      // Note: When retracting blue at tx4, asOf queries deduplicate by (entity, attribute)
-      // keeping the latest tx, then filter to add=true. If the retraction has the highest tx,
+      // Note: When subing blue at tx4, asOf queries deduplicate by (entity, attribute)
+      // keeping the latest tx, then filter to add=true. If the subion has the highest tx,
       // it might be picked during deduplication, then filtered out, resulting in empty.
-      // This tests the edge case where a retraction happens at the query tx.
+      // This tests the edge case where a subion happens at the query tx.
       const atTx4 = await db.asOf(tx4).datoms({ e: 1, a: "tag" });
       const valuesAtTx4 = atTx4.map((d) => d.v);
       // The implementation should handle this correctly - green (tx3) should be visible
@@ -688,7 +686,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         expect(valuesAtTx4).toContain("green");
         expect(valuesAtTx4).not.toContain("blue");
       } else {
-        // If implementation picks retraction during deduplication, verify green at tx3
+        // If implementation picks subion during deduplication, verify green at tx3
         const atTx3Check = await db.asOf(tx3).datoms({ e: 1, a: "tag" });
         expect(atTx3Check.length).toBeGreaterThanOrEqual(1);
         expect(atTx3Check[0].v).toBe("green");
@@ -703,7 +701,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(valuesSinceTx2).toContain("green");
       // Should not include red or blue (they were before tx2)
 
-      // Use history to see all values at tx2 (including retract ones)
+      // Use history to see all values at tx2 (including sub ones)
       const historyAtTx2 = await db.history().datoms({
         e: 1,
         a: "tag",
@@ -829,7 +827,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "add", e: 1, a: "status", v: "completed" },
       ]);
       const tx4 = await db.transact([
-        { op: "retract", e: 1, a: "status", v: "completed" },
+        { op: "sub", e: 1, a: "status", v: "completed" },
       ]);
       const tx5 = await db.transact([
         { op: "add", e: 1, a: "status", v: "failed" },
@@ -846,7 +844,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         e: 1,
         a: "status",
       });
-      // Should see failed (completed was retract, so filtered out)
+      // Should see failed (completed was sub, so filtered out)
       expect(sinceTx3.length).toBeGreaterThanOrEqual(1);
       const values = sinceTx3.map((d) => d.v);
       expect(values).toContain("failed");
