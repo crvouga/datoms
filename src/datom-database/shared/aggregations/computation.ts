@@ -39,7 +39,19 @@ export function applyAggregations(
 
       const def = getAggregationDefinition(agg.type);
       if (def) {
-        aggregated[outputKey] = def.compute(values, agg.defaultValue);
+        const result = def.compute(values, agg.defaultValue);
+        // If result is a string that matches a numeric default value, convert to number
+        if (
+          result !== null &&
+          agg.defaultValue !== undefined &&
+          typeof result === "string" &&
+          result === agg.defaultValue &&
+          /^-?\d+$/.test(agg.defaultValue)
+        ) {
+          aggregated[outputKey] = Number(agg.defaultValue);
+        } else {
+          aggregated[outputKey] = result;
+        }
       } else {
         // Fallback for unregistered aggregations
         aggregated[outputKey] = null;

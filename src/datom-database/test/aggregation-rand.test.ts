@@ -16,7 +16,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   });
 
   describe("Aggregation: rand", () => {
-    test("should return a random value from the set", async () => {
+    test("should return N random values with replacement", async () => {
       const { db } = f;
       await db.transact([
         { op: "assert", e: 1, a: "value", v: 10 },
@@ -25,24 +25,28 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { random: ["rand", "seed123", "?value"] },
+        find: { random: ["rand", 3, "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      // Should return one of the values
-      const randomValue = results[0]["random"];
-      expect(randomValue).toBeDefined();
-      expect([10, 20, 30]).toContain(randomValue as number);
+      const randomValues = results[0]["random"];
+      expect(randomValues).toBeDefined();
+      expect(Array.isArray(randomValues)).toBe(true);
+      expect((randomValues as unknown as number[]).length).toBe(3);
+      // All values should be from the set
+      (randomValues as unknown as number[]).forEach((val) => {
+        expect([10, 20, 30]).toContain(val);
+      });
 
       await db.close();
     });
 
-    test("should return null or undefined for empty results", async () => {
+    test("should return null for empty results", async () => {
       const { db } = f;
       const query: DatalogQuery = {
-        find: { random: ["rand", "seed123", "?value"] },
+        find: { random: ["rand", 1, "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -55,72 +59,50 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should return single value when only one exists", async () => {
+    test("should return single value when N=1", async () => {
       const { db } = f;
-      await db.transact([{ op: "assert", e: 1, a: "value", v: 42 }]);
+      await db.transact([
+        { op: "assert", e: 1, a: "value", v: 10 },
+        { op: "assert", e: 2, a: "value", v: 20 },
+        { op: "assert", e: 3, a: "value", v: 30 },
+      ]);
 
       const query: DatalogQuery = {
-        find: { random: ["rand", "seed123", "?value"] },
+        find: { random: ["rand", 1, "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["random"]).toBe(42);
+      const randomValue = results[0]["random"];
+      expect(randomValue).toBeDefined();
+      expect([10, 20, 30]).toContain(randomValue as number);
+      expect(Array.isArray(randomValue)).toBe(false);
 
       await db.close();
     });
 
-    test("should return consistent result with same seed", async () => {
+    test("should allow duplicates (with replacement)", async () => {
       const { db } = f;
       await db.transact([
         { op: "assert", e: 1, a: "value", v: 10 },
         { op: "assert", e: 2, a: "value", v: 20 },
-        { op: "assert", e: 3, a: "value", v: 30 },
       ]);
 
       const query: DatalogQuery = {
-        find: { random: ["rand", "seed456", "?value"] },
+        find: { random: ["rand", 5, "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results1 = await db.query(query);
-      const results2 = await db.query(query);
-
-      // With the same seed, should return the same value
-      expect(results1[0]["random"]).toBe(results2[0]["random"]);
-
-      await db.close();
-    });
-
-    test("should return different results with different seeds", async () => {
-      const { db } = f;
-      await db.transact([
-        { op: "assert", e: 1, a: "value", v: 10 },
-        { op: "assert", e: 2, a: "value", v: 20 },
-        { op: "assert", e: 3, a: "value", v: 30 },
-      ]);
-
-      const query1: DatalogQuery = {
-        find: { random: ["rand", "seed1", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
-      };
-
-      const query2: DatalogQuery = {
-        find: { random: ["rand", "seed2", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
-      };
-
-      const results1 = await db.query(query1);
-      const results2 = await db.query(query2);
-
-      // Results should be valid values (may or may not be different depending on implementation)
-      const randomValue1 = results1[0]["random"];
-      const randomValue2 = results2[0]["random"];
-      expect(randomValue1).toBeDefined();
-      expect(randomValue2).toBeDefined();
-      expect([10, 20, 30]).toContain(randomValue1 as number);
-      expect([10, 20, 30]).toContain(randomValue2 as number);
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      const randomValues = results[0]["random"];
+      expect(Array.isArray(randomValues)).toBe(true);
+      expect((randomValues as unknown as number[]).length).toBe(5);
+      // Should allow duplicates (with replacement)
+      (randomValues as unknown as number[]).forEach((val) => {
+        expect([10, 20]).toContain(val);
+      });
 
       await db.close();
     });
@@ -134,15 +116,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { random: ["rand", "seed789", "?name"] },
+        find: { random: ["rand", 2, "?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const randomValue = results[0]["random"];
-      expect(randomValue).toBeDefined();
-      expect(["Alice", "Bob", "Charlie"]).toContain(randomValue as string);
+      const randomValues = results[0]["random"];
+      expect(Array.isArray(randomValues)).toBe(true);
+      expect((randomValues as unknown as string[]).length).toBe(2);
+      (randomValues as unknown as string[]).forEach((val) => {
+        expect(["Alice", "Bob", "Charlie"]).toContain(val);
+      });
 
       await db.close();
     });
@@ -159,7 +144,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { random: ["rand", "seed999", "?price"] },
+        find: { random: ["rand", 3, "?price"] },
         where: [
           { e: "?e", a: "type", v: "product" },
           { e: "?e", a: "price", v: "?price" },
@@ -168,9 +153,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const randomValue = results[0]["random"];
-      expect(randomValue).toBeDefined();
-      expect([100, 200]).toContain(randomValue as number);
+      const randomValues = results[0]["random"];
+      expect(Array.isArray(randomValues)).toBe(true);
+      expect((randomValues as unknown as number[]).length).toBe(3);
+      (randomValues as unknown as number[]).forEach((val) => {
+        expect([100, 200]).toContain(val);
+      });
 
       await db.close();
     });

@@ -6,19 +6,6 @@ import type { Attribute, Value } from "../../../types.js";
 import { registerAggregation } from "./registry.js";
 
 /**
- * Helper function to generate a seeded hash for deterministic randomness
- */
-function seededHash(seed: string): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    const char = seed.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return Math.abs(hash);
-}
-
-/**
  * Register all aggregation implementations
  */
 function registerAllAggregations(): void {
@@ -128,34 +115,62 @@ function registerAllAggregations(): void {
     requiresSeed: false,
   });
 
-  // Random aggregation (requires seed)
+  // Random aggregation (rand N ?var) - returns N random values with replacement
+  // Can return duplicates
   registerAggregation("rand", {
-    compute: (values, seed) => {
+    compute: (values, countStr) => {
       if (values.length === 0) {
         return null;
       }
-      const seedValue = seed || "default";
-      const hash = seededHash(seedValue);
-      const index = hash % values.length;
-      return values[index] as Value;
+      const count = countStr ? parseInt(countStr, 10) : 1;
+      if (isNaN(count) || count <= 0) {
+        return null;
+      }
+
+      // Generate N random values with replacement
+      const result: (Value | Attribute)[] = [];
+      for (let i = 0; i < count; i++) {
+        const randomIndex = Math.floor(Math.random() * values.length);
+        result.push(values[randomIndex]);
+      }
+
+      // If count is 1, return single value; otherwise return array
+      return (count === 1 ? result[0] : result) as Value;
     },
     supportsDefault: false,
-    requiresSeed: true,
+    requiresSeed: true, // Uses requiresSeed flag to indicate it needs the count parameter
   });
 
-  // Sample aggregation (requires seed)
+  // Sample aggregation (sample N ?var) - returns N random values without replacement
+  // No duplicates, returns array if N > 1
   registerAggregation("sample", {
-    compute: (values, seed) => {
+    compute: (values, countStr) => {
       if (values.length === 0) {
         return null;
       }
-      const seedValue = seed || "default";
-      const hash = seededHash(seedValue);
-      const index = hash % values.length;
-      return values[index] as Value;
+      const count = countStr ? parseInt(countStr, 10) : 1;
+      if (isNaN(count) || count <= 0) {
+        return null;
+      }
+
+      // If count >= values.length, return all values
+      if (count >= values.length) {
+        return (count === 1 ? values[0] : values) as Value;
+      }
+
+      // Sample N random values without replacement (Fisher-Yates shuffle)
+      const shuffled = [...values];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      const sampled = shuffled.slice(0, count);
+
+      // If count is 1, return single value; otherwise return array
+      return (count === 1 ? sampled[0] : sampled) as Value;
     },
     supportsDefault: false,
-    requiresSeed: true,
+    requiresSeed: true, // Uses requiresSeed flag to indicate it needs the count parameter
   });
 
   // Median aggregation

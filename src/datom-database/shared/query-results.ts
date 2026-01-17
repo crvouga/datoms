@@ -60,48 +60,53 @@ export function project(
   find: { [key: string]: unknown },
   _clauses: QueryClause[]
 ): QueryResult {
-  // Check if we have aggregations
-  if (hasAggregations(find)) {
-    // Apply aggregations first
-    const aggregated = applyAggregations(results, find);
-    // Then do regular projection for non-aggregated fields
-    const findKeys = Object.keys(find);
-    return aggregated.map((row) => {
-      const projected: Record<string, Value | Attribute> = {};
-      for (const outputKey of findKeys) {
-        const expr = find[outputKey];
-        const agg = parseAggregation(expr);
-        if (agg) {
-          // This is an aggregation, already computed
-          if (outputKey in row) {
-            projected[outputKey] = row[outputKey];
-          }
+  const findKeys = Object.keys(find);
+
+  // Check if results are already aggregated (they have output keys instead of variable names)
+  // This happens when applyAggregations was called before project
+  const isAlreadyAggregated =
+    results.length > 0 &&
+    findKeys.some((outputKey) => {
+      const expr = find[outputKey];
+      const agg = parseAggregation(expr);
+      return agg && outputKey in results[0];
+    });
+
+  // Helper function to project a single row
+  const projectRow = (row: Record<string, Value | Attribute>) => {
+    const projected: Record<string, Value | Attribute> = {};
+    for (const outputKey of findKeys) {
+      const expr = find[outputKey];
+      const agg = parseAggregation(expr);
+      if (agg) {
+        // This is an aggregation, already computed
+        if (outputKey in row) {
+          projected[outputKey] = row[outputKey];
+        }
+      } else {
+        // Regular variable projection - extract variable from tuple or string
+        let varName: string;
+        if (
+          Array.isArray(expr) &&
+          expr.length === 1 &&
+          typeof expr[0] === "string"
+        ) {
+          varName = expr[0];
+        } else if (typeof expr === "string") {
+          varName = expr;
         } else {
-          // Regular variable projection - extract variable from tuple or string
-          let varName: string;
-          if (
-            Array.isArray(expr) &&
-            expr.length === 1 &&
-            typeof expr[0] === "string"
-          ) {
-            varName = expr[0];
-          } else if (typeof expr === "string") {
-            varName = expr;
-          } else {
-            continue;
-          }
-          if (varName in row) {
-            projected[outputKey] = row[varName];
-          }
+          continue;
+        }
+        if (varName in row) {
+          projected[outputKey] = row[varName];
         }
       }
-      return projected;
-    });
-  }
+    }
+    return projected;
+  };
 
-  const findKeys = Object.keys(find);
+  // Handle empty find clause - strip ? from all keys
   if (findKeys.length === 0) {
-    // Strip ? from all keys when find is empty
     return results.map((row) => {
       const projected: Record<string, Value | Attribute> = {};
       for (const key of Object.keys(row)) {
@@ -111,29 +116,14 @@ export function project(
     });
   }
 
-  // Results already have variable names as keys, so map them to output keys
-  // The find object maps output keys to variable names (tuples or strings)
-  return results.map((row) => {
-    const projected: Record<string, Value | Attribute> = {};
-    for (const outputKey of findKeys) {
-      const expr = find[outputKey];
-      // Extract variable name from tuple or string
-      let varName: string;
-      if (
-        Array.isArray(expr) &&
-        expr.length === 1 &&
-        typeof expr[0] === "string"
-      ) {
-        varName = expr[0];
-      } else if (typeof expr === "string") {
-        varName = expr;
-      } else {
-        continue;
-      }
-      if (varName in row) {
-        projected[outputKey] = row[varName];
-      }
-    }
-    return projected;
-  });
+  // Check if we have aggregations
+  if (hasAggregations(find) && !isAlreadyAggregated) {
+    // Apply aggregations first
+    const aggregated = applyAggregations(results, find);
+    // Then project the aggregated results
+    return aggregated.map(projectRow);
+  }
+
+  // If already aggregated or no aggregations, just project the results
+  return results.map(projectRow);
 }

@@ -28,6 +28,12 @@ import {
   stripQuestionMark,
 } from "./shared/datalog-helpers.js";
 import { joinResults, project } from "./shared/query-helpers.js";
+import {
+  aggregationToSQL,
+  checkSQLAggregations,
+} from "./shared/aggregations/sql-helpers.js";
+import { parseAggregation } from "./shared/aggregations/index.js";
+import { applyAggregations } from "./shared/aggregations/index.js";
 
 /**
  * PostgreSQL database implementation
@@ -771,7 +777,73 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       );
     }
 
-    // Now execute the query with filtered datoms
+    // Check if we have aggregations - if so, use SQL query building
+    const aggCheck = checkSQLAggregations(modifiedQuery.find, "postgresql");
+    const hasAggs = aggCheck.hasAggregations;
+    const allAggsSupported = aggCheck.allSupported;
+
+    // If we have unsupported aggregations, use in-memory approach (for both single and multi-clause)
+    if (hasAggs && !allAggsSupported) {
+      // Use in-memory joins and aggregations
+      const firstClause = modifiedQuery.where[0];
+      const firstResults = await this.executeClauseWithFilteredDatoms(
+        firstClause,
+        afterResult.datoms
+      );
+
+      let results = firstResults;
+      for (let i = 1; i < modifiedQuery.where.length; i++) {
+        const clause = modifiedQuery.where[i];
+        const clauseResults = await this.executeClauseWithFilteredDatoms(
+          clause,
+          afterResult.datoms
+        );
+        results = joinResults(
+          results,
+          clauseResults,
+          modifiedQuery.where.slice(0, i + 1)
+        );
+      }
+
+      // Apply aggregations in-memory
+      const aggregated = applyAggregations(results, modifiedQuery.find);
+      const projected = project(
+        aggregated,
+        modifiedQuery.find,
+        modifiedQuery.where
+      );
+
+      if (modifiedQuery.orderBy) {
+        projected.sort((a, b) => {
+          for (const [variable, direction] of modifiedQuery.orderBy!) {
+            const key = stripQuestionMark(variable);
+            const aVal = a[key];
+            const bVal = b[key];
+
+            if (aVal == null && bVal == null) continue;
+            if (aVal == null) return direction === "asc" ? -1 : 1;
+            if (bVal == null) return direction === "asc" ? 1 : -1;
+
+            if (aVal < bVal) return direction === "asc" ? -1 : 1;
+            if (aVal > bVal) return direction === "asc" ? 1 : -1;
+          }
+          return 0;
+        });
+      }
+
+      if (modifiedQuery.limit) {
+        return projected.slice(0, modifiedQuery.limit);
+      }
+
+      return projected;
+    }
+
+    // For multi-clause queries with all aggregations supported, use SQL query building
+    if (modifiedQuery.where.length > 1 && hasAggs && allAggsSupported) {
+      return this.executeDatalogWithSQL(modifiedQuery);
+    }
+
+    // Now execute the query with filtered datoms (no aggregations or single clause with supported aggregations)
     const firstClause = modifiedQuery.where[0];
     const firstResults = await this.executeClauseWithFilteredDatoms(
       firstClause,
@@ -885,6 +957,372 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         result[valueVal as string] = datom.v;
       }
       return result;
+    });
+  }
+
+  /**
+   * Execute datalog query using SQL with aggregations
+   */
+  private async executeDatalogWithSQL(
+    query: DatalogQuery
+  ): Promise<QueryResult> {
+    const clauses = query.where;
+    const params: unknown[] = [];
+    const ctes: string[] = [];
+    const selectColumns: string[] = [];
+    const joinConditions: string[] = [];
+
+    // Build CTEs for each clause with deduplication using DISTINCT ON
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      if (!isQueryPattern(clause)) {
+        throw new Error(
+          "Only QueryPattern clauses are supported in SQL queries"
+        );
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+      const alias = `d${i}`;
+
+      const conditions: string[] = [];
+
+      // Add filters for bound values
+      if (!isVariable(entityVal)) {
+        conditions.push(`e = ?`);
+        params.push(String(entityVal));
+      }
+      if (!isVariable(attributeVal)) {
+        conditions.push(`a = ?`);
+        params.push(String(attributeVal));
+      }
+      if (!isVariable(valueVal)) {
+        let value = valueVal as Value;
+        if (value === undefined) {
+          value = "__UNDEFINED__";
+        }
+        conditions.push(`v = ?::jsonb`);
+        params.push(JSON.stringify(value));
+      }
+
+      const whereClause =
+        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      // PostgreSQL uses DISTINCT ON for deduplication
+      const cte = `
+        ${alias} AS (
+          SELECT DISTINCT ON (e, a, v)
+            e, a, v, tx
+          FROM ${this.tableName}
+          ${whereClause}
+          ORDER BY e, a, v, tx DESC
+        )`;
+
+      ctes.push(cte);
+
+      // Build SELECT columns for variables (only if not aggregating)
+      // Aggregations will be handled separately
+    }
+
+    // Map variables to their column references for aggregations
+    const variableToColumn: Map<string, string> = new Map();
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      if (!isQueryPattern(clause)) {
+        continue;
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+      const alias = `d${i}`;
+      if (isVariable(entityVal)) {
+        variableToColumn.set(entityVal as string, `${alias}.e`);
+      }
+      if (isVariable(attributeVal)) {
+        variableToColumn.set(attributeVal as string, `${alias}.a`);
+      }
+      if (isVariable(valueVal)) {
+        variableToColumn.set(valueVal as string, `${alias}.v`);
+      }
+    }
+
+    // Build JOIN conditions based on shared variables
+    const variableToClause: Map<
+      string,
+      { clauseIndex: number; field: string }[]
+    > = new Map();
+
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      if (!isQueryPattern(clause)) {
+        throw new Error(
+          "Only QueryPattern clauses are supported in JOIN conditions"
+        );
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+
+      if (isVariable(entityVal)) {
+        const varName = entityVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause.get(varName)!.push({ clauseIndex: i, field: "e" });
+      }
+      if (isVariable(attributeVal)) {
+        const varName = attributeVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause.get(varName)!.push({ clauseIndex: i, field: "a" });
+      }
+      if (isVariable(valueVal)) {
+        const varName = valueVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause.get(varName)!.push({ clauseIndex: i, field: "v" });
+      }
+    }
+
+    // Build JOIN conditions for shared variables
+    for (const occurrences of variableToClause.values()) {
+      if (occurrences.length > 1) {
+        for (let i = 1; i < occurrences.length; i++) {
+          const prev = occurrences[i - 1];
+          const curr = occurrences[i];
+          const prevAlias = `d${prev.clauseIndex}`;
+          const currAlias = `d${curr.clauseIndex}`;
+          joinConditions.push(
+            `${prevAlias}.${prev.field} = ${currAlias}.${curr.field}`
+          );
+        }
+      }
+    }
+
+    // Build aggregation SELECT columns
+    const groupByColumns: string[] = [];
+    const findKeys = Object.keys(query.find);
+    for (const outputKey of findKeys) {
+      const expr = query.find[outputKey];
+      const agg = parseAggregation(expr);
+
+      if (agg) {
+        // This is an aggregation - convert to SQL
+        const varName = agg.variable;
+        const columnRef = variableToColumn.get(varName);
+        if (columnRef) {
+          const sqlAgg = aggregationToSQL(
+            expr,
+            columnRef,
+            "postgresql",
+            outputKey
+          );
+          if (sqlAgg && sqlAgg.sql) {
+            selectColumns.push(sqlAgg.sql);
+          } else {
+            // Unsupported aggregation - return null
+            selectColumns.push(`NULL AS "${outputKey}"`);
+          }
+        } else {
+          // Variable not found - return null
+          selectColumns.push(`NULL AS "${outputKey}"`);
+        }
+      } else {
+        // Regular variable - include in SELECT and GROUP BY
+        let varName: string;
+        if (
+          Array.isArray(expr) &&
+          expr.length === 1 &&
+          typeof expr[0] === "string"
+        ) {
+          varName = expr[0];
+        } else if (typeof expr === "string") {
+          varName = expr;
+        } else {
+          continue;
+        }
+
+        const columnRef = variableToColumn.get(varName);
+        if (columnRef) {
+          selectColumns.push(`${columnRef} AS "${outputKey}"`);
+          groupByColumns.push(columnRef);
+        }
+      }
+    }
+
+    // Build the final SQL query
+    const cteClause = ctes.length > 0 ? `WITH ${ctes.join(", ")}` : "";
+    const fromClause = `FROM d0`;
+
+    // Build JOIN clauses
+    const joinClauses: string[] = [];
+    for (let i = 1; i < clauses.length; i++) {
+      const alias = `d${i}`;
+      const conditions: string[] = [];
+
+      for (const joinCond of joinConditions) {
+        if (joinCond.includes(`${alias}.`)) {
+          const parts = joinCond.split(" = ");
+          if (parts.length === 2) {
+            if (parts[0].startsWith(`${alias}.`)) {
+              conditions.push(joinCond);
+            } else if (parts[1].startsWith(`${alias}.`)) {
+              conditions.push(`${parts[1]} = ${parts[0]}`);
+            }
+          }
+        }
+      }
+
+      if (conditions.length > 0) {
+        joinClauses.push(`JOIN ${alias} ON ${conditions.join(" AND ")}`);
+      } else {
+        joinClauses.push(`CROSS JOIN ${alias}`);
+      }
+    }
+
+    const joinClause = joinClauses.join(" ");
+
+    // Build ORDER BY clause
+    let orderByClause = "";
+    if (query.orderBy && query.orderBy.length > 0) {
+      const orderParts = query.orderBy
+        .map(([variable, direction]) => {
+          for (let i = 0; i < clauses.length; i++) {
+            const clause = clauses[i];
+            if (!isQueryPattern(clause)) {
+              continue;
+            }
+            const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+            if (entityVal === variable) {
+              return `d${i}.e ${direction.toUpperCase()}`;
+            }
+            if (attributeVal === variable) {
+              return `d${i}.a ${direction.toUpperCase()}`;
+            }
+            if (valueVal === variable) {
+              return `d${i}.v ${direction.toUpperCase()}`;
+            }
+          }
+          return "";
+        })
+        .filter(Boolean);
+      if (orderParts.length > 0) {
+        orderByClause = `ORDER BY ${orderParts.join(", ")}`;
+      }
+    }
+
+    // Build GROUP BY clause if we have aggregations with non-aggregated columns
+    let groupByClause = "";
+    if (groupByColumns.length > 0) {
+      groupByClause = `GROUP BY ${groupByColumns.join(", ")}`;
+    }
+
+    const limitClause = query.limit ? `LIMIT ?` : "";
+    if (query.limit) {
+      params.push(query.limit);
+    }
+
+    const sql = `
+      ${cteClause}
+      SELECT ${selectColumns.join(", ")}
+      ${fromClause}
+      ${joinClause}
+      ${groupByClause}
+      ${orderByClause}
+      ${limitClause}
+    `;
+
+    const rows = await this.connection.query(sql, params);
+
+    // Convert SQL results back to QueryResult format
+    const reviveValue = (value: unknown): unknown => {
+      if (value === null || value === undefined) {
+        return value;
+      }
+      if (typeof value === "string") {
+        // For numeric strings (like aggregation results), try to convert to number first
+        // This handles cases where PostgreSQL returns COUNT(*) as a string "2"
+        if (/^-?\d+$/.test(value)) {
+          const num = parseInt(value, 10);
+          if (!isNaN(num)) {
+            return num;
+          }
+        }
+        if (/^-?\d*\.\d+$/.test(value)) {
+          const num = parseFloat(value);
+          if (!isNaN(num)) {
+            return num;
+          }
+        }
+        // Try to parse as JSON, but if it fails, use the string as-is
+        try {
+          return JSON.parse(value);
+        } catch {
+          return value;
+        }
+      }
+      if (Array.isArray(value)) {
+        return value.map(reviveValue);
+      }
+      if (typeof value === "object" && value !== null) {
+        const revived: Record<string, unknown> = {};
+        const valueObj = value as Record<string, unknown>;
+        for (const key in valueObj) {
+          revived[key] = reviveValue(valueObj[key]);
+        }
+        return revived;
+      }
+      return value;
+    };
+
+    const results: Record<string, Value | Attribute>[] = rows.map(
+      (row: DatabaseRow) => {
+        const result: Record<string, Value | Attribute> = {};
+        for (const key of Object.keys(row)) {
+          let value: unknown = row[key];
+          // PostgreSQL stores values as JSONB, so parse them
+          // But for aggregation results, they might already be numbers or strings
+          if (typeof value === "string") {
+            // For numeric strings (aggregation results), convert directly
+            if (/^-?\d+$/.test(value)) {
+              const num = parseInt(value, 10);
+              if (!isNaN(num)) {
+                value = num;
+              } else {
+                // Try JSON parse for other string values
+                try {
+                  value = JSON.parse(value);
+                } catch {
+                  // Not valid JSON, keep as string
+                }
+              }
+            } else {
+              // Try JSON parse for non-numeric strings
+              try {
+                value = JSON.parse(value);
+              } catch {
+                // Not valid JSON, keep as string
+              }
+            }
+          }
+          result[key] = reviveValue(value) as Value | Attribute;
+        }
+        return result;
+      }
+    );
+
+    // For SQL queries with aggregations, the results already have output keys as column names
+    // We just need to map them directly without calling applyAggregations again
+    // (The project function would try to re-aggregate, but we've already done it in SQL)
+    if (Object.keys(query.find).length === 0) {
+      return results;
+    }
+
+    // Map results - they already have output keys as keys (from SQL aliases)
+    return results.map((row) => {
+      const projected: Record<string, Value | Attribute> = {};
+      for (const outputKey of Object.keys(query.find)) {
+        if (outputKey in row) {
+          projected[outputKey] = row[outputKey];
+        }
+      }
+      return projected;
     });
   }
 

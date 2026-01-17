@@ -20,9 +20,16 @@ import {
   stripQuestionMark,
 } from "./shared/datalog-helpers.js";
 import { joinResults, project } from "./shared/query-helpers.js";
+import {
+  aggregationToSQL,
+  checkSQLAggregations,
+} from "./shared/aggregations/sql-helpers.js";
+import { parseAggregation } from "./shared/aggregations/index.js";
+import { applyAggregations } from "./shared/aggregations/index.js";
 
 import type {
   DatalogQuery,
+  DatalogQueryFindVariable,
   QueryClause,
   QueryResult,
 } from "../datalog/datalog.js";
@@ -927,6 +934,32 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const selectColumns: string[] = [];
     const joinConditions: string[] = [];
 
+    // Check if we have aggregations and if they're all SQL-supported
+    const aggCheck = checkSQLAggregations(query.find, "sqlite");
+    const hasAggs = aggCheck.hasAggregations;
+    const allAggsSupported = aggCheck.allSupported;
+
+    // If we have unsupported aggregations, fetch raw data and apply aggregations in-memory
+    if (hasAggs && !allAggsSupported) {
+      // Build query without aggregations to get raw data
+      const rawFind: Record<string, DatalogQueryFindVariable> = {};
+      for (const [outputKey, expr] of Object.entries(query.find)) {
+        const agg = parseAggregation(expr);
+        if (!agg) {
+          // Keep non-aggregations
+          rawFind[outputKey] = expr as DatalogQueryFindVariable;
+        } else {
+          // For unsupported aggregations, include the variable itself as a tuple
+          rawFind[agg.variable] = [agg.variable as `?${string}`];
+        }
+      }
+      const rawQuery: DatalogQuery = { ...query, find: rawFind };
+      const rawResults = await this.executeDatalogWithSQLRaw(rawQuery);
+      // Apply aggregations in-memory
+      const aggregated = applyAggregations(rawResults, query.find);
+      return project(aggregated, query.find, query.where);
+    }
+
     // Build CTEs for each clause with deduplication
     for (let i = 0; i < clauses.length; i++) {
       const clause = clauses[i];
@@ -991,21 +1024,24 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       ctes.push(rankedCte);
       ctes.push(cte);
 
-      // Build SELECT columns for variables
-      if (isVariable(entityVal)) {
-        selectColumns.push(
-          `${alias}.e AS ${this.escapeColumnName(entityVal as string)}`
-        );
-      }
-      if (isVariable(attributeVal)) {
-        selectColumns.push(
-          `${alias}.a AS ${this.escapeColumnName(attributeVal as string)}`
-        );
-      }
-      if (isVariable(valueVal)) {
-        selectColumns.push(
-          `${alias}.v AS ${this.escapeColumnName(valueVal as string)}`
-        );
+      // Build SELECT columns for variables (only if not aggregating)
+      if (!hasAggs || !allAggsSupported) {
+        // Normal mode: select all variables
+        if (isVariable(entityVal)) {
+          selectColumns.push(
+            `${alias}.e AS ${this.escapeColumnName(entityVal as string)}`
+          );
+        }
+        if (isVariable(attributeVal)) {
+          selectColumns.push(
+            `${alias}.a AS ${this.escapeColumnName(attributeVal as string)}`
+          );
+        }
+        if (isVariable(valueVal)) {
+          selectColumns.push(
+            `${alias}.v AS ${this.escapeColumnName(valueVal as string)}`
+          );
+        }
       }
     }
 
@@ -1129,9 +1165,94 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       }
     }
 
+    // Build aggregation SELECT columns if we have aggregations
+    const groupByColumns: string[] = [];
+    if (hasAggs && allAggsSupported) {
+      // Clear regular select columns - we'll build aggregation columns instead
+      selectColumns.length = 0;
+
+      // Map variables to their column references for aggregations
+      const variableToColumn: Map<string, string> = new Map();
+      for (let i = 0; i < clauses.length; i++) {
+        const clause = clauses[i];
+        if (!isQueryPattern(clause)) {
+          continue;
+        }
+        const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+        const alias = `d${i}`;
+        if (isVariable(entityVal)) {
+          variableToColumn.set(entityVal as string, `${alias}.e`);
+        }
+        if (isVariable(attributeVal)) {
+          variableToColumn.set(attributeVal as string, `${alias}.a`);
+        }
+        if (isVariable(valueVal)) {
+          variableToColumn.set(valueVal as string, `${alias}.v`);
+        }
+      }
+
+      // Build SELECT columns from find clause
+      const findKeys = Object.keys(query.find);
+      for (const outputKey of findKeys) {
+        const expr = query.find[outputKey];
+        const agg = parseAggregation(expr);
+
+        if (agg) {
+          // This is an aggregation - convert to SQL
+          const varName = agg.variable;
+          const columnRef = variableToColumn.get(varName);
+          if (columnRef) {
+            const sqlAgg = aggregationToSQL(
+              expr,
+              columnRef,
+              "sqlite",
+              outputKey
+            );
+            if (sqlAgg && sqlAgg.sql) {
+              selectColumns.push(sqlAgg.sql);
+            } else {
+              // Unsupported aggregation - return null
+              selectColumns.push(`NULL AS ${this.escapeColumnName(outputKey)}`);
+            }
+          } else {
+            // Variable not found - return null
+            selectColumns.push(`NULL AS ${this.escapeColumnName(outputKey)}`);
+          }
+        } else {
+          // Regular variable - include in SELECT and GROUP BY
+          let varName: string;
+          if (
+            Array.isArray(expr) &&
+            expr.length === 1 &&
+            typeof expr[0] === "string"
+          ) {
+            varName = expr[0];
+          } else if (typeof expr === "string") {
+            varName = expr;
+          } else {
+            continue;
+          }
+
+          const columnRef = variableToColumn.get(varName);
+          if (columnRef) {
+            selectColumns.push(
+              `${columnRef} AS ${this.escapeColumnName(outputKey)}`
+            );
+            groupByColumns.push(columnRef);
+          }
+        }
+      }
+    }
+
     const limitClause = query.limit ? `LIMIT ?` : "";
     if (query.limit) {
       params.push(query.limit);
+    }
+
+    // Build GROUP BY clause if we have aggregations with non-aggregated columns
+    let groupByClause = "";
+    if (hasAggs && allAggsSupported && groupByColumns.length > 0) {
+      groupByClause = `GROUP BY ${groupByColumns.join(", ")}`;
     }
 
     const sql = `
@@ -1139,6 +1260,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       SELECT ${selectColumns.join(", ")}
       ${fromClause}
       ${joinClause}
+      ${groupByClause}
       ${orderByClause}
       ${limitClause}
     `;
@@ -1166,8 +1288,213 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       }
     );
 
-    // Use the shared project function which handles aggregations
+    // Use the shared project function for projection (aggregations already handled in SQL)
     return project(results, query.find, query.where);
+  }
+
+  /**
+   * Execute SQL query without aggregation handling (used internally for fetching raw data)
+   */
+  private async executeDatalogWithSQLRaw(
+    query: DatalogQuery
+  ): Promise<Record<string, Value | Attribute>[]> {
+    const clauses = query.where;
+    const params: unknown[] = [];
+    const ctes: string[] = [];
+    const selectColumns: string[] = [];
+    const joinConditions: string[] = [];
+
+    // Build CTEs for each clause with deduplication
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      if (!isQueryPattern(clause)) {
+        throw new Error(
+          "Only QueryPattern clauses are supported in SQL queries"
+        );
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+      const alias = `d${i}`;
+
+      const conditions: string[] = [];
+
+      // Add filters for bound values
+      if (!isVariable(entityVal)) {
+        conditions.push(`e = ?`);
+        params.push(String(entityVal));
+      }
+      if (!isVariable(attributeVal)) {
+        conditions.push(`a = ?`);
+        params.push(String(attributeVal));
+      }
+      if (!isVariable(valueVal)) {
+        let value = valueVal as Value;
+        if (value === undefined) {
+          value = "__UNDEFINED__";
+        }
+        conditions.push(`v = ?`);
+        params.push(JSON.stringify(value));
+      }
+
+      const whereClause =
+        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      // Use ROW_NUMBER for deduplication
+      const partitionBy = "e, a, v";
+
+      const rankedCte = `
+        ${alias}_ranked AS (
+          SELECT 
+            e,
+            a,
+            v,
+            tx,
+            op,
+            ROW_NUMBER() OVER (
+              PARTITION BY ${partitionBy}
+              ORDER BY tx DESC
+            ) AS rn
+          FROM ${this.tableName}
+          ${whereClause}
+        )`;
+
+      const cte = `
+        ${alias} AS (
+          SELECT e, a, v, tx
+          FROM ${alias}_ranked
+          WHERE rn = 1 AND op = 'assert'
+        )`;
+
+      ctes.push(rankedCte);
+      ctes.push(cte);
+
+      // Build SELECT columns for variables
+      if (isVariable(entityVal)) {
+        selectColumns.push(
+          `${alias}.e AS ${this.escapeColumnName(entityVal as string)}`
+        );
+      }
+      if (isVariable(attributeVal)) {
+        selectColumns.push(
+          `${alias}.a AS ${this.escapeColumnName(attributeVal as string)}`
+        );
+      }
+      if (isVariable(valueVal)) {
+        selectColumns.push(
+          `${alias}.v AS ${this.escapeColumnName(valueVal as string)}`
+        );
+      }
+    }
+
+    // Build JOIN conditions based on shared variables
+    const variableToClause: Map<
+      string,
+      { clauseIndex: number; field: string }[]
+    > = new Map();
+
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      if (!isQueryPattern(clause)) {
+        throw new Error(
+          "Only QueryPattern clauses are supported in JOIN conditions"
+        );
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+
+      if (isVariable(entityVal)) {
+        const varName = entityVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause.get(varName)!.push({ clauseIndex: i, field: "e" });
+      }
+      if (isVariable(attributeVal)) {
+        const varName = attributeVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause.get(varName)!.push({ clauseIndex: i, field: "a" });
+      }
+      if (isVariable(valueVal)) {
+        const varName = valueVal as string;
+        if (!variableToClause.has(varName)) {
+          variableToClause.set(varName, []);
+        }
+        variableToClause.get(varName)!.push({ clauseIndex: i, field: "v" });
+      }
+    }
+
+    // Build JOIN conditions for shared variables
+    for (const occurrences of variableToClause.values()) {
+      if (occurrences.length > 1) {
+        for (let i = 1; i < occurrences.length; i++) {
+          const prev = occurrences[i - 1];
+          const curr = occurrences[i];
+          const prevAlias = `d${prev.clauseIndex}`;
+          const currAlias = `d${curr.clauseIndex}`;
+          joinConditions.push(
+            `${prevAlias}.${prev.field} = ${currAlias}.${curr.field}`
+          );
+        }
+      }
+    }
+
+    // Build the final SQL query
+    const cteClause = ctes.length > 0 ? `WITH ${ctes.join(", ")}` : "";
+    const fromClause = `FROM d0`;
+
+    // Build JOIN clauses
+    const joinClauses: string[] = [];
+    for (let i = 1; i < clauses.length; i++) {
+      const alias = `d${i}`;
+      const conditions: string[] = [];
+
+      for (const joinCond of joinConditions) {
+        if (joinCond.includes(`${alias}.`)) {
+          const parts = joinCond.split(" = ");
+          if (parts.length === 2) {
+            if (parts[0].startsWith(`${alias}.`)) {
+              conditions.push(joinCond);
+            } else if (parts[1].startsWith(`${alias}.`)) {
+              conditions.push(`${parts[1]} = ${parts[0]}`);
+            }
+          }
+        }
+      }
+
+      if (conditions.length > 0) {
+        joinClauses.push(`JOIN ${alias} ON ${conditions.join(" AND ")}`);
+      } else {
+        joinClauses.push(`CROSS JOIN ${alias}`);
+      }
+    }
+
+    const joinClause = joinClauses.join(" ");
+
+    const sql = `
+      ${cteClause}
+      SELECT ${selectColumns.join(", ")}
+      ${fromClause}
+      ${joinClause}
+    `;
+
+    const rows = await this.connection.query(sql, params);
+
+    // Convert SQL results back to format
+    return rows.map((row: Record<string, unknown>) => {
+      const result: Record<string, Value | Attribute> = {};
+      for (const key of Object.keys(row)) {
+        let value: unknown = row[key];
+        if (typeof value === "string") {
+          try {
+            value = JSON.parse(value);
+          } catch {
+            // Not valid JSON, keep as string
+          }
+        }
+        result[key] = this.reviveValue(value) as Value | Attribute;
+      }
+      return result;
+    });
   }
 
   private escapeColumnName(name: string): string {

@@ -46,7 +46,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Should return the default value when no results
-      expect(results[0]["maximum"]).toBe("0");
+      expect(results[0]["maximum"]).toBe(0);
 
       await db.close();
     });
@@ -103,7 +103,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["maximum"]).toBe("0");
+      expect(results[0]["maximum"]).toBe(0);
 
       await db.close();
     });

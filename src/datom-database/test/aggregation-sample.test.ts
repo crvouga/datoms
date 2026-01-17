@@ -16,7 +16,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   });
 
   describe("Aggregation: sample", () => {
-    test("should return a sample value from the set", async () => {
+    test("should return a sample of N values from the set", async () => {
       const { db } = f;
       await db.transact([
         { op: "assert", e: 1, a: "value", v: 10 },
@@ -25,24 +25,31 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { sample: ["sample", "seed123", "?value"] },
+        find: { sample: ["sample", 2, "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      // Should return one of the values
-      const sampleValue = results[0]["sample"];
-      expect(sampleValue).toBeDefined();
-      expect([10, 20, 30]).toContain(sampleValue as number);
+      const sampleValues = results[0]["sample"];
+      expect(sampleValues).toBeDefined();
+      expect(Array.isArray(sampleValues)).toBe(true);
+      expect((sampleValues as unknown as number[]).length).toBe(2);
+      // All values should be from the set
+      (sampleValues as unknown as number[]).forEach((val) => {
+        expect([10, 20, 30]).toContain(val);
+      });
+      // Should have no duplicates (sample is without replacement)
+      const unique = new Set(sampleValues as unknown as number[]);
+      expect(unique.size).toBe(2);
 
       await db.close();
     });
 
-    test("should return null or undefined for empty results", async () => {
+    test("should return null for empty results", async () => {
       const { db } = f;
       const query: DatalogQuery = {
-        find: { sample: ["sample", "seed123", "?value"] },
+        find: { sample: ["sample", 1, "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
@@ -55,72 +62,74 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should return single value when only one exists", async () => {
+    test("should return single value when N=1", async () => {
       const { db } = f;
-      await db.transact([{ op: "assert", e: 1, a: "value", v: 42 }]);
+      await db.transact([
+        { op: "assert", e: 1, a: "value", v: 10 },
+        { op: "assert", e: 2, a: "value", v: 20 },
+        { op: "assert", e: 3, a: "value", v: 30 },
+      ]);
 
       const query: DatalogQuery = {
-        find: { sample: ["sample", "seed123", "?value"] },
+        find: { sample: ["sample", 1, "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["sample"]).toBe(42);
+      const sampleValue = results[0]["sample"];
+      expect(sampleValue).toBeDefined();
+      expect([10, 20, 30]).toContain(sampleValue as number);
+      expect(Array.isArray(sampleValue)).toBe(false);
 
       await db.close();
     });
 
-    test("should return consistent result with same seed", async () => {
+    test("should return all values when N >= total", async () => {
       const { db } = f;
       await db.transact([
         { op: "assert", e: 1, a: "value", v: 10 },
         { op: "assert", e: 2, a: "value", v: 20 },
-        { op: "assert", e: 3, a: "value", v: 30 },
       ]);
 
       const query: DatalogQuery = {
-        find: { sample: ["sample", "seed456", "?value"] },
+        find: { sample: ["sample", 5, "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results1 = await db.query(query);
-      const results2 = await db.query(query);
-
-      // With the same seed, should return the same value
-      expect(results1[0]["sample"]).toBe(results2[0]["sample"]);
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      const sampleValues = results[0]["sample"];
+      expect(Array.isArray(sampleValues)).toBe(true);
+      expect((sampleValues as unknown as number[]).length).toBe(2);
+      expect((sampleValues as unknown as number[]).sort()).toEqual([10, 20]);
 
       await db.close();
     });
 
-    test("should return different results with different seeds", async () => {
+    test("should return array of N values without duplicates", async () => {
       const { db } = f;
       await db.transact([
         { op: "assert", e: 1, a: "value", v: 10 },
         { op: "assert", e: 2, a: "value", v: 20 },
         { op: "assert", e: 3, a: "value", v: 30 },
+        { op: "assert", e: 4, a: "value", v: 40 },
+        { op: "assert", e: 5, a: "value", v: 50 },
       ]);
 
-      const query1: DatalogQuery = {
-        find: { sample: ["sample", "seed1", "?value"] },
+      const query: DatalogQuery = {
+        find: { sample: ["sample", 3, "?value"] },
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const query2: DatalogQuery = {
-        find: { sample: ["sample", "seed2", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
-      };
-
-      const results1 = await db.query(query1);
-      const results2 = await db.query(query2);
-
-      // Results should be valid values (may or may not be different depending on implementation)
-      const sampleValue1 = results1[0]["sample"];
-      const sampleValue2 = results2[0]["sample"];
-      expect(sampleValue1).toBeDefined();
-      expect(sampleValue2).toBeDefined();
-      expect([10, 20, 30]).toContain(sampleValue1 as number);
-      expect([10, 20, 30]).toContain(sampleValue2 as number);
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      const sampleValues = results[0]["sample"];
+      expect(Array.isArray(sampleValues)).toBe(true);
+      expect((sampleValues as unknown as number[]).length).toBe(3);
+      // Check no duplicates
+      const unique = new Set(sampleValues as unknown as number[]);
+      expect(unique.size).toBe(3);
 
       await db.close();
     });
@@ -134,15 +143,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { sample: ["sample", "seed789", "?name"] },
+        find: { sample: ["sample", 2, "?name"] },
         where: [{ e: "?e", a: "name", v: "?name" }],
       };
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const sampleValue = results[0]["sample"];
-      expect(sampleValue).toBeDefined();
-      expect(["Alice", "Bob", "Charlie"]).toContain(sampleValue as string);
+      const sampleValues = results[0]["sample"];
+      expect(Array.isArray(sampleValues)).toBe(true);
+      expect((sampleValues as unknown as string[]).length).toBe(2);
+      (sampleValues as unknown as string[]).forEach((val) => {
+        expect(["Alice", "Bob", "Charlie"]).toContain(val);
+      });
 
       await db.close();
     });
@@ -159,7 +171,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: { sample: ["sample", "seed999", "?price"] },
+        find: { sample: ["sample", 2, "?price"] },
         where: [
           { e: "?e", a: "type", v: "product" },
           { e: "?e", a: "price", v: "?price" },
@@ -168,9 +180,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const sampleValue = results[0]["sample"];
-      expect(sampleValue).toBeDefined();
-      expect([100, 200]).toContain(sampleValue as number);
+      const sampleValues = results[0]["sample"];
+      expect(Array.isArray(sampleValues)).toBe(true);
+      expect((sampleValues as unknown as number[]).length).toBe(2);
+      expect((sampleValues as unknown as number[]).sort()).toEqual([100, 200]);
 
       await db.close();
     });
