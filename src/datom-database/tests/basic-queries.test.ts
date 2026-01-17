@@ -18,12 +18,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should execute simple query", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 2, a: "name", v: "Bob" },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?x"],
@@ -57,13 +55,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should filter by constant in where clause", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "type", v: "person" },
-          { e: 2, a: "type", v: "car" },
-          { e: 3, a: "type", v: "person" },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "type", v: "person" },
+        { op: "added", e: 2, a: "type", v: "car" },
+        { op: "added", e: 3, a: "type", v: "person" },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?x"],
@@ -78,12 +74,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle empty find clause", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 2, a: "name", v: "Bob" },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+      ]);
 
       const query: DatalogQuery = {
         find: [],
@@ -100,12 +94,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle find variables not in where clause", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 2, a: "name", v: "Bob" },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?x", "?missing"],

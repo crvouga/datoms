@@ -105,10 +105,24 @@ export async function importDatoms(
       const filteredRetracted = await filterExistingDatoms(db, dedupeRetracted);
 
       if (filteredAdded.length > 0) {
-        await db.transact({ add: filteredAdded });
+        await db.transact(
+          filteredAdded.map((d) => ({
+            op: "added" as const,
+            e: d.e,
+            a: d.a,
+            v: d.v,
+          }))
+        );
       }
       if (filteredRetracted.length > 0) {
-        await db.transact({ retract: filteredRetracted });
+        await db.transact(
+          filteredRetracted.map((d) => ({
+            op: "retracted" as const,
+            e: d.e,
+            a: d.a,
+            v: d.v,
+          }))
+        );
       }
 
       datomCount += batch.length;
@@ -150,10 +164,24 @@ export async function importDatoms(
     const filteredRetracted = await filterExistingDatoms(db, dedupeRetracted);
 
     if (filteredAdded.length > 0) {
-      await db.transact({ add: filteredAdded });
+      await db.transact(
+        filteredAdded.map((d) => ({
+          op: "added" as const,
+          e: d.e,
+          a: d.a,
+          v: d.v,
+        }))
+      );
     }
     if (filteredRetracted.length > 0) {
-      await db.transact({ retract: filteredRetracted });
+      await db.transact(
+        filteredRetracted.map((d) => ({
+          op: "retracted" as const,
+          e: d.e,
+          a: d.a,
+          v: d.v,
+        }))
+      );
     }
     datomCount += batch.length;
   }

@@ -18,13 +18,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should handle boolean values", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "active", v: true },
-          { e: 2, a: "active", v: false },
-          { e: 3, a: "active", v: true },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "active", v: true },
+        { op: "added", e: 2, a: "active", v: false },
+        { op: "added", e: 3, a: "active", v: true },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e"],
@@ -45,13 +43,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const date2 = new Date("2023-02-01");
       const date3 = new Date("2023-01-01");
 
-      await db.transact({
-        add: [
-          { e: 1, a: "created", v: date1 },
-          { e: 2, a: "created", v: date2 },
-          { e: 3, a: "created", v: date3 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "created", v: date1 },
+        { op: "added", e: 2, a: "created", v: date2 },
+        { op: "added", e: 3, a: "created", v: date3 },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e", "?d"],
@@ -71,13 +67,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle null values", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "middleName", v: null },
-          { e: 2, a: "middleName", v: "Smith" },
-          { e: 3, a: "middleName", v: null },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "middleName", v: null },
+        { op: "added", e: 2, a: "middleName", v: "Smith" },
+        { op: "added", e: 3, a: "middleName", v: null },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e"],
@@ -94,13 +88,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle undefined values", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "optional", v: undefined },
-          { e: 2, a: "optional", v: "value" },
-          { e: 3, a: "optional", v: undefined },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "optional", v: undefined },
+        { op: "added", e: 2, a: "optional", v: "value" },
+        { op: "added", e: 3, a: "optional", v: undefined },
+      ]);
 
       // Querying for undefined doesn't filter properly due to how undefined is handled in queries
       // Instead, test that we can retrieve all optional values and filter in the query
@@ -123,15 +115,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle mixed value types", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "data", v: "string" },
-          { e: 1, a: "data", v: 42 },
-          { e: 1, a: "data", v: true },
-          { e: 2, a: "data", v: "string" },
-          { e: 2, a: "data", v: 100 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "data", v: "string" },
+        { op: "added", e: 1, a: "data", v: 42 },
+        { op: "added", e: 1, a: "data", v: true },
+        { op: "added", e: 2, a: "data", v: "string" },
+        { op: "added", e: 2, a: "data", v: 100 },
+      ]);
 
       const results = await db.query({
         find: ["?e", "?v"],

@@ -40,7 +40,7 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
     test("should include query performance metrics if available", async () => {
       const { db } = f;
       // Run some queries to generate metrics
-      await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
+      await db.transact([{ op: "added", e: 1, a: "name", v: "Alice" }]);
       await db.datoms({ e: 1 });
       await db.datoms({ a: "name" });
 
@@ -56,7 +56,7 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
     test("should include transaction health metrics if available", async () => {
       const { db } = f;
       // Run some transactions to generate metrics
-      await db.transact({ add: [{ e: 1, a: "name", v: "Alice" }] });
+      await db.transact([{ op: "added", e: 1, a: "name", v: "Alice" }]);
 
       const observableDb = new ObservableDatabase(db);
       const health = await observableDb.healthCheck();

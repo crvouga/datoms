@@ -439,12 +439,12 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
 
 /**
  * Transaction operations format for transact() method
- * Supports object format { e, a, v } for DatomInput
+ * Array of operations, each specifying whether to add or retract a datom
  */
-export type TransactOperations = {
-  add?: DatomInput[];
-  retract?: DatomInput[];
-};
+export type TransactOperations = Array<
+  | { op: "added"; e: EntityId; a: Attribute; v: Value }
+  | { op: "retracted"; e: EntityId; a: Attribute; v: Value }
+>;
 
 /**
  * Abstract datom database class that provides a high-level interface
@@ -559,6 +559,22 @@ export type TransactOperations = {
  * Abstract datom database class (Datomic-like minimal API)
  * Provides core operations: datoms, query, transact, and time-travel views
  */
+/**
+ * Result of a speculative transaction using the `with()` method (Datomic-like)
+ * Provides a read-only view of what the database would look like after applying the transaction
+ * without actually committing the changes
+ */
+export interface WithResult {
+  /** The database state before applying the transaction (read-only view) */
+  dbBefore: DatabaseView;
+  /** The database state after applying the transaction (read-only speculative view) */
+  dbAfter: DatabaseView;
+  /** The datoms that would be applied by this transaction */
+  txData: Datom[];
+  /** Map of temporary IDs to resolved entity IDs (empty for now, reserved for future tempid support) */
+  tempIds: Record<string, EntityId>;
+}
+
 export abstract class DatomDatabase implements DatomReader {
   protected initialized = false;
   protected schema: Map<string, AttributeDefinition> = new Map();
@@ -602,18 +618,18 @@ export abstract class DatomDatabase implements DatomReader {
 
   /**
    * Execute bulk operations atomically (Datomic-like transact)
-   * @param ops Object containing add and/or retract arrays
+   * @param ops Array of operations, each specifying whether to add or retract a datom
    * @param metadata Optional metadata to associate with this transaction
    * @returns The transaction ID
    * @example
-   * await db.transact({
-   *   add: [{ e: 300, a: "status", v: "active" }],
-   *   retract: [{ e: 42, a: "type", v: "cat" }]
-   * });
+   * await db.transact([
+   *   { op: "added", e: 300, a: "status", v: "active" },
+   *   { op: "retracted", e: 42, a: "type", v: "cat" }
+   * ]);
    *
    * // With metadata
    * await db.transact(
-   *   { add: [{ e: 300, a: "status", v: "active" }] },
+   *   [{ op: "added", e: 300, a: "status", v: "active" }],
    *   { userId: "alice", reason: "status_update" }
    * );
    */
@@ -623,14 +639,26 @@ export abstract class DatomDatabase implements DatomReader {
   ): Promise<TransactionId> {
     await this.ensureInitialized();
 
+    // Separate operations by type
+    const adds: DatomInput[] = [];
+    const retracts: DatomInput[] = [];
+
+    for (const op of ops) {
+      if (op.op === "added") {
+        adds.push({ e: op.e, a: op.a, v: op.v });
+      } else {
+        retracts.push({ e: op.e, a: op.a, v: op.v });
+      }
+    }
+
     // Validate transaction data
     // Apply retracts first, then adds, so validation can see retracted values
-    if (ops.retract && ops.retract.length > 0) {
-      await this.validateDatoms(ops.retract, false);
+    if (retracts.length > 0) {
+      await this.validateDatoms(retracts, false);
     }
-    if (ops.add && ops.add.length > 0) {
+    if (adds.length > 0) {
       // Validate adds, but account for retracts in the same transaction
-      await this.validateDatoms(ops.add, true, ops.retract);
+      await this.validateDatoms(adds, true, retracts);
     }
 
     // Apply retracts first, then adds
@@ -638,12 +666,12 @@ export abstract class DatomDatabase implements DatomReader {
     // depending on the implementation. For atomicity, implementations should ensure
     // they use the same transaction ID when called sequentially.
     let txId: TransactionId;
-    if (ops.retract && ops.retract.length > 0) {
-      txId = await this.retractDatoms(ops.retract);
+    if (retracts.length > 0) {
+      txId = await this.retractDatoms(retracts);
     }
-    if (ops.add && ops.add.length > 0) {
-      txId = await this.addDatoms(ops.add);
-    } else if (!ops.retract || ops.retract.length === 0) {
+    if (adds.length > 0) {
+      txId = await this.addDatoms(adds);
+    } else if (retracts.length === 0) {
       // If there are no operations, still create a new transaction ID
       // This ensures that even empty transactions get a unique ID (useful for metadata tracking)
       txId = await this.addDatoms([]);
@@ -1605,7 +1633,7 @@ export abstract class DatomDatabase implements DatomReader {
   async with(ops: {
     add?: DatomInput[];
     retract?: DatomInput[];
-  }): Promise<import("../types.js").WithResult> {
+  }): Promise<WithResult> {
     await this.ensureInitialized();
 
     // Validate transaction data

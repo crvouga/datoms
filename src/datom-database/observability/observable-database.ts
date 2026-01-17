@@ -59,8 +59,8 @@ export class ObservableDatabase {
     ops: TransactOperations,
     metadata?: Record<string, unknown>
   ): Promise<TransactionId> {
-    const addedCount = ops.add?.length ?? 0;
-    const retractedCount = ops.retract?.length ?? 0;
+    const addedCount = ops.filter((op) => op.op === "added").length;
+    const retractedCount = ops.filter((op) => op.op === "retracted").length;
     const startTime = Date.now();
 
     try {

@@ -18,14 +18,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should handle multiple where clauses (join)", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 1, a: "age", v: 30 },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 2, a: "age", v: 40 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 1, a: "age", v: 30 },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 2, a: "age", v: 40 },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?x", "?a"],
@@ -47,26 +45,24 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle complex joins with multiple entities and attributes", async () => {
       const { db } = f;
       // Create a company structure: employees, departments, and their relationships
-      await db.transact({
-        add: [
-          // Employees
-          { e: 1, a: "name", v: "Alice" },
-          { e: 1, a: "role", v: "engineer" },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 2, a: "role", v: "manager" },
-          { e: 3, a: "name", v: "Charlie" },
-          { e: 3, a: "role", v: "engineer" },
-          // Departments
-          { e: 10, a: "name", v: "Engineering" },
-          { e: 10, a: "budget", v: "100_000" },
-          { e: 11, a: "name", v: "Sales" },
-          { e: 11, a: "budget", v: "50_000" },
-          // Employee-Department relationships
-          { e: 1, a: "department", v: 10 },
-          { e: 2, a: "department", v: 10 },
-          { e: 3, a: "department", v: 10 },
-        ],
-      });
+      await db.transact([
+        // Employees
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 1, a: "role", v: "engineer" },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 2, a: "role", v: "manager" },
+        { op: "added", e: 3, a: "name", v: "Charlie" },
+        { op: "added", e: 3, a: "role", v: "engineer" },
+        // Departments
+        { op: "added", e: 10, a: "name", v: "Engineering" },
+        { op: "added", e: 10, a: "budget", v: "100_000" },
+        { op: "added", e: 11, a: "name", v: "Sales" },
+        { op: "added", e: 11, a: "budget", v: "50_000" },
+        // Employee-Department relationships
+        { op: "added", e: 1, a: "department", v: 10 },
+        { op: "added", e: 2, a: "department", v: 10 },
+        { op: "added", e: 3, a: "department", v: 10 },
+      ]);
 
       // Find all engineers in the Engineering department with the department budget
       const query: DatalogQuery = {
@@ -94,19 +90,17 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle queries with multiple constraints on same entity", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 1, a: "age", v: 30 },
-          { e: 1, a: "city", v: "NYC" },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 2, a: "age", v: 25 },
-          { e: 2, a: "city", v: "NYC" },
-          { e: 3, a: "name", v: "Charlie" },
-          { e: 3, a: "age", v: 30 },
-          { e: 3, a: "city", v: "LA" },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 1, a: "age", v: 30 },
+        { op: "added", e: 1, a: "city", v: "NYC" },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 2, a: "age", v: 25 },
+        { op: "added", e: 2, a: "city", v: "NYC" },
+        { op: "added", e: 3, a: "name", v: "Charlie" },
+        { op: "added", e: 3, a: "age", v: 30 },
+        { op: "added", e: 3, a: "city", v: "LA" },
+      ]);
 
       // Find people in NYC who are 30 years old
       const query: DatalogQuery = {
@@ -128,19 +122,17 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle complex variable bindings across multiple clauses", async () => {
       const { db } = f;
       // Create a network of connections
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Node1" },
-          { e: 2, a: "name", v: "Node2" },
-          { e: 3, a: "name", v: "Node3" },
-          { e: 4, a: "name", v: "Node4" },
-          // Connections: 1->2, 2->3, 3->4, 1->4
-          { e: 1, a: "connects", v: 2 },
-          { e: 2, a: "connects", v: 3 },
-          { e: 3, a: "connects", v: 4 },
-          { e: 1, a: "connects", v: 4 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Node1" },
+        { op: "added", e: 2, a: "name", v: "Node2" },
+        { op: "added", e: 3, a: "name", v: "Node3" },
+        { op: "added", e: 4, a: "name", v: "Node4" },
+        // Connections: 1->2, 2->3, 3->4, 1->4
+        { op: "added", e: 1, a: "connects", v: 2 },
+        { op: "added", e: 2, a: "connects", v: 3 },
+        { op: "added", e: 3, a: "connects", v: 4 },
+        { op: "added", e: 1, a: "connects", v: 4 },
+      ]);
 
       // Find all paths of length 2: A -> B -> C
       const query: DatalogQuery = {
@@ -162,13 +154,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle join with no matching results", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 3, a: "age", v: 30 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 3, a: "age", v: 30 },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?name", "?age"],
@@ -188,17 +178,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle join with incompatible variable bindings", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 1, a: "age", v: 30 },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 2, a: "age", v: 25 },
-          // Entity 3 has name "Alice" but age 25 (different from entity 1)
-          { e: 3, a: "name", v: "Alice" },
-          { e: 3, a: "age", v: 25 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 1, a: "age", v: 30 },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 2, a: "age", v: 25 },
+        // Entity 3 has name "Alice" but age 25 (different from entity 1)
+        { op: "added", e: 3, a: "name", v: "Alice" },
+        { op: "added", e: 3, a: "age", v: 25 },
+      ]);
 
       // Find entities where name is Alice AND age is 25
       const query: DatalogQuery = {
@@ -218,16 +206,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle join with multiple common variables", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 1, a: "age", v: 30 },
-          { e: 1, a: "city", v: "NYC" },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 2, a: "age", v: 30 },
-          { e: 2, a: "city", v: "LA" },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 1, a: "age", v: 30 },
+        { op: "added", e: 1, a: "city", v: "NYC" },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 2, a: "age", v: 30 },
+        { op: "added", e: 2, a: "city", v: "LA" },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?name", "?age", "?city"],
@@ -250,18 +236,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle variable binding across disconnected clauses", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 1, a: "age", v: 30 },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 2, a: "age", v: 25 },
-          { e: 10, a: "employee", v: 1 },
-          { e: 10, a: "department", v: "Engineering" },
-          { e: 11, a: "employee", v: 2 },
-          { e: 11, a: "department", v: "Sales" },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 1, a: "age", v: 30 },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 2, a: "age", v: 25 },
+        { op: "added", e: 10, a: "employee", v: 1 },
+        { op: "added", e: 10, a: "department", v: "Engineering" },
+        { op: "added", e: 11, a: "employee", v: 2 },
+        { op: "added", e: 11, a: "department", v: "Sales" },
+      ]);
 
       // Find employees and their departments through a join entity
       const query: DatalogQuery = {

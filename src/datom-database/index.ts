@@ -45,7 +45,7 @@ export {
 } from "../datalog/datalog.js";
 
 // WithResult type (for speculative transactions)
-export type { WithResult } from "../types.js";
+export type { WithResult } from "./datom-database.js";
 
 // Migration registry
 export { MigrationRegistry } from "./migrations/migration-registry.js";

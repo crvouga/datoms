@@ -18,13 +18,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should support ordering and limits", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "score", v: 100 },
-          { e: 2, a: "score", v: 400 },
-          { e: 3, a: "score", v: 250 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "score", v: 100 },
+        { op: "added", e: 2, a: "score", v: 400 },
+        { op: "added", e: 3, a: "score", v: 250 },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e", "?s"],
@@ -43,19 +41,17 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle queries with ordering on multiple variables", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 1, a: "score", v: 100 },
-          { e: 1, a: "age", v: 30 },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 2, a: "score", v: 100 },
-          { e: 2, a: "age", v: 25 },
-          { e: 3, a: "name", v: "Charlie" },
-          { e: 3, a: "score", v: 200 },
-          { e: 3, a: "age", v: 30 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 1, a: "score", v: 100 },
+        { op: "added", e: 1, a: "age", v: 30 },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 2, a: "score", v: 100 },
+        { op: "added", e: 2, a: "age", v: 25 },
+        { op: "added", e: 3, a: "name", v: "Charlie" },
+        { op: "added", e: 3, a: "score", v: 200 },
+        { op: "added", e: 3, a: "age", v: 30 },
+      ]);
 
       // Find all people, ordered by score (desc) then age (asc)
       const query: DatalogQuery = {
@@ -84,13 +80,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle limit 0", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "score", v: 100 },
-          { e: 2, a: "score", v: 200 },
-          { e: 3, a: "score", v: 300 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "score", v: 100 },
+        { op: "added", e: 2, a: "score", v: 200 },
+        { op: "added", e: 3, a: "score", v: 300 },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e", "?s"],
@@ -109,12 +103,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle limit larger than results", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "score", v: 100 },
-          { e: 2, a: "score", v: 200 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "score", v: 100 },
+        { op: "added", e: 2, a: "score", v: 200 },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e", "?s"],
@@ -130,14 +122,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle limit with ordering", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "score", v: 100 },
-          { e: 2, a: "score", v: 400 },
-          { e: 3, a: "score", v: 250 },
-          { e: 4, a: "score", v: 300 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "score", v: 100 },
+        { op: "added", e: 2, a: "score", v: 400 },
+        { op: "added", e: 3, a: "score", v: 250 },
+        { op: "added", e: 4, a: "score", v: 300 },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e", "?s"],
@@ -156,14 +146,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle ordering on variable not in find", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 1, a: "score", v: 100 },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 2, a: "score", v: 200 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 1, a: "score", v: 100 },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 2, a: "score", v: 200 },
+      ]);
 
       // Note: Current implementation orders AFTER projection, so ordering by variables
       // not in find doesn't work (they're undefined after projection).
@@ -204,14 +192,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle ordering with null values", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "score", v: 100 },
-          { e: 2, a: "score", v: null },
-          { e: 3, a: "score", v: 200 },
-          { e: 4, a: "score", v: null },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "score", v: 100 },
+        { op: "added", e: 2, a: "score", v: null },
+        { op: "added", e: 3, a: "score", v: 200 },
+        { op: "added", e: 4, a: "score", v: null },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e", "?s"],
@@ -231,14 +217,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle ordering with mixed types", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "value", v: "zebra" },
-          { e: 2, a: "value", v: 100 },
-          { e: 3, a: "value", v: "apple" },
-          { e: 4, a: "value", v: 50 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "value", v: "zebra" },
+        { op: "added", e: 2, a: "value", v: 100 },
+        { op: "added", e: 3, a: "value", v: "apple" },
+        { op: "added", e: 4, a: "value", v: 50 },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e", "?v"],

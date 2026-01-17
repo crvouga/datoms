@@ -450,19 +450,3 @@ export interface Logger {
  * Used internally for batch query result mapping
  */
 export type BatchQueryKey = string;
-
-/**
- * Result of a speculative transaction using the `with()` method (Datomic-like)
- * Provides a read-only view of what the database would look like after applying the transaction
- * without actually committing the changes
- */
-export interface WithResult {
-  /** The database state before applying the transaction (read-only view) */
-  dbBefore: import("./datom-database/datom-database.js").DatabaseView;
-  /** The database state after applying the transaction (read-only speculative view) */
-  dbAfter: import("./datom-database/datom-database.js").DatabaseView;
-  /** The datoms that would be applied by this transaction */
-  txData: Datom[];
-  /** Map of temporary IDs to resolved entity IDs (empty for now, reserved for future tempid support) */
-  tempIds: Record<string, EntityId>;
-}

@@ -18,13 +18,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should handle variable in entity position", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 3, a: "age", v: 30 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 3, a: "age", v: 30 },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e", "?v"],
@@ -43,14 +41,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle variable in attribute position", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 1, a: "age", v: 30 },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 2, a: "city", v: "NYC" },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 1, a: "age", v: 30 },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 2, a: "city", v: "NYC" },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?attr", "?v"],
@@ -69,14 +65,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle all positions as variables", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 1, a: "age", v: 30 },
-          { e: 2, a: "name", v: "Bob" },
-          { e: 2, a: "age", v: 25 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 1, a: "age", v: 30 },
+        { op: "added", e: 2, a: "name", v: "Bob" },
+        { op: "added", e: 2, a: "age", v: 25 },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e", "?attr", "?v"],
@@ -101,13 +95,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle string entity IDs", async () => {
       const { db } = f;
-      await db.transact({
-        add: [
-          { e: "user-1", a: "name", v: "Alice" },
-          { e: "user-2", a: "name", v: "Bob" },
-          { e: "user-1", a: "age", v: 30 },
-        ],
-      });
+      await db.transact([
+        { op: "added", e: "user-1", a: "name", v: "Alice" },
+        { op: "added", e: "user-2", a: "name", v: "Bob" },
+        { op: "added", e: "user-1", a: "age", v: 30 },
+      ]);
 
       const query: DatalogQuery = {
         find: ["?e", "?n"],
