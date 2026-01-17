@@ -338,11 +338,11 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
 
       try {
         // Use a very short timeout that will definitely be exceeded
-        await db.datoms({ entity: 1, timeoutMs: 1 });
+        await db.datoms({ e: 1, timeoutMs: 1 });
         // If query completes too fast, add a delay to ensure timeout
         await new Promise((resolve) => setTimeout(resolve, 10));
         // Re-query with timeout
-        await db.datoms({ entity: 1, timeoutMs: 1 });
+        await db.datoms({ e: 1, timeoutMs: 1 });
         // If we get here, the timeout didn't trigger (query was too fast)
         // This is acceptable - timeout is best-effort
       } catch (error) {
@@ -367,7 +367,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       }
 
       try {
-        await db.datoms({ attribute: "tag", maxResultSize: 5 });
+        await db.datoms({ a: "tag", maxResultSize: 5 });
         throw new Error("Should have thrown QueryResultSizeError");
       } catch (error) {
         expect(error).toBeInstanceOf(QueryResultSizeError);
@@ -385,7 +385,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       await db.transact({ add: [[1, "name", "Alice"]] });
 
       const results = await db.datoms({
-        entity: 1,
+        e: 1,
         maxResultSize: 10,
       });
       expect(results).toHaveLength(1);

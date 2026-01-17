@@ -117,17 +117,17 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const conditions: string[] = [];
     const params: unknown[] = [];
 
-    if (options.entity !== undefined) {
+    if (options.e !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      params.push(String(options.e));
     }
-    if (options.attribute !== undefined) {
+    if (options.a !== undefined) {
       conditions.push("attribute = ?");
-      params.push(String(options.attribute));
+      params.push(String(options.a));
     }
-    if (options.value !== undefined) {
+    if (options.v !== undefined) {
       conditions.push("value = ?");
-      let value = options.value;
+      let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
@@ -196,13 +196,13 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       const parsedValue: unknown = JSON.parse(String(row.value));
       const revivedValue = reviveValue(parsedValue) as Value;
 
-      return [
-        entity,
-        String(row.attribute),
-        revivedValue,
-        Number(row.tx),
-        Boolean(row.added),
-      ] as Datom;
+      return {
+        e: entity,
+        a: String(row.attribute),
+        v: revivedValue,
+        tx: Number(row.tx),
+        added: Boolean(row.added),
+      };
     });
   }
 
@@ -211,17 +211,17 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const conditions: string[] = [];
     const params: unknown[] = [];
 
-    if (options.entity !== undefined) {
+    if (options.e !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      params.push(String(options.e));
     }
-    if (options.attribute !== undefined) {
+    if (options.a !== undefined) {
       conditions.push("attribute = ?");
-      params.push(String(options.attribute));
+      params.push(String(options.a));
     }
-    if (options.value !== undefined) {
+    if (options.v !== undefined) {
       conditions.push("value = ?");
-      let value = options.value;
+      let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
@@ -333,13 +333,13 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       const parsedValue: unknown = JSON.parse(String(row.value));
       const revivedValue = reviveValue(parsedValue) as Value;
 
-      return [
-        entity,
-        String(row.attribute),
-        revivedValue,
-        Number(row.tx),
-        Boolean(row.added),
-      ] as Datom;
+      return {
+        e: entity,
+        a: String(row.attribute),
+        v: revivedValue,
+        tx: Number(row.tx),
+        added: Boolean(row.added),
+      };
     });
   }
 
@@ -353,17 +353,17 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const params: unknown[] = [];
 
     // Build WHERE conditions
-    if (options.entity !== undefined) {
+    if (options.e !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      params.push(String(options.e));
     }
-    if (options.attribute !== undefined) {
+    if (options.a !== undefined) {
       conditions.push("attribute = ?");
-      params.push(String(options.attribute));
+      params.push(String(options.a));
     }
-    if (options.value !== undefined) {
+    if (options.v !== undefined) {
       conditions.push("value = ?");
-      let value = options.value;
+      let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
@@ -434,17 +434,17 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const params: unknown[] = [];
 
     // Build WHERE conditions
-    if (options.entity !== undefined) {
+    if (options.e !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      params.push(String(options.e));
     }
-    if (options.attribute !== undefined) {
+    if (options.a !== undefined) {
       conditions.push("attribute = ?");
-      params.push(String(options.attribute));
+      params.push(String(options.a));
     }
-    if (options.value !== undefined) {
+    if (options.v !== undefined) {
       conditions.push("value = ?");
-      let value = options.value;
+      let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
@@ -497,17 +497,17 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const params: unknown[] = [];
 
     // Build WHERE conditions
-    if (options.entity !== undefined) {
+    if (options.e !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      params.push(String(options.e));
     }
-    if (options.attribute !== undefined) {
+    if (options.a !== undefined) {
       conditions.push("attribute = ?");
-      params.push(String(options.attribute));
+      params.push(String(options.a));
     }
-    if (options.value !== undefined) {
+    if (options.v !== undefined) {
       conditions.push("value = ?");
-      let value = options.value;
+      let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
@@ -614,13 +614,13 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       const parsedValue: unknown = JSON.parse(String(row.value));
       const revivedValue = reviveValue(parsedValue) as Value;
 
-      return [
-        entity,
-        String(row.attribute),
-        revivedValue,
-        Number(row.tx),
-        Boolean(row.added),
-      ] as Datom;
+      return {
+        e: entity,
+        a: String(row.attribute),
+        v: revivedValue,
+        tx: Number(row.tx),
+        added: Boolean(row.added),
+      };
     });
   }
 
@@ -643,22 +643,22 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
       const datoms = await this.executeQuery({
-        entity,
-        attribute,
-        value,
+        e: entity,
+        a: attribute,
+        v: value,
         added: true,
       });
 
       const results = datoms.map((datom) => {
         const result: Record<string, Value | Attribute> = {};
         if (isVariable(entityVal)) {
-          result[entityVal as string] = datom[0];
+          result[entityVal as string] = datom.e;
         }
         if (isVariable(attributeVal)) {
-          result[attributeVal as string] = datom[1];
+          result[attributeVal as string] = datom.a;
         }
         if (isVariable(valueVal)) {
-          result[valueVal as string] = datom[2];
+          result[valueVal as string] = datom.v;
         }
         return result;
       });
@@ -1094,9 +1094,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     // Datalog queries manage their own limiting via joins, so bypass validation
     const queryOptions: QueryOptions = {
-      ...(entity !== undefined && { entity }),
-      ...(attribute !== undefined && { attribute }),
-      ...(value !== undefined && { value }),
+      ...(entity !== undefined && { e: entity }),
+      ...(attribute !== undefined && { a: attribute }),
+      ...(value !== undefined && { v: value }),
     };
 
     const datoms = await this.queryInternal(queryOptions);
@@ -1104,13 +1104,13 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     return datoms.map((datom: Datom) => {
       const result: Record<string, Value | Attribute> = {};
       if (isVariable(entityVal)) {
-        result[entityVal as string] = datom[0];
+        result[entityVal as string] = datom.e;
       }
       if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom[1];
+        result[attributeVal as string] = datom.a;
       }
       if (isVariable(valueVal)) {
-        result[valueVal as string] = datom[2];
+        result[valueVal as string] = datom.v;
       }
       return result;
     });

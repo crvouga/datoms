@@ -21,11 +21,11 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
       await db.transact({ add: [[1, "name", "Alice"]] });
 
       const results = await db.datoms({
-        entity: 1,
+        e: 1,
         timeoutMs: 5000,
       });
       expect(results).toHaveLength(1);
-      expect(results[0][2]).toBe("Alice");
+      expect(results[0].v).toBe("Alice");
     });
 
     test("should throw QueryTimeoutError when timeout exceeded", async () => {
@@ -34,7 +34,7 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
 
       // Use a very short timeout - may or may not trigger depending on query speed
       try {
-        await db.datoms({ entity: 1, timeoutMs: 1 });
+        await db.datoms({ e: 1, timeoutMs: 1 });
         // If query completes quickly, that's fine - timeout is best-effort
       } catch (error) {
         if (error instanceof QueryTimeoutError) {
@@ -57,12 +57,12 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
       });
 
       const results = await db.datoms({
-        entity: 1,
-        attribute: "name",
+        e: 1,
+        a: "name",
         timeoutMs: 1000,
       });
       expect(results).toHaveLength(1);
-      expect(results[0][2]).toBe("Alice");
+      expect(results[0].v).toBe("Alice");
     });
 
     test("should work with pagination", async () => {
@@ -72,7 +72,7 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
       }
 
       const results = await db.datoms({
-        attribute: "tag",
+        a: "tag",
         limit: 3,
         timeoutMs: 1000,
       });

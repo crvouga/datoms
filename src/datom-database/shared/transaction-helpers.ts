@@ -20,13 +20,13 @@ export async function getValueHelper(
   entity: EntityId,
   attribute: string
 ): Promise<Value | undefined> {
-  const datomsResult = await datoms({ entity, attribute });
+  const datomsResult = await datoms({ e: entity, a: attribute });
   if (datomsResult.length === 0) {
     return undefined;
   }
   // Return the value with the highest tx (latest value for this attribute)
-  const sorted = datomsResult.sort((a, b) => b[3] - a[3]);
-  return sorted[0][2];
+  const sorted = datomsResult.sort((a, b) => b.tx - a.tx);
+  return sorted[0].v;
 }
 
 /**
@@ -49,8 +49,8 @@ export async function getValuesHelper(
   entity: EntityId,
   attribute: string
 ): Promise<Value[]> {
-  const datomsResult = await datoms({ entity, attribute });
-  return datomsResult.map((d) => d[2]);
+  const datomsResult = await datoms({ e: entity, a: attribute });
+  return datomsResult.map((d) => d.v);
 }
 
 /**
@@ -62,7 +62,7 @@ export async function hasFactHelper(
   attribute: string,
   value: Value
 ): Promise<boolean> {
-  const datomsResult = await datoms({ entity, attribute, value });
+  const datomsResult = await datoms({ e: entity, a: attribute, v: value });
   return datomsResult.length > 0;
 }
 
@@ -100,10 +100,10 @@ export async function findEntitiesHelper(
   attribute: string,
   value: Value
 ): Promise<EntityId[]> {
-  const datomsResult = await datoms({ attribute, value });
+  const datomsResult = await datoms({ a: attribute, v: value });
   const entitySet = new Set<EntityId>();
   for (const datom of datomsResult) {
-    entitySet.add(datom[0]);
+    entitySet.add(datom.e);
   }
   return Array.from(entitySet);
 }
@@ -117,10 +117,10 @@ export async function retractEntityHelper(
   entity: EntityId
 ): Promise<void> {
   // Get all datoms for this entity that are currently visible
-  const entityDatoms = await datoms({ entity, added: true });
+  const entityDatoms = await datoms({ e: entity, added: true });
 
   // Retract all of them
-  const retractions: DatomInput[] = entityDatoms.map((d) => [d[0], d[1], d[2]]);
+  const retractions: DatomInput[] = entityDatoms.map((d) => [d.e, d.a, d.v]);
   await retract(retractions);
 }
 
@@ -134,12 +134,12 @@ export async function retractAttributeHelper(
   attribute: string
 ): Promise<void> {
   // Get all current values for this entity-attribute pair
-  const datomsResult = await datoms({ entity, attribute });
+  const datomsResult = await datoms({ e: entity, a: attribute });
   if (datomsResult.length === 0) {
     return;
   }
   // Retract all existing values
-  const toRetract: DatomInput[] = datomsResult.map((d) => [d[0], d[1], d[2]]);
+  const toRetract: DatomInput[] = datomsResult.map((d) => [d.e, d.a, d.v]);
   await retract(toRetract);
 }
 

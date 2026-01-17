@@ -139,22 +139,22 @@ abstract class BaseDatabaseView implements DatabaseView {
     const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
     const firstDatoms = await this.datoms({
-      entity,
-      attribute,
-      value,
+      e: entity,
+      a: attribute,
+      v: value,
     });
 
     // Map datom fields to variable names from the clause
     const firstResults = firstDatoms.map((datom) => {
       const result: Record<string, Value | Attribute> = {};
       if (isVariable(entityVal)) {
-        result[entityVal as string] = datom[0];
+        result[entityVal as string] = datom.e;
       }
       if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom[1];
+        result[attributeVal as string] = datom.a;
       }
       if (isVariable(valueVal)) {
-        result[valueVal as string] = datom[2];
+        result[valueVal as string] = datom.v;
       }
       return result;
     });
@@ -173,21 +173,21 @@ abstract class BaseDatabaseView implements DatabaseView {
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
       const clauseDatoms = await this.datoms({
-        entity,
-        attribute,
-        value,
+        e: entity,
+        a: attribute,
+        v: value,
       });
 
       const clauseResults = clauseDatoms.map((datom) => {
         const result: Record<string, Value | Attribute> = {};
         if (isVariable(entityVal)) {
-          result[entityVal as string] = datom[0];
+          result[entityVal as string] = datom.e;
         }
         if (isVariable(attributeVal)) {
-          result[attributeVal as string] = datom[1];
+          result[attributeVal as string] = datom.a;
         }
         if (isVariable(valueVal)) {
-          result[valueVal as string] = datom[2];
+          result[valueVal as string] = datom.v;
         }
         return result;
       });
@@ -245,9 +245,9 @@ class AsOfDatabaseView extends BaseDatabaseView {
   async datoms(options: QueryOptions): Promise<Datom[]> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
-      options.entity !== undefined ||
-      options.attribute !== undefined ||
-      options.value !== undefined ||
+      options.e !== undefined ||
+      options.a !== undefined ||
+      options.v !== undefined ||
       options.tx !== undefined;
     const hasLimit = options.limit !== undefined;
 
@@ -270,9 +270,9 @@ class HistoryDatabaseView extends BaseDatabaseView {
   async datoms(options: QueryOptions): Promise<Datom[]> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
-      options.entity !== undefined ||
-      options.attribute !== undefined ||
-      options.value !== undefined ||
+      options.e !== undefined ||
+      options.a !== undefined ||
+      options.v !== undefined ||
       options.tx !== undefined;
     const hasLimit = options.limit !== undefined;
 
@@ -302,9 +302,9 @@ class SinceDatabaseView extends BaseDatabaseView {
   async datoms(options: QueryOptions): Promise<Datom[]> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
-      options.entity !== undefined ||
-      options.attribute !== undefined ||
-      options.value !== undefined ||
+      options.e !== undefined ||
+      options.a !== undefined ||
+      options.v !== undefined ||
       options.tx !== undefined;
     const hasLimit = options.limit !== undefined;
 
@@ -327,9 +327,9 @@ class CurrentDatabaseView extends BaseDatabaseView {
   async datoms(options: QueryOptions): Promise<Datom[]> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
-      options.entity !== undefined ||
-      options.attribute !== undefined ||
-      options.value !== undefined ||
+      options.e !== undefined ||
+      options.a !== undefined ||
+      options.v !== undefined ||
       options.tx !== undefined;
     const hasLimit = options.limit !== undefined;
 
@@ -361,9 +361,9 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
   async datoms(options: QueryOptions): Promise<Datom[]> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
-      options.entity !== undefined ||
-      options.attribute !== undefined ||
-      options.value !== undefined ||
+      options.e !== undefined ||
+      options.a !== undefined ||
+      options.v !== undefined ||
       options.tx !== undefined;
     const hasLimit = options.limit !== undefined;
 
@@ -379,22 +379,22 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
     // Create a map of base datoms by (entity, attribute, value) for efficient lookup
     const baseMap = new Map<string, Datom>();
     for (const datom of baseDatoms) {
-      const key = `${String(datom[0])}|${String(datom[1])}|${JSON.stringify(datom[2])}`;
+      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
       const existing = baseMap.get(key);
-      if (!existing || datom[3] > existing[3]) {
+      if (!existing || datom.tx > existing.tx) {
         baseMap.set(key, datom);
       }
     }
 
     // Apply retracts first (remove matching datoms)
     for (const retract of this.speculativeRetracts) {
-      const key = `${String(retract[0])}|${String(retract[1])}|${JSON.stringify(retract[2])}`;
+      const key = `${String(retract.e)}|${String(retract.a)}|${JSON.stringify(retract.v)}`;
       baseMap.delete(key);
     }
 
     // Apply adds (add or update datoms)
     for (const add of this.speculativeAdds) {
-      const key = `${String(add[0])}|${String(add[1])}|${JSON.stringify(add[2])}`;
+      const key = `${String(add.e)}|${String(add.a)}|${JSON.stringify(add.v)}`;
       baseMap.set(key, add);
     }
 
@@ -402,26 +402,26 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
     let results = Array.from(baseMap.values());
 
     // Apply filters from options
-    if (options.entity !== undefined) {
-      results = results.filter((d) => d[0] === options.entity);
+    if (options.e !== undefined) {
+      results = results.filter((d) => d.e === options.e);
     }
-    if (options.attribute !== undefined) {
-      results = results.filter((d) => d[1] === options.attribute);
+    if (options.a !== undefined) {
+      results = results.filter((d) => d.a === options.a);
     }
-    if (options.value !== undefined) {
+    if (options.v !== undefined) {
       results = results.filter(
-        (d) => JSON.stringify(d[2]) === JSON.stringify(options.value)
+        (d) => JSON.stringify(d.v) === JSON.stringify(options.v)
       );
     }
     if (options.tx !== undefined) {
-      results = results.filter((d) => d[3] === options.tx);
+      results = results.filter((d) => d.tx === options.tx);
     }
 
     // Apply added filter
     if (options.added === undefined || options.added === true) {
-      results = results.filter((d) => d[4]);
+      results = results.filter((d) => d.added);
     } else if (options.added === false) {
-      results = results.filter((d) => !d[4]);
+      results = results.filter((d) => !d.added);
     }
 
     // Apply pagination
@@ -787,15 +787,15 @@ export abstract class DatomDatabase implements DatomReader {
     // Check if uniqueness constraint is being added
     if (!oldDefinition.unique && newDefinition.unique) {
       // Find all datoms with this attribute
-      const allDatoms = await this.queryInternal({ attribute: name });
+      const allDatoms = await this.queryInternal({ a: name });
       // Group by value to check for duplicates
       const valueToEntities = new Map<string, EntityId[]>();
       for (const datom of allDatoms) {
-        const valueKey = JSON.stringify(datom[2]);
+        const valueKey = JSON.stringify(datom.v);
         if (!valueToEntities.has(valueKey)) {
           valueToEntities.set(valueKey, []);
         }
-        valueToEntities.get(valueKey)!.push(datom[0]);
+        valueToEntities.get(valueKey)!.push(datom.e);
       }
       // Check for duplicate values across different entities
       for (const [valueKey, entities] of valueToEntities) {
@@ -817,14 +817,14 @@ export abstract class DatomDatabase implements DatomReader {
       newDefinition.cardinality === "one"
     ) {
       // Find all entities with multiple values for this attribute
-      const allDatoms = await this.queryInternal({ attribute: name });
+      const allDatoms = await this.queryInternal({ a: name });
       const entityToValues = new Map<string, Set<string>>();
       for (const datom of allDatoms) {
-        const entityKey = String(datom[0]);
+        const entityKey = String(datom.e);
         if (!entityToValues.has(entityKey)) {
           entityToValues.set(entityKey, new Set());
         }
-        entityToValues.get(entityKey)!.add(JSON.stringify(datom[2]));
+        entityToValues.get(entityKey)!.add(JSON.stringify(datom.v));
       }
       // Check for entities with multiple values
       const violations: string[] = [];
@@ -851,18 +851,18 @@ export abstract class DatomDatabase implements DatomReader {
         oldDefinition.type !== newDefinition.type)
     ) {
       // Validate all existing values match the new type
-      const allDatoms = await this.queryInternal({ attribute: name });
+      const allDatoms = await this.queryInternal({ a: name });
       for (const datom of allDatoms) {
         const typeError = this.validateValueType(
-          datom[2],
+          datom.v,
           newDefinition.type!,
           name
         );
         if (typeError) {
           throw new Error(
             `Cannot change type constraint for attribute "${name}": existing value ${JSON.stringify(
-              datom[2]
-            )} for entity "${String(datom[0])}" does not match new type "${
+              datom.v
+            )} for entity "${String(datom.e)}" does not match new type "${
               newDefinition.type
             }". ${typeError.message}`
           );
@@ -1081,9 +1081,9 @@ export abstract class DatomDatabase implements DatomReader {
     await this.ensureInitialized();
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
-      options.entity !== undefined ||
-      options.attribute !== undefined ||
-      options.value !== undefined ||
+      options.e !== undefined ||
+      options.a !== undefined ||
+      options.v !== undefined ||
       options.tx !== undefined;
     const hasLimit = options.limit !== undefined;
 
@@ -1186,20 +1186,20 @@ export abstract class DatomDatabase implements DatomReader {
     // Filter to only datoms with tx <= txId
     // If options.tx is specified, use the minimum of both
     const maxTx = options.tx !== undefined ? Math.min(options.tx, txId) : txId;
-    const filtered = allDatoms.filter((d) => d[3] <= maxTx);
+    const filtered = allDatoms.filter((d) => d.tx <= maxTx);
 
     // Deduplicate by (entity, attribute) keeping the latest tx
     const deduplicated = new Map<string, Datom>();
     for (const datom of filtered) {
-      const key = `${String(datom[0])}|${String(datom[1])}`;
+      const key = `${String(datom.e)}|${String(datom.a)}`;
       const existing = deduplicated.get(key);
-      if (!existing || datom[3] > existing[3]) {
+      if (!existing || datom.tx > existing.tx) {
         deduplicated.set(key, datom);
       }
     }
 
     // Filter out retracted datoms (keep only added: true)
-    return Array.from(deduplicated.values()).filter((d) => d[4]);
+    return Array.from(deduplicated.values()).filter((d) => d.added);
   }
 
   /**
@@ -1238,21 +1238,21 @@ export abstract class DatomDatabase implements DatomReader {
     });
 
     // Filter to only datoms with tx > txId
-    const filtered = allDatoms.filter((d) => d[3] > txId);
+    const filtered = allDatoms.filter((d) => d.tx > txId);
 
     // Deduplicate by (entity, attribute, value) keeping the latest tx
     const deduplicated = new Map<string, Datom>();
     for (const datom of filtered) {
-      const valueKey = JSON.stringify(datom[2]);
-      const key = `${String(datom[0])}|${String(datom[1])}|${valueKey}`;
+      const valueKey = JSON.stringify(datom.v);
+      const key = `${String(datom.e)}|${String(datom.a)}|${valueKey}`;
       const existing = deduplicated.get(key);
-      if (!existing || datom[3] > existing[3]) {
+      if (!existing || datom.tx > existing.tx) {
         deduplicated.set(key, datom);
       }
     }
 
     // Filter out retracted datoms (keep only added: true)
-    return Array.from(deduplicated.values()).filter((d) => d[4]);
+    return Array.from(deduplicated.values()).filter((d) => d.added);
   }
 
   /**
@@ -1363,13 +1363,13 @@ export abstract class DatomDatabase implements DatomReader {
           }
 
           const existingDatoms = await this.queryInternal({
-            entity,
-            attribute: String(attribute),
+            e: entity,
+            a: String(attribute),
           });
           if (existingDatoms.length > 0) {
             // If the existing value is the same as what we're trying to add, allow it (idempotent)
             // This is useful for imports where the same datom might appear multiple times
-            const existingValue = existingDatoms[0][2];
+            const existingValue = existingDatoms[0].v;
             if (JSON.stringify(existingValue) !== JSON.stringify(newValue)) {
               // Check if the existing value is being retracted
               const existingIsBeingRetracted = retractsInSameTransaction?.some(
@@ -1406,12 +1406,12 @@ export abstract class DatomDatabase implements DatomReader {
         for (const [valueKey, valueDatoms] of valueGroups) {
           const value = JSON.parse(valueKey) as Value;
           const existingDatoms = await this.datoms({
-            attribute: attrKey,
-            value,
+            a: attrKey,
+            v: value,
           });
 
           if (existingDatoms.length > 0) {
-            const existingEntity = existingDatoms[0]?.[0];
+            const existingEntity = existingDatoms[0]?.e;
             // Check if any of the new datoms have a different entity
             for (const datom of valueDatoms) {
               if (
@@ -1619,25 +1619,25 @@ export abstract class DatomDatabase implements DatomReader {
 
     if (ops.retract && ops.retract.length > 0) {
       for (const datom of ops.retract) {
-        speculativeRetracts.push([
-          datom[0],
-          datom[1],
-          datom[2],
-          speculativeTxId,
-          false,
-        ] as Datom);
+        speculativeRetracts.push({
+          e: datom[0],
+          a: datom[1],
+          v: datom[2],
+          tx: speculativeTxId,
+          added: false,
+        });
       }
     }
 
     if (ops.add && ops.add.length > 0) {
       for (const datom of ops.add) {
-        speculativeAdds.push([
-          datom[0],
-          datom[1],
-          datom[2],
-          speculativeTxId,
-          true,
-        ] as Datom);
+        speculativeAdds.push({
+          e: datom[0],
+          a: datom[1],
+          v: datom[2],
+          tx: speculativeTxId,
+          added: true,
+        });
       }
     }
 

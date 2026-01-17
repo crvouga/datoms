@@ -28,13 +28,13 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       });
 
       const datoms: Datom[] = [];
-      for await (const datom of exportDatoms(db, { attribute: "name" })) {
+      for await (const datom of exportDatoms(db, { a: "name" })) {
         datoms.push(datom);
       }
 
       expect(datoms).toHaveLength(2);
-      expect(datoms.some((d) => d[2] === "Alice")).toBe(true);
-      expect(datoms.some((d) => d[2] === "Bob")).toBe(true);
+      expect(datoms.some((d) => d.v === "Alice")).toBe(true);
+      expect(datoms.some((d) => d.v === "Bob")).toBe(true);
     });
 
     test("should export with filters", async () => {
@@ -49,12 +49,12 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       });
 
       const datoms: Datom[] = [];
-      for await (const datom of exportDatoms(db, { entity: 1 })) {
+      for await (const datom of exportDatoms(db, { e: 1 })) {
         datoms.push(datom);
       }
 
       expect(datoms).toHaveLength(2);
-      expect(datoms.every((d) => d[0] === 1)).toBe(true);
+      expect(datoms.every((d) => d.e === 1)).toBe(true);
     });
 
     test("should export without filters (full scan)", async () => {
@@ -91,7 +91,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       });
 
       const datoms: Datom[] = [];
-      for await (const datom of exportDatoms(db, { attribute: "name" })) {
+      for await (const datom of exportDatoms(db, { a: "name" })) {
         datoms.push(datom);
       }
       await observableDb.emitEvent({
@@ -121,7 +121,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       try {
         const datoms: Datom[] = [];
         for await (const datom of exportDatoms(db, {
-          attribute: "nonexistent",
+          a: "nonexistent",
         })) {
           datoms.push(datom);
         }
@@ -180,9 +180,9 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       expect(count).toBe(exported.length);
 
       // Verify imported data
-      const alice = await db2.datoms({ entity: 1 });
+      const alice = await db2.datoms({ e: 1 });
       expect(alice.length).toBeGreaterThan(0);
-      expect(alice.some((d) => d[2] === "Alice")).toBe(true);
+      expect(alice.some((d) => d.v === "Alice")).toBe(true);
 
       await db2.close();
     });
@@ -193,7 +193,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       const datoms: Datom[] = [];
       for (let i = 1; i <= 50; i++) {
         await db.transact({ add: [[i, "name", `Entity${i}`]] });
-        const entityDatoms = await db.datoms({ entity: i });
+        const entityDatoms = await db.datoms({ e: i });
         datoms.push(...entityDatoms);
       }
 
@@ -221,7 +221,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       expect(count).toBe(exported.length);
 
       // Verify some entities
-      const entity1 = await db2.datoms({ entity: 1 });
+      const entity1 = await db2.datoms({ e: 1 });
       expect(entity1.length).toBeGreaterThan(0);
 
       await db2.close();
@@ -239,7 +239,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
       // Export
       const exported: Datom[] = [];
-      for await (const datom of exportDatoms(db, { entity: 1 })) {
+      for await (const datom of exportDatoms(db, { e: 1 })) {
         exported.push(datom);
       }
 
@@ -281,7 +281,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
       // Export
       const exported: Datom[] = [];
-      for await (const datom of exportDatoms(db, { entity: 1 })) {
+      for await (const datom of exportDatoms(db, { e: 1 })) {
         exported.push(datom);
       }
 
@@ -363,7 +363,13 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       });
 
       // Create invalid datom (wrong type)
-      const invalidDatom: Datom = [1, "age", "not-a-number", 1, true];
+      const invalidDatom: Datom = {
+        e: 1,
+        a: "age",
+        v: "not-a-number",
+        tx: 1,
+        added: true,
+      };
 
       const observableDb = new ObservableDatabase(db);
       const events: DatabaseEvent[] = [];

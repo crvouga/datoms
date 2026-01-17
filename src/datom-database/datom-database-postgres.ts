@@ -156,16 +156,16 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const params: unknown[] = [];
 
     // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
-    if (options.entity !== undefined) {
+    if (options.e !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      params.push(String(options.e));
     }
-    if (options.attribute !== undefined) {
+    if (options.a !== undefined) {
       conditions.push("attribute = ?");
-      params.push(String(options.attribute));
+      params.push(String(options.a));
     }
-    if (options.value !== undefined) {
-      let value = options.value;
+    if (options.v !== undefined) {
+      let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
@@ -236,13 +236,13 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         typeof row.value === "string" ? JSON.parse(row.value) : row.value;
       const revivedValue = reviveValue(parsedValue) as Value;
 
-      return [
-        entity,
-        String(row.attribute),
-        revivedValue,
-        Number(row.tx),
-        Boolean(row.added),
-      ] as Datom;
+      return {
+        e: entity,
+        a: String(row.attribute),
+        v: revivedValue,
+        tx: Number(row.tx),
+        added: Boolean(row.added),
+      };
     });
   }
 
@@ -255,16 +255,16 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const params: unknown[] = [];
 
     // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
-    if (options.entity !== undefined) {
+    if (options.e !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      params.push(String(options.e));
     }
-    if (options.attribute !== undefined) {
+    if (options.a !== undefined) {
       conditions.push("attribute = ?");
-      params.push(String(options.attribute));
+      params.push(String(options.a));
     }
-    if (options.value !== undefined) {
-      let value = options.value;
+    if (options.v !== undefined) {
+      let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
@@ -378,13 +378,13 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         typeof row.value === "string" ? JSON.parse(row.value) : row.value;
       const revivedValue = reviveValue(parsedValue) as Value;
 
-      return [
-        entity,
-        String(row.attribute),
-        revivedValue,
-        Number(row.tx),
-        Boolean(row.added),
-      ] as Datom;
+      return {
+        e: entity,
+        a: String(row.attribute),
+        v: revivedValue,
+        tx: Number(row.tx),
+        added: Boolean(row.added),
+      };
     });
   }
 
@@ -398,16 +398,16 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const params: unknown[] = [];
 
     // Build WHERE conditions
-    if (options.entity !== undefined) {
+    if (options.e !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      params.push(String(options.e));
     }
-    if (options.attribute !== undefined) {
+    if (options.a !== undefined) {
       conditions.push("attribute = ?");
-      params.push(String(options.attribute));
+      params.push(String(options.a));
     }
-    if (options.value !== undefined) {
-      let value = options.value;
+    if (options.v !== undefined) {
+      let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
@@ -475,16 +475,16 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const params: unknown[] = [];
 
     // Build WHERE conditions
-    if (options.entity !== undefined) {
+    if (options.e !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      params.push(String(options.e));
     }
-    if (options.attribute !== undefined) {
+    if (options.a !== undefined) {
       conditions.push("attribute = ?");
-      params.push(String(options.attribute));
+      params.push(String(options.a));
     }
-    if (options.value !== undefined) {
-      let value = options.value;
+    if (options.v !== undefined) {
+      let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
@@ -538,16 +538,16 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const params: unknown[] = [];
 
     // Build WHERE conditions
-    if (options.entity !== undefined) {
+    if (options.e !== undefined) {
       conditions.push("entity = ?");
-      params.push(String(options.entity));
+      params.push(String(options.e));
     }
-    if (options.attribute !== undefined) {
+    if (options.a !== undefined) {
       conditions.push("attribute = ?");
-      params.push(String(options.attribute));
+      params.push(String(options.a));
     }
-    if (options.value !== undefined) {
-      let value = options.value;
+    if (options.v !== undefined) {
+      let value = options.v;
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
@@ -652,13 +652,13 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         typeof row.value === "string" ? JSON.parse(row.value) : row.value;
       const revivedValue = reviveValue(parsedValue) as Value;
 
-      return [
-        entity,
-        String(row.attribute),
-        revivedValue,
-        Number(row.tx),
-        Boolean(row.added),
-      ] as Datom;
+      return {
+        e: entity,
+        a: String(row.attribute),
+        v: revivedValue,
+        tx: Number(row.tx),
+        added: Boolean(row.added),
+      };
     });
   }
 
@@ -814,9 +814,9 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
 
     // Datalog queries manage their own limiting via joins, so bypass validation
     const queryOptions: QueryOptions = {
-      ...(entity !== undefined && { entity }),
-      ...(attribute !== undefined && { attribute }),
-      ...(value !== undefined && { value }),
+      ...(entity !== undefined && { e: entity }),
+      ...(attribute !== undefined && { a: attribute }),
+      ...(value !== undefined && { v: value }),
     };
 
     const datoms = await this.queryInternal(queryOptions);
@@ -824,13 +824,13 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return datoms.map((datom: Datom) => {
       const result: Record<string, Value | Attribute> = {};
       if (isVariable(entityVal)) {
-        result[entityVal as string] = datom[0];
+        result[entityVal as string] = datom.e;
       }
       if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom[1];
+        result[attributeVal as string] = datom.a;
       }
       if (isVariable(valueVal)) {
-        result[valueVal as string] = datom[2];
+        result[valueVal as string] = datom.v;
       }
       return result;
     });

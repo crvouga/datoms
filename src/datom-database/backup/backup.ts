@@ -70,8 +70,8 @@ export async function importDatoms(
 
   for await (const datom of source) {
     // Convert Datom to DatomInput
-    batch.push([datom[0], datom[1], datom[2]]);
-    batchAdded.push(datom[4]);
+    batch.push([datom.e, datom.a, datom.v]);
+    batchAdded.push(datom.added);
 
     if (batch.length >= batchSize) {
       // Process batch: separate added and retracted datoms
@@ -238,10 +238,10 @@ async function filterExistingDatoms(
     const existingValuesBatch: unknown[][] = [];
     for (const q of queries) {
       const datoms = await db.datoms({
-        entity: q.entity,
-        attribute: q.attribute,
+        e: q.entity,
+        a: q.attribute,
       });
-      existingValuesBatch.push(datoms.map((d) => d[2]));
+      existingValuesBatch.push(datoms.map((d) => d.v));
     }
 
     // Build Map for O(1) lookups: key is entity|attribute, value is Set of values

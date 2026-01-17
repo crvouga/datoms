@@ -22,20 +22,20 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact({ add: [[1, "name", "Alice"]] });
 
       // Use with() to see what the transaction would look like
-      const initial = await db.datoms({ entity: 1 });
+      const initial = await db.datoms({ e: 1 });
       expect(initial).toHaveLength(1);
 
       const withResult = await db.with({ add: [[1, "status", "pending"]] });
-      const updated = await withResult.dbAfter.datoms({ entity: 1 });
+      const updated = await withResult.dbAfter.datoms({ e: 1 });
       expect(updated).toHaveLength(2);
 
       // Now commit the changes
       await db.transact({ add: [[1, "status", "pending"]] });
 
       // Verify changes are committed
-      const final = await db.datoms({ entity: 1 });
+      const final = await db.datoms({ e: 1 });
       expect(final).toHaveLength(2);
-      const values = final.map((d) => d[2]);
+      const values = final.map((d) => d.v);
       expect(values).toContain("Alice");
       expect(values).toContain("pending");
 
@@ -51,13 +51,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const withResult = await db.with({ add: [[1, "status", "pending"]] });
 
       // Query dbAfter to see speculative state
-      const speculative = await withResult.dbAfter.datoms({ entity: 1 });
+      const speculative = await withResult.dbAfter.datoms({ e: 1 });
       expect(speculative).toHaveLength(2);
 
       // But actual database should not be changed (with() doesn't commit)
-      const final = await db.datoms({ entity: 1 });
+      const final = await db.datoms({ e: 1 });
       expect(final).toHaveLength(1);
-      expect(final[0][2]).toBe("Alice");
+      expect(final[0].v).toBe("Alice");
 
       await db.close();
     });
@@ -68,16 +68,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact({ add: [[1, "name", "Alice"]] });
 
       // Query before adding
-      const before = await db.datoms({ entity: 1 });
+      const before = await db.datoms({ e: 1 });
       expect(before).toHaveLength(1);
 
       // Use with() to see what adding would look like
       const withResult = await db.with({ add: [[1, "age", 30]] });
 
       // Query dbAfter - should see speculative change
-      const after = await withResult.dbAfter.datoms({ entity: 1 });
+      const after = await withResult.dbAfter.datoms({ e: 1 });
       expect(after).toHaveLength(2);
-      const values = after.map((d) => d[2]);
+      const values = after.map((d) => d.v);
       expect(values).toContain("Alice");
       expect(values).toContain(30);
 
@@ -98,17 +98,17 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const withResult = await db.with({ retract: [[1, "age", 30]] });
 
       // Query dbAfter should not see retracted datom
-      const result = await withResult.dbAfter.datoms({ entity: 1 });
+      const result = await withResult.dbAfter.datoms({ e: 1 });
       expect(result).toHaveLength(1);
-      expect(result[0][2]).toBe("Alice");
+      expect(result[0].v).toBe("Alice");
 
       // Now commit the retraction
       await db.transact({ retract: [[1, "age", 30]] });
 
       // Verify retraction is committed
-      const final = await db.datoms({ entity: 1 });
+      const final = await db.datoms({ e: 1 });
       expect(final).toHaveLength(1);
-      expect(final[0][2]).toBe("Alice");
+      expect(final[0].v).toBe("Alice");
 
       await db.close();
     });
@@ -160,16 +160,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       });
 
       // Verify all operations were applied
-      const alice = await db.datoms({ entity: 1 });
+      const alice = await db.datoms({ e: 1 });
       expect(alice).toHaveLength(2);
-      const aliceValues = alice.map((d) => d[2]);
+      const aliceValues = alice.map((d) => d.v);
       expect(aliceValues).toContain("Alice");
       expect(aliceValues).toContain(31);
       expect(aliceValues).not.toContain(30);
 
-      const bob = await db.datoms({ entity: 2 });
+      const bob = await db.datoms({ e: 2 });
       expect(bob).toHaveLength(1);
-      expect(bob[0][2]).toBe("Bob");
+      expect(bob[0].v).toBe("Bob");
 
       await db.close();
     });
@@ -189,15 +189,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       });
 
       // Query dbAfter to see speculative state
-      const speculative = await withResult.dbAfter.datoms({ entity: 1 });
+      const speculative = await withResult.dbAfter.datoms({ e: 1 });
       expect(speculative.length).toBeGreaterThan(0);
 
       // But actual database should not be changed (with() doesn't commit)
-      const result = await db.datoms({ entity: 1 });
+      const result = await db.datoms({ e: 1 });
       expect(result).toHaveLength(1);
-      expect(result[0][2]).toBe("Initial");
+      expect(result[0].v).toBe("Initial");
 
-      const entity2 = await db.datoms({ entity: 2 });
+      const entity2 = await db.datoms({ e: 2 });
       expect(entity2).toHaveLength(0);
 
       await db.close();
@@ -230,12 +230,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.transact({ add: [[1, "name", "Alice"]] });
 
-      let entity = await db.datoms({ entity: 1, added: true });
+      let entity = await db.datoms({ e: 1, added: true });
       expect(entity).toHaveLength(1);
 
       // Use with() to see what adding age would look like
       const withResult = await db.with({ add: [[1, "age", 30]] });
-      entity = await withResult.dbAfter.datoms({ entity: 1, added: true });
+      entity = await withResult.dbAfter.datoms({ e: 1, added: true });
       expect(entity).toHaveLength(2);
 
       await db.close();
@@ -247,18 +247,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact({ add: [[1, "name", "Alice"]] });
 
       const nameDatoms = await db.datoms({
-        entity: 1,
-        attribute: "name",
-        value: "Alice",
+        e: 1,
+        a: "name",
+        v: "Alice",
       });
       expect(nameDatoms.length).toBeGreaterThan(0);
 
       // Use with() to see what adding status would look like
       const withResult = await db.with({ add: [[1, "status", "active"]] });
       const statusDatoms = await withResult.dbAfter.datoms({
-        entity: 1,
-        attribute: "status",
-        value: "active",
+        e: 1,
+        a: "status",
+        v: "active",
       });
       expect(statusDatoms.length).toBeGreaterThan(0);
 
@@ -364,14 +364,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const withResult = await db.with({ add: [[1, "age", 30]] });
 
       // dbBefore should show current state
-      const before = await withResult.dbBefore.datoms({ entity: 1 });
+      const before = await withResult.dbBefore.datoms({ e: 1 });
       expect(before).toHaveLength(1);
-      expect(before[0][2]).toBe("Alice");
+      expect(before[0].v).toBe("Alice");
 
       // dbAfter should show speculative state
-      const after = await withResult.dbAfter.datoms({ entity: 1 });
+      const after = await withResult.dbAfter.datoms({ e: 1 });
       expect(after).toHaveLength(2);
-      const values = after.map((d) => d[2]);
+      const values = after.map((d) => d.v);
       expect(values).toContain("Alice");
       expect(values).toContain(30);
     });
@@ -388,12 +388,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // txData should contain the datoms that would be applied
       expect(withResult.txData.length).toBeGreaterThan(0);
       const hasAdd = withResult.txData.some(
-        (d) => d[0] === 1 && d[1] === "age" && d[2] === 30 && d[4] === true
+        (d) => d.e === 1 && d.a === "age" && d.v === 30 && d.added === true
       );
       expect(hasAdd).toBe(true);
       const hasRetract = withResult.txData.some(
         (d) =>
-          d[0] === 1 && d[1] === "name" && d[2] === "Alice" && d[4] === false
+          d.e === 1 && d.a === "name" && d.v === "Alice" && d.added === false
       );
       expect(hasRetract).toBe(true);
     });

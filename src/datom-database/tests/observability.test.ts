@@ -90,12 +90,12 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
         events.push(event);
       });
 
-      await observableDb.datoms({ entity: 1 });
+      await observableDb.datoms({ e: 1 });
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe("query");
       if (events[0].type === "query") {
-        expect(events[0].options).toEqual({ entity: 1 });
+        expect(events[0].options).toEqual({ e: 1 });
         expect(events[0].resultCount).toBe(1);
         expect(typeof events[0].duration).toBe("number");
       }
@@ -157,7 +157,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       const datoms: any[] = [];
       for await (const datom of observableDb.exportDatoms({
-        attribute: "name",
+        a: "name",
       })) {
         datoms.push(datom);
       }
@@ -181,7 +181,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       // Export and import
       const exported: any[] = [];
-      for await (const datom of observableDb.exportDatoms({ entity: 1 })) {
+      for await (const datom of observableDb.exportDatoms({ e: 1 })) {
         exported.push(datom);
       }
 
@@ -305,9 +305,9 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       });
 
       // Perform some queries using observableDb to track metrics
-      await observableDb.datoms({ entity: 1 });
-      await observableDb.datoms({ entity: 2 });
-      await observableDb.datoms({ attribute: "name" });
+      await observableDb.datoms({ e: 1 });
+      await observableDb.datoms({ e: 2 });
+      await observableDb.datoms({ a: "name" });
 
       const stats = await observableDb.getStats();
 
@@ -372,7 +372,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       observableDb.setLogger(logger);
 
       await observableDb.transact({ add: [[1, "name", "Alice"]] });
-      await observableDb.datoms({ entity: 1 });
+      await observableDb.datoms({ e: 1 });
 
       // Should have logged transaction and query events
       expect(logMessages.length).toBeGreaterThan(0);
@@ -431,7 +431,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
       observableDb.setLogger(logger);
       await observableDb.transact({ add: [[1, "name", "Alice"]] });
-      await observableDb.datoms({ entity: 1 });
+      await observableDb.datoms({ e: 1 });
 
       // Should have logged query event at debug level
       const queryLog = debugLogs.find((m) => m.message.includes("query"));
@@ -445,7 +445,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       const { db } = f;
       // Should not throw when no logger is set
       await db.transact({ add: [[1, "name", "Alice"]] });
-      await db.datoms({ entity: 1 });
+      await db.datoms({ e: 1 });
     });
   });
 });

@@ -41,8 +41,8 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
       const { db } = f;
       // Run some queries to generate metrics
       await db.transact({ add: [[1, "name", "Alice"]] });
-      await db.datoms({ entity: 1 });
-      await db.datoms({ attribute: "name" });
+      await db.datoms({ e: 1 });
+      await db.datoms({ a: "name" });
 
       const observableDb = new ObservableDatabase(db);
       const health = await observableDb.healthCheck();
