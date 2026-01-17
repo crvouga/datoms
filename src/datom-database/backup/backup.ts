@@ -69,57 +69,12 @@ export async function importDatoms(
   let batchAdded: boolean[] = []; // Track which datoms in batch are added vs retracted
 
   for await (const datom of source) {
-      // Convert Datom to DatomInput
-      batch.push([datom.entity, datom.attribute, datom.value]);
-      batchAdded.push(datom.added);
+    // Convert Datom to DatomInput
+    batch.push([datom.entity, datom.attribute, datom.value]);
+    batchAdded.push(datom.added);
 
-      if (batch.length >= batchSize) {
-        // Process batch: separate added and retracted datoms
-        const addedBatch: DatomInput[] = [];
-        const retractedBatch: DatomInput[] = [];
-        for (let i = 0; i < batch.length; i++) {
-          if (batchAdded[i]) {
-            addedBatch.push(batch[i]);
-          } else {
-            retractedBatch.push(batch[i]);
-          }
-        }
-
-        // Deduplicate batches: keep only the latest occurrence of each (entity, attribute, value) pair
-        const dedupeAdded = deduplicateBatch(addedBatch);
-        const dedupeRetracted = deduplicateBatch(retractedBatch);
-
-        if (validate) {
-          if (dedupeAdded.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-            await (db as any).validateDatoms(dedupeAdded, true);
-          }
-          if (dedupeRetracted.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-            await (db as any).validateDatoms(dedupeRetracted, false);
-          }
-        }
-
-        // Filter out datoms that already exist with the same value (idempotent import)
-        const filteredAdded = await filterExistingDatoms(db, dedupeAdded);
-        const filteredRetracted = await filterExistingDatoms(db, dedupeRetracted);
-
-        if (filteredAdded.length > 0) {
-          await db.transact({ add: filteredAdded });
-        }
-        if (filteredRetracted.length > 0) {
-          await db.transact({ retract: filteredRetracted });
-        }
-
-        datomCount += batch.length;
-        batch = [];
-        batchAdded = [];
-      }
-    }
-
-    // Process remaining batch
-    if (batch.length > 0) {
-      // Separate added and retracted datoms
+    if (batch.length >= batchSize) {
+      // Process batch: separate added and retracted datoms
       const addedBatch: DatomInput[] = [];
       const retractedBatch: DatomInput[] = [];
       for (let i = 0; i < batch.length; i++) {
@@ -155,10 +110,55 @@ export async function importDatoms(
       if (filteredRetracted.length > 0) {
         await db.transact({ retract: filteredRetracted });
       }
+
       datomCount += batch.length;
+      batch = [];
+      batchAdded = [];
+    }
+  }
+
+  // Process remaining batch
+  if (batch.length > 0) {
+    // Separate added and retracted datoms
+    const addedBatch: DatomInput[] = [];
+    const retractedBatch: DatomInput[] = [];
+    for (let i = 0; i < batch.length; i++) {
+      if (batchAdded[i]) {
+        addedBatch.push(batch[i]);
+      } else {
+        retractedBatch.push(batch[i]);
+      }
     }
 
-    return datomCount;
+    // Deduplicate batches: keep only the latest occurrence of each (entity, attribute, value) pair
+    const dedupeAdded = deduplicateBatch(addedBatch);
+    const dedupeRetracted = deduplicateBatch(retractedBatch);
+
+    if (validate) {
+      if (dedupeAdded.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        await (db as any).validateDatoms(dedupeAdded, true);
+      }
+      if (dedupeRetracted.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        await (db as any).validateDatoms(dedupeRetracted, false);
+      }
+    }
+
+    // Filter out datoms that already exist with the same value (idempotent import)
+    const filteredAdded = await filterExistingDatoms(db, dedupeAdded);
+    const filteredRetracted = await filterExistingDatoms(db, dedupeRetracted);
+
+    if (filteredAdded.length > 0) {
+      await db.transact({ add: filteredAdded });
+    }
+    if (filteredRetracted.length > 0) {
+      await db.transact({ retract: filteredRetracted });
+    }
+    datomCount += batch.length;
+  }
+
+  return datomCount;
 }
 
 /**
@@ -237,7 +237,10 @@ async function filterExistingDatoms(
     // Get all values for each entity-attribute pair
     const existingValuesBatch: unknown[][] = [];
     for (const q of queries) {
-      const datoms = await db.datoms({ entity: q.entity, attribute: q.attribute });
+      const datoms = await db.datoms({
+        entity: q.entity,
+        attribute: q.attribute,
+      });
       existingValuesBatch.push(datoms.map((d) => d.value));
     }
 
@@ -265,10 +268,7 @@ async function filterExistingDatoms(
       const existingValueSet = existingValuesMap.get(key);
 
       // Only include if value doesn't exist or is different
-      if (
-        !existingValueSet ||
-        !existingValueSet.has(getValueKey(value))
-      ) {
+      if (!existingValueSet || !existingValueSet.has(getValueKey(value))) {
         filtered.push(chunk[i]);
       }
       // If value matches, skip (idempotent)

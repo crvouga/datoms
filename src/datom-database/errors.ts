@@ -7,7 +7,10 @@
  * Base error class for all datom database errors
  */
 export class DatomDatabaseError extends Error {
-  constructor(message: string, public readonly code?: string) {
+  constructor(
+    message: string,
+    public readonly code?: string
+  ) {
     super(message);
     this.name = "DatomDatabaseError";
     Object.setPrototypeOf(this, DatomDatabaseError.prototype);

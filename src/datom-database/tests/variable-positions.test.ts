@@ -18,11 +18,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should handle variable in entity position", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [2, "name", "Bob"],
-        [3, "age", 30],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [2, "name", "Bob"],
+          [3, "age", 30],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?e", "?v"],
@@ -41,12 +43,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle variable in attribute position", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [1, "age", 30],
-        [2, "name", "Bob"],
-        [2, "city", "NYC"],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+          [2, "name", "Bob"],
+          [2, "city", "NYC"],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?attr", "?v"],
@@ -65,12 +69,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle all positions as variables", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [1, "age", 30],
-        [2, "name", "Bob"],
-        [2, "age", 25],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+          [2, "name", "Bob"],
+          [2, "age", 25],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?e", "?attr", "?v"],
@@ -91,11 +97,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle string entity IDs", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        ["user-1", "name", "Alice"],
-        ["user-2", "name", "Bob"],
-        ["user-1", "age", 30],
-      ]});
+      await db.transact({
+        add: [
+          ["user-1", "name", "Alice"],
+          ["user-2", "name", "Bob"],
+          ["user-1", "age", 30],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?e", "?n"],

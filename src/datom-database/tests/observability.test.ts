@@ -83,7 +83,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should emit query events", async () => {
       const { db } = f;
-      await observableDb.transact({ add: [[1, "name", "Alice"]]});
+      await observableDb.transact({ add: [[1, "name", "Alice"]] });
 
       const events: DatabaseEvent[] = [];
       observableDb.on("query", (event) => {
@@ -143,10 +143,12 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should emit backup events", async () => {
       const { db } = f;
-      await observableDb.transact({ add: [
-        [1, "name", "Alice"],
-        [2, "name", "Bob"],
-      ]});
+      await observableDb.transact({
+        add: [
+          [1, "name", "Alice"],
+          [2, "name", "Bob"],
+        ],
+      });
 
       const events: DatabaseEvent[] = [];
       observableDb.on("backup", (event) => {
@@ -154,7 +156,9 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       });
 
       const datoms: any[] = [];
-      for await (const datom of observableDb.exportDatoms({ attribute: "name" })) {
+      for await (const datom of observableDb.exportDatoms({
+        attribute: "name",
+      })) {
         datoms.push(datom);
       }
 
@@ -168,7 +172,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should emit restore events", async () => {
       const { db } = f;
-      await observableDb.transact({ add: [[1, "name", "Alice"]]});
+      await observableDb.transact({ add: [[1, "name", "Alice"]] });
 
       const events: DatabaseEvent[] = [];
       observableDb.on("backup", (event) => {
@@ -263,7 +267,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
   describe("Stats", () => {
     test("should return basic stats", async () => {
       const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]]});
+      await db.transact({ add: [[1, "name", "Alice"]] });
 
       const stats = await observableDb.getStats();
 
@@ -293,10 +297,12 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should track query metrics", async () => {
       const { db } = f;
-      await observableDb.transact({ add: [
-        [1, "name", "Alice"],
-        [2, "name", "Bob"],
-      ]});
+      await observableDb.transact({
+        add: [
+          [1, "name", "Alice"],
+          [2, "name", "Bob"],
+        ],
+      });
 
       // Perform some queries using observableDb to track metrics
       await observableDb.datoms({ entity: 1 });
@@ -312,8 +318,8 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should track transaction metrics", async () => {
       const { db } = f;
-      await observableDb.transact({ add: [[1, "name", "Alice"]]});
-      await observableDb.transact({ add: [[2, "name", "Bob"]]});
+      await observableDb.transact({ add: [[1, "name", "Alice"]] });
+      await observableDb.transact({ add: [[2, "name", "Bob"]] });
       await observableDb.transact({
         add: [[3, "name", "Charlie"]],
         retract: [[1, "name", "Alice"]],
@@ -329,8 +335,8 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should include latest transaction in stats", async () => {
       const { db } = f;
-      const tx1 = await db.transact({ add: [[1, "name", "Alice"]]});
-      const tx2 = await db.transact({ add: [[2, "name", "Bob"]]});
+      const tx1 = await db.transact({ add: [[1, "name", "Alice"]] });
+      const tx2 = await db.transact({ add: [[2, "name", "Bob"]] });
 
       const stats = await observableDb.getStats();
 
@@ -424,7 +430,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       };
 
       observableDb.setLogger(logger);
-      await observableDb.transact({ add: [[1, "name", "Alice"]]});
+      await observableDb.transact({ add: [[1, "name", "Alice"]] });
       await observableDb.datoms({ entity: 1 });
 
       // Should have logged query event at debug level

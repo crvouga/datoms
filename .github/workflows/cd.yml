@@ -43,6 +43,24 @@ jobs:
       - name: Type check
         run: bunx tsc --noEmit
 
+  format:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Check formatting
+        run: bun run format:check
+
   test:
     runs-on: ubuntu-latest
     
@@ -137,7 +155,7 @@ jobs:
   # - feat: = minor version
   # - fix: = patch version
   publish:
-    needs: [lint, type-check, test, verify-build]
+    needs: [lint, type-check, format, test, verify-build]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     permissions:

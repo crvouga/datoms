@@ -11,7 +11,7 @@ import type { Attribute, EntityId, Value } from "../types.js";
 export type QueryClause = [
   entity: string | EntityId,
   attribute: string,
-  value: string | Value
+  value: string | Value,
 ];
 
 /**

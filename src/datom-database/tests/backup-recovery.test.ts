@@ -20,10 +20,12 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
   describe("export", () => {
     test("should return async iterable", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [2, "name", "Bob"],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [2, "name", "Bob"],
+        ],
+      });
 
       const datoms: Datom[] = [];
       for await (const datom of exportDatoms(db, { attribute: "name" })) {
@@ -37,12 +39,14 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should export with filters", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [1, "age", 30],
-        [2, "name", "Bob"],
-        [2, "age", 25],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+          [2, "name", "Bob"],
+          [2, "age", 25],
+        ],
+      });
 
       const datoms: Datom[] = [];
       for await (const datom of exportDatoms(db, { entity: 1 })) {
@@ -55,11 +59,13 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should export without filters (full scan)", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [2, "name", "Bob"],
-        [3, "name", "Charlie"],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [2, "name", "Bob"],
+          [3, "name", "Charlie"],
+        ],
+      });
 
       const datoms: Datom[] = [];
       for await (const datom of exportDatoms(db)) {
@@ -71,10 +77,12 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should emit backup events", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [2, "name", "Bob"],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [2, "name", "Bob"],
+        ],
+      });
 
       const observableDb = new ObservableDatabase(db);
       const events: DatabaseEvent[] = [];
@@ -112,7 +120,9 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       // (This depends on implementation, but we should test error handling)
       try {
         const datoms: Datom[] = [];
-        for await (const datom of exportDatoms(db, { attribute: "nonexistent" })) {
+        for await (const datom of exportDatoms(db, {
+          attribute: "nonexistent",
+        })) {
           datoms.push(datom);
         }
         await observableDb.emitEvent({
@@ -141,10 +151,12 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
   describe("import", () => {
     test("should import from async iterable", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [2, "name", "Bob"],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [2, "name", "Bob"],
+        ],
+      });
 
       // Export datoms
       const exported: Datom[] = [];
@@ -180,7 +192,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       // Create many datoms
       const datoms: Datom[] = [];
       for (let i = 1; i <= 50; i++) {
-        await db.transact({ add: [[i, "name", `Entity${i}`]]});
+        await db.transact({ add: [[i, "name", `Entity${i}`]] });
         const entityDatoms = await db.datoms({ entity: i });
         datoms.push(...entityDatoms);
       }
@@ -202,7 +214,9 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         }
       }
 
-      const count = await importDatoms(db2, datomGenerator(), { batchSize: 10 });
+      const count = await importDatoms(db2, datomGenerator(), {
+        batchSize: 10,
+      });
 
       expect(count).toBe(exported.length);
 
@@ -221,7 +235,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         type: "number",
       });
 
-      await db.transact({ add: [[1, "age", 30]]});
+      await db.transact({ add: [[1, "age", 30]] });
 
       // Export
       const exported: Datom[] = [];
@@ -245,11 +259,16 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         }
       }
 
-      const count = await importDatoms(db2, datomGenerator(), { validate: true });
+      const count = await importDatoms(db2, datomGenerator(), {
+        validate: true,
+      });
 
       expect(count).toBe(exported.length);
 
-      const ageResults = await db2.query({ find: ["?v"], where: [[1, "age", "?v"]] });
+      const ageResults = await db2.query({
+        find: ["?v"],
+        where: [[1, "age", "?v"]],
+      });
       const age = ageResults[0]?.v;
       expect(age).toBe(30);
 
@@ -258,7 +277,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should import without validation", async () => {
       const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]]});
+      await db.transact({ add: [[1, "name", "Alice"]] });
 
       // Export
       const exported: Datom[] = [];
@@ -277,7 +296,9 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
         }
       }
 
-      const count = await importDatoms(db2, datomGenerator(), { validate: false });
+      const count = await importDatoms(db2, datomGenerator(), {
+        validate: false,
+      });
 
       expect(count).toBe(exported.length);
 
@@ -286,10 +307,12 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should emit restore events", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [2, "name", "Bob"],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [2, "name", "Bob"],
+        ],
+      });
 
       // Export
       const exported: Datom[] = [];

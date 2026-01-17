@@ -105,7 +105,6 @@ export interface TransactResult {
   retractedCount: number;
 }
 
-
 /**
  * Transaction interface (Datomic-like minimal API)
  * Provides core operations scoped to a transaction.
@@ -156,7 +155,7 @@ abstract class BaseDatabaseView implements DatabaseView {
   constructor(protected db: DatomDatabase) {}
 
   abstract datoms(options: QueryOptions): Promise<Datom[]>;
-  
+
   async query(query: DatalogQuery): Promise<QueryResult> {
     // Views need to execute queries using their filtered datoms() method
     // We'll execute the query manually using the view's datoms() method
@@ -167,12 +166,12 @@ abstract class BaseDatabaseView implements DatabaseView {
    * Execute a datalog query using the view's filtered datoms() method
    * This ensures time-travel filters are applied correctly
    */
-  private async executeQueryWithView(query: DatalogQuery): Promise<QueryResult> {
+  private async executeQueryWithView(
+    query: DatalogQuery
+  ): Promise<QueryResult> {
     if (query.where.length === 0) {
       return [];
     }
-
-    
 
     // Execute first clause using view's datoms() method
     const firstClause = query.where[0];
@@ -209,7 +208,9 @@ abstract class BaseDatabaseView implements DatabaseView {
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
       const [entityVal, attributeVal, valueVal] = clause;
-      const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+      const entity = isVariable(entityVal)
+        ? undefined
+        : (entityVal as EntityId);
       const attribute = isVariable(attributeVal)
         ? undefined
         : (attributeVal as string);
@@ -235,7 +236,11 @@ abstract class BaseDatabaseView implements DatabaseView {
         return result;
       });
 
-      results = joinResults(results, clauseResults, query.where.slice(0, i + 1));
+      results = joinResults(
+        results,
+        clauseResults,
+        query.where.slice(0, i + 1)
+      );
     }
 
     // Project to find variables
@@ -243,15 +248,16 @@ abstract class BaseDatabaseView implements DatabaseView {
 
     // Apply ordering if specified
     if (query.orderBy) {
-      
       projected.sort((a, b) => {
         for (const [variable, direction] of query.orderBy!) {
           const key = stripQuestionMark(variable);
           const aVal = a[key];
           const bVal = b[key];
           if (aVal === undefined && bVal === undefined) return 0;
-          if (aVal === undefined || aVal === null) return direction === "asc" ? 1 : -1;
-          if (bVal === undefined || bVal === null) return direction === "asc" ? -1 : 1;
+          if (aVal === undefined || aVal === null)
+            return direction === "asc" ? 1 : -1;
+          if (bVal === undefined || bVal === null)
+            return direction === "asc" ? -1 : 1;
           if (aVal < bVal) return direction === "asc" ? -1 : 1;
           if (aVal > bVal) return direction === "asc" ? 1 : -1;
         }
@@ -266,7 +272,6 @@ abstract class BaseDatabaseView implements DatabaseView {
 
     return projected;
   }
-
 }
 
 /**
@@ -274,7 +279,10 @@ abstract class BaseDatabaseView implements DatabaseView {
  * Filters queries to only include datoms with tx <= txId and deduplicates by (entity, attribute)
  */
 class AsOfDatabaseView extends BaseDatabaseView {
-  constructor(db: DatomDatabase, private txId: TransactionId) {
+  constructor(
+    db: DatomDatabase,
+    private txId: TransactionId
+  ) {
     super(db);
   }
 
@@ -328,7 +336,10 @@ class HistoryDatabaseView extends BaseDatabaseView {
  * Filters queries to only include datoms with tx > txId
  */
 class SinceDatabaseView extends BaseDatabaseView {
-  constructor(db: DatomDatabase, private txId: TransactionId) {
+  constructor(
+    db: DatomDatabase,
+    private txId: TransactionId
+  ) {
     super(db);
   }
 
@@ -1082,8 +1093,7 @@ export abstract class DatomDatabase implements DatomReader {
 
     // Filter to only datoms with tx <= txId
     // If options.tx is specified, use the minimum of both
-    const maxTx =
-      options.tx !== undefined ? Math.min(options.tx, txId) : txId;
+    const maxTx = options.tx !== undefined ? Math.min(options.tx, txId) : txId;
     const filtered = allDatoms.filter((d) => d.tx <= maxTx);
 
     // Deduplicate by (entity, attribute) keeping the latest tx
@@ -1246,7 +1256,7 @@ export abstract class DatomDatabase implements DatomReader {
           const entity = datom[0];
           const attribute = datom[1];
           const newValue = datom[2];
-          
+
           // Check if this value is being retracted in the same transaction
           const isBeingRetracted = retractsInSameTransaction?.some(
             (r) =>
@@ -1254,12 +1264,12 @@ export abstract class DatomDatabase implements DatomReader {
               String(r[1]) === String(attribute) &&
               JSON.stringify(r[2]) === JSON.stringify(newValue)
           );
-          
+
           // If being retracted, skip validation (it's a replace operation)
           if (isBeingRetracted) {
             continue;
           }
-          
+
           const existingDatoms = await this.queryInternal({
             entity,
             attribute: String(attribute),
@@ -1276,7 +1286,7 @@ export abstract class DatomDatabase implements DatomReader {
                   String(r[1]) === String(attribute) &&
                   JSON.stringify(r[2]) === JSON.stringify(existingValue)
               );
-              
+
               if (!existingIsBeingRetracted) {
                 throw new CardinalityError(
                   String(attribute),
@@ -1408,7 +1418,6 @@ export abstract class DatomDatabase implements DatomReader {
    */
   protected abstract executeQuery(options: QueryOptions): Promise<Datom[]>;
 
-
   /**
    * Execute a datalog query
    * @param query Datalog query to execute
@@ -1418,7 +1427,6 @@ export abstract class DatomDatabase implements DatomReader {
    * // result will be [{"e": 123}] not [{"?e": 123}]
    */
   abstract query(query: DatalogQuery): Promise<QueryResult>;
-
 
   /**
    * Create a database view showing the state at a specific transaction ID

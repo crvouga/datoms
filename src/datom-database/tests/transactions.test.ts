@@ -208,11 +208,17 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact({ add: [[1, "name", "Alice"]] });
 
       await db.transaction(async (tx) => {
-        const nameResults = await tx.query({ find: ["?v"], where: [[1, "name", "?v"]] });
+        const nameResults = await tx.query({
+          find: ["?v"],
+          where: [[1, "name", "?v"]],
+        });
         expect(nameResults[0]?.v).toBe("Alice");
 
         await tx.transact({ add: [[1, "age", 30]] });
-        const ageResults = await tx.query({ find: ["?v"], where: [[1, "age", "?v"]] });
+        const ageResults = await tx.query({
+          find: ["?v"],
+          where: [[1, "age", "?v"]],
+        });
         expect(ageResults[0]?.v).toBe(30);
       });
 
@@ -242,11 +248,19 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact({ add: [[1, "name", "Alice"]] });
 
       await db.transaction(async (tx) => {
-        const nameDatoms = await tx.datoms({ entity: 1, attribute: "name", value: "Alice" });
+        const nameDatoms = await tx.datoms({
+          entity: 1,
+          attribute: "name",
+          value: "Alice",
+        });
         expect(nameDatoms.length).toBeGreaterThan(0);
 
         await tx.transact({ add: [[1, "status", "active"]] });
-        const statusDatoms = await tx.datoms({ entity: 1, attribute: "status", value: "active" });
+        const statusDatoms = await tx.datoms({
+          entity: 1,
+          attribute: "status",
+          value: "active",
+        });
         expect(statusDatoms.length).toBeGreaterThan(0);
       });
 
@@ -467,7 +481,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact({ add: [[1, "name", "Alice"]] });
 
       await db.transaction(async (tx) => {
-        await tx.transact({ add: [[2, "name", "Bob"]]});
+        await tx.transact({ add: [[2, "name", "Bob"]] });
       });
 
       // Should succeed normally

@@ -149,7 +149,6 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return tx;
   }
 
-
   public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
 
@@ -417,8 +416,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     }
 
     // Merge options.tx with txId: use minimum of both if options.tx is specified
-    const maxTx =
-      options.tx !== undefined ? Math.min(options.tx, txId) : txId;
+    const maxTx = options.tx !== undefined ? Math.min(options.tx, txId) : txId;
     conditions.push("tx <= ?");
     params.push(maxTx);
 
@@ -663,7 +661,6 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       };
     });
   }
-
 
   async query(query: DatalogQuery): Promise<QueryResult> {
     await this.ensureInitialized();

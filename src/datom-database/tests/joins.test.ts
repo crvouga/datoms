@@ -18,12 +18,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should handle multiple where clauses (join)", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [1, "age", 30],
-        [2, "name", "Bob"],
-        [2, "age", 40],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+          [2, "name", "Bob"],
+          [2, "age", 40],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?x", "?a"],
@@ -45,24 +47,26 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle complex joins with multiple entities and attributes", async () => {
       const { db } = f;
       // Create a company structure: employees, departments, and their relationships
-      await db.transact({ add: [
-        // Employees
-        [1, "name", "Alice"],
-        [1, "role", "engineer"],
-        [2, "name", "Bob"],
-        [2, "role", "manager"],
-        [3, "name", "Charlie"],
-        [3, "role", "engineer"],
-        // Departments
-        [10, "name", "Engineering"],
-        [10, "budget", 100_000],
-        [11, "name", "Sales"],
-        [11, "budget", 50_000],
-        // Employee-Department relationships
-        [1, "department", 10],
-        [2, "department", 10],
-        [3, "department", 10],
-      ]});
+      await db.transact({
+        add: [
+          // Employees
+          [1, "name", "Alice"],
+          [1, "role", "engineer"],
+          [2, "name", "Bob"],
+          [2, "role", "manager"],
+          [3, "name", "Charlie"],
+          [3, "role", "engineer"],
+          // Departments
+          [10, "name", "Engineering"],
+          [10, "budget", 100_000],
+          [11, "name", "Sales"],
+          [11, "budget", 50_000],
+          // Employee-Department relationships
+          [1, "department", 10],
+          [2, "department", 10],
+          [3, "department", 10],
+        ],
+      });
 
       // Find all engineers in the Engineering department with the department budget
       const query: DatalogQuery = {
@@ -90,17 +94,19 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle queries with multiple constraints on same entity", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [1, "age", 30],
-        [1, "city", "NYC"],
-        [2, "name", "Bob"],
-        [2, "age", 25],
-        [2, "city", "NYC"],
-        [3, "name", "Charlie"],
-        [3, "age", 30],
-        [3, "city", "LA"],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+          [1, "city", "NYC"],
+          [2, "name", "Bob"],
+          [2, "age", 25],
+          [2, "city", "NYC"],
+          [3, "name", "Charlie"],
+          [3, "age", 30],
+          [3, "city", "LA"],
+        ],
+      });
 
       // Find people in NYC who are 30 years old
       const query: DatalogQuery = {
@@ -122,17 +128,19 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle complex variable bindings across multiple clauses", async () => {
       const { db } = f;
       // Create a network of connections
-      await db.transact({ add: [
-        [1, "name", "Node1"],
-        [2, "name", "Node2"],
-        [3, "name", "Node3"],
-        [4, "name", "Node4"],
-        // Connections: 1->2, 2->3, 3->4, 1->4
-        [1, "connects", 2],
-        [2, "connects", 3],
-        [3, "connects", 4],
-        [1, "connects", 4],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Node1"],
+          [2, "name", "Node2"],
+          [3, "name", "Node3"],
+          [4, "name", "Node4"],
+          // Connections: 1->2, 2->3, 3->4, 1->4
+          [1, "connects", 2],
+          [2, "connects", 3],
+          [3, "connects", 4],
+          [1, "connects", 4],
+        ],
+      });
 
       // Find all paths of length 2: A -> B -> C
       const query: DatalogQuery = {
@@ -154,11 +162,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle join with no matching results", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [2, "name", "Bob"],
-        [3, "age", 30],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [2, "name", "Bob"],
+          [3, "age", 30],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?name", "?age"],
@@ -178,15 +188,17 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle join with incompatible variable bindings", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [1, "age", 30],
-        [2, "name", "Bob"],
-        [2, "age", 25],
-        // Entity 3 has name "Alice" but age 25 (different from entity 1)
-        [3, "name", "Alice"],
-        [3, "age", 25],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+          [2, "name", "Bob"],
+          [2, "age", 25],
+          // Entity 3 has name "Alice" but age 25 (different from entity 1)
+          [3, "name", "Alice"],
+          [3, "age", 25],
+        ],
+      });
 
       // Find entities where name is Alice AND age is 25
       const query: DatalogQuery = {
@@ -206,14 +218,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle join with multiple common variables", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [1, "age", 30],
-        [1, "city", "NYC"],
-        [2, "name", "Bob"],
-        [2, "age", 30],
-        [2, "city", "LA"],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+          [1, "city", "NYC"],
+          [2, "name", "Bob"],
+          [2, "age", 30],
+          [2, "city", "LA"],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?name", "?age", "?city"],
@@ -236,16 +250,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle variable binding across disconnected clauses", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [1, "age", 30],
-        [2, "name", "Bob"],
-        [2, "age", 25],
-        [10, "employee", 1],
-        [10, "department", "Engineering"],
-        [11, "employee", 2],
-        [11, "department", "Sales"],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+          [2, "name", "Bob"],
+          [2, "age", 25],
+          [10, "employee", 1],
+          [10, "department", "Engineering"],
+          [11, "employee", 2],
+          [11, "department", "Sales"],
+        ],
+      });
 
       // Find employees and their departments through a join entity
       const query: DatalogQuery = {

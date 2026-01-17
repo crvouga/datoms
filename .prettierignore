@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+bun.lock
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Test databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+docker-compose.yml
+
+# CI/CD
+.github/
+
+# Logs
+*.log

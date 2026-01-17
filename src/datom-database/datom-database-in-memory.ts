@@ -80,7 +80,6 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return tx;
   }
 
-
   /**
    * Check if a datom is currently added (not retracted)
    */
@@ -207,8 +206,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Filter to only datoms with tx <= txId
     // If options.tx is specified, use the minimum of both
-    const maxTx =
-      options.tx !== undefined ? Math.min(options.tx, txId) : txId;
+    const maxTx = options.tx !== undefined ? Math.min(options.tx, txId) : txId;
     results = results.filter((d) => d.tx <= maxTx);
 
     // Deduplicate by (entity, attribute) keeping the latest tx
@@ -312,7 +310,6 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     const limit = options.limit;
     return results.slice(offset, limit ? offset + limit : undefined);
   }
-
 
   async query(query: DatalogQuery): Promise<QueryResult> {
     await this.ensureInitialized();

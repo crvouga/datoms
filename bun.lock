@@ -17,6 +17,7 @@
         "eslint": "^8.57.0",
         "madge": "^8.0.0",
         "pg": "^8.11.3",
+        "prettier": "^3.0.0",
         "semantic-release": "^23.0.0",
         "typescript": "^5.3.0",
       },
@@ -686,6 +687,8 @@
     "precinct": ["precinct@12.2.0", "", { "dependencies": { "@dependents/detective-less": "^5.0.1", "commander": "^12.1.0", "detective-amd": "^6.0.1", "detective-cjs": "^6.0.1", "detective-es6": "^5.0.1", "detective-postcss": "^7.0.1", "detective-sass": "^6.0.1", "detective-scss": "^5.0.1", "detective-stylus": "^5.0.1", "detective-typescript": "^14.0.0", "detective-vue2": "^2.2.0", "module-definition": "^6.0.1", "node-source-walk": "^7.0.1", "postcss": "^8.5.1", "typescript": "^5.7.3" }, "bin": { "precinct": "bin/cli.js" } }, "sha512-NFBMuwIfaJ4SocE9YXPU/n4AcNSoFMVFjP72nvl3cx69j/ke61/hPOWFREVxLkFhhEGnA8ZuVfTqJBa+PK3b5w=="],
 
     "prelude-ls": ["prelude-ls@1.2.1", "", {}, "sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g=="],
+
+    "prettier": ["prettier@3.8.0", "", { "bin": { "prettier": "bin/prettier.cjs" } }, "sha512-yEPsovQfpxYfgWNhCfECjG5AQaO+K3dp6XERmOepyPDVqcJm+bjyCVO3pmU+nAPe0N5dDvekfGezt/EIiRe1TA=="],
 
     "pretty-ms": ["pretty-ms@7.0.1", "", { "dependencies": { "parse-ms": "^2.1.0" } }, "sha512-973driJZvxiGOQ5ONsFhOF/DtzPMOMtgC11kCpUrPGMTgqp2q/1gwzCquocrN33is0VZ5GFHXZYMM9l6h67v2Q=="],
 

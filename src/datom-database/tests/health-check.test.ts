@@ -40,7 +40,7 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
     test("should include query performance metrics if available", async () => {
       const { db } = f;
       // Run some queries to generate metrics
-      await db.transact({ add: [[1, "name", "Alice"]]});
+      await db.transact({ add: [[1, "name", "Alice"]] });
       await db.datoms({ entity: 1 });
       await db.datoms({ attribute: "name" });
 
@@ -57,7 +57,7 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
       const { db } = f;
       // Run some transactions to generate metrics
       await db.transaction(async (tx) => {
-        await tx.transact({ add: [[1, "name", "Alice"]]});
+        await tx.transact({ add: [[1, "name", "Alice"]] });
       });
 
       const observableDb = new ObservableDatabase(db);

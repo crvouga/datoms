@@ -18,11 +18,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should support ordering and limits", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "score", 100],
-        [2, "score", 400],
-        [3, "score", 250],
-      ]});
+      await db.transact({
+        add: [
+          [1, "score", 100],
+          [2, "score", 400],
+          [3, "score", 250],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?e", "?s"],
@@ -41,17 +43,19 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle queries with ordering on multiple variables", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [1, "score", 100],
-        [1, "age", 30],
-        [2, "name", "Bob"],
-        [2, "score", 100],
-        [2, "age", 25],
-        [3, "name", "Charlie"],
-        [3, "score", 200],
-        [3, "age", 30],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "score", 100],
+          [1, "age", 30],
+          [2, "name", "Bob"],
+          [2, "score", 100],
+          [2, "age", 25],
+          [3, "name", "Charlie"],
+          [3, "score", 200],
+          [3, "age", 30],
+        ],
+      });
 
       // Find all people, ordered by score (desc) then age (asc)
       const query: DatalogQuery = {
@@ -80,11 +84,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle limit 0", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "score", 100],
-        [2, "score", 200],
-        [3, "score", 300],
-      ]});
+      await db.transact({
+        add: [
+          [1, "score", 100],
+          [2, "score", 200],
+          [3, "score", 300],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?e", "?s"],
@@ -103,10 +109,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle limit larger than results", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "score", 100],
-        [2, "score", 200],
-      ]});
+      await db.transact({
+        add: [
+          [1, "score", 100],
+          [2, "score", 200],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?e", "?s"],
@@ -122,12 +130,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle limit with ordering", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "score", 100],
-        [2, "score", 400],
-        [3, "score", 250],
-        [4, "score", 300],
-      ]});
+      await db.transact({
+        add: [
+          [1, "score", 100],
+          [2, "score", 400],
+          [3, "score", 250],
+          [4, "score", 300],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?e", "?s"],
@@ -146,12 +156,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle ordering on variable not in find", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "name", "Alice"],
-        [1, "score", 100],
-        [2, "name", "Bob"],
-        [2, "score", 200],
-      ]});
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "score", 100],
+          [2, "name", "Bob"],
+          [2, "score", 200],
+        ],
+      });
 
       // Note: Current implementation orders AFTER projection, so ordering by variables
       // not in find doesn't work (they're undefined after projection).
@@ -192,12 +204,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle ordering with null values", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "score", 100],
-        [2, "score", null],
-        [3, "score", 200],
-        [4, "score", null],
-      ]});
+      await db.transact({
+        add: [
+          [1, "score", 100],
+          [2, "score", null],
+          [3, "score", 200],
+          [4, "score", null],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?e", "?s"],
@@ -217,12 +231,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle ordering with mixed types", async () => {
       const { db } = f;
-      await db.transact({ add: [
-        [1, "value", "zebra"],
-        [2, "value", 100],
-        [3, "value", "apple"],
-        [4, "value", 50],
-      ]});
+      await db.transact({
+        add: [
+          [1, "value", "zebra"],
+          [2, "value", 100],
+          [3, "value", "apple"],
+          [4, "value", 50],
+        ],
+      });
 
       const query: DatalogQuery = {
         find: ["?e", "?v"],

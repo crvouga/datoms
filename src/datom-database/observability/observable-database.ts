@@ -16,7 +16,10 @@ import type {
   TransactionId,
 } from "../../types.js";
 import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
-import { exportDatoms as exportDatomsImpl, importDatoms as importDatomsImpl } from "../backup/backup.js";
+import {
+  exportDatoms as exportDatomsImpl,
+  importDatoms as importDatomsImpl,
+} from "../backup/backup.js";
 
 /**
  * Observable database wrapper that adds observability features to a DatomDatabase
@@ -323,8 +326,8 @@ export class ObservableDatabase {
         event.type === "error"
           ? "error"
           : event.type === "query"
-          ? "debug"
-          : "info";
+            ? "debug"
+            : "info";
       const logMeta: Record<string, unknown> = { eventType: event.type };
 
       if (event.type === "transaction") {
@@ -398,7 +401,7 @@ export class ObservableDatabase {
    */
   async getStats(): Promise<DatabaseStats> {
     const latestTx = await this.db.getLatestTransaction();
-    
+
     // Get schema attribute count from exportSchema
     let schemaAttributeCount = 0;
     try {
@@ -427,9 +430,16 @@ export class ObservableDatabase {
    * Hook for implementations to provide detailed statistics
    */
   protected async getDetailedStats(): Promise<
-    Partial<Pick<DatabaseStats, "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics">>
+    Partial<
+      Pick<
+        DatabaseStats,
+        "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics"
+      >
+    >
   > {
-    const stats: Partial<Pick<DatabaseStats, "queryMetrics" | "transactionMetrics">> = {};
+    const stats: Partial<
+      Pick<DatabaseStats, "queryMetrics" | "transactionMetrics">
+    > = {};
 
     // Add query metrics if available
     if (this.queryCount > 0) {
@@ -442,7 +452,8 @@ export class ObservableDatabase {
     // Add transaction metrics if available
     if (this.transactionCount > 0) {
       stats.transactionMetrics = {
-        averageTransactionTime: this.transactionTimeSum / this.transactionCount / 1000, // Convert to seconds
+        averageTransactionTime:
+          this.transactionTimeSum / this.transactionCount / 1000, // Convert to seconds
       };
     }
 

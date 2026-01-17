@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type {
-  ConnectionPoolConfig,
-  ConnectionPoolStats,
-} from "../../types.js";
+import type { ConnectionPoolConfig, ConnectionPoolStats } from "../../types.js";
 import type { SQLDatabase } from "../../sql-database/sql-database.js";
 
 describe("Connection Pooling Types", () => {
