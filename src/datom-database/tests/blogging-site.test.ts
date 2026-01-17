@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { datoms, type Datom } from "../../types.js";
+import { datoms, records, type Datom } from "../../datoms.js";
 import type { DatomDatabase } from "../datom-database.js";
 import { TransactionError } from "../errors.js";
 import type {
@@ -375,20 +375,26 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       const { db } = f;
 
       // Create author
-      await db.transact([
-        { op: "add", e: 1, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: 1, a: USER_NAME, v: "Author" },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 1,
+          [USER_TYPE]: USER_TYPE_AUTHOR,
+          [USER_NAME]: "Author",
+        })
+      );
 
       // Create draft post
       const now = new Date().toISOString();
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "My First Post" },
-        { op: "add", e: 100, a: POST_CONTENT, v: "This is the content" },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
-        { op: "add", e: 100, a: POST_AUTHOR, v: 1 },
-        { op: "add", e: 100, a: POST_CREATED_AT, v: now },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 100,
+          [POST_TITLE]: "My First Post",
+          [POST_CONTENT]: "This is the content",
+          [POST_STATUS]: POST_STATUS_DRAFT,
+          [POST_AUTHOR]: 1,
+          [POST_CREATED_AT]: now,
+        })
+      );
 
       const results = await db.query({
         find: { e: ["?e"], title: ["?title"], status: ["?status"] },
@@ -408,25 +414,34 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       const { db } = f;
 
       // Create author
-      await db.transact([
-        { op: "add", e: 1, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: 1, a: USER_NAME, v: "Author" },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 1,
+          [USER_TYPE]: USER_TYPE_AUTHOR,
+          [USER_NAME]: "Author",
+        })
+      );
 
       // Create draft post
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "My Post" },
-        { op: "add", e: 100, a: POST_CONTENT, v: "Content" },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
-        { op: "add", e: 100, a: POST_AUTHOR, v: 1 },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 100,
+          [POST_TITLE]: "My Post",
+          [POST_CONTENT]: "Content",
+          [POST_STATUS]: POST_STATUS_DRAFT,
+          [POST_AUTHOR]: 1,
+        })
+      );
 
       // Publish the post
       const now = new Date().toISOString();
       await db.transact([
         { op: "sub", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_PUBLISHED },
-        { op: "add", e: 100, a: POST_UPDATED_AT, v: now },
+        ...datoms({
+          entityId: 100,
+          [POST_STATUS]: POST_STATUS_PUBLISHED,
+          [POST_UPDATED_AT]: now,
+        }),
       ]);
 
       const results = await db.query({
@@ -446,27 +461,36 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       const { db } = f;
 
       // Create author
-      await db.transact([
-        { op: "add", e: 1, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: 1, a: USER_NAME, v: "Author" },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 1,
+          [USER_TYPE]: USER_TYPE_AUTHOR,
+          [USER_NAME]: "Author",
+        })
+      );
 
       // Create post
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "Original Title" },
-        { op: "add", e: 100, a: POST_CONTENT, v: "Original Content" },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
-        { op: "add", e: 100, a: POST_AUTHOR, v: 1 },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 100,
+          [POST_TITLE]: "Original Title",
+          [POST_CONTENT]: "Original Content",
+          [POST_STATUS]: POST_STATUS_DRAFT,
+          [POST_AUTHOR]: 1,
+        })
+      );
 
       // Edit the post
       const now = new Date().toISOString();
       await db.transact([
         { op: "sub", e: 100, a: POST_TITLE, v: "Original Title" },
-        { op: "add", e: 100, a: POST_TITLE, v: "Updated Title" },
         { op: "sub", e: 100, a: POST_CONTENT, v: "Original Content" },
-        { op: "add", e: 100, a: POST_CONTENT, v: "Updated Content" },
-        { op: "add", e: 100, a: POST_UPDATED_AT, v: now },
+        ...datoms({
+          entityId: 100,
+          [POST_TITLE]: "Updated Title",
+          [POST_CONTENT]: "Updated Content",
+          [POST_UPDATED_AT]: now,
+        }),
       ]);
 
       const results = await db.query({
@@ -490,18 +514,24 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       // Create author
       const authorId = 1;
-      await db.transact([
-        { op: "add", e: authorId, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: authorId, a: USER_NAME, v: "Author" },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: authorId,
+          [USER_TYPE]: USER_TYPE_AUTHOR,
+          [USER_NAME]: "Author",
+        })
+      );
 
       // Create draft post by this author
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "Draft Post" },
-        { op: "add", e: 100, a: POST_CONTENT, v: "Content" },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
-        { op: "add", e: 100, a: POST_AUTHOR, v: authorId },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 100,
+          [POST_TITLE]: "Draft Post",
+          [POST_CONTENT]: "Content",
+          [POST_STATUS]: POST_STATUS_DRAFT,
+          [POST_AUTHOR]: authorId,
+        })
+      );
 
       // Register interceptor to filter posts based on user role
       db.interceptors.register(createPostAccessInterceptor());
@@ -530,20 +560,31 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       // Create two authors
       const author1Id = 1;
       const author2Id = 2;
-      await db.transact([
-        { op: "add", e: author1Id, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: author1Id, a: USER_NAME, v: "Author 1" },
-        { op: "add", e: author2Id, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: author2Id, a: USER_NAME, v: "Author 2" },
-      ]);
+      await db.transact(
+        datoms(
+          {
+            entityId: author1Id,
+            [USER_TYPE]: USER_TYPE_AUTHOR,
+            [USER_NAME]: "Author 1",
+          },
+          {
+            entityId: author2Id,
+            [USER_TYPE]: USER_TYPE_AUTHOR,
+            [USER_NAME]: "Author 2",
+          }
+        )
+      );
 
       // Create draft post by author 2
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "Author 2's Draft" },
-        { op: "add", e: 100, a: POST_CONTENT, v: "Content" },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
-        { op: "add", e: 100, a: POST_AUTHOR, v: author2Id },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 100,
+          [POST_TITLE]: "Author 2's Draft",
+          [POST_CONTENT]: "Content",
+          [POST_STATUS]: POST_STATUS_DRAFT,
+          [POST_AUTHOR]: author2Id,
+        })
+      );
 
       // Register interceptor
       db.interceptors.register(createPostAccessInterceptor());
@@ -567,20 +608,31 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       // Create two authors
       const author1Id = 1;
       const author2Id = 2;
-      await db.transact([
-        { op: "add", e: author1Id, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: author1Id, a: USER_NAME, v: "Author 1" },
-        { op: "add", e: author2Id, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: author2Id, a: USER_NAME, v: "Author 2" },
-      ]);
+      await db.transact(
+        datoms(
+          {
+            entityId: author1Id,
+            [USER_TYPE]: USER_TYPE_AUTHOR,
+            [USER_NAME]: "Author 1",
+          },
+          {
+            entityId: author2Id,
+            [USER_TYPE]: USER_TYPE_AUTHOR,
+            [USER_NAME]: "Author 2",
+          }
+        )
+      );
 
       // Create published post by author 2
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "Published Post" },
-        { op: "add", e: 100, a: POST_CONTENT, v: "Content" },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_PUBLISHED },
-        { op: "add", e: 100, a: POST_AUTHOR, v: author2Id },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 100,
+          [POST_TITLE]: "Published Post",
+          [POST_CONTENT]: "Content",
+          [POST_STATUS]: POST_STATUS_PUBLISHED,
+          [POST_AUTHOR]: author2Id,
+        })
+      );
 
       // Register interceptor
       db.interceptors.register(createPostAccessInterceptor());
@@ -605,22 +657,38 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       // Create author and reader
       const authorId = 1;
       const readerId = 2;
-      await db.transact([
-        { op: "add", e: authorId, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: authorId, a: USER_NAME, v: "Author" },
-        { op: "add", e: readerId, a: USER_TYPE, v: USER_TYPE_READER },
-        { op: "add", e: readerId, a: USER_NAME, v: "Reader" },
-      ]);
+      await db.transact(
+        datoms(
+          {
+            entityId: authorId,
+            [USER_TYPE]: USER_TYPE_AUTHOR,
+            [USER_NAME]: "Author",
+          },
+          {
+            entityId: readerId,
+            [USER_TYPE]: USER_TYPE_READER,
+            [USER_NAME]: "Reader",
+          }
+        )
+      );
 
       // Create draft and published posts
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "Draft Post" },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
-        { op: "add", e: 100, a: POST_AUTHOR, v: authorId },
-        { op: "add", e: 101, a: POST_TITLE, v: "Published Post" },
-        { op: "add", e: 101, a: POST_STATUS, v: POST_STATUS_PUBLISHED },
-        { op: "add", e: 101, a: POST_AUTHOR, v: authorId },
-      ]);
+      await db.transact(
+        datoms(
+          {
+            entityId: 100,
+            [POST_TITLE]: "Draft Post",
+            [POST_STATUS]: POST_STATUS_DRAFT,
+            [POST_AUTHOR]: authorId,
+          },
+          {
+            entityId: 101,
+            [POST_TITLE]: "Published Post",
+            [POST_STATUS]: POST_STATUS_PUBLISHED,
+            [POST_AUTHOR]: authorId,
+          }
+        )
+      );
 
       // Register interceptor
       db.interceptors.register(createPostAccessInterceptor());
@@ -649,22 +717,38 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       // Create admin and author
       const adminId = 1;
       const authorId = 2;
-      await db.transact([
-        { op: "add", e: adminId, a: USER_TYPE, v: USER_TYPE_ADMIN },
-        { op: "add", e: adminId, a: USER_NAME, v: "Admin" },
-        { op: "add", e: authorId, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: authorId, a: USER_NAME, v: "Author" },
-      ]);
+      await db.transact(
+        datoms(
+          {
+            entityId: adminId,
+            [USER_TYPE]: USER_TYPE_ADMIN,
+            [USER_NAME]: "Admin",
+          },
+          {
+            entityId: authorId,
+            [USER_TYPE]: USER_TYPE_AUTHOR,
+            [USER_NAME]: "Author",
+          }
+        )
+      );
 
       // Create draft and published posts
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "Draft Post" },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
-        { op: "add", e: 100, a: POST_AUTHOR, v: authorId },
-        { op: "add", e: 101, a: POST_TITLE, v: "Published Post" },
-        { op: "add", e: 101, a: POST_STATUS, v: POST_STATUS_PUBLISHED },
-        { op: "add", e: 101, a: POST_AUTHOR, v: authorId },
-      ]);
+      await db.transact(
+        datoms(
+          {
+            entityId: 100,
+            [POST_TITLE]: "Draft Post",
+            [POST_STATUS]: POST_STATUS_DRAFT,
+            [POST_AUTHOR]: authorId,
+          },
+          {
+            entityId: 101,
+            [POST_TITLE]: "Published Post",
+            [POST_STATUS]: POST_STATUS_PUBLISHED,
+            [POST_AUTHOR]: authorId,
+          }
+        )
+      );
 
       // Register interceptor
       db.interceptors.register(createPostAccessInterceptor());
@@ -696,20 +780,26 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       // Try to create post without title (should fail)
       await expect(
-        db.transact([
-          { op: "add", e: 100, a: POST_CONTENT, v: "Content" },
-          { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
-          { op: "add", e: 100, a: POST_AUTHOR, v: 1 },
-        ])
+        db.transact(
+          datoms({
+            entityId: 100,
+            [POST_CONTENT]: "Content",
+            [POST_STATUS]: POST_STATUS_DRAFT,
+            [POST_AUTHOR]: 1,
+          })
+        )
       ).rejects.toThrow(TransactionError);
 
       // Create post with all required fields (should succeed)
-      await db.transact([
-        { op: "add", e: 101, a: POST_TITLE, v: "Valid Post" },
-        { op: "add", e: 101, a: POST_CONTENT, v: "Content" },
-        { op: "add", e: 101, a: POST_STATUS, v: POST_STATUS_DRAFT },
-        { op: "add", e: 101, a: POST_AUTHOR, v: 1 },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 101,
+          [POST_TITLE]: "Valid Post",
+          [POST_CONTENT]: "Content",
+          [POST_STATUS]: POST_STATUS_DRAFT,
+          [POST_AUTHOR]: 1,
+        })
+      );
 
       const results = await db.query({
         find: { e: ["?e"], title: ["?title"] },
@@ -728,23 +818,32 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       // Try to create post with non-existent author (should fail)
       await expect(
-        db.transact([
-          { op: "add", e: 100, a: POST_TITLE, v: "Post" },
-          { op: "add", e: 100, a: POST_AUTHOR, v: 999 },
-        ])
+        db.transact(
+          datoms({
+            entityId: 100,
+            [POST_TITLE]: "Post",
+            [POST_AUTHOR]: 999,
+          })
+        )
       ).rejects.toThrow(TransactionError);
 
       // Create author first
-      await db.transact([
-        { op: "add", e: 1, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: 1, a: USER_NAME, v: "Author" },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 1,
+          [USER_TYPE]: USER_TYPE_AUTHOR,
+          [USER_NAME]: "Author",
+        })
+      );
 
       // Now create post (should succeed)
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "Post" },
-        { op: "add", e: 100, a: POST_AUTHOR, v: 1 },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 100,
+          [POST_TITLE]: "Post",
+          [POST_AUTHOR]: 1,
+        })
+      );
 
       const results = await db.query({
         find: { e: ["?e"], title: ["?title"] },
@@ -760,11 +859,13 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should create tags", async () => {
       const { db } = f;
 
-      await db.transact([
-        { op: "add", e: 1, a: TAG_NAME, v: "javascript" },
-        { op: "add", e: 2, a: TAG_NAME, v: "typescript" },
-        { op: "add", e: 3, a: TAG_NAME, v: "database" },
-      ]);
+      await db.transact(
+        datoms(
+          { entityId: 1, [TAG_NAME]: "javascript" },
+          { entityId: 2, [TAG_NAME]: "typescript" },
+          { entityId: 3, [TAG_NAME]: "database" }
+        )
+      );
 
       const results = await db.query({
         find: { e: ["?e"], name: ["?name"] },
@@ -783,28 +884,42 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       const { db } = f;
 
       // Create author
-      await db.transact([
-        { op: "add", e: 1, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: 1, a: USER_NAME, v: "Author" },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 1,
+          [USER_TYPE]: USER_TYPE_AUTHOR,
+          [USER_NAME]: "Author",
+        })
+      );
 
       // Create post
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "My Post" },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_PUBLISHED },
-        { op: "add", e: 100, a: POST_AUTHOR, v: 1 },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 100,
+          [POST_TITLE]: "My Post",
+          [POST_STATUS]: POST_STATUS_PUBLISHED,
+          [POST_AUTHOR]: 1,
+        })
+      );
 
       // Create tags
-      await db.transact([
-        { op: "add", e: 1, a: TAG_NAME, v: "javascript" },
-        { op: "add", e: 2, a: TAG_NAME, v: "typescript" },
-      ]);
+      await db.transact(
+        datoms(
+          { entityId: 1, [TAG_NAME]: "javascript" },
+          { entityId: 2, [TAG_NAME]: "typescript" }
+        )
+      );
 
       // Associate tags with post
       await db.transact([
-        { op: "add", e: 100, a: POST_TAG, v: 1 },
-        { op: "add", e: 100, a: POST_TAG, v: 2 },
+        ...datoms({
+          entityId: 100,
+          [POST_TAG]: 1,
+        }),
+        ...datoms({
+          entityId: 100,
+          [POST_TAG]: 2,
+        }),
       ]);
 
       const results = await db.query({
@@ -832,28 +947,41 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       const { db } = f;
 
       // Create author
-      await db.transact([
-        { op: "add", e: 1, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: 1, a: USER_NAME, v: "Author" },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 1,
+          [USER_TYPE]: USER_TYPE_AUTHOR,
+          [USER_NAME]: "Author",
+        })
+      );
 
       // Create tags
-      await db.transact([
-        { op: "add", e: 1, a: TAG_NAME, v: "javascript" },
-        { op: "add", e: 2, a: TAG_NAME, v: "typescript" },
-      ]);
+      await db.transact(
+        datoms(
+          { entityId: 1, [TAG_NAME]: "javascript" },
+          { entityId: 2, [TAG_NAME]: "typescript" }
+        )
+      );
 
       // Create posts
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "JS Post" },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_PUBLISHED },
-        { op: "add", e: 100, a: POST_AUTHOR, v: 1 },
-        { op: "add", e: 100, a: POST_TAG, v: 1 },
-        { op: "add", e: 101, a: POST_TITLE, v: "TS Post" },
-        { op: "add", e: 101, a: POST_STATUS, v: POST_STATUS_PUBLISHED },
-        { op: "add", e: 101, a: POST_AUTHOR, v: 1 },
-        { op: "add", e: 101, a: POST_TAG, v: 2 },
-      ]);
+      await db.transact(
+        datoms(
+          {
+            entityId: 100,
+            [POST_TITLE]: "JS Post",
+            [POST_STATUS]: POST_STATUS_PUBLISHED,
+            [POST_AUTHOR]: 1,
+            [POST_TAG]: 1,
+          },
+          {
+            entityId: 101,
+            [POST_TITLE]: "TS Post",
+            [POST_STATUS]: POST_STATUS_PUBLISHED,
+            [POST_AUTHOR]: 1,
+            [POST_TAG]: 2,
+          }
+        )
+      );
 
       // Query posts with javascript tag
       const results = await db.query({
@@ -876,41 +1004,57 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       // Create author
       const authorId = 1;
-      await db.transact([
-        { op: "add", e: authorId, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: authorId, a: USER_NAME, v: "Author" },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: authorId,
+          [USER_TYPE]: USER_TYPE_AUTHOR,
+          [USER_NAME]: "Author",
+        })
+      );
 
       // Create draft post
-      await db.transact([
-        { op: "add", e: 100, a: POST_TITLE, v: "My Blog Post" },
-        { op: "add", e: 100, a: POST_CONTENT, v: "Initial content" },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
-        { op: "add", e: 100, a: POST_AUTHOR, v: authorId },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 100,
+          [POST_TITLE]: "My Blog Post",
+          [POST_CONTENT]: "Initial content",
+          [POST_STATUS]: POST_STATUS_DRAFT,
+          [POST_AUTHOR]: authorId,
+        })
+      );
 
       // Edit post
       await db.transact([
         { op: "sub", e: 100, a: POST_CONTENT, v: "Initial content" },
-        { op: "add", e: 100, a: POST_CONTENT, v: "Updated content" },
+        ...datoms({
+          entityId: 100,
+          [POST_CONTENT]: "Updated content",
+        }),
       ]);
 
       // Create tags
-      await db.transact([
-        { op: "add", e: 1, a: TAG_NAME, v: "javascript" },
-        { op: "add", e: 2, a: TAG_NAME, v: "tutorial" },
-      ]);
+      await db.transact(
+        datoms(
+          { entityId: 1, [TAG_NAME]: "javascript" },
+          { entityId: 2, [TAG_NAME]: "tutorial" }
+        )
+      );
 
       // Add tags to post
-      await db.transact([
-        { op: "add", e: 100, a: POST_TAG, v: 1 },
-        { op: "add", e: 100, a: POST_TAG, v: 2 },
-      ]);
+      await db.transact(
+        datoms(
+          { entityId: 100, [POST_TAG]: 1 },
+          { entityId: 100, [POST_TAG]: 2 }
+        )
+      );
 
       // Publish post
       await db.transact([
         { op: "sub", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
-        { op: "add", e: 100, a: POST_STATUS, v: POST_STATUS_PUBLISHED },
+        datoms({
+          entityId: 100,
+          [POST_STATUS]: POST_STATUS_PUBLISHED,
+        }),
       ]);
 
       // Verify final state

@@ -623,7 +623,7 @@ export abstract class DatomDatabase implements DatomReader {
    * );
    */
   async transact(
-    ops: DatomInput[],
+    ops: (DatomInput | DatomInput[])[],
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>
   ): Promise<TransactionId> {
@@ -640,7 +640,7 @@ export abstract class DatomDatabase implements DatomReader {
     const adds: DatomInput[] = [];
     const subs: DatomInput[] = [];
 
-    for (const op of ops) {
+    for (const op of ops.flat()) {
       const datom = { e: op.e, a: op.a, v: op.v, op: op.op };
 
       if (op.op === "add") {

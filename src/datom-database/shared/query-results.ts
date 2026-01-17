@@ -3,7 +3,7 @@
  */
 
 import type { QueryClause, QueryResult } from "../../datalog/datalog.js";
-import type { Attribute, Value } from "../../types.js";
+import type { Attribute, Value } from "../../datoms.js";
 import {
   hasAggregations,
   applyAggregations,

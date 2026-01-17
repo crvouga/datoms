@@ -4,7 +4,8 @@
  */
 
 import type { DatomDatabase } from "../datom-database.js";
-import type { Datom, DatomInput, QueryOptions } from "../../types.js";
+import type { QueryOptions } from "../../types.js";
+import type { Datom, DatomInput } from "../../datoms.js";
 
 /**
  * Export all datoms from the database as an async iterable

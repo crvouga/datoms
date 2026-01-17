@@ -2,7 +2,7 @@
  * Types and interfaces for aggregation functions
  */
 
-import type { Attribute, Value } from "../../../types.js";
+import type { Attribute, Value } from "../../../datoms.js";
 
 /**
  * Aggregation function that computes a value from an array of values

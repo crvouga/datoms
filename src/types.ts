@@ -2,108 +2,25 @@
  * Core types for the datoms database
  */
 
-/**
- * A unique identifier for an entity
- */
-export type EntityId = number | string;
+// Re-export core datom types and utilities from datoms module
+export { datoms, records } from "./datoms.js";
+export type {
+  Attribute,
+  Datom,
+  DatomInput,
+  EntityId,
+  TransactionId,
+  Value,
+} from "./datoms.js";
 
-/**
- * An attribute name (e.g., "name", "age", "email")
- */
-export type Attribute = string;
-
-/**
- * A value that can be stored in a datom.
- *
- * **Type Safety:** This is a strict union type of allowed value types.
- * All values must be one of these types - no other types are permitted.
- *
- * **Supported Types:**
- * - Primitives: `string`, `number`, `boolean`
- * - Temporal: `Date` objects
- * - Nullability: `null`, `undefined` (for optional attributes)
- * - References: `EntityId` (number | string) for entity relationships
- *
- * **Note:** `EntityId` is included here to allow referencing other entities as values.
- * Since `EntityId` can be `number | string`, numeric entity IDs overlap with
- * the `number` type, which is intentional and handled correctly by TypeScript.
- *
- * @example
- * // Valid values:
- * [1, "name", "Alice"]                    // string
- * [1, "age", 30]                          // number
- * [1, "active", true]                      // boolean
- * [1, "createdAt", new Date()]            // Date
- * [1, "middleName", null]                 // null
- * [1, "optional", undefined]              // undefined
- * [1, "parent", 42]                       // EntityId (number)
- * [1, "owner", "user-123"]               // EntityId (string)
- */
-export type Value =
-  | string
-  | number
-  | boolean
-  | Date
-  | null
-  | undefined
-  | EntityId;
-
-/**
- * A transaction ID (monotonically increasing)
- */
-export type TransactionId = number;
-
-/**
- * A datom represents a fact: { e: entity, a: attribute, v: value, tx: transaction, op: "add" | "sub" }
- * This is the fundamental unit of data in a datalog database
- */
-export type Datom = {
-  /** The entity this datom describes */
-  e: EntityId;
-  /** The attribute being asserted */
-  a: Attribute;
-  /** The value of the attribute */
-  v: Value;
-  /** The transaction ID when this datom was add */
-  tx: TransactionId;
-  /** The operation type (add or sub) */
-  op: "add" | "sub";
-};
-
-export const datoms = <T extends { entityId: EntityId }>(
-  ...records: (T | T[])[]
-): DatomInput[] => {
-  return records.flatMap((r) =>
-    (Array.isArray(r) ? r : [r]).flatMap((r) => {
-      const datoms: DatomInput[] = [];
-      for (const [key, value] of Object.entries(r)) {
-        datoms.push({
-          e: r.entityId,
-          a: key,
-          v: value as Value,
-          op: "add",
-        });
-      }
-      return datoms;
-    })
-  );
-};
-
-/**
- * A partial datom for adding/subtracting facts (without tx and add)
- * Tuple format: [entity, attribute, value]
- * This is more efficient and aligns with the fixed EAV structure
- */
-export type DatomInput = {
-  /** The entity this datom describes */
-  e: EntityId;
-  /** The attribute being asserted */
-  a: Attribute;
-  /** The value of the attribute */
-  v: Value;
-  /** The operation type (add or sub) */
-  op: "add" | "sub";
-};
+// Import types for use in this file
+import type {
+  Attribute,
+  Datom,
+  EntityId,
+  TransactionId,
+  Value,
+} from "./datoms.js";
 
 /**
  * Options for querying datoms
