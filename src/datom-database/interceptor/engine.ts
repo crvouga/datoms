@@ -290,14 +290,17 @@ export class TransactionError extends DatomDatabaseError {
  * filter results, or perform side effects
  */
 export class InterceptorEngine {
-  private beforeReadInterceptors: BeforeRead[] = [];
-  private afterReadInterceptors: AfterRead[] = [];
-  private beforeWriteInterceptors: BeforeWrite[] = [];
-  private afterWriteInterceptors: Array<{
-    type: "afterWrite";
-    name: string;
-    execute: (tx: Transaction, ctx: WriteContext) => Promise<void>;
-  }> = [];
+  private beforeRead: BeforeRead[];
+  private afterRead: AfterRead[];
+  private beforeWrite: BeforeWrite[];
+  private afterWrite: AfterWrite[];
+
+  constructor() {
+    this.beforeRead = [];
+    this.afterRead = [];
+    this.beforeWrite = [];
+    this.afterWrite = [];
+  }
 
   /**
    * Register an interceptor
@@ -313,14 +316,20 @@ export class InterceptorEngine {
    * });
    */
   register(interceptor: Interceptor): void {
-    if (interceptor.type === "beforeRead") {
-      this.beforeReadInterceptors.push(interceptor);
-    } else if (interceptor.type === "afterRead") {
-      this.afterReadInterceptors.push(interceptor);
-    } else if (interceptor.type === "beforeWrite") {
-      this.beforeWriteInterceptors.push(interceptor);
-    } else {
-      this.afterWriteInterceptors.push(interceptor);
+    switch (interceptor.type) {
+      case "beforeRead":
+        this.beforeRead.push(interceptor);
+        break;
+      case "afterRead":
+        this.afterRead.push(interceptor);
+        break;
+      case "beforeWrite":
+        this.beforeWrite.push(interceptor);
+        break;
+      case "afterWrite":
+      default:
+        this.afterWrite.push(interceptor);
+        break;
     }
   }
 
@@ -340,7 +349,7 @@ export class InterceptorEngine {
     let result = query;
     const allErrors: InterceptorErrorWithName[] = [];
 
-    for (const interceptor of this.beforeReadInterceptors) {
+    for (const interceptor of this.beforeRead) {
       const interceptorResult = await interceptor.execute(result, ctx);
 
       result = interceptorResult.query as DatalogQuery;
@@ -373,7 +382,7 @@ export class InterceptorEngine {
   async runAfterRead(datoms: Datom[], ctx: ReadContext): Promise<Datom[]> {
     let result = datoms;
 
-    for (const interceptor of this.afterReadInterceptors) {
+    for (const interceptor of this.afterRead) {
       result = await interceptor.execute(result, ctx);
     }
 
@@ -396,7 +405,7 @@ export class InterceptorEngine {
     let result = tx;
     const allErrors: InterceptorErrorWithName[] = [];
 
-    for (const interceptor of this.beforeWriteInterceptors) {
+    for (const interceptor of this.beforeWrite) {
       const interceptorResult = await interceptor.execute(result, ctx);
 
       result = interceptorResult.tx;
@@ -428,7 +437,7 @@ export class InterceptorEngine {
    */
   async runAfterWrite(tx: Transaction, ctx: WriteContext): Promise<void> {
     await Promise.allSettled(
-      this.afterWriteInterceptors.map((interceptor) =>
+      this.afterWrite.map((interceptor) =>
         interceptor.execute(tx, ctx).catch((err) => {
           console.error(
             `After-write interceptor "${interceptor.name}" failed:`,

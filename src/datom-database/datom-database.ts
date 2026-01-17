@@ -294,7 +294,7 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
   constructor(
     db: DatomDatabase,
     private speculativeAdds: Datom[],
-    private speculativesubs: Datom[]
+    private speculativeSubs: Datom[]
   ) {
     super(db);
   }
@@ -328,7 +328,7 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
     }
 
     // Apply subs first (remove matching datoms)
-    for (const sub of this.speculativesubs) {
+    for (const sub of this.speculativeSubs) {
       const key = `${String(sub.e)}|${String(sub.a)}|${JSON.stringify(sub.v)}`;
       baseMap.delete(key);
     }
@@ -485,17 +485,6 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
  * Provides a read-only view of what the database would look like after applying the transaction
  * without actually committing the changes
  */
-export interface WithResult {
-  /** The database state before applying the transaction (read-only view) */
-  dbBefore: DatabaseView;
-  /** The database state after applying the transaction (read-only speculative view) */
-  dbAfter: DatabaseView;
-  /** The datoms that would be applied by this transaction */
-  txData: Datom[];
-  /** Map of temporary IDs to resolved entity IDs (empty for now, reserved for future tempid support) */
-  tempIds: Record<string, EntityId>;
-}
-
 export abstract class DatomDatabase implements DatabaseView {
   protected initialized = false;
   public readonly interceptors: InterceptorEngine;
@@ -555,7 +544,7 @@ export abstract class DatomDatabase implements DatabaseView {
    *   { userId: "alice", syncSource: "client" }
    * );
    */
-  async write(
+  async transact(
     ops: (DatomInput | DatomInput[])[],
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>
@@ -1183,6 +1172,17 @@ export abstract class DatomDatabase implements DatabaseView {
       await this.initialize();
     }
   }
+}
+
+export interface WithResult {
+  /** The database state before applying the transaction (read-only view) */
+  dbBefore: DatabaseView;
+  /** The database state after applying the transaction (read-only speculative view) */
+  dbAfter: DatabaseView;
+  /** The datoms that would be applied by this transaction */
+  txData: Datom[];
+  /** Map of temporary IDs to resolved entity IDs (empty for now, reserved for future tempid support) */
+  tempIds: Record<string, EntityId>;
 }
 
 // Re-export error classes and types from interceptor engine

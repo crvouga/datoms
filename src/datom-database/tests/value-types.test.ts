@@ -18,7 +18,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should handle boolean values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "active", v: true },
         { op: "add", e: 2, a: "active", v: false },
         { op: "add", e: 3, a: "active", v: true },
@@ -43,7 +43,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const date2 = new Date("2023-02-01");
       const date3 = new Date("2023-01-01");
 
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "created", v: date1 },
         { op: "add", e: 2, a: "created", v: date2 },
         { op: "add", e: 3, a: "created", v: date3 },
@@ -67,7 +67,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle null values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "middleName", v: null },
         { op: "add", e: 2, a: "middleName", v: "Smith" },
         { op: "add", e: 3, a: "middleName", v: null },
@@ -88,7 +88,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle undefined values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "optional", v: undefined },
         { op: "add", e: 2, a: "optional", v: "value" },
         { op: "add", e: 3, a: "optional", v: undefined },
@@ -114,7 +114,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle mixed value types", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "data", v: "string" },
         { op: "add", e: 1, a: "data", v: 42 },
         { op: "add", e: 1, a: "data", v: true },

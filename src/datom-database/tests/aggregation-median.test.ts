@@ -18,7 +18,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Aggregation: median", () => {
     test("should calculate median of odd number of values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "age", v: 20 },
         { op: "add", e: 2, a: "age", v: 30 },
         { op: "add", e: 3, a: "age", v: 40 },
@@ -38,7 +38,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate median of even number of values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "age", v: 20 },
         { op: "add", e: 2, a: "age", v: 30 },
         { op: "add", e: 3, a: "age", v: 40 },
@@ -76,7 +76,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate median of single value", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "score", v: 85 }]);
+      await db.transact([{ op: "add", e: 1, a: "score", v: 85 }]);
 
       const query: DatalogQuery = {
         find: { median: ["median", "?score"] },
@@ -92,7 +92,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate median with unsorted values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: 50 },
         { op: "add", e: 2, a: "value", v: 10 },
         { op: "add", e: 3, a: "value", v: 30 },
@@ -115,7 +115,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate median with duplicate values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: 10 },
         { op: "add", e: 2, a: "value", v: 20 },
         { op: "add", e: 3, a: "value", v: 20 },
@@ -137,7 +137,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate median with filters", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "type", v: "student" },
         { op: "add", e: 1, a: "score", v: 80 },
         { op: "add", e: 2, a: "type", v: "student" },
@@ -166,7 +166,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate median with decimal numbers", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "price", v: 10.5 },
         { op: "add", e: 2, a: "price", v: 20.5 },
         { op: "add", e: 3, a: "price", v: 30.5 },

@@ -18,7 +18,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should handle variable in entity position", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
         { op: "add", e: 3, a: "age", v: 30 },
@@ -41,7 +41,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle variable in attribute position", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 30 },
         { op: "add", e: 2, a: "name", v: "Bob" },
@@ -65,7 +65,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle all positions as variables", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 30 },
         { op: "add", e: 2, a: "name", v: "Bob" },
@@ -95,7 +95,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle string entity IDs", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: "user-1", a: "name", v: "Alice" },
         { op: "add", e: "user-2", a: "name", v: "Bob" },
         { op: "add", e: "user-1", a: "age", v: 30 },

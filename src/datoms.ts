@@ -53,6 +53,8 @@ export type Value =
  */
 export type TransactionId = number;
 
+export type DatomOperation = "add" | "sub";
+
 /**
  * A datom represents a fact: { e: entity, a: attribute, v: value, tx: transaction, op: "add" | "sub" }
  * This is the fundamental unit of data in a datalog database
@@ -67,7 +69,7 @@ export type Datom = {
   /** The transaction ID when this datom was add */
   tx: TransactionId;
   /** The operation type (add or sub) */
-  op: "add" | "sub";
+  op: DatomOperation;
 };
 
 /**
@@ -83,7 +85,7 @@ export type DatomInput = {
   /** The value of the attribute */
   v: Value;
   /** The operation type (add or sub) */
-  op: "add" | "sub";
+  op: DatomOperation;
 };
 
 /**

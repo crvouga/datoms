@@ -29,7 +29,7 @@ describe.each(FIXTURES)(
       test("should register before-read interceptor", async () => {
         const { db } = f;
 
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         let called = false;
         const interceptor: BeforeRead = {
@@ -54,7 +54,7 @@ describe.each(FIXTURES)(
       test("should register after-read interceptor", async () => {
         const { db } = f;
 
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         let called = false;
         const interceptor: AfterRead = {
@@ -90,7 +90,7 @@ describe.each(FIXTURES)(
         };
 
         db.interceptors.register(interceptor);
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         expect(called).toBe(true);
         await db.close();
@@ -109,7 +109,7 @@ describe.each(FIXTURES)(
         };
 
         db.interceptors.register(interceptor);
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         // Wait a bit for async after-write interceptors
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -123,7 +123,7 @@ describe.each(FIXTURES)(
       test("should modify query before execution", async () => {
         const { db } = f;
 
-        await db.write([
+        await db.transact([
           { op: "add", e: 1, a: "name", v: "Alice" },
           { op: "add", e: 2, a: "name", v: "Bob" },
         ]);
@@ -249,7 +249,7 @@ describe.each(FIXTURES)(
       test("should filter results", async () => {
         const { db } = f;
 
-        await db.write([
+        await db.transact([
           { op: "add", e: 1, a: "name", v: "Alice" },
           { op: "add", e: 2, a: "name", v: "Bob" },
           { op: "add", e: 3, a: "name", v: "Alice" },
@@ -279,7 +279,7 @@ describe.each(FIXTURES)(
       test("should transform results", async () => {
         const { db } = f;
 
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         const interceptor: AfterRead = {
           type: "afterRead",
@@ -309,7 +309,7 @@ describe.each(FIXTURES)(
       test("should chain multiple after-read interceptors", async () => {
         const { db } = f;
 
-        await db.write([
+        await db.transact([
           { op: "add", e: 1, a: "name", v: "Alice" },
           { op: "add", e: 2, a: "name", v: "Bob" },
           { op: "add", e: 3, a: "name", v: "Charlie" },
@@ -347,7 +347,7 @@ describe.each(FIXTURES)(
       test("should pass context to after-read interceptor", async () => {
         const { db } = f;
 
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         let receivedContext: Record<string, unknown> | undefined;
 
@@ -406,13 +406,13 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor);
 
         // Valid email should succeed
-        await db.write([
+        await db.transact([
           { op: "add", e: 1, a: "email", v: "alice@example.com" },
         ]);
 
         // Invalid email should fail
         await expect(
-          db.write([{ op: "add", e: 2, a: "email", v: "invalid-email" }])
+          db.transact([{ op: "add", e: 2, a: "email", v: "invalid-email" }])
         ).rejects.toThrow(TransactionError);
 
         await db.close();
@@ -451,7 +451,7 @@ describe.each(FIXTURES)(
 
         db.interceptors.register(interceptor);
 
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         const datoms = await db.datoms({ e: 1 });
         const hasTimestamp = datoms.some((d) => d.a === "updatedAt");
@@ -486,7 +486,7 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor1);
         db.interceptors.register(interceptor2);
 
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         expect(firstCalled).toBe(true);
         expect(secondCalled).toBe(false);
@@ -509,7 +509,7 @@ describe.each(FIXTURES)(
 
         db.interceptors.register(interceptor);
 
-        await db.write(
+        await db.transact(
           [{ op: "add", e: 1, a: "name", v: "Alice" }],
           { userId: "alice", reason: "test" },
           { source: "client", ip: "127.0.0.1" }
@@ -568,11 +568,11 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor2);
 
         // This should pass (no errors)
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         // This should fail with age validation error
         await expect(
-          db.write([{ op: "add", e: 2, a: "age", v: -5 }])
+          db.transact([{ op: "add", e: 2, a: "age", v: -5 }])
         ).rejects.toThrow(TransactionError);
 
         await db.close();
@@ -597,7 +597,7 @@ describe.each(FIXTURES)(
 
         db.interceptors.register(interceptor);
 
-        const txId = await db.write([
+        const txId = await db.transact([
           { op: "add", e: 1, a: "name", v: "Alice" },
         ]);
 
@@ -631,7 +631,7 @@ describe.each(FIXTURES)(
 
         try {
           // Transaction should succeed even if after-write interceptor fails
-          const txId = await db.write([
+          const txId = await db.transact([
             { op: "add", e: 1, a: "name", v: "Alice" },
           ]);
 
@@ -673,7 +673,7 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor1);
         db.interceptors.register(interceptor2);
 
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         // Wait for async after-write interceptors
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -697,7 +697,7 @@ describe.each(FIXTURES)(
 
         db.interceptors.register(interceptor);
 
-        await db.write(
+        await db.transact(
           [{ op: "add", e: 1, a: "name", v: "Alice" }],
           { userId: "alice", reason: "test" },
           { source: "client", ip: "127.0.0.1" }
@@ -792,7 +792,7 @@ describe.each(FIXTURES)(
         db.interceptors.register(readInterceptor);
         db.interceptors.register(writeInterceptor);
 
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
         expect(writeCalled).toBe(true);
 
         await db.query({
@@ -831,7 +831,7 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor);
 
         try {
-          await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+          await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
           throw new Error("Should have thrown TransactionError");
         } catch (error: unknown) {
           expect(error).toBeInstanceOf(TransactionError);
@@ -883,7 +883,7 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor2);
         db.interceptors.register(interceptor3);
 
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         expect(executionOrder).toEqual(["first", "second", "third"]);
         await db.close();
@@ -906,7 +906,7 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor);
 
         // Empty transaction (should still create a transaction ID)
-        await db.write([]);
+        await db.transact([]);
 
         expect(called).toBe(true);
         await db.close();
@@ -915,7 +915,7 @@ describe.each(FIXTURES)(
       test("should handle sub operations with interceptors", async () => {
         const { db } = f;
 
-        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         let called = false;
         const interceptor: BeforeWrite = {
@@ -931,7 +931,7 @@ describe.each(FIXTURES)(
 
         db.interceptors.register(interceptor);
 
-        await db.write([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
 
         expect(called).toBe(true);
         const datoms = await db.datoms({ e: 1 });

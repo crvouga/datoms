@@ -18,7 +18,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Aggregation: count", () => {
     test("should count all matching values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "age", v: 25 },
         { op: "add", e: 2, a: "age", v: 30 },
         { op: "add", e: 3, a: "age", v: 35 },
@@ -52,7 +52,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should count single value", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const query: DatalogQuery = {
         find: { total: ["count", "?name"] },
@@ -68,7 +68,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should count with filters", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "type", v: "person" },
         { op: "add", e: 2, a: "type", v: "person" },
         { op: "add", e: 3, a: "type", v: "car" },
@@ -88,7 +88,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should count with multiple clauses", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 25 },
         { op: "add", e: 2, a: "name", v: "Bob" },
@@ -112,7 +112,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should count different data types", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: 42 },
         { op: "add", e: 2, a: "value", v: "test" },
         { op: "add", e: 3, a: "value", v: true },

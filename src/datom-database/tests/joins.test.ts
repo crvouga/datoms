@@ -18,7 +18,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should handle multiple where clauses (join)", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 30 },
         { op: "add", e: 2, a: "name", v: "Bob" },
@@ -45,7 +45,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle complex joins with multiple entities and attributes", async () => {
       const { db } = f;
       // Create a company structure: employees, departments, and their relationships
-      await db.write([
+      await db.transact([
         // Employees
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "role", v: "engineer" },
@@ -90,7 +90,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle queries with multiple constraints on same entity", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 30 },
         { op: "add", e: 1, a: "city", v: "NYC" },
@@ -122,7 +122,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle complex variable bindings across multiple clauses", async () => {
       const { db } = f;
       // Create a network of connections
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Node1" },
         { op: "add", e: 2, a: "name", v: "Node2" },
         { op: "add", e: 3, a: "name", v: "Node3" },
@@ -154,7 +154,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle join with no matching results", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
         { op: "add", e: 3, a: "age", v: 30 },
@@ -178,7 +178,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle join with incompatible variable bindings", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 30 },
         { op: "add", e: 2, a: "name", v: "Bob" },
@@ -206,7 +206,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle join with multiple common variables", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 30 },
         { op: "add", e: 1, a: "city", v: "NYC" },
@@ -236,7 +236,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle variable binding across disconnected clauses", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 30 },
         { op: "add", e: 2, a: "name", v: "Bob" },

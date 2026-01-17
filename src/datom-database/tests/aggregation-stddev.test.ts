@@ -18,7 +18,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Aggregation: stddev", () => {
     test("should calculate standard deviation of numeric values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: 10 },
         { op: "add", e: 2, a: "value", v: 20 },
         { op: "add", e: 3, a: "value", v: 30 },
@@ -55,7 +55,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return 0 or null for single value", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "value", v: 10 }]);
+      await db.transact([{ op: "add", e: 1, a: "value", v: 10 }]);
 
       const query: DatalogQuery = {
         find: { stddev: ["stddev", "?value"] },
@@ -76,7 +76,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate standard deviation with identical values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: 10 },
         { op: "add", e: 2, a: "value", v: 10 },
         { op: "add", e: 3, a: "value", v: 10 },
@@ -97,7 +97,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate standard deviation with negative numbers", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: -10 },
         { op: "add", e: 2, a: "value", v: 0 },
         { op: "add", e: 3, a: "value", v: 10 },
@@ -118,7 +118,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate standard deviation with decimal numbers", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: 10.5 },
         { op: "add", e: 2, a: "value", v: 20.5 },
         { op: "add", e: 3, a: "value", v: 30.5 },
@@ -139,7 +139,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate standard deviation with filters", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "type", v: "group1" },
         { op: "add", e: 1, a: "score", v: 80 },
         { op: "add", e: 2, a: "type", v: "group1" },
@@ -168,7 +168,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate standard deviation with larger dataset", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: 1 },
         { op: "add", e: 2, a: "value", v: 2 },
         { op: "add", e: 3, a: "value", v: 3 },

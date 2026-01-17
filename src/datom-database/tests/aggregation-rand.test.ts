@@ -18,7 +18,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Aggregation: rand", () => {
     test("should return a random value from the set", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: 10 },
         { op: "add", e: 2, a: "value", v: 20 },
         { op: "add", e: 3, a: "value", v: 30 },
@@ -57,7 +57,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return single value when only one exists", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "value", v: 42 }]);
+      await db.transact([{ op: "add", e: 1, a: "value", v: 42 }]);
 
       const query: DatalogQuery = {
         find: { random: ["rand", "seed123", "?value"] },
@@ -73,7 +73,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return consistent result with same seed", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: 10 },
         { op: "add", e: 2, a: "value", v: 20 },
         { op: "add", e: 3, a: "value", v: 30 },
@@ -95,7 +95,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return different results with different seeds", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: 10 },
         { op: "add", e: 2, a: "value", v: 20 },
         { op: "add", e: 3, a: "value", v: 30 },
@@ -127,7 +127,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should work with string values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
         { op: "add", e: 3, a: "name", v: "Charlie" },
@@ -149,7 +149,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should work with filters", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "type", v: "product" },
         { op: "add", e: 1, a: "price", v: 100 },
         { op: "add", e: 2, a: "type", v: "product" },

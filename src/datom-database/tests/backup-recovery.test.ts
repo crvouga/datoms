@@ -20,7 +20,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
   describe("export", () => {
     test("should return async iterable", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
       ]);
@@ -37,7 +37,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should export with filters", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 30 },
         { op: "add", e: 2, a: "name", v: "Bob" },
@@ -55,7 +55,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should export without filters (full scan)", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
         { op: "add", e: 3, a: "name", v: "Charlie" },
@@ -71,7 +71,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should emit backup events", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
       ]);
@@ -143,7 +143,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
   describe("import", () => {
     test("should import from async iterable", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
       ]);
@@ -182,7 +182,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       // Create many datoms
       const datoms: Datom[] = [];
       for (let i = 1; i <= 50; i++) {
-        await db.write([{ op: "add", e: i, a: "name", v: `Entity${i}` }]);
+        await db.transact([{ op: "add", e: i, a: "name", v: `Entity${i}` }]);
         const entityDatoms = await db.datoms({ e: i });
         datoms.push(...entityDatoms);
       }
@@ -219,7 +219,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should import with validation", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "age", v: 30 }]);
+      await db.transact([{ op: "add", e: 1, a: "age", v: 30 }]);
 
       // Export
       const exported: Datom[] = [];
@@ -256,7 +256,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should import without validation", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       // Export
       const exported: Datom[] = [];
@@ -286,7 +286,7 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should emit restore events", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
       ]);

@@ -268,7 +268,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: row.op as "add" | "sub",
+        op: typeof row.op === "string" && row.op === "add" ? "add" : "sub",
       };
     });
   }
@@ -419,7 +419,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: row.op as "add" | "sub",
+        op: typeof row.op === "string" && row.op === "add" ? "add" : "sub",
       };
     });
   }
@@ -704,7 +704,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: row.op as "add" | "sub",
+        op: typeof row.op === "string" && row.op === "add" ? "add" : "sub",
       };
     });
   }

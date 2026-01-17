@@ -17,6 +17,7 @@ export type {
 import type {
   Attribute,
   Datom,
+  DatomOperation,
   EntityId,
   TransactionId,
   Value,
@@ -35,7 +36,7 @@ export interface QueryOptions {
   /** Filter by transaction ID */
   tx?: TransactionId;
   /** Filter by operation type */
-  op?: "add" | "sub";
+  op?: DatomOperation;
   /** Limit the number of results */
   limit?: number;
   /** Offset for pagination */

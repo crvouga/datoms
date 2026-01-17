@@ -18,7 +18,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should execute successful transaction", async () => {
       const { db } = f;
 
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       // Use with() to see what the transaction would look like
       const initial = await db.datoms({ e: 1 });
@@ -31,7 +31,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(updated).toHaveLength(2);
 
       // Now commit the changes
-      await db.write([{ op: "add", e: 1, a: "status", v: "pending" }]);
+      await db.transact([{ op: "add", e: 1, a: "status", v: "pending" }]);
 
       // Verify changes are committed
       const final = await db.datoms({ e: 1 });
@@ -46,7 +46,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should not commit changes when using with()", async () => {
       const { db } = f;
 
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       // Use with() to see what the transaction would look like
       const withResult = await db.with([
@@ -68,7 +68,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should see speculative changes with with()", async () => {
       const { db } = f;
 
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       // Query before adding
       const before = await db.datoms({ e: 1 });
@@ -90,7 +90,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle sub with with()", async () => {
       const { db } = f;
 
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 30 },
       ]);
@@ -104,7 +104,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(result[0].v).toBe("Alice");
 
       // Now commit the subion
-      await db.write([{ op: "sub", e: 1, a: "age", v: 30 }]);
+      await db.transact([{ op: "sub", e: 1, a: "age", v: 30 }]);
 
       // Verify subion is committed
       const final = await db.datoms({ e: 1 });
@@ -117,7 +117,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle query with with()", async () => {
       const { db } = f;
 
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
       ]);
@@ -144,13 +144,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
 
       // First add initial data
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 30 },
       ]);
 
       // Then update in a single transaction: sub old age, add new age, add Bob
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "age", v: 31 },
         { op: "add", e: 2, a: "name", v: "Bob" },
         { op: "sub", e: 1, a: "age", v: 30 },
@@ -174,7 +174,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should not commit changes when using with()", async () => {
       const { db } = f;
 
-      await db.write([{ op: "add", e: 1, a: "name", v: "Initial" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Initial" }]);
 
       // Use with() to see what the transaction would look like
       const withResult = await db.with([
@@ -201,7 +201,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle query with with()", async () => {
       const { db } = f;
 
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const nameResults = await db.query({
         find: { v: ["?v"] },
@@ -223,7 +223,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle datoms query with with()", async () => {
       const { db } = f;
 
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       let entity = await db.datoms({ e: 1, op: "add" });
       expect(entity).toHaveLength(1);
@@ -239,7 +239,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle hasFact with with()", async () => {
       const { db } = f;
 
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const nameDatoms = await db.datoms({
         e: 1,
@@ -265,7 +265,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle complex query with with()", async () => {
       const { db } = f;
 
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "department", v: "Engineering" },
         { op: "add", e: 2, a: "name", v: "Bob" },
@@ -304,11 +304,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return latest transaction ID after adding datoms", async () => {
       const { db } = f;
-      const tx1 = await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      const tx1 = await db.transact([
+        { op: "add", e: 1, a: "name", v: "Alice" },
+      ]);
       const latestTx = await db.getLatestTransaction();
       expect(latestTx).toBe(tx1);
 
-      const tx2 = await db.write([{ op: "add", e: 2, a: "name", v: "Bob" }]);
+      const tx2 = await db.transact([{ op: "add", e: 2, a: "name", v: "Bob" }]);
       const latestTx2 = await db.getLatestTransaction();
       expect(latestTx2).toBe(tx2);
       expect(latestTx2).toBeGreaterThan(tx1);
@@ -316,16 +318,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return latest transaction after subion", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
-      const tx2 = await db.write([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      const tx2 = await db.transact([
+        { op: "sub", e: 1, a: "name", v: "Alice" },
+      ]);
       const latestTx = await db.getLatestTransaction();
       expect(latestTx).toBe(tx2);
     });
 
     test("should return latest transaction after transact", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
-      const tx2 = await db.write([
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      const tx2 = await db.transact([
         { op: "add", e: 2, a: "name", v: "Bob" },
         { op: "sub", e: 1, a: "name", v: "Alice" },
       ]);
@@ -335,11 +339,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should work with transact()", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
       const beforeTx = await db.getLatestTransaction();
 
       // Use transact() to commit changes
-      const txId = await db.write([{ op: "add", e: 2, a: "name", v: "Bob" }]);
+      const txId = await db.transact([
+        { op: "add", e: 2, a: "name", v: "Bob" },
+      ]);
       expect(txId).toBeGreaterThan(beforeTx);
 
       // After commit, latest should be updated
@@ -352,7 +358,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("With Result", () => {
     test("should return dbBefore and dbAfter", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const withResult = await db.with([{ op: "add", e: 1, a: "age", v: 30 }]);
 
@@ -371,7 +377,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return txData", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const withResult = await db.with([
         { op: "add", e: 1, a: "age", v: 30 },

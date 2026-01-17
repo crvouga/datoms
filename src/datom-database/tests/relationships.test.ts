@@ -19,7 +19,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle multi-entity relationships (friendships)", async () => {
       const { db } = f;
       // Create people
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
         { op: "add", e: 3, a: "name", v: "Charlie" },
@@ -54,7 +54,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle transitive relationships (friends of friends)", async () => {
       const { db } = f;
       // Create people and friendships
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
         { op: "add", e: 3, a: "name", v: "Charlie" },
@@ -90,7 +90,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle parent-child relationships", async () => {
       const { db } = f;
       // Create a family tree
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
         { op: "add", e: 3, a: "name", v: "Charlie" },
@@ -128,7 +128,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle many-to-many relationships", async () => {
       const { db } = f;
       // Create students and courses with enrollments
-      await db.write([
+      await db.transact([
         // Students
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
@@ -170,7 +170,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle multi-valued attributes", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "tag", v: "red" },
         { op: "add", e: 1, a: "tag", v: "blue" },
         { op: "add", e: 1, a: "tag", v: "green" },

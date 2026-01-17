@@ -18,7 +18,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Aggregation: distinct", () => {
     test("should return distinct values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 2, a: "name", v: "Bob" },
         { op: "add", e: 3, a: "name", v: "Alice" },
@@ -66,7 +66,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return single value when only one exists", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const query: DatalogQuery = {
         find: { distinctNames: ["distinct", "?name"] },
@@ -87,7 +87,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return distinct numeric values", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "age", v: 25 },
         { op: "add", e: 2, a: "age", v: 30 },
         { op: "add", e: 3, a: "age", v: 25 },
@@ -114,7 +114,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return distinct values with filters", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "type", v: "person" },
         { op: "add", e: 1, a: "city", v: "NYC" },
         { op: "add", e: 2, a: "type", v: "person" },
@@ -147,7 +147,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return distinct different data types", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "value", v: 42 },
         { op: "add", e: 2, a: "value", v: "test" },
         { op: "add", e: 3, a: "value", v: 42 },

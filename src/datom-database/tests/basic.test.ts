@@ -22,7 +22,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
   test("should add datoms", async () => {
     const { db } = f;
-    const tx = await db.write([
+    const tx = await db.transact([
       { op: "add", e: 1, a: "name", v: "Alice" },
       { op: "add", e: 1, a: "age", v: 30 },
     ]);
@@ -38,7 +38,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
   test("should query datoms", async () => {
     const { db } = f;
-    await db.write([
+    await db.transact([
       { op: "add", e: 1, a: "name", v: "Alice" },
       { op: "add", e: 2, a: "name", v: "Bob" },
     ]);
@@ -49,8 +49,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
   test("should sub datoms", async () => {
     const { db } = f;
-    await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
-    await db.write([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
+    await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+    await db.transact([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
 
     const entity = await db.datoms({ e: 1, op: "add" });
     expect(entity).toHaveLength(0);
@@ -59,13 +59,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("subAttribute", () => {
     test("should sub all values for single-valued attribute", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "age", v: 30 },
       ]);
 
       const nameDatoms = await db.datoms({ e: 1, a: "name" });
-      await db.write(
+      await db.transact(
         nameDatoms.map((d) => ({
           op: "sub" as const,
           e: d.e,
@@ -89,7 +89,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should sub all values for multi-valued attribute", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "tag", v: "red" },
         { op: "add", e: 1, a: "tag", v: "blue" },
         { op: "add", e: 1, a: "tag", v: "green" },
@@ -97,7 +97,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const tagDatoms = await db.datoms({ e: 1, a: "tag" });
-      await db.write(
+      await db.transact(
         tagDatoms.map((d) => ({
           op: "sub" as const,
           e: d.e,
@@ -118,14 +118,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle subing non-existent attribute", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       // Should not throw, just return a transaction ID
       const nonexistentDatoms = await db.datoms({
         e: 1,
         a: "nonexistent",
       });
-      const tx = await db.write(
+      const tx = await db.transact(
         nonexistentDatoms.map((d) => ({
           op: "sub" as const,
           e: d.e,
@@ -138,7 +138,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should work within transactions", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "tag", v: "red" },
         { op: "add", e: 1, a: "tag", v: "blue" },
       ]);
@@ -163,7 +163,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(tags).toHaveLength(0);
 
       // Now commit the subion
-      await db.write(
+      await db.transact(
         tagDatoms.map((d) => ({
           op: "sub" as const,
           e: d.e,
@@ -179,7 +179,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should only sub specified entity-attribute pair", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "tag", v: "red" },
         { op: "add", e: 1, a: "tag", v: "blue" },
         { op: "add", e: 2, a: "tag", v: "red" },
@@ -187,7 +187,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       const tag1Datoms = await db.datoms({ e: 1, a: "tag" });
-      await db.write(
+      await db.transact(
         tag1Datoms.map((d) => ({
           op: "sub" as const,
           e: d.e,
@@ -210,7 +210,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("upsert", () => {
     test("should add value when attribute doesn't exist", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "status", v: "active" }]);
+      await db.transact([{ op: "add", e: 1, a: "status", v: "active" }]);
 
       const statusResults = await db.query({
         find: { v: ["?v"] },
@@ -222,8 +222,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should work for undefined cardinality (treats as many)", async () => {
       const { db } = f;
       // No schema definition
-      await db.write([{ op: "add", e: 1, a: "tag", v: "red" }]);
-      await db.write([{ op: "add", e: 1, a: "tag", v: "blue" }]);
+      await db.transact([{ op: "add", e: 1, a: "tag", v: "red" }]);
+      await db.transact([{ op: "add", e: 1, a: "tag", v: "blue" }]);
 
       const tags = await db.datoms({ e: 1, a: "tag" });
       expect(tags).toHaveLength(2);
@@ -234,7 +234,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should work within transactions", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "status", v: "pending" }]);
+      await db.transact([{ op: "add", e: 1, a: "status", v: "pending" }]);
 
       const existing = await db.datoms({ e: 1, a: "status" });
 
@@ -257,7 +257,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(statusResults[0]?.v).toBe("active");
 
       // Now commit the changes
-      await db.write([
+      await db.transact([
         ...existing.map((d) => ({
           op: "sub" as const,
           e: d.e,
@@ -278,7 +278,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
   test("should get value for entity-attribute", async () => {
     const { db } = f;
-    await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+    await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
     const nameResults = await db.query({
       find: { v: ["?v"] },
@@ -299,7 +299,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return value for single-valued attribute", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const results = await db.query({
         find: { v: ["?v"] },
@@ -310,9 +310,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return most recent value for multi-valued attribute", async () => {
       const { db } = f;
-      const tx1 = await db.write([{ op: "add", e: 1, a: "tag", v: "red" }]);
-      const tx2 = await db.write([{ op: "add", e: 1, a: "tag", v: "blue" }]);
-      const tx3 = await db.write([{ op: "add", e: 1, a: "tag", v: "green" }]);
+      const tx1 = await db.transact([{ op: "add", e: 1, a: "tag", v: "red" }]);
+      const tx2 = await db.transact([{ op: "add", e: 1, a: "tag", v: "blue" }]);
+      const tx3 = await db.transact([
+        { op: "add", e: 1, a: "tag", v: "green" },
+      ]);
 
       // Should return the value with highest tx
       const datoms = await db.datoms({ e: 1, a: "tag" });
@@ -322,11 +324,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return most recent value after subion", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "tag", v: "red" },
         { op: "add", e: 1, a: "tag", v: "blue" },
       ]);
-      await db.write([{ op: "sub", e: 1, a: "tag", v: "blue" }]);
+      await db.transact([{ op: "sub", e: 1, a: "tag", v: "blue" }]);
 
       // Latest should be "red" since "blue" was sub
       const datoms = await db.datoms({ e: 1, a: "tag" });
@@ -336,7 +338,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should work within transactions", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "tag", v: "red" }]);
+      await db.transact([{ op: "add", e: 1, a: "tag", v: "red" }]);
 
       // Use with() to see what adding would look like
       const withResult = await db.with([
@@ -352,7 +354,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(sorted[0].v).toBe("blue");
 
       // Now commit the change
-      await db.write([{ op: "add", e: 1, a: "tag", v: "blue" }]);
+      await db.transact([{ op: "add", e: 1, a: "tag", v: "blue" }]);
 
       // After commit, should still be blue
       const finalDatoms = await db.datoms({ e: 1, a: "tag" });
@@ -362,9 +364,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle time-travel queries correctly", async () => {
       const { db } = f;
-      const tx1 = await db.write([{ op: "add", e: 1, a: "tag", v: "red" }]);
-      const tx2 = await db.write([{ op: "add", e: 1, a: "tag", v: "blue" }]);
-      const tx3 = await db.write([{ op: "add", e: 1, a: "tag", v: "green" }]);
+      const tx1 = await db.transact([{ op: "add", e: 1, a: "tag", v: "red" }]);
+      const tx2 = await db.transact([{ op: "add", e: 1, a: "tag", v: "blue" }]);
+      const tx3 = await db.transact([
+        { op: "add", e: 1, a: "tag", v: "green" },
+      ]);
 
       // Current latest should be green
       const currentDatoms = await db.datoms({ e: 1, a: "tag" });
@@ -384,10 +388,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should be equivalent to getValue", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
       // Add tags in separate transactions to ensure different transaction IDs
-      await db.write([{ op: "add", e: 1, a: "tag", v: "red" }]);
-      await db.write([{ op: "add", e: 1, a: "tag", v: "blue" }]);
+      await db.transact([{ op: "add", e: 1, a: "tag", v: "red" }]);
+      await db.transact([{ op: "add", e: 1, a: "tag", v: "blue" }]);
 
       const nameResults = await db.query({
         find: { v: ["?v"] },
@@ -411,15 +415,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return true for existing entity", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
       const datoms = await db.datoms({ e: 1, limit: 1 });
       expect(datoms.length).toBeGreaterThan(0);
     });
 
     test("should return true even if entity has sub datoms", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
-      await db.write([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
       const datoms = await db.datoms({ e: 1, limit: 1 });
       // Entity exists if it has any datoms (including sub ones)
       // This depends on implementation, but typically should return false after subion
@@ -429,8 +433,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return false for entity with only sub datoms", async () => {
       const { db } = f;
-      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
-      await db.write([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
       // exists() uses query with limit: 1, which should only return add datoms
       const datoms = await db.datoms({ e: 1, limit: 1 });
       expect(datoms.length).toBe(0);
@@ -440,7 +444,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("upsertMany", () => {
     test("should upsert multiple values atomically", async () => {
       const { db } = f;
-      await db.write([
+      await db.transact([
         { op: "add", e: 1, a: "status", v: "pending" },
         { op: "add", e: 2, a: "status", v: "active" },
         { op: "add", e: 1, a: "name", v: "Alice" },
@@ -466,7 +470,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle empty array", async () => {
       const { db } = f;
-      const tx = await db.write([]);
+      const tx = await db.transact([]);
       expect(tx).toBeGreaterThan(0);
     });
   });
@@ -475,13 +479,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should work together: upsert, subAttribute, getLatestValue", async () => {
       const { db } = f;
       // Upsert initial value
-      await db.write([{ op: "add", e: 1, a: "status", v: "pending" }]);
+      await db.transact([{ op: "add", e: 1, a: "status", v: "pending" }]);
       const pendingDatoms = await db.datoms({ e: 1, a: "status" });
       expect(pendingDatoms[0]?.v).toBe("pending");
 
       // Upsert new value
       const existing1 = await db.datoms({ e: 1, a: "status" });
-      await db.write([
+      await db.transact([
         ...existing1.map((d) => ({
           op: "sub" as const,
           e: d.e,
@@ -495,7 +499,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // sub attribute
       const statusDatoms = await db.datoms({ e: 1, a: "status" });
-      await db.write(
+      await db.transact(
         statusDatoms.map((d) => ({
           op: "sub" as const,
           e: d.e,
@@ -507,7 +511,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(aftersub.length).toBe(0);
 
       // Upsert again
-      await db.write([{ op: "add", e: 1, a: "status", v: "completed" }]);
+      await db.transact([{ op: "add", e: 1, a: "status", v: "completed" }]);
       const completedDatoms = await db.datoms({
         e: 1,
         a: "status",
@@ -519,11 +523,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       const initialTx = await db.getLatestTransaction();
 
-      const tx1 = await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      const tx1 = await db.transact([
+        { op: "add", e: 1, a: "name", v: "Alice" },
+      ]);
       expect(tx1).toBeGreaterThan(initialTx);
 
       const nameDatoms = await db.datoms({ e: 1, a: "name" });
-      const tx2 = await db.write(
+      const tx2 = await db.transact(
         nameDatoms.map((d) => ({
           op: "sub" as const,
           e: d.e,
@@ -533,7 +539,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       );
       expect(tx2).toBeGreaterThan(tx1);
 
-      const tx3 = await db.write([{ op: "add", e: 1, a: "name", v: "Bob" }]);
+      const tx3 = await db.transact([{ op: "add", e: 1, a: "name", v: "Bob" }]);
       expect(tx3).toBeGreaterThan(tx2);
 
       const latestTx = await db.getLatestTransaction();
