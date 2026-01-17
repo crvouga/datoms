@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import {
   ConnectionPoolExhaustedError,
-  MigrationError,
-  MigrationRollbackError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
@@ -69,19 +67,6 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       // This test is removed as it tested transaction() callback behavior
       // that is no longer available. Use with() for speculation and transact() for commits.
       // The test is kept here as a placeholder to document the removed functionality.
-    });
-  });
-
-  describe("MigrationError", () => {
-    test("should have correct error properties", () => {
-      const cause = new Error("Test error");
-      const error = new MigrationError("Migration failed", 2, cause);
-      expect(error).toBeInstanceOf(MigrationError);
-      expect(error.code).toBe("MIGRATION_ERROR");
-      expect(error.name).toBe("MigrationError");
-      expect(error.version).toBe(2);
-      expect(error.cause).toBe(cause);
-      expect(error.message).toContain("Migration failed");
     });
   });
 
@@ -155,19 +140,6 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       expect(error.waitingRequests).toBe(5);
       expect(error.maxConnections).toBe(10);
       expect(error.message).toContain("exhausted");
-    });
-  });
-
-  describe("MigrationRollbackError", () => {
-    test("should have correct error properties", () => {
-      const cause = new Error("Test error");
-      const error = new MigrationRollbackError("Rollback failed", 2, cause);
-      expect(error).toBeInstanceOf(MigrationRollbackError);
-      expect(error.code).toBe("MIGRATION_ROLLBACK_ERROR");
-      expect(error.name).toBe("MigrationRollbackError");
-      expect(error.version).toBe(2);
-      expect(error.cause).toBe(cause);
-      expect(error.message).toContain("Rollback failed");
     });
   });
 });

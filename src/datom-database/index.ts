@@ -14,9 +14,6 @@ export type {
   DatabaseHealthStatus,
   EntityId,
   Logger,
-  Migration,
-  MigrationDatabase,
-  MigrationState,
   OptimisticLockOptions,
   QueryExplainResult,
   QueryOptions,
@@ -45,15 +42,10 @@ export {
 // WithResult type (for speculative transactions)
 export type { WithResult } from "./datom-database.js";
 
-// Migration registry
-export { MigrationRegistry } from "./migrations/migration-registry.js";
-
 // Error classes
 export {
   ConnectionPoolExhaustedError,
   DatomDatabaseError,
-  MigrationError,
-  MigrationRollbackError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,

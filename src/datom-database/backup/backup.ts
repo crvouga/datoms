@@ -8,7 +8,7 @@ import type { Datom, DatomInput, QueryOptions } from "../../types.js";
 
 /**
  * Export all datoms from the database as an async iterable
- * Useful for backup, replication, and migration scenarios
+ * Useful for backup and replication scenarios
  *
  * **Note:** This method bypasses query safety checks and can perform full table scans.
  * Use filters in options to limit the export scope when possible.
@@ -44,7 +44,7 @@ export async function* exportDatoms(
 
 /**
  * Import datoms into the database from an async iterable
- * Useful for restore, replication, and migration scenarios
+ * Useful for restore, and replication scenarios
  *
  * @param db Database instance
  * @param source Async iterable of datoms to import

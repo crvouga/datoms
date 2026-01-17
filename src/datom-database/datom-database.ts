@@ -9,20 +9,15 @@ import type {
   Datom,
   DatomInput,
   EntityId,
-  Migration,
-  MigrationState,
   QueryOptions,
   TransactionId,
   Value,
 } from "../types.js";
 import {
-  MigrationError,
-  MigrationRollbackError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
 } from "./errors.js";
-import { MigrationRegistry } from "./migrations/migration-registry.js";
 import {
   isVariable,
   isQueryPattern,
@@ -504,14 +499,14 @@ export type TransactOperations = Array<{
  * - Deadlock detection and resolution is backend-specific
  *
  * **Observability:**
- * - Event system for monitoring transactions, queries, errors, and migrations
+ * - Event system for monitoring transactions, queries, and errors
  * - Database statistics via `getStats()` for performance monitoring
  * - Query and transaction metrics are tracked automatically
  * - Health checks via `healthCheck()` for operational monitoring
  *
  * **Backup & Recovery:**
  * - Export datoms via `export()` for backup and replication
- * - Import datoms via `import()` for restore and migration
+ * - Import datoms via `import()` for restore
  * - Supports streaming for large datasets
  *
  * **Connection Pooling (SQL Implementations):**
@@ -577,10 +572,6 @@ export interface WithResult {
 
 export abstract class DatomDatabase implements DatomReader {
   protected initialized = false;
-  /** Migration version tracking (separate from schema) */
-  protected migrationVersion: number = 0;
-  /** Migration registry for managing migrations */
-  protected migrationRegistry: MigrationRegistry = new MigrationRegistry();
 
   /**
    * Initialize the database
@@ -1129,229 +1120,6 @@ export abstract class DatomDatabase implements DatomReader {
       txData,
       tempIds: {}, // Empty for now, reserved for future tempid support
     };
-  }
-
-  /**
-   * Register a migration
-   * @param migration Migration to register
-   * @example
-   * db.registerMigration({
-   *   version: 1,
-   *   name: "add_user_table",
-   *   up: async (db) => {
-   *     // perform migration steps
-   *   },
-   *   down: async (db) => {
-   *     // rollback migration steps
-   *   }
-   * });
-   */
-  registerMigration(migration: Migration): void {
-    this.migrationRegistry.register(migration);
-  }
-
-  /**
-   * Register multiple migrations
-   * @param migrations Array of migrations to register
-   */
-  registerMigrations(migrations: Migration[]): void {
-    this.migrationRegistry.registerAll(migrations);
-  }
-
-  /**
-   * Get migration state for a specific version
-   * Implementations should override this to persist migration state
-   * @param version Migration version
-   * @returns Migration state or undefined if not applied
-   */
-  protected async getMigrationState(
-    _version: number
-  ): Promise<MigrationState | undefined> {
-    // Default: no migration state tracking
-    // Implementations should override to persist state
-    return undefined;
-  }
-
-  /**
-   * Save migration state after applying a migration
-   * Implementations should override this to persist migration state
-   * @param state Migration state to save
-   */
-  protected async saveMigrationState(_state: MigrationState): Promise<void> {
-    // Default: no migration state tracking
-    // Implementations should override to persist state
-  }
-
-  /**
-   * Update migration state after rollback
-   * Implementations should override this to persist migration state
-   * @param version Migration version to mark as rolled back
-   */
-  protected async markMigrationRolledBack(_version: number): Promise<void> {
-    // Default: no migration state tracking
-    // Implementations should override to persist state
-  }
-
-  /**
-   * Migrate to a specific version using registered migrations
-   * Executes all pending migrations up to the target version
-   * @param targetVersion Target schema version to migrate to
-   * @throws MigrationError if migration fails
-   * @example
-   * await db.registerMigration({
-   *   version: 1,
-   *   name: "add_indexes",
-   *   up: async (db) => { // perform migration },
-   *   down: async (db) => { // rollback migration }
-   * });
-   * await db.migrateTo(1);
-   */
-  async migrateTo(targetVersion: number): Promise<void> {
-    await this.ensureInitialized();
-
-    if (targetVersion < this.migrationVersion) {
-      throw new MigrationError(
-        `Cannot migrate backwards from version ${this.migrationVersion} to ${targetVersion}. Use rollbackTo() instead.`,
-        targetVersion
-      );
-    }
-
-    if (targetVersion === this.migrationVersion) {
-      return; // Already at target version
-    }
-
-    // Get pending migrations (only those that haven't been applied yet)
-    const pendingMigrations = this.migrationRegistry.getRange(
-      this.migrationVersion + 1,
-      targetVersion
-    );
-
-    if (pendingMigrations.length === 0) {
-      // No migrations to apply, but update migration version
-      await this.migrate(targetVersion);
-      return;
-    }
-
-    // Execute migrations in order
-    for (const migration of pendingMigrations) {
-      try {
-        await migration.up(this);
-
-        // Save migration state
-        await this.saveMigrationState({
-          version: migration.version,
-          name: migration.name,
-          appliedAt: new Date().toISOString(),
-          rolledBack: false,
-        });
-
-        // Update migration version
-        await this.migrate(migration.version);
-      } catch (error) {
-        const migrationError = new MigrationError(
-          `Migration ${migration.version} (${migration.name}) failed: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-          migration.version,
-          error instanceof Error ? error : undefined
-        );
-
-        throw migrationError;
-      }
-    }
-  }
-
-  /**
-   * Rollback to a specific version using registered migrations
-   * Executes down migrations in reverse order from current version to target version
-   * @param targetVersion Target schema version to rollback to
-   * @throws MigrationRollbackError if rollback fails
-   * @example
-   * await db.rollbackTo(0); // Rollback all migrations
-   */
-  async rollbackTo(targetVersion: number): Promise<void> {
-    await this.ensureInitialized();
-
-    // Get migrations to rollback (in reverse order)
-    // Note: Without schema version tracking, we rollback all migrations from highest to targetVersion
-    const allMigrations = this.migrationRegistry.getAll();
-    const migrationsToRollback = allMigrations
-      .filter((m) => m.version > targetVersion)
-      .sort((a, b) => b.version - a.version);
-
-    if (migrationsToRollback.length === 0) {
-      return;
-    }
-
-    // Execute down migrations in reverse order
-    for (const migration of migrationsToRollback) {
-      try {
-        await migration.down(this);
-
-        // Mark migration as rolled back
-        await this.markMigrationRolledBack(migration.version);
-      } catch (error) {
-        const rollbackError = new MigrationRollbackError(
-          `Rollback of migration ${migration.version} (${
-            migration.name
-          }) failed: ${error instanceof Error ? error.message : String(error)}`,
-          migration.version,
-          error instanceof Error ? error : undefined
-        );
-
-        throw rollbackError;
-      }
-    }
-  }
-
-  /**
-   * Migrate the database to a specific version
-   * Implementations should override this method to perform actual migrations.
-   * @param targetVersion Target version to migrate to
-   * @throws MigrationError if migration fails
-   */
-  async migrate(targetVersion: number): Promise<void> {
-    await this.ensureInitialized();
-    try {
-      if (targetVersion < this.migrationVersion) {
-        throw new MigrationError(
-          `Cannot migrate backwards from version ${this.migrationVersion} to ${targetVersion}`,
-          targetVersion
-        );
-      }
-
-      await this.onMigrate(this.migrationVersion, targetVersion);
-      this.migrationVersion = targetVersion;
-    } catch (error) {
-      // If error is already a MigrationError, rethrow
-      if (error instanceof MigrationError) {
-        throw error;
-      }
-      // For other errors during onMigrate, wrap in MigrationError
-      throw new MigrationError(
-        `Migration to version ${targetVersion} failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        targetVersion,
-        error instanceof Error ? error : undefined
-      );
-    }
-  }
-
-  /**
-   * Hook for implementations to perform actual migration logic
-   * @param fromVersion Current schema version
-   * @param toVersion Target schema version
-   * @example
-   * protected async onMigrate(fromVersion: number, toVersion: number): Promise<void> {
-   *   // Perform migration steps
-   * }
-   */
-  protected async onMigrate(
-    _fromVersion: number,
-    _toVersion: number
-  ): Promise<void> {
-    // Override in implementations to perform actual migrations
   }
 
   /**

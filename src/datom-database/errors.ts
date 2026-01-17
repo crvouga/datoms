@@ -63,29 +63,6 @@ export class QuerySafetyError extends DatomDatabaseError {
 }
 
 /**
- * Error thrown when schema migration fails
- * @example
- * try {
- *   await db.migrate(2);
- * } catch (error) {
- *   if (error instanceof MigrationError) {
- *     // Handle migration failure
- *   }
- * }
- */
-export class MigrationError extends DatomDatabaseError {
-  constructor(
-    message: string,
-    public readonly version?: number,
-    public readonly cause?: Error
-  ) {
-    super(message, "MIGRATION_ERROR");
-    this.name = "MigrationError";
-    Object.setPrototypeOf(this, MigrationError.prototype);
-  }
-}
-
-/**
  * Error thrown when a query exceeds its timeout
  * @example
  * try {
@@ -155,28 +132,5 @@ export class ConnectionPoolExhaustedError extends DatomDatabaseError {
     );
     this.name = "ConnectionPoolExhaustedError";
     Object.setPrototypeOf(this, ConnectionPoolExhaustedError.prototype);
-  }
-}
-
-/**
- * Error thrown when a migration rollback fails
- * @example
- * try {
- *   await db.rollbackTo(1);
- * } catch (error) {
- *   if (error instanceof MigrationRollbackError) {
- *     // Rollback failed
- *   }
- * }
- */
-export class MigrationRollbackError extends DatomDatabaseError {
-  constructor(
-    message: string,
-    public readonly version?: number,
-    public readonly cause?: Error
-  ) {
-    super(message, "MIGRATION_ROLLBACK_ERROR");
-    this.name = "MigrationRollbackError";
-    Object.setPrototypeOf(this, MigrationRollbackError.prototype);
   }
 }

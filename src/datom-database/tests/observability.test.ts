@@ -125,24 +125,6 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       }
     });
 
-    test("should emit migration events", async () => {
-      const { db } = f;
-      const events: DatabaseEvent[] = [];
-
-      observableDb.on("migration", (event) => {
-        events.push(event);
-      });
-
-      await observableDb.migrate(2);
-
-      expect(events).toHaveLength(1);
-      expect(events[0].type).toBe("migration");
-      if (events[0].type === "migration") {
-        expect(events[0].version).toBe(2);
-        expect(events[0].success).toBe(true);
-      }
-    });
-
     test("should emit backup events", async () => {
       const { db } = f;
       await observableDb.transact([

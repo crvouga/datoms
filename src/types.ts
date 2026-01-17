@@ -141,7 +141,6 @@ export type DatabaseEventType =
   | "transaction"
   | "error"
   | "query"
-  | "migration"
   | "backup"
   | "restore";
 
@@ -176,16 +175,6 @@ export interface QueryEvent {
 }
 
 /**
- * Event payload for migration events
- */
-export interface MigrationEvent {
-  type: "migration";
-  version: number;
-  success: boolean;
-  error?: Error;
-}
-
-/**
  * Event payload for backup/restore events
  */
 export interface BackupEvent {
@@ -202,7 +191,6 @@ export type DatabaseEvent =
   | TransactionEvent
   | ErrorEvent
   | QueryEvent
-  | MigrationEvent
   | BackupEvent;
 
 /**
@@ -340,46 +328,6 @@ export interface DatabaseHealth {
   /** Health check errors or warnings */
   errors?: string[];
   warnings?: string[];
-}
-
-/**
- * Minimal database interface for migrations
- * Provides the operations that migrations typically need
- */
-export interface MigrationDatabase {
-  /** Migrate to a specific schema version */
-  migrate(targetVersion: number): Promise<void>;
-}
-
-/**
- * Migration interface for up/down migrations
- * Migrations are versioned and can be rolled back
- */
-export interface Migration {
-  /** Migration version number (must be unique and sequential) */
-  version: number;
-  /** Migration name/description */
-  name: string;
-  /** Up migration: applies the migration */
-  up(db: MigrationDatabase): Promise<void>;
-  /** Down migration: rolls back the migration */
-  down(db: MigrationDatabase): Promise<void>;
-}
-
-/**
- * Migration state stored in database
- */
-export interface MigrationState {
-  /** Migration version */
-  version: number;
-  /** Migration name */
-  name: string;
-  /** When migration was applied */
-  appliedAt: string;
-  /** Whether migration was rolled back */
-  rolledBack: boolean;
-  /** When migration was rolled back (if applicable) */
-  rolledBackAt?: string;
 }
 
 /**

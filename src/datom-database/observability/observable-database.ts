@@ -178,44 +178,6 @@ export class ObservableDatabase {
   }
 
   /**
-   * Migrate the database schema and automatically emit migration events
-   * This wraps the underlying database's migrate method to add observability
-   */
-  async migrate(targetVersion: number): Promise<void> {
-    try {
-      await this.db.migrate(targetVersion);
-
-      // Emit migration event
-      await this.emitEvent({
-        type: "migration",
-        version: targetVersion,
-        success: true,
-      });
-    } catch (error) {
-      // Emit migration event with failure
-      await this.emitEvent({
-        type: "migration",
-        version: targetVersion,
-        success: false,
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-
-      // Also emit error event
-      await this.emitEvent({
-        type: "error",
-        error: error instanceof Error ? error : new Error(String(error)),
-        context: {
-          operation: "migrate",
-          targetVersion,
-        },
-      });
-
-      // Re-throw the error so callers can handle it
-      throw error;
-    }
-  }
-
-  /**
    * Export datoms from the database and automatically emit backup events
    * This wraps the backup module's exportDatoms function to add observability
    */
@@ -337,9 +299,6 @@ export class ObservableDatabase {
       } else if (event.type === "error") {
         logMeta.error = event.error.message;
         logMeta.errorStack = event.error.stack;
-      } else if (event.type === "migration") {
-        logMeta.version = event.version;
-        logMeta.success = event.success;
       } else if (event.type === "backup" || event.type === "restore") {
         logMeta.datomCount = event.datomCount;
         logMeta.success = event.success;
