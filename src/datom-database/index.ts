@@ -8,12 +8,11 @@ export type {
   BatchQueryKey,
   ConnectionPoolConfig,
   ConnectionPoolStats,
-  Datom,
-  DatomInput,
   DatabaseHealth,
   DatabaseHealthStatus,
+  Datom,
+  DatomInput,
   EntityId,
-  InterceptorError,
   Logger,
   OptimisticLockOptions,
   QueryExplainResult,
@@ -24,19 +23,6 @@ export type {
   TransactionOptions,
   Value,
 } from "../types.js";
-
-// Interceptor types
-export type {
-  AfterReadInterceptor,
-  AfterWriteInterceptor,
-  BeforeReadInterceptor,
-  BeforeReadInterceptorResult,
-  BeforeWriteInterceptor,
-  BeforeWriteInterceptorResult,
-  Interceptor,
-  ReadContext,
-  WriteContext,
-} from "./interceptor/types.js";
 
 // DatomDatabase classes
 export { InMemoryDatomDatabase } from "./datom-database-in-memory.js";
@@ -57,19 +43,5 @@ export {
 // WithResult type (for speculative transactions)
 export type { WithResult } from "./datom-database.js";
 
-// Error classes
-export {
-  ConnectionPoolExhaustedError,
-  DatomDatabaseError,
-  QueryError,
-  QueryResultSizeError,
-  QuerySafetyError,
-  QueryTimeoutError,
-  TransactionConflictError,
-  TransactionError,
-} from "./errors.js";
-
-// Interceptor system
 export { InterceptorEngine } from "./interceptor/engine.js";
 export { InterceptorValidator } from "./interceptor/validator.js";
-export type { InterceptorErrorWithName } from "./errors.js";

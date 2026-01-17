@@ -19,9 +19,9 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
-import type { ReadContext } from "./interceptor/types.js";
-import { DatomDatabase } from "./datom-database.js";
-import { InterceptorErrorWithName, QueryError } from "./errors.js";
+
+import { DatomDatabase, QueryError } from "./datom-database.js";
+import type { ReadContext } from "./interceptor/engine.js";
 import {
   isQueryPattern,
   isVariable,
@@ -316,7 +316,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     if (beforeResult.errors.length > 0) {
       throw new QueryError(
         "Query blocked by interceptors",
-        beforeResult.errors as InterceptorErrorWithName[]
+        beforeResult.errors
       );
     }
 

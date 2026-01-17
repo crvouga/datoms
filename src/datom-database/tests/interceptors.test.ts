@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import type {
-  AfterReadInterceptor,
-  BeforeReadInterceptor,
-  BeforeWriteInterceptor,
-  AfterWriteInterceptor,
-} from "../interceptor/types.js";
+import {
+  AfterRead,
+  AfterWrite,
+  BeforeRead,
+  BeforeWrite,
+  QueryError,
+  TransactionError,
+} from "../interceptor/engine";
 import { InterceptorValidator } from "../interceptor/validator.js";
-import { QueryError, TransactionError } from "../errors.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
 
 describe.each(FIXTURES)(
@@ -28,10 +29,10 @@ describe.each(FIXTURES)(
       test("should register before-read interceptor", async () => {
         const { db } = f;
 
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         let called = false;
-        const interceptor: BeforeReadInterceptor = {
+        const interceptor: BeforeRead = {
           type: "beforeRead",
           name: "test-interceptor",
           execute: async (query) => {
@@ -53,10 +54,10 @@ describe.each(FIXTURES)(
       test("should register after-read interceptor", async () => {
         const { db } = f;
 
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         let called = false;
-        const interceptor: AfterReadInterceptor = {
+        const interceptor: AfterRead = {
           type: "afterRead",
           name: "test-interceptor",
           execute: async (datoms) => {
@@ -79,7 +80,7 @@ describe.each(FIXTURES)(
         const { db } = f;
 
         let called = false;
-        const interceptor: BeforeWriteInterceptor = {
+        const interceptor: BeforeWrite = {
           type: "beforeWrite",
           name: "test-interceptor",
           execute: async (tx) => {
@@ -89,7 +90,7 @@ describe.each(FIXTURES)(
         };
 
         db.interceptors.register(interceptor);
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         expect(called).toBe(true);
         await db.close();
@@ -99,7 +100,7 @@ describe.each(FIXTURES)(
         const { db } = f;
 
         let called = false;
-        const interceptor: AfterWriteInterceptor = {
+        const interceptor: AfterWrite = {
           type: "afterWrite",
           name: "test-interceptor",
           execute: async () => {
@@ -108,7 +109,7 @@ describe.each(FIXTURES)(
         };
 
         db.interceptors.register(interceptor);
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         // Wait a bit for async after-write interceptors
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -122,12 +123,12 @@ describe.each(FIXTURES)(
       test("should modify query before execution", async () => {
         const { db } = f;
 
-        await db.transact([
+        await db.write([
           { op: "add", e: 1, a: "name", v: "Alice" },
           { op: "add", e: 2, a: "name", v: "Bob" },
         ]);
 
-        const interceptor: BeforeReadInterceptor = {
+        const interceptor: BeforeRead = {
           type: "beforeRead",
           name: "modify-query",
           execute: async (query) => {
@@ -155,7 +156,7 @@ describe.each(FIXTURES)(
       test("should block query with errors", async () => {
         const { db } = f;
 
-        const interceptor: BeforeReadInterceptor = {
+        const interceptor: BeforeRead = {
           type: "beforeRead",
           name: "block-query",
           execute: async () => {
@@ -184,7 +185,7 @@ describe.each(FIXTURES)(
         let firstCalled = false;
         let secondCalled = false;
 
-        const interceptor1: BeforeReadInterceptor = {
+        const interceptor1: BeforeRead = {
           type: "beforeRead",
           name: "first",
           execute: async (query) => {
@@ -193,7 +194,7 @@ describe.each(FIXTURES)(
           },
         };
 
-        const interceptor2: BeforeReadInterceptor = {
+        const interceptor2: BeforeRead = {
           type: "beforeRead",
           name: "second",
           execute: async (query) => {
@@ -220,7 +221,7 @@ describe.each(FIXTURES)(
 
         let receivedContext: Record<string, unknown> | undefined;
 
-        const interceptor: BeforeReadInterceptor = {
+        const interceptor: BeforeRead = {
           type: "beforeRead",
           name: "context-test",
           execute: async (query, ctx) => {
@@ -248,13 +249,13 @@ describe.each(FIXTURES)(
       test("should filter results", async () => {
         const { db } = f;
 
-        await db.transact([
+        await db.write([
           { op: "add", e: 1, a: "name", v: "Alice" },
           { op: "add", e: 2, a: "name", v: "Bob" },
           { op: "add", e: 3, a: "name", v: "Alice" },
         ]);
 
-        const interceptor: AfterReadInterceptor = {
+        const interceptor: AfterRead = {
           type: "afterRead",
           name: "filter-results",
           execute: async (datoms) => {
@@ -278,9 +279,9 @@ describe.each(FIXTURES)(
       test("should transform results", async () => {
         const { db } = f;
 
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
-        const interceptor: AfterReadInterceptor = {
+        const interceptor: AfterRead = {
           type: "afterRead",
           name: "transform-results",
           execute: async (datoms) => {
@@ -308,13 +309,13 @@ describe.each(FIXTURES)(
       test("should chain multiple after-read interceptors", async () => {
         const { db } = f;
 
-        await db.transact([
+        await db.write([
           { op: "add", e: 1, a: "name", v: "Alice" },
           { op: "add", e: 2, a: "name", v: "Bob" },
           { op: "add", e: 3, a: "name", v: "Charlie" },
         ]);
 
-        const interceptor1: AfterReadInterceptor = {
+        const interceptor1: AfterRead = {
           type: "afterRead",
           name: "filter-1",
           execute: async (datoms) => {
@@ -322,7 +323,7 @@ describe.each(FIXTURES)(
           },
         };
 
-        const interceptor2: AfterReadInterceptor = {
+        const interceptor2: AfterRead = {
           type: "afterRead",
           name: "filter-2",
           execute: async (datoms) => {
@@ -346,11 +347,11 @@ describe.each(FIXTURES)(
       test("should pass context to after-read interceptor", async () => {
         const { db } = f;
 
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         let receivedContext: Record<string, unknown> | undefined;
 
-        const interceptor: AfterReadInterceptor = {
+        const interceptor: AfterRead = {
           type: "afterRead",
           name: "context-test",
           execute: async (datoms, ctx) => {
@@ -378,7 +379,7 @@ describe.each(FIXTURES)(
       test("should validate transaction", async () => {
         const { db } = f;
 
-        const interceptor: BeforeWriteInterceptor = {
+        const interceptor: BeforeWrite = {
           type: "beforeWrite",
           name: "validate-email",
           execute: async (tx) => {
@@ -405,13 +406,13 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor);
 
         // Valid email should succeed
-        await db.transact([
+        await db.write([
           { op: "add", e: 1, a: "email", v: "alice@example.com" },
         ]);
 
         // Invalid email should fail
         await expect(
-          db.transact([{ op: "add", e: 2, a: "email", v: "invalid-email" }])
+          db.write([{ op: "add", e: 2, a: "email", v: "invalid-email" }])
         ).rejects.toThrow(TransactionError);
 
         await db.close();
@@ -420,7 +421,7 @@ describe.each(FIXTURES)(
       test("should modify transaction", async () => {
         const { db } = f;
 
-        const interceptor: BeforeWriteInterceptor = {
+        const interceptor: BeforeWrite = {
           type: "beforeWrite",
           name: "add-timestamp",
           execute: async (tx) => {
@@ -450,7 +451,7 @@ describe.each(FIXTURES)(
 
         db.interceptors.register(interceptor);
 
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         const datoms = await db.datoms({ e: 1 });
         const hasTimestamp = datoms.some((d) => d.a === "updatedAt");
@@ -464,7 +465,7 @@ describe.each(FIXTURES)(
         let firstCalled = false;
         let secondCalled = false;
 
-        const interceptor1: BeforeWriteInterceptor = {
+        const interceptor1: BeforeWrite = {
           type: "beforeWrite",
           name: "first",
           execute: async (tx) => {
@@ -473,7 +474,7 @@ describe.each(FIXTURES)(
           },
         };
 
-        const interceptor2: BeforeWriteInterceptor = {
+        const interceptor2: BeforeWrite = {
           type: "beforeWrite",
           name: "second",
           execute: async (tx) => {
@@ -485,7 +486,7 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor1);
         db.interceptors.register(interceptor2);
 
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         expect(firstCalled).toBe(true);
         expect(secondCalled).toBe(false);
@@ -497,7 +498,7 @@ describe.each(FIXTURES)(
 
         let receivedContext: Record<string, unknown> | undefined;
 
-        const interceptor: BeforeWriteInterceptor = {
+        const interceptor: BeforeWrite = {
           type: "beforeWrite",
           name: "context-test",
           execute: async (tx, ctx) => {
@@ -508,7 +509,7 @@ describe.each(FIXTURES)(
 
         db.interceptors.register(interceptor);
 
-        await db.transact(
+        await db.write(
           [{ op: "add", e: 1, a: "name", v: "Alice" }],
           { userId: "alice", reason: "test" },
           { source: "client", ip: "127.0.0.1" }
@@ -530,7 +531,7 @@ describe.each(FIXTURES)(
       test("should collect multiple errors from interceptors", async () => {
         const { db } = f;
 
-        const interceptor1: BeforeWriteInterceptor = {
+        const interceptor1: BeforeWrite = {
           type: "beforeWrite",
           name: "validator-1",
           execute: async (tx) => {
@@ -544,7 +545,7 @@ describe.each(FIXTURES)(
           },
         };
 
-        const interceptor2: BeforeWriteInterceptor = {
+        const interceptor2: BeforeWrite = {
           type: "beforeWrite",
           name: "validator-2",
           execute: async (tx) => {
@@ -567,11 +568,11 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor2);
 
         // This should pass (no errors)
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         // This should fail with age validation error
         await expect(
-          db.transact([{ op: "add", e: 2, a: "age", v: -5 }])
+          db.write([{ op: "add", e: 2, a: "age", v: -5 }])
         ).rejects.toThrow(TransactionError);
 
         await db.close();
@@ -585,7 +586,7 @@ describe.each(FIXTURES)(
         let called = false;
         let receivedTx: unknown;
 
-        const interceptor: AfterWriteInterceptor = {
+        const interceptor: AfterWrite = {
           type: "afterWrite",
           name: "side-effect",
           execute: async (tx) => {
@@ -596,7 +597,7 @@ describe.each(FIXTURES)(
 
         db.interceptors.register(interceptor);
 
-        const txId = await db.transact([
+        const txId = await db.write([
           { op: "add", e: 1, a: "name", v: "Alice" },
         ]);
 
@@ -612,7 +613,7 @@ describe.each(FIXTURES)(
       test("should not block transaction on failure", async () => {
         const { db } = f;
 
-        const interceptor: AfterWriteInterceptor = {
+        const interceptor: AfterWrite = {
           type: "afterWrite",
           name: "failing-interceptor",
           execute: async () => {
@@ -630,7 +631,7 @@ describe.each(FIXTURES)(
 
         try {
           // Transaction should succeed even if after-write interceptor fails
-          const txId = await db.transact([
+          const txId = await db.write([
             { op: "add", e: 1, a: "name", v: "Alice" },
           ]);
 
@@ -653,7 +654,7 @@ describe.each(FIXTURES)(
 
         const executionOrder: string[] = [];
 
-        const interceptor1: AfterWriteInterceptor = {
+        const interceptor1: AfterWrite = {
           type: "afterWrite",
           name: "first",
           execute: async () => {
@@ -661,7 +662,7 @@ describe.each(FIXTURES)(
           },
         };
 
-        const interceptor2: AfterWriteInterceptor = {
+        const interceptor2: AfterWrite = {
           type: "afterWrite",
           name: "second",
           execute: async () => {
@@ -672,7 +673,7 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor1);
         db.interceptors.register(interceptor2);
 
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         // Wait for async after-write interceptors
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -686,7 +687,7 @@ describe.each(FIXTURES)(
 
         let receivedContext: Record<string, unknown> | undefined;
 
-        const interceptor: AfterWriteInterceptor = {
+        const interceptor: AfterWrite = {
           type: "afterWrite",
           name: "context-test",
           execute: async (tx, ctx) => {
@@ -696,7 +697,7 @@ describe.each(FIXTURES)(
 
         db.interceptors.register(interceptor);
 
-        await db.transact(
+        await db.write(
           [{ op: "add", e: 1, a: "name", v: "Alice" }],
           { userId: "alice", reason: "test" },
           { source: "client", ip: "127.0.0.1" }
@@ -770,7 +771,7 @@ describe.each(FIXTURES)(
         let readCalled = false;
         let writeCalled = false;
 
-        const readInterceptor: BeforeReadInterceptor = {
+        const readInterceptor: BeforeRead = {
           type: "beforeRead",
           name: "read-logger",
           execute: async (query) => {
@@ -779,7 +780,7 @@ describe.each(FIXTURES)(
           },
         };
 
-        const writeInterceptor: BeforeWriteInterceptor = {
+        const writeInterceptor: BeforeWrite = {
           type: "beforeWrite",
           name: "write-logger",
           execute: async (tx) => {
@@ -791,7 +792,7 @@ describe.each(FIXTURES)(
         db.interceptors.register(readInterceptor);
         db.interceptors.register(writeInterceptor);
 
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
         expect(writeCalled).toBe(true);
 
         await db.query({
@@ -806,7 +807,7 @@ describe.each(FIXTURES)(
       test("should handle interceptor errors with proper error structure", async () => {
         const { db } = f;
 
-        const interceptor: BeforeWriteInterceptor = {
+        const interceptor: BeforeWrite = {
           type: "beforeWrite",
           name: "error-test",
           execute: async (tx) => {
@@ -830,9 +831,9 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor);
 
         try {
-          await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+          await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
           throw new Error("Should have thrown TransactionError");
-        } catch (error) {
+        } catch (error: unknown) {
           expect(error).toBeInstanceOf(TransactionError);
           if (error instanceof TransactionError) {
             expect(error.errors).toHaveLength(2);
@@ -851,7 +852,7 @@ describe.each(FIXTURES)(
 
         const executionOrder: string[] = [];
 
-        const interceptor1: BeforeWriteInterceptor = {
+        const interceptor1: BeforeWrite = {
           type: "beforeWrite",
           name: "first",
           execute: async (tx) => {
@@ -860,7 +861,7 @@ describe.each(FIXTURES)(
           },
         };
 
-        const interceptor2: BeforeWriteInterceptor = {
+        const interceptor2: BeforeWrite = {
           type: "beforeWrite",
           name: "second",
           execute: async (tx) => {
@@ -869,7 +870,7 @@ describe.each(FIXTURES)(
           },
         };
 
-        const interceptor3: BeforeWriteInterceptor = {
+        const interceptor3: BeforeWrite = {
           type: "beforeWrite",
           name: "third",
           execute: async (tx) => {
@@ -882,7 +883,7 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor2);
         db.interceptors.register(interceptor3);
 
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         expect(executionOrder).toEqual(["first", "second", "third"]);
         await db.close();
@@ -892,7 +893,7 @@ describe.each(FIXTURES)(
         const { db } = f;
 
         let called = false;
-        const interceptor: BeforeWriteInterceptor = {
+        const interceptor: BeforeWrite = {
           type: "beforeWrite",
           name: "empty-tx-handler",
           execute: async (tx) => {
@@ -905,7 +906,7 @@ describe.each(FIXTURES)(
         db.interceptors.register(interceptor);
 
         // Empty transaction (should still create a transaction ID)
-        await db.transact([]);
+        await db.write([]);
 
         expect(called).toBe(true);
         await db.close();
@@ -914,10 +915,10 @@ describe.each(FIXTURES)(
       test("should handle sub operations with interceptors", async () => {
         const { db } = f;
 
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         let called = false;
-        const interceptor: BeforeWriteInterceptor = {
+        const interceptor: BeforeWrite = {
           type: "beforeWrite",
           name: "sub-handler",
           execute: async (tx) => {
@@ -930,7 +931,7 @@ describe.each(FIXTURES)(
 
         db.interceptors.register(interceptor);
 
-        await db.transact([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
 
         expect(called).toBe(true);
         const datoms = await db.datoms({ e: 1 });

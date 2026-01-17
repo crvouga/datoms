@@ -65,7 +65,7 @@ export class ObservableDatabase {
     const startTime = Date.now();
 
     try {
-      const txId = await this.db.transact(ops, metadata);
+      const txId = await this.db.write(ops, metadata);
       const duration = (Date.now() - startTime) / 1000;
 
       // Track transaction metrics

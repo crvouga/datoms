@@ -249,7 +249,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
   describe("Stats", () => {
     test("should return basic stats", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const stats = await observableDb.getStats();
 
@@ -296,10 +296,8 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
 
     test("should include latest transaction in stats", async () => {
       const { db } = f;
-      const tx1 = await db.transact([
-        { op: "add", e: 1, a: "name", v: "Alice" },
-      ]);
-      const tx2 = await db.transact([{ op: "add", e: 2, a: "name", v: "Bob" }]);
+      const tx1 = await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      const tx2 = await db.write([{ op: "add", e: 2, a: "name", v: "Bob" }]);
 
       const stats = await observableDb.getStats();
 
@@ -407,7 +405,7 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
     test("should work without logger", async () => {
       const { db } = f;
       // Should not throw when no logger is set
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
       await db.datoms({ e: 1 });
     });
   });

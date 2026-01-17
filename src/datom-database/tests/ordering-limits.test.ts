@@ -18,7 +18,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Database query (Datalog)", () => {
     test("should support ordering and limits", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "score", v: 100 },
         { op: "add", e: 2, a: "score", v: 400 },
         { op: "add", e: 3, a: "score", v: 250 },
@@ -41,7 +41,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle queries with ordering on multiple variables", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "score", v: 100 },
         { op: "add", e: 1, a: "age", v: 30 },
@@ -80,7 +80,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle limit 0", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "score", v: 100 },
         { op: "add", e: 2, a: "score", v: 200 },
         { op: "add", e: 3, a: "score", v: 300 },
@@ -103,7 +103,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle limit larger than results", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "score", v: 100 },
         { op: "add", e: 2, a: "score", v: 200 },
       ]);
@@ -120,7 +120,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle limit with ordering", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "score", v: 100 },
         { op: "add", e: 2, a: "score", v: 400 },
         { op: "add", e: 3, a: "score", v: 250 },
@@ -142,7 +142,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle ordering on variable not in find", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "name", v: "Alice" },
         { op: "add", e: 1, a: "score", v: 100 },
         { op: "add", e: 2, a: "name", v: "Bob" },
@@ -188,7 +188,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle ordering with null values", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "score", v: 100 },
         { op: "add", e: 2, a: "score", v: null },
         { op: "add", e: 3, a: "score", v: 200 },
@@ -213,7 +213,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should handle ordering with mixed types", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "value", v: "zebra" },
         { op: "add", e: 2, a: "value", v: 100 },
         { op: "add", e: 3, a: "value", v: "apple" },

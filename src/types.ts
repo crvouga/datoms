@@ -286,15 +286,6 @@ export interface Logger {
 export type BatchQueryKey = string;
 
 /**
- * Error structure returned by interceptors
- */
-export type InterceptorError = {
-  message: string;
-  code?: string;
-  datom?: Datom;
-};
-
-/**
  * Transaction data structure for interceptors
  */
 export type Transaction = {

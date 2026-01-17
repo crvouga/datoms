@@ -18,7 +18,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("Aggregation: avg", () => {
     test("should calculate average of numeric values", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "age", v: 20 },
         { op: "add", e: 2, a: "age", v: 30 },
         { op: "add", e: 3, a: "age", v: 40 },
@@ -57,7 +57,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate average of single value", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "score", v: 85 }]);
+      await db.write([{ op: "add", e: 1, a: "score", v: 85 }]);
 
       const query: DatalogQuery = {
         find: { average: ["avg", "?score"] },
@@ -73,7 +73,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate average of decimal numbers", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "price", v: 10.5 },
         { op: "add", e: 2, a: "price", v: 20.5 },
         { op: "add", e: 3, a: "price", v: 30.0 },
@@ -93,7 +93,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate average with negative numbers", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "value", v: 10 },
         { op: "add", e: 2, a: "value", v: -5 },
         { op: "add", e: 3, a: "value", v: 15 },
@@ -113,7 +113,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate average with filters", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "type", v: "student" },
         { op: "add", e: 1, a: "score", v: 80 },
         { op: "add", e: 2, a: "type", v: "student" },
@@ -139,7 +139,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate average with duplicate values", async () => {
       const { db } = f;
-      await db.transact([
+      await db.write([
         { op: "add", e: 1, a: "value", v: 10 },
         { op: "add", e: 2, a: "value", v: 10 },
         { op: "add", e: 3, a: "value", v: 10 },

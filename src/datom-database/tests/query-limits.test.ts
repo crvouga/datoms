@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { QueryResultSizeError } from "../errors.js";
+import { QueryResultSizeError } from "../interceptor/engine";
 import { Fixture, FIXTURES } from "./fixtures.js";
 
 describe.each(FIXTURES)(
@@ -21,7 +21,7 @@ describe.each(FIXTURES)(
       test("should allow queries within limit", async () => {
         const { db } = f;
         for (let i = 1; i <= 5; i++) {
-          await db.transact([{ op: "add", e: i, a: "tag", v: `tag-${i}` }]);
+          await db.write([{ op: "add", e: i, a: "tag", v: `tag-${i}` }]);
         }
 
         const results = await db.datoms({
@@ -35,13 +35,13 @@ describe.each(FIXTURES)(
         const { db } = f;
         // Add more datoms than the limit
         for (let i = 1; i <= 10; i++) {
-          await db.transact([{ op: "add", e: i, a: "tag", v: `tag-${i}` }]);
+          await db.write([{ op: "add", e: i, a: "tag", v: `tag-${i}` }]);
         }
 
         try {
           await db.datoms({ a: "tag", maxResultSize: 5 });
           throw new Error("Should have thrown QueryResultSizeError");
-        } catch (error) {
+        } catch (error: unknown) {
           expect(error).toBeInstanceOf(QueryResultSizeError);
           const sizeError = error as QueryResultSizeError;
           expect(sizeError.resultSize).toBeGreaterThan(5);
@@ -53,7 +53,7 @@ describe.each(FIXTURES)(
       test("should work with limit option", async () => {
         const { db } = f;
         for (let i = 1; i <= 10; i++) {
-          await db.transact([{ op: "add", e: i, a: "tag", v: `tag-${i}` }]);
+          await db.write([{ op: "add", e: i, a: "tag", v: `tag-${i}` }]);
         }
 
         // limit should be applied first, then maxResultSize check
@@ -67,7 +67,7 @@ describe.each(FIXTURES)(
 
       test("should work with filters", async () => {
         const { db } = f;
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
         const results = await db.datoms({
           e: 1,

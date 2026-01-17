@@ -1,12 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { datoms, records, type Datom } from "../../datoms.js";
-import type { DatomDatabase } from "../datom-database.js";
-import { TransactionError } from "../errors.js";
-import type {
-  AfterReadInterceptor,
-  BeforeWriteInterceptor,
-} from "../interceptor/types.js";
+import { datoms, type Datom } from "../../datoms.js";
+import type { AfterRead, BeforeWrite } from "../interceptor/engine";
+import { TransactionError } from "../datom-database.js";
 import { InterceptorValidator } from "../interceptor/validator.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
 
@@ -44,13 +40,13 @@ const POST_STATUS_PUBLISHED = "published";
  * - Authors can see published posts from other authors
  * - Readers can only see published posts
  */
-const createPostAccessInterceptor = (): AfterReadInterceptor => ({
+const POST_ACCESS_CONTROL: AfterRead = {
   type: "afterRead",
   name: "post-access-control",
-  execute: async (datoms, ctx) => {
+  async execute(datoms, ctx) {
+    const { db } = ctx;
     const userId = ctx.userId as number | undefined;
     const userType = ctx.userType as string | undefined;
-    const db = ctx.db;
 
     // If no user context, block all posts
     if (!userId || !userType) {
@@ -156,18 +152,18 @@ const createPostAccessInterceptor = (): AfterReadInterceptor => ({
 
     return [...nonPostDatoms, ...filteredPostDatoms];
   },
-});
+};
 
 /**
  * Post validator interceptor
  * Validates that posts have required fields: title, author, and status
  */
-const createPostValidatorInterceptor = (
-  db: DatomDatabase
-): BeforeWriteInterceptor => ({
+const POST_VALIDATOR: BeforeWrite = {
   type: "beforeWrite",
   name: "post-validator",
-  execute: async (tx) => {
+  async execute(tx, ctx) {
+    const { db } = ctx;
+
     const validator = new InterceptorValidator();
 
     // Find all post entities being created/updated
@@ -234,18 +230,17 @@ const createPostValidatorInterceptor = (
 
     return { tx };
   },
-});
+};
 
 /**
  * Author validator interceptor
  * Validates that post authors are either authors or admins
  */
-const createAuthorValidatorInterceptor = (
-  db: DatomDatabase
-): BeforeWriteInterceptor => ({
+const AUTHOR_VALIDATOR: BeforeWrite = {
   type: "beforeWrite",
   name: "author-validator",
-  execute: async (tx) => {
+  async execute(tx, ctx) {
+    const { db } = ctx;
     const validator = new InterceptorValidator();
 
     // Find all post author assignments
@@ -277,7 +272,7 @@ const createAuthorValidatorInterceptor = (
 
     return { tx };
   },
-});
+};
 
 describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -295,7 +290,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should create admin user", async () => {
       const { db } = f;
 
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_ADMIN,
@@ -322,7 +317,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should create author user", async () => {
       const { db } = f;
 
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 2,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -347,7 +342,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should create reader user", async () => {
       const { db } = f;
 
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 3,
           [USER_TYPE]: USER_TYPE_READER,
@@ -375,7 +370,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       const { db } = f;
 
       // Create author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -385,7 +380,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       // Create draft post
       const now = new Date().toISOString();
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: "My First Post",
@@ -414,7 +409,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       const { db } = f;
 
       // Create author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -423,7 +418,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create draft post
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: "My Post",
@@ -435,7 +430,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       // Publish the post
       const now = new Date().toISOString();
-      await db.transact([
+      await db.write([
         { op: "sub", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
         ...datoms({
           entityId: 100,
@@ -461,7 +456,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       const { db } = f;
 
       // Create author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -470,7 +465,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create post
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: "Original Title",
@@ -482,7 +477,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       // Edit the post
       const now = new Date().toISOString();
-      await db.transact([
+      await db.write([
         { op: "sub", e: 100, a: POST_TITLE, v: "Original Title" },
         { op: "sub", e: 100, a: POST_CONTENT, v: "Original Content" },
         ...datoms({
@@ -514,7 +509,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       // Create author
       const authorId = 1;
-      await db.transact(
+      await db.write(
         datoms({
           entityId: authorId,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -523,7 +518,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create draft post by this author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: "Draft Post",
@@ -534,7 +529,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Register interceptor to filter posts based on user role
-      db.interceptors.register(createPostAccessInterceptor());
+      db.interceptors.register(POST_ACCESS_CONTROL);
 
       // Query as the author
       const results = await db.query(
@@ -560,7 +555,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       // Create two authors
       const author1Id = 1;
       const author2Id = 2;
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: author1Id,
@@ -576,7 +571,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create draft post by author 2
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: "Author 2's Draft",
@@ -587,7 +582,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Register interceptor
-      db.interceptors.register(createPostAccessInterceptor());
+      db.interceptors.register(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should NOT see author 2's draft)
       const results = await db.query(
@@ -608,7 +603,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       // Create two authors
       const author1Id = 1;
       const author2Id = 2;
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: author1Id,
@@ -624,7 +619,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create published post by author 2
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: "Published Post",
@@ -635,7 +630,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Register interceptor
-      db.interceptors.register(createPostAccessInterceptor());
+      db.interceptors.register(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should see author 2's published post)
       const results = await db.query(
@@ -657,7 +652,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       // Create author and reader
       const authorId = 1;
       const readerId = 2;
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: authorId,
@@ -673,7 +668,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create draft and published posts
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: 100,
@@ -691,7 +686,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Register interceptor
-      db.interceptors.register(createPostAccessInterceptor());
+      db.interceptors.register(POST_ACCESS_CONTROL);
 
       // Query as reader (should only see published post)
       const results = await db.query(
@@ -717,7 +712,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       // Create admin and author
       const adminId = 1;
       const authorId = 2;
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: adminId,
@@ -733,7 +728,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create draft and published posts
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: 100,
@@ -751,7 +746,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Register interceptor
-      db.interceptors.register(createPostAccessInterceptor());
+      db.interceptors.register(POST_ACCESS_CONTROL);
 
       // Query as admin (should see all posts)
       const results = await db.query(
@@ -776,11 +771,11 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should validate post has required fields", async () => {
       const { db } = f;
 
-      db.interceptors.register(createPostValidatorInterceptor(db));
+      db.interceptors.register(POST_VALIDATOR);
 
       // Try to create post without title (should fail)
       await expect(
-        db.transact(
+        db.write(
           datoms({
             entityId: 100,
             [POST_CONTENT]: "Content",
@@ -791,7 +786,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       ).rejects.toThrow(TransactionError);
 
       // Create post with all required fields (should succeed)
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 101,
           [POST_TITLE]: "Valid Post",
@@ -814,11 +809,11 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should validate author exists", async () => {
       const { db } = f;
 
-      db.interceptors.register(createAuthorValidatorInterceptor(db));
+      db.interceptors.register(AUTHOR_VALIDATOR);
 
       // Try to create post with non-existent author (should fail)
       await expect(
-        db.transact(
+        db.write(
           datoms({
             entityId: 100,
             [POST_TITLE]: "Post",
@@ -828,7 +823,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       ).rejects.toThrow(TransactionError);
 
       // Create author first
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -837,7 +832,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Now create post (should succeed)
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: "Post",
@@ -859,7 +854,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should create tags", async () => {
       const { db } = f;
 
-      await db.transact(
+      await db.write(
         datoms(
           { entityId: 1, [TAG_NAME]: "javascript" },
           { entityId: 2, [TAG_NAME]: "typescript" },
@@ -884,7 +879,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       const { db } = f;
 
       // Create author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -893,7 +888,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create post
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: "My Post",
@@ -903,7 +898,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create tags
-      await db.transact(
+      await db.write(
         datoms(
           { entityId: 1, [TAG_NAME]: "javascript" },
           { entityId: 2, [TAG_NAME]: "typescript" }
@@ -911,7 +906,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Associate tags with post
-      await db.transact([
+      await db.write([
         ...datoms({
           entityId: 100,
           [POST_TAG]: 1,
@@ -947,7 +942,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       const { db } = f;
 
       // Create author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -956,7 +951,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create tags
-      await db.transact(
+      await db.write(
         datoms(
           { entityId: 1, [TAG_NAME]: "javascript" },
           { entityId: 2, [TAG_NAME]: "typescript" }
@@ -964,7 +959,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create posts
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: 100,
@@ -1004,7 +999,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       // Create author
       const authorId = 1;
-      await db.transact(
+      await db.write(
         datoms({
           entityId: authorId,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -1013,7 +1008,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Create draft post
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: "My Blog Post",
@@ -1024,7 +1019,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Edit post
-      await db.transact([
+      await db.write([
         { op: "sub", e: 100, a: POST_CONTENT, v: "Initial content" },
         ...datoms({
           entityId: 100,
@@ -1033,7 +1028,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       ]);
 
       // Create tags
-      await db.transact(
+      await db.write(
         datoms(
           { entityId: 1, [TAG_NAME]: "javascript" },
           { entityId: 2, [TAG_NAME]: "tutorial" }
@@ -1041,7 +1036,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Add tags to post
-      await db.transact(
+      await db.write(
         datoms(
           { entityId: 100, [POST_TAG]: 1 },
           { entityId: 100, [POST_TAG]: 2 }
@@ -1049,7 +1044,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Publish post
-      await db.transact([
+      await db.write([
         { op: "sub", e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT },
         datoms({
           entityId: 100,

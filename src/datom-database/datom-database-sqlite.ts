@@ -3,13 +3,6 @@
  * Accepts a SqlConnection interface for SQLite-compatible databases
  */
 
-import { DatomDatabase } from "./datom-database.js";
-import {
-  isVariable,
-  isQueryPattern,
-  stripQuestionMark,
-} from "./shared/datalog-helpers.js";
-import { joinResults, project } from "./shared/query-helpers.js";
 import type {
   Attribute,
   Datom,
@@ -19,14 +12,22 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
-import type { ReadContext } from "./interceptor/types.js";
+import { DatomDatabase } from "./datom-database.js";
+import type { ReadContext } from "./interceptor/engine.js";
+import {
+  isQueryPattern,
+  isVariable,
+  stripQuestionMark,
+} from "./shared/datalog-helpers.js";
+import { joinResults, project } from "./shared/query-helpers.js";
+
 import type {
   DatalogQuery,
   QueryClause,
   QueryResult,
 } from "../datalog/datalog.js";
 import type { SQLDatabase } from "../sql-database/sql-database.js";
-import { InterceptorErrorWithName, QueryError } from "./errors.js";
+import { QueryError } from "./datom-database.js";
 
 /**
  * SQLite database implementation
@@ -648,7 +649,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     if (beforeResult.errors.length > 0) {
       throw new QueryError(
         "Query blocked by interceptors",
-        beforeResult.errors as InterceptorErrorWithName[]
+        beforeResult.errors
       );
     }
 

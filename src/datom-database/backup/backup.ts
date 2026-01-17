@@ -106,7 +106,7 @@ export async function importDatoms(
       const filteredsub = await filterExistingDatoms(db, dedupesub);
 
       if (filteredadd.length > 0) {
-        await db.transact(
+        await db.write(
           filteredadd.map((d) => ({
             op: "add" as const,
             e: d.e,
@@ -116,7 +116,7 @@ export async function importDatoms(
         );
       }
       if (filteredsub.length > 0) {
-        await db.transact(
+        await db.write(
           filteredsub.map((d) => ({
             op: "sub" as const,
             e: d.e,
@@ -165,7 +165,7 @@ export async function importDatoms(
     const filteredsub = await filterExistingDatoms(db, dedupesub);
 
     if (filteredadd.length > 0) {
-      await db.transact(
+      await db.write(
         filteredadd.map((d) => ({
           op: "add" as const,
           e: d.e,
@@ -175,7 +175,7 @@ export async function importDatoms(
       );
     }
     if (filteredsub.length > 0) {
-      await db.transact(
+      await db.write(
         filteredsub.map((d) => ({
           op: "sub" as const,
           e: d.e,

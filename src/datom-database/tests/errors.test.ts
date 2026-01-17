@@ -6,7 +6,7 @@ import {
   QuerySafetyError,
   QueryTimeoutError,
   TransactionConflictError,
-} from "../errors.js";
+} from "../datom-database.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
 
 describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
@@ -24,7 +24,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
   describe("QuerySafetyError", () => {
     test("should throw QuerySafetyError for query without filters or limits", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       try {
         await db.datoms({});
@@ -40,7 +40,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
 
     test("should throw QuerySafetyError for history query without filters or limits", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       try {
         await db.history().datoms({});
@@ -57,11 +57,11 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
   describe("TransactionConflictError", () => {
     test("should throw TransactionConflictError when optimistic lock fails", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
       const initialTx = await db.getLatestTransaction();
 
       // First transaction updates the database
-      await db.transact([{ op: "add", e: 2, a: "name", v: "Bob" }]);
+      await db.write([{ op: "add", e: 2, a: "name", v: "Bob" }]);
 
       // Note: Optimistic locking is not supported with with() or transact()
       // This test is removed as it tested transaction() callback behavior
@@ -73,7 +73,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
   describe("QueryTimeoutError", () => {
     test("should throw QueryTimeoutError when query exceeds timeout", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       try {
         // Use a very short timeout that will definitely be exceeded
@@ -84,7 +84,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
         await db.datoms({ e: 1, timeoutMs: 1 });
         // If we get here, the timeout didn't trigger (query was too fast)
         // This is acceptable - timeout is best-effort
-      } catch (error) {
+      } catch (error: unknown) {
         if (error instanceof QueryTimeoutError) {
           expect(error).toBeInstanceOf(QueryTimeoutError);
           expect(error.code).toBe("QUERY_TIMEOUT");
@@ -102,7 +102,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       const { db } = f;
       // Add multiple datoms
       for (let i = 1; i <= 10; i++) {
-        await db.transact([{ op: "add", e: i, a: "tag", v: `tag-${i}` }]);
+        await db.write([{ op: "add", e: i, a: "tag", v: `tag-${i}` }]);
       }
 
       try {
@@ -121,7 +121,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
 
     test("should not throw when result is within maxResultSize", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.write([{ op: "add", e: 1, a: "name", v: "Alice" }]);
 
       const results = await db.datoms({
         e: 1,

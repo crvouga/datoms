@@ -14,90 +14,23 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
+import { DatabaseView } from "./datom-database-types.js";
 import {
-  InterceptorErrorWithName,
+  InterceptorEngine,
   QueryError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
+  ReadContext,
   TransactionError,
-} from "./errors.js";
-import { InterceptorEngine } from "./interceptor/engine.js";
-import type { ReadContext, WriteContext } from "./interceptor/types.js";
+  WriteContext,
+} from "./interceptor/engine.js";
 import {
   isQueryPattern,
   isVariable,
   stripQuestionMark,
 } from "./shared/datalog-helpers.js";
 import { joinResults, project } from "./shared/query-helpers.js";
-
-/**
- * Minimal interface for reading datoms (Datomic-like)
- * Only core operations: datoms and query
- */
-export interface DatomReader {
-  /**
-   * Query datoms from the database using query options
-   * @param options Query options (must include at least one filter or limit to prevent full scans)
-   * @returns Array of matching datoms
-   * @example
-   * // Query for all datoms with a specific entity ID
-   * const datoms = await db.datoms({ entity: 123 });
-   *
-   * // Query with a filter and limit
-   * const recent = await db.datoms({ attribute: "age", limit: 5 });
-   *
-   * // Time-travel query: use database views
-   * const dbPast = db.asOf(87);
-   * const atOldTx = await dbPast.datoms({ entity: 42 });
-   */
-  datoms(options: QueryOptions): Promise<Datom[]>;
-
-  /**
-   * Execute a datalog query
-   * @param query Datalog query to execute
-   * @param context Optional context object for interceptors
-   * @returns Query results as an array of records
-   * @example
-   * const results = await db.query({ find: ["?e"], where: [["?e", "name", "alice"]] });
-   * //=> [{"e": 1}, {"e": 2}]
-   */
-  query(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResult>;
-}
-
-/**
- * Read-only database view for time-travel queries (Datomic-like)
- * Provides minimal interface for querying historical or filtered database states
- * Views are immutable and cannot modify the database
- */
-export interface DatabaseView {
-  /**
-   * Query datoms from the database view using query options
-   * @param options Query options (must include at least one filter or limit to prevent full scans)
-   * @returns Array of matching datoms
-   * @example
-   * const dbPast = db.asOf(100);
-   * const datoms = await dbPast.datoms({ entity: 123 });
-   */
-  datoms(options: QueryOptions): Promise<Datom[]>;
-
-  /**
-   * Execute a datalog query against this database view
-   * @param query Datalog query to execute
-   * @param context Optional context object for interceptors
-   * @returns Query results as an array of records
-   * @example
-   * const dbPast = db.asOf(100);
-   * const results = await dbPast.query({ find: ["?e"], where: [["?e", "name", "Alice"]] });
-   */
-  query(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResult>;
-}
 
 /**
  * Base class for database views that filter queries by transaction ID
@@ -563,7 +496,7 @@ export interface WithResult {
   tempIds: Record<string, EntityId>;
 }
 
-export abstract class DatomDatabase implements DatomReader {
+export abstract class DatomDatabase implements DatabaseView {
   protected initialized = false;
   public readonly interceptors: InterceptorEngine;
 
@@ -622,7 +555,7 @@ export abstract class DatomDatabase implements DatomReader {
    *   { userId: "alice", syncSource: "client" }
    * );
    */
-  async transact(
+  async write(
     ops: (DatomInput | DatomInput[])[],
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>
@@ -691,7 +624,7 @@ export abstract class DatomDatabase implements DatomReader {
     if (beforeResult.errors.length > 0) {
       throw new TransactionError(
         "Transaction validation failed",
-        beforeResult.errors as InterceptorErrorWithName[]
+        beforeResult.errors
       );
     }
 
@@ -1058,7 +991,7 @@ export abstract class DatomDatabase implements DatomReader {
     if (beforeResult.errors.length > 0) {
       throw new QueryError(
         "Query blocked by interceptors",
-        beforeResult.errors as InterceptorErrorWithName[]
+        beforeResult.errors
       );
     }
 
@@ -1251,3 +1184,19 @@ export abstract class DatomDatabase implements DatomReader {
     }
   }
 }
+
+// Re-export error classes and types from interceptor engine
+export {
+  ConnectionPoolExhaustedError,
+  DatomDatabaseError,
+  QueryError,
+  QueryResultSizeError,
+  QuerySafetyError,
+  QueryTimeoutError,
+  TransactionConflictError,
+  TransactionError,
+  type InterceptorError,
+  type InterceptorErrorWithName,
+  type ReadContext,
+  type WriteContext,
+} from "./interceptor/engine.js";

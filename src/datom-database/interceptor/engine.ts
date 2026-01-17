@@ -3,16 +3,286 @@
  * Supports before-read, after-read, before-write, and after-write interceptors
  */
 
-import type {
-  AfterReadInterceptor,
-  BeforeReadInterceptor,
-  BeforeWriteInterceptor,
-  Interceptor,
-} from "./types.js";
-import type { Datom, Transaction } from "../../types.js";
 import type { DatalogQuery } from "../../datalog/datalog.js";
-import type { InterceptorErrorWithName } from "../errors.js";
-import type { ReadContext, WriteContext } from "./types.js";
+import type { Datom, Transaction } from "../../types.js";
+import { DatabaseView } from "../datom-database-types.js";
+
+/**
+ * Error structure returned by interceptors
+ */
+export type InterceptorError = {
+  message: string;
+  code?: string;
+  datom?: Datom;
+};
+/**
+ * Error with interceptor name attached
+ */
+export type InterceptorErrorWithName = {
+  interceptor: string;
+} & InterceptorError;
+
+/**
+ * Context passed to read interceptors
+ * Contains database reference and any additional context data
+ * Note: This is a generic type that gets resolved when used with DatomDatabase
+ */
+export type ReadContext = {
+  db: DatabaseView;
+  [key: string]: unknown;
+};
+
+/**
+ * Context passed to write interceptors
+ * Contains database reference, transaction metadata, and any additional context data
+ * Note: This is a generic type that gets resolved when used with DatomDatabase
+ */
+export type WriteContext = {
+  db: DatabaseView;
+  txMeta?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+/**
+ * Result from before-read interceptors
+ */
+export type BeforeReadResult = {
+  query: DatalogQuery;
+  errors?: InterceptorError[];
+  stopProcessing?: boolean;
+};
+
+/**
+ * Before-read interceptor
+ * Runs before query execution, can modify query or return errors
+ */
+export type BeforeRead = {
+  type: "beforeRead";
+  name: string;
+  execute: (query: DatalogQuery, ctx: ReadContext) => Promise<BeforeReadResult>;
+};
+
+/**
+ * After-read interceptor
+ * Runs after query execution, can filter/transform results
+ */
+export type AfterRead = {
+  type: "afterRead";
+  name: string;
+  execute: (datoms: Datom[], ctx: ReadContext) => Promise<Datom[]>;
+};
+
+/**
+ * Result from before-write interceptors
+ */
+export type BeforeWriteResult = {
+  tx: Transaction;
+  errors?: InterceptorError[];
+  stopProcessing?: boolean;
+};
+
+/**
+ * Before-write interceptor
+ * Runs before transaction commit, can validate/augment transaction or return errors
+ */
+export type BeforeWrite = {
+  type: "beforeWrite";
+  name: string;
+  execute: (tx: Transaction, ctx: WriteContext) => Promise<BeforeWriteResult>;
+};
+
+/**
+ * After-write interceptor
+ * Runs after transaction commit, for side effects (failures don't fail transaction)
+ */
+export type AfterWrite = {
+  type: "afterWrite";
+  name: string;
+  execute: (tx: Transaction, ctx: WriteContext) => Promise<void>;
+};
+
+/**
+ * Union type for all interceptor types
+ */
+export type Interceptor = BeforeRead | AfterRead | BeforeWrite | AfterWrite;
+
+/**
+ * Base error class for all datom database errors
+ */
+export class DatomDatabaseError extends Error {
+  constructor(
+    message: string,
+    public readonly code?: string
+  ) {
+    super(message);
+    this.name = "DatomDatabaseError";
+    Object.setPrototypeOf(this, DatomDatabaseError.prototype);
+  }
+}
+
+/**
+ * Error thrown when a transaction conflict occurs
+ * Useful for optimistic locking scenarios
+ * @example
+ * try {
+ *   await db.transaction(async (tx) => {
+ *     // Long-running transaction that conflicts with another
+ *   });
+ * } catch (error) {
+ *   if (error instanceof TransactionConflictError) {
+ *     // Retry the transaction
+ *   }
+ * }
+ */
+export class TransactionConflictError extends DatomDatabaseError {
+  constructor(
+    message: string,
+    public readonly txId?: number,
+    public readonly conflictingTxId?: number
+  ) {
+    super(message, "TRANSACTION_CONFLICT");
+    this.name = "TransactionConflictError";
+    Object.setPrototypeOf(this, TransactionConflictError.prototype);
+  }
+}
+
+/**
+ * Error thrown when a query would perform a full table scan without filters
+ * @example
+ * try {
+ *   await db.datoms({}); // Throws QuerySafetyError
+ * } catch (error) {
+ *   if (error instanceof QuerySafetyError) {
+ *     // Add filters or limit to the query
+ *   }
+ * }
+ */
+export class QuerySafetyError extends DatomDatabaseError {
+  constructor(message: string) {
+    super(message, "QUERY_SAFETY_VIOLATION");
+    this.name = "QuerySafetyError";
+    Object.setPrototypeOf(this, QuerySafetyError.prototype);
+  }
+}
+
+/**
+ * Error thrown when a query exceeds its timeout
+ * @example
+ * try {
+ *   await db.datoms({ entity: 1, timeoutMs: 100 });
+ * } catch (error) {
+ *   if (error instanceof QueryTimeoutError) {
+ *     // Query took too long
+ *   }
+ * }
+ */
+export class QueryTimeoutError extends DatomDatabaseError {
+  constructor(
+    public readonly timeoutMs: number,
+    public readonly queryOptions?: unknown
+  ) {
+    super(`Query exceeded timeout of ${timeoutMs}ms`, "QUERY_TIMEOUT");
+    this.name = "QueryTimeoutError";
+    Object.setPrototypeOf(this, QueryTimeoutError.prototype);
+  }
+}
+
+/**
+ * Error thrown when a query result exceeds the maximum allowed size
+ * @example
+ * try {
+ *   await db.datoms({ attribute: "tag", maxResultSize: 1000 });
+ * } catch (error) {
+ *   if (error instanceof QueryResultSizeError) {
+ *     // Result set too large
+ *   }
+ * }
+ */
+export class QueryResultSizeError extends DatomDatabaseError {
+  constructor(
+    public readonly resultSize: number,
+    public readonly maxResultSize: number,
+    public readonly queryOptions?: unknown
+  ) {
+    super(
+      `Query result size ${resultSize} exceeds maximum allowed size ${maxResultSize}`,
+      "QUERY_RESULT_SIZE_EXCEEDED"
+    );
+    this.name = "QueryResultSizeError";
+    Object.setPrototypeOf(this, QueryResultSizeError.prototype);
+  }
+}
+
+/**
+ * Error thrown when connection pool is exhausted
+ * @example
+ * try {
+ *   await db.datoms({ entity: 1 });
+ * } catch (error) {
+ *   if (error instanceof ConnectionPoolExhaustedError) {
+ *     // No connections available
+ *   }
+ * }
+ */
+export class ConnectionPoolExhaustedError extends DatomDatabaseError {
+  constructor(
+    public readonly waitingRequests: number,
+    public readonly maxConnections: number
+  ) {
+    super(
+      `Connection pool exhausted: ${waitingRequests} requests waiting, max connections: ${maxConnections}`,
+      "CONNECTION_POOL_EXHAUSTED"
+    );
+    this.name = "ConnectionPoolExhaustedError";
+    Object.setPrototypeOf(this, ConnectionPoolExhaustedError.prototype);
+  }
+}
+
+/**
+ * Error thrown when a query is blocked or fails validation by interceptors
+ * @example
+ * try {
+ *   await db.query(query, context);
+ * } catch (error) {
+ *   if (error instanceof QueryError) {
+ *     // Handle interceptor errors
+ *     console.log("Validation errors:", error.errors);
+ *   }
+ * }
+ */
+export class QueryError extends DatomDatabaseError {
+  constructor(
+    message: string,
+    public readonly errors: InterceptorErrorWithName[]
+  ) {
+    super(message, "QUERY_INTERCEPTOR_ERROR");
+    this.name = "QueryError";
+    Object.setPrototypeOf(this, QueryError.prototype);
+  }
+}
+
+/**
+ * Error thrown when a transaction fails validation by interceptors
+ * @example
+ * try {
+ *   await db.transact(ops, metadata, context);
+ * } catch (error) {
+ *   if (error instanceof TransactionError) {
+ *     // Handle validation errors
+ *     console.log("Validation errors:", error.errors);
+ *   }
+ * }
+ */
+export class TransactionError extends DatomDatabaseError {
+  constructor(
+    message: string,
+    public readonly errors: InterceptorErrorWithName[]
+  ) {
+    super(message, "TRANSACTION_INTERCEPTOR_ERROR");
+    this.name = "TransactionError";
+    Object.setPrototypeOf(this, TransactionError.prototype);
+  }
+}
 
 /**
  * Engine for managing and executing database interceptors
@@ -20,9 +290,9 @@ import type { ReadContext, WriteContext } from "./types.js";
  * filter results, or perform side effects
  */
 export class InterceptorEngine {
-  private beforeReadInterceptors: BeforeReadInterceptor[] = [];
-  private afterReadInterceptors: AfterReadInterceptor[] = [];
-  private beforeWriteInterceptors: BeforeWriteInterceptor[] = [];
+  private beforeReadInterceptors: BeforeRead[] = [];
+  private afterReadInterceptors: AfterRead[] = [];
+  private beforeWriteInterceptors: BeforeWrite[] = [];
   private afterWriteInterceptors: Array<{
     type: "afterWrite";
     name: string;
