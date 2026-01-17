@@ -4,7 +4,11 @@
  */
 
 import { DatomDatabase } from "./datom-database.js";
-import { isVariable, stripQuestionMark } from "./shared/datalog-helpers.js";
+import {
+  isVariable,
+  isQueryPattern,
+  stripQuestionMark,
+} from "./shared/datalog-helpers.js";
 import { project } from "./shared/query-helpers.js";
 import type {
   Attribute,
@@ -633,6 +637,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     // For single clause queries, use the optimized query method
     if (query.where.length === 1) {
       const clause = query.where[0];
+      if (!isQueryPattern(clause)) {
+        throw new Error("Only QueryPattern clauses are supported");
+      }
       const { e: entityVal, a: attributeVal, v: valueVal } = clause;
       const entity = isVariable(entityVal)
         ? undefined
@@ -683,6 +690,11 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     // Build CTEs for each clause with deduplication
     for (let i = 0; i < clauses.length; i++) {
       const clause = clauses[i];
+      if (!isQueryPattern(clause)) {
+        throw new Error(
+          "Only QueryPattern clauses are supported in SQL queries"
+        );
+      }
       const { e: entityVal, a: attributeVal, v: valueVal } = clause;
       const alias = `d${i}`;
 
@@ -765,6 +777,11 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     for (let i = 0; i < clauses.length; i++) {
       const clause = clauses[i];
+      if (!isQueryPattern(clause)) {
+        throw new Error(
+          "Only QueryPattern clauses are supported in JOIN conditions"
+        );
+      }
       const { e: entityVal, a: attributeVal, v: valueVal } = clause;
 
       if (isVariable(entityVal)) {
@@ -850,6 +867,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
           // Find which clause/alias has this variable
           for (let i = 0; i < clauses.length; i++) {
             const clause = clauses[i];
+            if (!isQueryPattern(clause)) {
+              continue; // Skip non-pattern clauses in ORDER BY
+            }
             const { e: entityVal, a: attributeVal, v: valueVal } = clause;
             if (entityVal === variable) {
               return `d${i}.e ${direction.toUpperCase()}`;
@@ -1081,6 +1101,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   private async executeClause(
     clause: QueryClause
   ): Promise<Record<string, Value | Attribute>[]> {
+    if (!isQueryPattern(clause)) {
+      throw new Error("Only QueryPattern clauses are supported");
+    }
     const { e: entityVal, a: attributeVal, v: valueVal } = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
     const attribute = isVariable(attributeVal)

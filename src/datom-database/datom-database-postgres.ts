@@ -20,7 +20,11 @@ import type {
   Value,
 } from "../types.js";
 import { DatomDatabase } from "./datom-database.js";
-import { isVariable, stripQuestionMark } from "./shared/datalog-helpers.js";
+import {
+  isVariable,
+  isQueryPattern,
+  stripQuestionMark,
+} from "./shared/datalog-helpers.js";
 import { joinResults, project } from "./shared/query-helpers.js";
 
 /**
@@ -846,6 +850,9 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
   private async executeClause(
     clause: QueryClause
   ): Promise<Record<string, Value | Attribute>[]> {
+    if (!isQueryPattern(clause)) {
+      throw new Error("Only QueryPattern clauses are supported");
+    }
     const { e: entityVal, a: attributeVal, v: valueVal } = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
     const attribute = isVariable(attributeVal)

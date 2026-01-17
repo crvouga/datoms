@@ -3,6 +3,8 @@
  * These utilities are used across all database implementations
  */
 
+import type { QueryClause, QueryPattern } from "../../datalog/datalog.js";
+
 /**
  * Check if a value is a variable (starts with ?)
  * @param value Value to check
@@ -10,6 +12,21 @@
  */
 export function isVariable(value: unknown): boolean {
   return typeof value === "string" && value.startsWith("?");
+}
+
+/**
+ * Type guard to check if a QueryClause is a QueryPattern
+ * @param clause Query clause to check
+ * @returns True if the clause is a QueryPattern
+ */
+export function isQueryPattern(clause: QueryClause): clause is QueryPattern {
+  return (
+    typeof clause === "object" &&
+    clause !== null &&
+    "e" in clause &&
+    !("or" in clause) &&
+    !("not" in clause)
+  );
 }
 
 /**

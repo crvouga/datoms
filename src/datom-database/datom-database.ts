@@ -28,7 +28,11 @@ import {
   UniqueConstraintError,
 } from "./errors.js";
 import { MigrationRegistry } from "./migrations/migration-registry.js";
-import { isVariable, stripQuestionMark } from "./shared/datalog-helpers.js";
+import {
+  isVariable,
+  isQueryPattern,
+  stripQuestionMark,
+} from "./shared/datalog-helpers.js";
 import { joinResults, project } from "./shared/query-helpers.js";
 
 /**
@@ -131,6 +135,9 @@ abstract class BaseDatabaseView implements DatabaseView {
 
     // Execute first clause using view's datoms() method
     const firstClause = query.where[0];
+    if (!isQueryPattern(firstClause)) {
+      throw new Error("First clause must be a QueryPattern");
+    }
     const { e: entityVal, a: attributeVal, v: valueVal } = firstClause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
     const attribute = isVariable(attributeVal)
@@ -163,6 +170,9 @@ abstract class BaseDatabaseView implements DatabaseView {
     let results = firstResults;
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
+      if (!isQueryPattern(clause)) {
+        throw new Error("Only QueryPattern clauses are supported in joins");
+      }
       const { e: entityVal, a: attributeVal, v: valueVal } = clause;
       const entity = isVariable(entityVal)
         ? undefined

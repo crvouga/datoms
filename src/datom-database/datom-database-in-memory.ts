@@ -19,7 +19,11 @@ import type {
   QueryClause,
   QueryResult,
 } from "../datalog/datalog.js";
-import { isVariable, stripQuestionMark } from "./shared/datalog-helpers.js";
+import {
+  isVariable,
+  isQueryPattern,
+  stripQuestionMark,
+} from "./shared/datalog-helpers.js";
 import { joinResults, project } from "./shared/query-helpers.js";
 
 /**
@@ -78,22 +82,6 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     }
 
     return tx;
-  }
-
-  /**
-   * Check if a datom is currently add (not retract)
-   */
-  private isCurrentlyadd(datom: Datom): boolean {
-    // Find the latest transaction for this (entity, attribute, value)
-    let latest: Datom | null = null;
-    for (const d of this._datomsArray) {
-      if (d.e === datom.e && d.a === datom.a && d.v === datom.v) {
-        if (!latest || d.tx > latest.tx) {
-          latest = d;
-        }
-      }
-    }
-    return latest !== null && latest.op === "add";
   }
 
   async datoms(options: QueryOptions): Promise<Datom[]> {
@@ -368,6 +356,9 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   private async executeClause(
     clause: QueryClause
   ): Promise<Record<string, Value | Attribute>[]> {
+    if (!isQueryPattern(clause)) {
+      throw new Error("Only QueryPattern clauses are supported");
+    }
     const { e: entityVal, a: attributeVal, v: valueVal } = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
     const attribute = isVariable(attributeVal)
