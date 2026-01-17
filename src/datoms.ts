@@ -162,7 +162,7 @@ export type DatomInput = {
  *   })
  * );
  */
-export const datoms = <T extends { entityId: EntityId }>(
+export const datoms = <T extends { entityId: EntityId; op?: DatomOperation }>(
   ...records: (T | T[])[]
 ): DatomInput[] => {
   return records.flatMap((r) =>
@@ -173,7 +173,7 @@ export const datoms = <T extends { entityId: EntityId }>(
           e: r.entityId,
           a: key,
           v: value as Value,
-          op: "add",
+          op: r.op ?? "add",
         });
       }
       return datoms;

@@ -1,6 +1,6 @@
 import type { Interceptor } from "../datom-database/interceptor/engine.js";
 import { InterceptorValidator } from "../datom-database/interceptor/validator.js";
-import { EntityId, type Datom } from "../datoms.js";
+import { Attribute, EntityId, records, Value, type Datom } from "../datoms.js";
 
 // Schema constants
 export const USER_TYPE = "user/type";
@@ -67,46 +67,29 @@ export const POST_ACCESS_CONTROL: Interceptor = {
         d.a !== POST_AUTHOR
     );
 
-    // Build a map of post entities and their attributes
-    const postEntities = new Set<EntityId>();
-    const postData = new Map<
-      EntityId,
-      {
-        author?: number;
-        status?: string;
-        title?: string;
-        content?: string;
-      }
-    >();
+    // Group post datoms by entity ID
+    const postEntities = new Set<EntityId>(postDatoms.map((d) => d.e));
+    const postData = new Map<EntityId, Record<Attribute, Value>>();
 
-    for (const datom of postDatoms) {
-      postEntities.add(datom.e);
-      if (!postData.has(datom.e)) {
-        postData.set(datom.e, {});
-      }
-      const data = postData.get(datom.e as number)!;
-      if (datom.a === POST_AUTHOR) {
-        data.author = datom.v as number;
-      } else if (datom.a === POST_STATUS) {
-        data.status = datom.v as string;
-      } else if (datom.a === POST_TITLE) {
-        data.title = datom.v as string;
-      } else if (datom.a === POST_CONTENT) {
-        data.content = datom.v as string;
+    // Convert post datoms to records grouped by entity
+    for (const postId of postEntities) {
+      const entityDatoms = postDatoms.filter((d) => d.e === postId);
+      const entityRecords = records(entityDatoms);
+      if (entityRecords.length > 0) {
+        postData.set(postId, entityRecords[0]);
       }
     }
 
     // Fetch missing author/status information from database for posts that don't have it
     for (const postId of postEntities) {
-      const data = postData.get(postId)!;
-      if (data.author === undefined || data.status === undefined) {
+      const data = postData.get(postId) || {};
+      if (!(POST_AUTHOR in data) || !(POST_STATUS in data)) {
         const postEntityDatoms = await db.datoms({ e: postId });
-        for (const datom of postEntityDatoms) {
-          if (datom.a === POST_AUTHOR && data.author === undefined) {
-            data.author = datom.v as number;
-          } else if (datom.a === POST_STATUS && data.status === undefined) {
-            data.status = datom.v as string;
-          }
+        const existingRecords = records(postEntityDatoms);
+        if (existingRecords.length > 0) {
+          // Merge existing record data into current data
+          Object.assign(data, existingRecords[0]);
+          postData.set(postId, data);
         }
       }
     }
@@ -114,8 +97,8 @@ export const POST_ACCESS_CONTROL: Interceptor = {
     // Filter posts based on access rules
     const allowedPosts = new Set<EntityId>();
     for (const [postId, data] of postData.entries()) {
-      const author = data.author;
-      const status = data.status;
+      const author = data[POST_AUTHOR] as number | undefined;
+      const status = data[POST_STATUS] as string | undefined;
 
       // Admins can see all posts
       if (userType === USER_TYPE_ADMIN) {
@@ -176,15 +159,17 @@ export const POST_VALIDATOR: Interceptor = {
     // Validate each post entity
     for (const postId of postEntities) {
       const postDatoms = tx.datoms.filter((d) => d.e === postId);
-      const hasTitle = postDatoms.some((d) => d.a === POST_TITLE);
-      const hasAuthor = postDatoms.some((d) => d.a === POST_AUTHOR);
-      const hasStatus = postDatoms.some((d) => d.a === POST_STATUS);
+      const postRecord = records(postDatoms)[0] || {};
+      const hasTitle = POST_TITLE in postRecord;
+      const hasAuthor = POST_AUTHOR in postRecord;
+      const hasStatus = POST_STATUS in postRecord;
 
       // Check existing datoms for posts being updated
       const existingDatoms = await db.datoms({ e: postId });
-      const existingHasTitle = existingDatoms.some((d) => d.a === POST_TITLE);
-      const existingHasAuthor = existingDatoms.some((d) => d.a === POST_AUTHOR);
-      const existingHasStatus = existingDatoms.some((d) => d.a === POST_STATUS);
+      const existingRecord = records(existingDatoms)[0] || {};
+      const existingHasTitle = POST_TITLE in existingRecord;
+      const existingHasAuthor = POST_AUTHOR in existingRecord;
+      const existingHasStatus = POST_STATUS in existingRecord;
 
       const finalHasTitle = hasTitle || existingHasTitle;
       const finalHasAuthor = hasAuthor || existingHasAuthor;
@@ -242,12 +227,10 @@ export const AUTHOR_VALIDATOR: Interceptor = {
       if (datom.a === POST_AUTHOR && datom.op === "add") {
         const authorId = datom.v as number;
         const authorDatoms = await db.datoms({ e: authorId });
-        const isAuthor = authorDatoms.some(
-          (d) => d.a === USER_TYPE && d.v === USER_TYPE_AUTHOR
-        );
-        const isAdmin = authorDatoms.some(
-          (d) => d.a === USER_TYPE && d.v === USER_TYPE_ADMIN
-        );
+        const authorRecord = records(authorDatoms)[0] || {};
+        const userType = authorRecord[USER_TYPE] as string | undefined;
+        const isAuthor = userType === USER_TYPE_AUTHOR;
+        const isAdmin = userType === USER_TYPE_ADMIN;
 
         if (!isAuthor && !isAdmin) {
           validator.assert(
