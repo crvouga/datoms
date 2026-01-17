@@ -1,0 +1,269 @@
+import type { Interceptor } from "../datom-database/interceptor/engine.js";
+import { InterceptorValidator } from "../datom-database/interceptor/validator.js";
+import { EntityId, type Datom } from "../datoms.js";
+
+// Schema constants
+export const USER_TYPE = "user/type";
+export const USER_NAME = "user/name";
+export const USER_EMAIL = "user/email";
+export const POST_TITLE = "post/title";
+export const POST_CONTENT = "post/content";
+export const POST_STATUS = "post/status";
+export const POST_AUTHOR = "post/author";
+export const POST_CREATED_AT = "post/createdAt";
+export const POST_UPDATED_AT = "post/updatedAt";
+export const TAG_NAME = "tag/name";
+export const POST_TAG = "post/tag";
+
+// User types
+export const USER_TYPE_ADMIN = "admin";
+export const USER_TYPE_AUTHOR = "author";
+export const USER_TYPE_READER = "reader";
+
+// Post statuses
+export const POST_STATUS_DRAFT = "draft";
+export const POST_STATUS_PUBLISHED = "published";
+
+// ============================================================================
+// Interceptors
+// ============================================================================
+
+/**
+ * Post access control interceptor
+ * Filters post datoms based on user role and ownership:
+ * - Admins can see all posts
+ * - Authors can see their own posts (published or draft)
+ * - Authors can see published posts from other authors
+ * - Readers can only see published posts
+ */
+export const POST_ACCESS_CONTROL: Interceptor = {
+  type: "afterRead",
+  name: "post-access-control",
+  async execute(datoms, ctx) {
+    const { db } = ctx;
+    const userId = ctx.userId as number | undefined;
+    const userType = ctx.userType as string | undefined;
+
+    // If no user context, block all posts
+    if (!userId || !userType) {
+      return datoms.filter((d: Datom) => d.a !== POST_TITLE);
+    }
+
+    // Get all post-related datoms
+    const postDatoms = datoms.filter(
+      (d: Datom) =>
+        d.a === POST_TITLE ||
+        d.a === POST_CONTENT ||
+        d.a === POST_STATUS ||
+        d.a === POST_AUTHOR
+    );
+
+    // Get non-post datoms (always allow)
+    const nonPostDatoms = datoms.filter(
+      (d: Datom) =>
+        d.a !== POST_TITLE &&
+        d.a !== POST_CONTENT &&
+        d.a !== POST_STATUS &&
+        d.a !== POST_AUTHOR
+    );
+
+    // Build a map of post entities and their attributes
+    const postEntities = new Set<EntityId>();
+    const postData = new Map<
+      EntityId,
+      {
+        author?: number;
+        status?: string;
+        title?: string;
+        content?: string;
+      }
+    >();
+
+    for (const datom of postDatoms) {
+      postEntities.add(datom.e);
+      if (!postData.has(datom.e)) {
+        postData.set(datom.e, {});
+      }
+      const data = postData.get(datom.e as number)!;
+      if (datom.a === POST_AUTHOR) {
+        data.author = datom.v as number;
+      } else if (datom.a === POST_STATUS) {
+        data.status = datom.v as string;
+      } else if (datom.a === POST_TITLE) {
+        data.title = datom.v as string;
+      } else if (datom.a === POST_CONTENT) {
+        data.content = datom.v as string;
+      }
+    }
+
+    // Fetch missing author/status information from database for posts that don't have it
+    for (const postId of postEntities) {
+      const data = postData.get(postId)!;
+      if (data.author === undefined || data.status === undefined) {
+        const postEntityDatoms = await db.datoms({ e: postId });
+        for (const datom of postEntityDatoms) {
+          if (datom.a === POST_AUTHOR && data.author === undefined) {
+            data.author = datom.v as number;
+          } else if (datom.a === POST_STATUS && data.status === undefined) {
+            data.status = datom.v as string;
+          }
+        }
+      }
+    }
+
+    // Filter posts based on access rules
+    const allowedPosts = new Set<EntityId>();
+    for (const [postId, data] of postData.entries()) {
+      const author = data.author;
+      const status = data.status;
+
+      // Admins can see all posts
+      if (userType === USER_TYPE_ADMIN) {
+        allowedPosts.add(postId);
+      }
+      // Authors can see their own posts (published or draft)
+      else if (userType === USER_TYPE_AUTHOR && author === userId) {
+        allowedPosts.add(postId);
+      }
+      // Readers can only see published posts
+      else if (
+        userType === USER_TYPE_READER &&
+        status === POST_STATUS_PUBLISHED
+      ) {
+        allowedPosts.add(postId);
+      }
+      // Authors can see published posts from others
+      else if (
+        userType === USER_TYPE_AUTHOR &&
+        status === POST_STATUS_PUBLISHED
+      ) {
+        allowedPosts.add(postId);
+      }
+    }
+
+    // Filter datoms to only include allowed posts
+    const filteredPostDatoms = postDatoms.filter((d) => allowedPosts.has(d.e));
+
+    return [...nonPostDatoms, ...filteredPostDatoms];
+  },
+};
+
+/**
+ * Post validator interceptor
+ * Validates that posts have required fields: title, author, and status
+ */
+export const POST_VALIDATOR: Interceptor = {
+  type: "beforeWrite",
+  name: "post-validator",
+  async execute(tx, ctx) {
+    const { db } = ctx;
+
+    const validator = new InterceptorValidator();
+
+    // Find all post entities being created/updated
+    const postEntities = new Set<number>();
+    for (const datom of tx.datoms) {
+      if (
+        datom.a === POST_TITLE ||
+        datom.a === POST_CONTENT ||
+        datom.a === POST_STATUS ||
+        datom.a === POST_AUTHOR
+      ) {
+        postEntities.add(datom.e as number);
+      }
+    }
+
+    // Validate each post entity
+    for (const postId of postEntities) {
+      const postDatoms = tx.datoms.filter((d) => d.e === postId);
+      const hasTitle = postDatoms.some((d) => d.a === POST_TITLE);
+      const hasAuthor = postDatoms.some((d) => d.a === POST_AUTHOR);
+      const hasStatus = postDatoms.some((d) => d.a === POST_STATUS);
+
+      // Check existing datoms for posts being updated
+      const existingDatoms = await db.datoms({ e: postId });
+      const existingHasTitle = existingDatoms.some((d) => d.a === POST_TITLE);
+      const existingHasAuthor = existingDatoms.some((d) => d.a === POST_AUTHOR);
+      const existingHasStatus = existingDatoms.some((d) => d.a === POST_STATUS);
+
+      const finalHasTitle = hasTitle || existingHasTitle;
+      const finalHasAuthor = hasAuthor || existingHasAuthor;
+      const finalHasStatus = hasStatus || existingHasStatus;
+
+      if (!finalHasTitle) {
+        validator.assert(
+          false,
+          "Post must have a title",
+          "MISSING_TITLE",
+          postDatoms.find((d) => d.e === postId)
+        );
+      }
+
+      if (!finalHasAuthor) {
+        validator.assert(
+          false,
+          "Post must have an author",
+          "MISSING_AUTHOR",
+          postDatoms.find((d) => d.e === postId)
+        );
+      }
+
+      if (!finalHasStatus) {
+        validator.assert(
+          false,
+          "Post must have a status",
+          "MISSING_STATUS",
+          postDatoms.find((d) => d.e === postId)
+        );
+      }
+    }
+
+    if (validator.hasErrors()) {
+      return { tx, errors: validator.getErrors() };
+    }
+
+    return { tx };
+  },
+};
+
+/**
+ * Author validator interceptor
+ * Validates that post authors are either authors or admins
+ */
+export const AUTHOR_VALIDATOR: Interceptor = {
+  type: "beforeWrite",
+  name: "author-validator",
+  async execute(tx, ctx) {
+    const { db } = ctx;
+    const validator = new InterceptorValidator();
+
+    // Find all post author assignments
+    for (const datom of tx.datoms) {
+      if (datom.a === POST_AUTHOR && datom.op === "add") {
+        const authorId = datom.v as number;
+        const authorDatoms = await db.datoms({ e: authorId });
+        const isAuthor = authorDatoms.some(
+          (d) => d.a === USER_TYPE && d.v === USER_TYPE_AUTHOR
+        );
+        const isAdmin = authorDatoms.some(
+          (d) => d.a === USER_TYPE && d.v === USER_TYPE_ADMIN
+        );
+
+        if (!isAuthor && !isAdmin) {
+          validator.assert(
+            false,
+            `User ${authorId} is not an author or admin`,
+            "INVALID_AUTHOR",
+            datom
+          );
+        }
+      }
+    }
+
+    if (validator.hasErrors()) {
+      return { tx, errors: validator.getErrors() };
+    }
+
+    return { tx };
+  },
+};
