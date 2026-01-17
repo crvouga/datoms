@@ -1,6 +1,6 @@
 /**
- * Interceptor engine for managing and executing database interceptors
- * Supports before-read, after-read, before-write, and after-write interceptors
+ * Hook engine for managing and executing database hooks
+ * Supports before-read, after-read, before-write, and after-write hooks
  */
 
 import type { DatalogQuery } from "../../datalog/datalog.js";
@@ -8,22 +8,22 @@ import type { Datom, Transaction } from "../../types.js";
 import { DatabaseView } from "../datom-database-types.js";
 
 /**
- * Error structure returned by interceptors
+ * Error structure returned by hooks
  */
-export type InterceptorError = {
+export type HookError = {
   message: string;
   code?: string;
   datom?: Datom;
 };
 /**
- * Error with interceptor name attached
+ * Error with hook name attached
  */
-export type InterceptorErrorWithName = {
-  interceptor: string;
-} & InterceptorError;
+export type HookErrorWithName = {
+  hook: string;
+} & HookError;
 
 /**
- * Context passed to read interceptors
+ * Context passed to read hooks
  * Contains database reference and any additional context data
  * Note: This is a generic type that gets resolved when used with DatomDatabase
  */
@@ -33,7 +33,7 @@ export type ReadContext = {
 };
 
 /**
- * Context passed to write interceptors
+ * Context passed to write hooks
  * Contains database reference, transaction metadata, and any additional context data
  * Note: This is a generic type that gets resolved when used with DatomDatabase
  */
@@ -44,16 +44,16 @@ export type WriteContext = {
 };
 
 /**
- * Result from before-read interceptors
+ * Result from before-read hooks
  */
 export type BeforeReadResult = {
   query: DatalogQuery;
-  errors?: InterceptorError[];
+  errors?: HookError[];
   stopProcessing?: boolean;
 };
 
 /**
- * Before-read interceptor
+ * Before-read hook
  * Runs before query execution, can modify query or return errors
  */
 export type BeforeRead = {
@@ -63,7 +63,7 @@ export type BeforeRead = {
 };
 
 /**
- * After-read interceptor
+ * After-read hook
  * Runs after query execution, can filter/transform results
  */
 export type AfterRead = {
@@ -73,16 +73,16 @@ export type AfterRead = {
 };
 
 /**
- * Result from before-write interceptors
+ * Result from before-write hooks
  */
 export type BeforeWriteResult = {
   tx: Transaction;
-  errors?: InterceptorError[];
+  errors?: HookError[];
   stopProcessing?: boolean;
 };
 
 /**
- * Before-write interceptor
+ * Before-write hook
  * Runs before transaction commit, can validate/augment transaction or return errors
  */
 export type BeforeWrite = {
@@ -92,7 +92,7 @@ export type BeforeWrite = {
 };
 
 /**
- * After-write interceptor
+ * After-write hook
  * Runs after transaction commit, for side effects (failures don't fail transaction)
  */
 export type AfterWrite = {
@@ -102,9 +102,9 @@ export type AfterWrite = {
 };
 
 /**
- * Union type for all interceptor types
+ * Union type for all hook types
  */
-export type Interceptor = BeforeRead | AfterRead | BeforeWrite | AfterWrite;
+export type Hook = BeforeRead | AfterRead | BeforeWrite | AfterWrite;
 
 /**
  * Base error class for all datom database errors
@@ -239,13 +239,13 @@ export class ConnectionPoolExhaustedError extends DatomDatabaseError {
 }
 
 /**
- * Error thrown when a query is blocked or fails validation by interceptors
+ * Error thrown when a query is blocked or fails validation by hooks
  * @example
  * try {
  *   await db.query(query, context);
  * } catch (error) {
  *   if (error instanceof QueryError) {
- *     // Handle interceptor errors
+ *     // Handle hook errors
  *     console.log("Validation errors:", error.errors);
  *   }
  * }
@@ -253,16 +253,16 @@ export class ConnectionPoolExhaustedError extends DatomDatabaseError {
 export class QueryError extends DatomDatabaseError {
   constructor(
     message: string,
-    public readonly errors: InterceptorErrorWithName[]
+    public readonly errors: HookErrorWithName[]
   ) {
-    super(message, "QUERY_INTERCEPTOR_ERROR");
+    super(message, "QUERY_HOOK_ERROR");
     this.name = "QueryError";
     Object.setPrototypeOf(this, QueryError.prototype);
   }
 }
 
 /**
- * Error thrown when a transaction fails validation by interceptors
+ * Error thrown when a transaction fails validation by hooks
  * @example
  * try {
  *   await db.transact(ops, metadata, context);
@@ -276,20 +276,20 @@ export class QueryError extends DatomDatabaseError {
 export class TransactionError extends DatomDatabaseError {
   constructor(
     message: string,
-    public readonly errors: InterceptorErrorWithName[]
+    public readonly errors: HookErrorWithName[]
   ) {
-    super(message, "TRANSACTION_INTERCEPTOR_ERROR");
+    super(message, "TRANSACTION_HOOK_ERROR");
     this.name = "TransactionError";
     Object.setPrototypeOf(this, TransactionError.prototype);
   }
 }
 
 /**
- * Engine for managing and executing database interceptors
- * Interceptors run in registration order and can modify queries, validate transactions,
+ * Engine for managing and executing database hooks
+ * Hooks run in registration order and can modify queries, validate transactions,
  * filter results, or perform side effects
  */
-export class InterceptorEngine {
+export class HookEngine {
   private beforeRead: BeforeRead[];
   private afterRead: AfterRead[];
   private beforeWrite: BeforeWrite[];
@@ -303,8 +303,8 @@ export class InterceptorEngine {
   }
 
   /**
-   * Register an interceptor
-   * @param interceptor The interceptor to register
+   * Register a hook
+   * @param hook The hook to register
    * @example
    * engine.register({
    *   type: "beforeWrite",
@@ -315,26 +315,26 @@ export class InterceptorEngine {
    *   }
    * });
    */
-  register(interceptor: Interceptor): void {
-    switch (interceptor.type) {
+  register(hook: Hook): void {
+    switch (hook.type) {
       case "beforeRead":
-        this.beforeRead.push(interceptor);
+        this.beforeRead.push(hook);
         break;
       case "afterRead":
-        this.afterRead.push(interceptor);
+        this.afterRead.push(hook);
         break;
       case "beforeWrite":
-        this.beforeWrite.push(interceptor);
+        this.beforeWrite.push(hook);
         break;
       case "afterWrite":
       default:
-        this.afterWrite.push(interceptor);
+        this.afterWrite.push(hook);
         break;
     }
   }
 
   /**
-   * Run before-read interceptors (modify/block query before execution)
+   * Run before-read hooks (modify/block query before execution)
    * @param query The datalog query to process
    * @param ctx Read context with database reference and additional data
    * @returns Modified query and any errors
@@ -344,20 +344,20 @@ export class InterceptorEngine {
     ctx: ReadContext
   ): Promise<{
     query: DatalogQuery;
-    errors: InterceptorErrorWithName[];
+    errors: HookErrorWithName[];
   }> {
     let result = query;
-    const allErrors: InterceptorErrorWithName[] = [];
+    const allErrors: HookErrorWithName[] = [];
 
-    for (const interceptor of this.beforeRead) {
-      const interceptorResult = await interceptor.execute(result, ctx);
+    for (const hook of this.beforeRead) {
+      const hookResult = await hook.execute(result, ctx);
 
-      result = interceptorResult.query as DatalogQuery;
+      result = hookResult.query as DatalogQuery;
 
-      if (interceptorResult.errors && interceptorResult.errors.length > 0) {
-        for (const e of interceptorResult.errors) {
+      if (hookResult.errors && hookResult.errors.length > 0) {
+        for (const e of hookResult.errors) {
           allErrors.push({
-            interceptor: interceptor.name,
+            hook: hook.name,
             message: e.message,
             code: e.code,
             datom: e.datom,
@@ -365,7 +365,7 @@ export class InterceptorEngine {
         }
       }
 
-      if (interceptorResult.stopProcessing === true) {
+      if (hookResult.stopProcessing === true) {
         break;
       }
     }
@@ -374,7 +374,7 @@ export class InterceptorEngine {
   }
 
   /**
-   * Run after-read interceptors (filter/transform results after execution)
+   * Run after-read hooks (filter/transform results after execution)
    * @param datoms The datoms returned from the query
    * @param ctx Read context with database reference and additional data
    * @returns Filtered/transformed datoms
@@ -382,15 +382,15 @@ export class InterceptorEngine {
   async runAfterRead(datoms: Datom[], ctx: ReadContext): Promise<Datom[]> {
     let result = datoms;
 
-    for (const interceptor of this.afterRead) {
-      result = await interceptor.execute(result, ctx);
+    for (const hook of this.afterRead) {
+      result = await hook.execute(result, ctx);
     }
 
     return result;
   }
 
   /**
-   * Run before-write interceptors (validate/augment before commit)
+   * Run before-write hooks (validate/augment before commit)
    * @param tx The transaction to process
    * @param ctx Write context with database reference, metadata, and additional data
    * @returns Modified transaction and any errors
@@ -400,20 +400,20 @@ export class InterceptorEngine {
     ctx: WriteContext
   ): Promise<{
     tx: Transaction;
-    errors: InterceptorErrorWithName[];
+    errors: HookErrorWithName[];
   }> {
     let result = tx;
-    const allErrors: InterceptorErrorWithName[] = [];
+    const allErrors: HookErrorWithName[] = [];
 
-    for (const interceptor of this.beforeWrite) {
-      const interceptorResult = await interceptor.execute(result, ctx);
+    for (const hook of this.beforeWrite) {
+      const hookResult = await hook.execute(result, ctx);
 
-      result = interceptorResult.tx;
+      result = hookResult.tx;
 
-      if (interceptorResult.errors && interceptorResult.errors.length > 0) {
-        for (const e of interceptorResult.errors) {
+      if (hookResult.errors && hookResult.errors.length > 0) {
+        for (const e of hookResult.errors) {
           allErrors.push({
-            interceptor: interceptor.name,
+            hook: hook.name,
             message: e.message,
             code: e.code,
             datom: e.datom,
@@ -421,7 +421,7 @@ export class InterceptorEngine {
         }
       }
 
-      if (interceptorResult.stopProcessing === true) {
+      if (hookResult.stopProcessing === true) {
         break;
       }
     }
@@ -430,19 +430,16 @@ export class InterceptorEngine {
   }
 
   /**
-   * Run after-write interceptors (side effects after commit)
-   * Failures in after-write interceptors don't fail the transaction
+   * Run after-write hooks (side effects after commit)
+   * Failures in after-write hooks don't fail the transaction
    * @param tx The committed transaction
    * @param ctx Write context with database reference, metadata, and additional data
    */
   async runAfterWrite(tx: Transaction, ctx: WriteContext): Promise<void> {
     await Promise.allSettled(
-      this.afterWrite.map((interceptor) =>
-        interceptor.execute(tx, ctx).catch((err) => {
-          console.error(
-            `After-write interceptor "${interceptor.name}" failed:`,
-            err
-          );
+      this.afterWrite.map((hook) =>
+        hook.execute(tx, ctx).catch((err) => {
+          console.error(`After-write hook "${hook.name}" failed:`, err);
         })
       )
     );

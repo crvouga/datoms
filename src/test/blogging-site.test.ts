@@ -254,7 +254,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     });
   });
 
-  describe("Post Access Control with Interceptors", () => {
+  describe("Post Access Control with Hooks", () => {
     test("author should see their own draft posts", async () => {
       const { db } = f;
 
@@ -279,8 +279,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         })
       );
 
-      // Register interceptor to filter posts based on user role
-      db.interceptors.register(POST_ACCESS_CONTROL);
+      // Register hook to filter posts based on user role
+      db.hooks.register(POST_ACCESS_CONTROL);
 
       // Query as the author
       const results = await db.query(
@@ -332,8 +332,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         })
       );
 
-      // Register interceptor
-      db.interceptors.register(POST_ACCESS_CONTROL);
+      // Register hook
+      db.hooks.register(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should NOT see author 2's draft)
       const results = await db.query(
@@ -380,8 +380,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         })
       );
 
-      // Register interceptor
-      db.interceptors.register(POST_ACCESS_CONTROL);
+      // Register hook
+      db.hooks.register(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should see author 2's published post)
       const results = await db.query(
@@ -436,8 +436,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         )
       );
 
-      // Register interceptor
-      db.interceptors.register(POST_ACCESS_CONTROL);
+      // Register hook
+      db.hooks.register(POST_ACCESS_CONTROL);
 
       // Query as reader (should only see published post)
       const results = await db.query(
@@ -496,8 +496,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         )
       );
 
-      // Register interceptor
-      db.interceptors.register(POST_ACCESS_CONTROL);
+      // Register hook
+      db.hooks.register(POST_ACCESS_CONTROL);
 
       // Query as admin (should see all posts)
       const results = await db.query(
@@ -518,11 +518,11 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     });
   });
 
-  describe("Post Validation with Interceptors", () => {
+  describe("Post Validation with Hooks", () => {
     test("should validate post has required fields", async () => {
       const { db } = f;
 
-      db.interceptors.register(POST_VALIDATOR);
+      db.hooks.register(POST_VALIDATOR);
 
       // Try to create post without title (should fail)
       await expect(
@@ -560,7 +560,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should validate author exists", async () => {
       const { db } = f;
 
-      db.interceptors.register(AUTHOR_VALIDATOR);
+      db.hooks.register(AUTHOR_VALIDATOR);
 
       // Try to create post with non-existent author (should fail)
       await expect(

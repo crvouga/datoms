@@ -16,7 +16,7 @@ import type {
 } from "../types.js";
 import { DatabaseView } from "./datom-database-types.js";
 import {
-  InterceptorEngine,
+  HookEngine,
   QueryError,
   QueryResultSizeError,
   QuerySafetyError,
@@ -24,7 +24,7 @@ import {
   ReadContext,
   TransactionError,
   WriteContext,
-} from "./interceptor/engine.js";
+} from "./hook/engine.js";
 import {
   isQueryPattern,
   isVariable,
@@ -47,7 +47,7 @@ abstract class BaseDatabaseView implements DatabaseView {
   ): Promise<QueryResult> {
     // Views need to execute queries using their filtered datoms() method
     // We'll execute the query manually using the view's datoms() method
-    // Note: Views don't support interceptors yet - they use the base database's interceptors
+    // Note: Views don't support hooks yet - they use the base database's hooks
     // through the db reference, but the context is passed through
     return this.executeQueryWithView(query, context);
   }
@@ -487,10 +487,10 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
  */
 export abstract class DatomDatabase implements DatabaseView {
   protected initialized = false;
-  public readonly interceptors: InterceptorEngine;
+  public readonly hooks: HookEngine;
 
   constructor() {
-    this.interceptors = new InterceptorEngine();
+    this.hooks = new HookEngine();
   }
 
   /**
@@ -529,7 +529,7 @@ export abstract class DatomDatabase implements DatabaseView {
    * Execute bulk operations atomically (Datomic-like transact)
    * @param ops Array of operations, each specifying whether to add or sub a datom
    * @param metadata Optional metadata to associate with this transaction
-   * @param context Optional context object for interceptors (can contain any data)
+   * @param context Optional context object for hooks (can contain any data)
    * @returns The transaction ID
    * @example
    * await db.transact([
@@ -607,8 +607,8 @@ export abstract class DatomDatabase implements DatabaseView {
       meta: metadata,
     };
 
-    // Run before-write interceptors
-    const beforeResult = await this.interceptors.runBeforeWrite(tx, ctx);
+    // Run before-write hooks
+    const beforeResult = await this.hooks.runBeforeWrite(tx, ctx);
 
     if (beforeResult.errors.length > 0) {
       throw new TransactionError(
@@ -617,7 +617,7 @@ export abstract class DatomDatabase implements DatabaseView {
       );
     }
 
-    // Apply subs first, then adds (using the modified transaction from interceptors)
+    // Apply subs first, then adds (using the modified transaction from hooks)
     const finalTx = beforeResult.tx;
     const finalSubs = finalTx.datoms.filter((d) => d.op === "sub");
     const finalAdds = finalTx.datoms.filter((d) => d.op === "add");
@@ -644,15 +644,15 @@ export abstract class DatomDatabase implements DatabaseView {
       await this.onTransactionMetadata(committedTxId, metadata);
     }
 
-    // Create committed transaction object for after-write interceptors
+    // Create committed transaction object for after-write hooks
     const committedTx: Transaction = {
       datoms: finalTx.datoms.map((d) => ({ ...d, tx: committedTxId })),
       meta: metadata,
     };
 
-    // Run after-write interceptors (fire and forget, don't block)
-    this.interceptors.runAfterWrite(committedTx, ctx).catch((err) => {
-      console.error("After-write interceptor failed:", err);
+    // Run after-write hooks (fire and forget, don't block)
+    this.hooks.runAfterWrite(committedTx, ctx).catch((err) => {
+      console.error("After-write hook failed:", err);
     });
 
     return committedTxId;
@@ -935,13 +935,13 @@ export abstract class DatomDatabase implements DatabaseView {
   /**
    * Execute a datalog query
    * @param query Datalog query to execute
-   * @param context Optional context object for interceptors (can contain any data)
+   * @param context Optional context object for hooks (can contain any data)
    * @returns Query results as an array of records with keys that have the question mark prefix stripped
    * @example
    * const result = await db.query({ find: ["?e"], where: [["?e", "name", "Alice"]] });
    * // result will be [{"e": 123}] not [{"?e": 123}]
    *
-   * // With context for interceptors
+   * // With context for hooks
    * const result = await db.query(
    *   { find: ["?e"], where: [["?e", "name", "Alice"]] },
    *   { userId: "alice", syncTarget: "client" }
@@ -953,16 +953,16 @@ export abstract class DatomDatabase implements DatabaseView {
   ): Promise<QueryResult>;
 
   /**
-   * Helper method for implementations to handle query interceptors
-   * Extracts datoms from query execution, runs afterRead interceptors, then projects to results
+   * Helper method for implementations to handle query hooks
+   * Extracts datoms from query execution, runs afterRead hooks, then projects to results
    * @param query The datalog query
-   * @param context Optional context for interceptors
+   * @param context Optional context for hooks
    * @param extractDatoms Function that extracts datoms from the query (before projection)
    * @param projectToResults Function that projects filtered datoms to QueryResult
-   * @returns Query results after interceptors
+   * @returns Query results after hooks
    * @internal
    */
-  protected async executeQueryWithInterceptors(
+  protected async executeQueryWithHooks(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     extractDatoms: (query: DatalogQuery) => Promise<Datom[]>,
@@ -974,21 +974,18 @@ export abstract class DatomDatabase implements DatabaseView {
       ...(context || {}),
     };
 
-    // Run before-read interceptors
-    const beforeResult = await this.interceptors.runBeforeRead(query, ctx);
+    // Run before-read hooks
+    const beforeResult = await this.hooks.runBeforeRead(query, ctx);
 
     if (beforeResult.errors.length > 0) {
-      throw new QueryError(
-        "Query blocked by interceptors",
-        beforeResult.errors
-      );
+      throw new QueryError("Query blocked by hooks", beforeResult.errors);
     }
 
     // Extract datoms from the modified query
     const rawDatoms = await extractDatoms(beforeResult.query);
 
-    // Run after-read interceptors
-    const filteredDatoms = await this.interceptors.runAfterRead(rawDatoms, ctx);
+    // Run after-read hooks
+    const filteredDatoms = await this.hooks.runAfterRead(rawDatoms, ctx);
 
     // Project filtered datoms back to QueryResult
     return projectToResults(filteredDatoms, beforeResult.query);
@@ -1185,7 +1182,7 @@ export interface WithResult {
   tempIds: Record<string, EntityId>;
 }
 
-// Re-export error classes and types from interceptor engine
+// Re-export error classes and types from hook engine
 export {
   ConnectionPoolExhaustedError,
   DatomDatabaseError,
@@ -1195,8 +1192,8 @@ export {
   QueryTimeoutError,
   TransactionConflictError,
   TransactionError,
-  type InterceptorError,
-  type InterceptorErrorWithName,
+  type HookError,
+  type HookErrorWithName,
   type ReadContext,
   type WriteContext,
-} from "./interceptor/engine.js";
+} from "./hook/engine.js";

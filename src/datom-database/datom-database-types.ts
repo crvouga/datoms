@@ -25,7 +25,7 @@ export interface DatabaseView {
   /**
    * Execute a datalog query against this database view
    * @param query Datalog query to execute
-   * @param context Optional context object for interceptors
+   * @param context Optional context object for hooks
    * @returns Query results as an array of records
    * @example
    * const dbPast = db.asOf(100);

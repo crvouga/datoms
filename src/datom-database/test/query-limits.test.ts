@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { QueryResultSizeError } from "../interceptor/engine";
+import { QueryResultSizeError } from "../hook/engine";
 import { Fixture, FIXTURES } from "../../test/fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)(

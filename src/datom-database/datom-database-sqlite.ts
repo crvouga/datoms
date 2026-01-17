@@ -13,7 +13,7 @@ import type {
   Value,
 } from "../types.js";
 import { DatomDatabase } from "./datom-database.js";
-import type { ReadContext } from "./interceptor/engine.js";
+import type { ReadContext } from "./hook/engine.js";
 import {
   isQueryPattern,
   isVariable,
@@ -643,14 +643,11 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       ...(context || {}),
     };
 
-    // Run before-read interceptors
-    const beforeResult = await this.interceptors.runBeforeRead(query, ctx);
+    // Run before-read hooks
+    const beforeResult = await this.hooks.runBeforeRead(query, ctx);
 
     if (beforeResult.errors.length > 0) {
-      throw new QueryError(
-        "Query blocked by interceptors",
-        beforeResult.errors
-      );
+      throw new QueryError("Query blocked by hooks", beforeResult.errors);
     }
 
     const modifiedQuery = beforeResult.query;
@@ -681,8 +678,8 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         op: "add",
       });
 
-      // Run after-read interceptors
-      const filteredDatoms = await this.interceptors.runAfterRead(datoms, ctx);
+      // Run after-read hooks
+      const filteredDatoms = await this.hooks.runAfterRead(datoms, ctx);
 
       const results = filteredDatoms.map((datom) => {
         const result: Record<string, Value | Attribute> = {};
@@ -707,9 +704,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     }
 
     // For multi-clause queries, build a single SQL query with JOINs
-    // Extract datoms first for afterRead interceptors
+    // Extract datoms first for afterRead hooks
     const allDatoms = await this.extractDatomsFromQuery(modifiedQuery);
-    const filteredDatoms = await this.interceptors.runAfterRead(allDatoms, ctx);
+    const filteredDatoms = await this.hooks.runAfterRead(allDatoms, ctx);
 
     // Re-execute query with filtered datoms
     return this.executeDatalogWithSQLAndFilteredDatoms(
@@ -758,8 +755,8 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   }
 
   /**
-   * Execute datalog query with filtered datoms from interceptors
-   * Uses datom-level execution to properly support afterRead interceptors
+   * Execute datalog query with filtered datoms from hooks
+   * Uses datom-level execution to properly support afterRead hooks
    */
   private async executeDatalogWithSQLAndFilteredDatoms(
     query: DatalogQuery,

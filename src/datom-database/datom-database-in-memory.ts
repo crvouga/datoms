@@ -21,7 +21,7 @@ import type {
 } from "../types.js";
 
 import { DatomDatabase, QueryError } from "./datom-database.js";
-import type { ReadContext } from "./interceptor/engine.js";
+import type { ReadContext } from "./hook/engine.js";
 import {
   isQueryPattern,
   isVariable,
@@ -310,14 +310,11 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       ...(context || {}),
     };
 
-    // Run before-read interceptors
-    const beforeResult = await this.interceptors.runBeforeRead(query, ctx);
+    // Run before-read hooks
+    const beforeResult = await this.hooks.runBeforeRead(query, ctx);
 
     if (beforeResult.errors.length > 0) {
-      throw new QueryError(
-        "Query blocked by interceptors",
-        beforeResult.errors
-      );
+      throw new QueryError("Query blocked by hooks", beforeResult.errors);
     }
 
     const modifiedQuery = beforeResult.query;
@@ -328,7 +325,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       return [];
     }
 
-    // Extract all datoms from all clauses for afterRead interceptors
+    // Extract all datoms from all clauses for afterRead hooks
     const allDatomsSet = new Set<string>();
     const allDatoms: Datom[] = [];
 
@@ -360,8 +357,8 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       }
     }
 
-    // Run after-read interceptors
-    const filteredDatoms = await this.interceptors.runAfterRead(allDatoms, ctx);
+    // Run after-read hooks
+    const filteredDatoms = await this.hooks.runAfterRead(allDatoms, ctx);
 
     // Now execute the query with filtered datoms
     // Start with the first clause
@@ -418,7 +415,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   }
 
   /**
-   * Execute a clause using filtered datoms from interceptors
+   * Execute a clause using filtered datoms from hooks
    */
   private async executeClauseWithFilteredDatoms(
     clause: QueryClause,

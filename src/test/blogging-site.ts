@@ -1,5 +1,5 @@
-import type { Interceptor } from "../datom-database/interceptor/engine.js";
-import { InterceptorValidator } from "../datom-database/interceptor/validator.js";
+import type { Hook } from "../datom-database/hook/engine.js";
+import { HookValidator } from "../datom-database/hook/validator.js";
 import { Attribute, EntityId, records, Value, type Datom } from "../datoms.js";
 
 // Schema constants
@@ -25,18 +25,18 @@ export const POST_STATUS_DRAFT = "draft";
 export const POST_STATUS_PUBLISHED = "published";
 
 // ============================================================================
-// Interceptors
+// Hooks
 // ============================================================================
 
 /**
- * Post access control interceptor
+ * Post access control hook
  * Filters post datoms based on user role and ownership:
  * - Admins can see all posts
  * - Authors can see their own posts (published or draft)
  * - Authors can see published posts from other authors
  * - Readers can only see published posts
  */
-export const POST_ACCESS_CONTROL: Interceptor = {
+export const POST_ACCESS_CONTROL: Hook = {
   type: "afterRead",
   name: "post-access-control",
   async execute(datoms, ctx) {
@@ -132,16 +132,15 @@ export const POST_ACCESS_CONTROL: Interceptor = {
 };
 
 /**
- * Post validator interceptor
+ * Post validator hook
  * Validates that posts have required fields: title, author, and status
  */
-export const POST_VALIDATOR: Interceptor = {
+export const POST_VALIDATOR: Hook = {
   type: "beforeWrite",
   name: "post-validator",
   async execute(tx, ctx) {
     const { db } = ctx;
-
-    const validator = new InterceptorValidator();
+    const validator = new HookValidator();
 
     // Find all post entities being created/updated
     const postEntities = new Set<number>();
@@ -204,15 +203,15 @@ export const POST_VALIDATOR: Interceptor = {
 };
 
 /**
- * Author validator interceptor
+ * Author validator hook
  * Validates that post authors are either authors or admins
  */
-export const AUTHOR_VALIDATOR: Interceptor = {
+export const AUTHOR_VALIDATOR: Hook = {
   type: "beforeWrite",
   name: "author-validator",
   async execute(tx, ctx) {
     const { db } = ctx;
-    const validator = new InterceptorValidator();
+    const validator = new HookValidator();
 
     // Find all post author assignments
     for (const datom of tx.datoms) {

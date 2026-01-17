@@ -287,7 +287,7 @@ export interface Logger {
 export type BatchQueryKey = string;
 
 /**
- * Transaction data structure for interceptors
+ * Transaction data structure for hooks
  */
 export type Transaction = {
   datoms: Datom[];

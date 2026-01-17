@@ -1,15 +1,15 @@
 /**
- * Helper class for collecting validation errors in interceptors
+ * Helper class for collecting validation errors in hooks
  * Provides a convenient API for building up error lists
  */
 
 import type { Datom } from "../../types.js";
-import { InterceptorError } from "../datom-database.js";
+import { HookError } from "../datom-database.js";
 
 /**
- * Helper class for collecting validation errors in interceptors
+ * Helper class for collecting validation errors in hooks
  * @example
- * const validator = new InterceptorValidator();
+ * const validator = new HookValidator();
  * validator.assert(email.includes("@"), "Invalid email format", "INVALID_EMAIL", datom);
  * validator.assert(age > 0, "Age must be positive", "INVALID_AGE", datom);
  *
@@ -17,8 +17,8 @@ import { InterceptorError } from "../datom-database.js";
  *   return { tx, errors: validator.getErrors() };
  * }
  */
-export class InterceptorValidator {
-  private errors: InterceptorError[] = [];
+export class HookValidator {
+  private errors: HookError[] = [];
 
   /**
    * Assert a condition and add an error if it fails
@@ -42,7 +42,7 @@ export class InterceptorValidator {
    * Get all collected errors
    * @returns Array of errors, or undefined if no errors
    */
-  getErrors(): InterceptorError[] | undefined {
+  getErrors(): HookError[] | undefined {
     return this.errors.length > 0 ? this.errors : undefined;
   }
 
