@@ -3,7 +3,7 @@
  */
 
 import type { Value } from "../../../../datoms.js";
-import { registerAggregation } from "../shared/registry.js";
+import { registerAggregation } from "./registry.js";
 
 export function registerDistinctAggregation(): void {
   registerAggregation("distinct", {

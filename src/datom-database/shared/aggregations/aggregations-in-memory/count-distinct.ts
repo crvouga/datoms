@@ -2,7 +2,7 @@
  * Count distinct aggregation - in-memory implementation
  */
 
-import { registerAggregation } from "../shared/registry.js";
+import { registerAggregation } from "./registry.js";
 
 export function registerCountDistinctAggregation(): void {
   registerAggregation("count-distinct", {

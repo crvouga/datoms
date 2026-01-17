@@ -4,7 +4,7 @@
  */
 
 import type { Attribute, Value } from "../../../../datoms.js";
-import { registerAggregation } from "../shared/registry.js";
+import { registerAggregation } from "./registry.js";
 
 export function registerRandAggregation(): void {
   registerAggregation("rand", {

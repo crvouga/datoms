@@ -1,5 +1,5 @@
 /**
- * Types and interfaces for aggregation functions
+ * Types and interfaces for in-memory aggregation functions
  */
 
 import type { Attribute, Value } from "../../../../datoms.js";

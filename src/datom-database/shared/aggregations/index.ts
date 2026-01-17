@@ -10,11 +10,11 @@ import "./aggregations-sqlite/index.js";
 export type {
   AggregationFunction,
   AggregationDefinition,
-} from "./shared/types.js";
+} from "./aggregations-in-memory/types.js";
 export {
   getAggregationDefinition,
   registerAggregation,
-} from "./shared/registry.js";
+} from "./aggregations-in-memory/registry.js";
 export { parseAggregation } from "./shared/parser.js";
 export { hasAggregations, applyAggregations } from "./shared/computation.js";
 export { aggregationToSQL, checkSQLAggregations } from "./sql-helpers.js";

@@ -4,7 +4,8 @@
  */
 
 import { parseAggregation } from "./shared/parser.js";
-import { getSQLAggregationDefinition } from "./shared/sql-registry.js";
+import { getSQLAggregationDefinition as getPostgresSQLAggregationDefinition } from "./aggregations-postgres/registry.js";
+import { getSQLAggregationDefinition as getSQLiteSQLAggregationDefinition } from "./aggregations-sqlite/registry.js";
 import type { DatabaseType, SQLAggregationResult } from "./shared/sql-types.js";
 
 // Import implementations to register all SQL aggregations
@@ -33,7 +34,11 @@ export function aggregationToSQL(
     return null; // Not an aggregation
   }
 
-  const def = getSQLAggregationDefinition(agg.type, dbType);
+  const getSQLAggregationDefinition =
+    dbType === "postgresql"
+      ? getPostgresSQLAggregationDefinition
+      : getSQLiteSQLAggregationDefinition;
+  const def = getSQLAggregationDefinition(agg.type);
   if (!def) {
     return null; // Aggregation not supported for this database type
   }
@@ -43,8 +48,7 @@ export function aggregationToSQL(
     variableColumn,
     outputKey,
     agg.defaultValue,
-    isValueColumn,
-    dbType
+    isValueColumn
   );
 }
 

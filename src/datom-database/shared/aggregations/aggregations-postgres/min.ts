@@ -2,7 +2,7 @@
  * Min aggregation - PostgreSQL implementation
  */
 
-import { registerSQLAggregation } from "../shared/sql-registry.js";
+import { registerSQLAggregation } from "./registry.js";
 import {
   escapeColumnName,
   escapeValue,
@@ -10,31 +10,21 @@ import {
 } from "../shared/helpers.js";
 
 export function registerMinAggregation(): void {
-  registerSQLAggregation(
-    "min",
-    {
-      convert: (
-        variableColumn,
-        outputKey,
-        defaultValue,
-        isValueColumn,
-        dbType
-      ) => {
-        // For min/max on value columns, extract as numeric for proper numeric comparison
-        // This ensures 50 < 100 instead of "100" < "50" lexicographically
-        const minColumn = isValueColumn
-          ? getValueExtraction(variableColumn, isValueColumn, dbType)
-          : variableColumn;
-        const minDefault =
-          defaultValue !== undefined
-            ? `COALESCE(MIN(${minColumn}), ${escapeValue(defaultValue, dbType)})`
-            : `MIN(${minColumn})`;
-        return {
-          sql: `${minDefault} AS ${escapeColumnName(outputKey, dbType)}`,
-          requiresGroupBy: false,
-        };
-      },
+  registerSQLAggregation("min", {
+    convert: (variableColumn, outputKey, defaultValue, isValueColumn) => {
+      // For min/max on value columns, extract as numeric for proper numeric comparison
+      // This ensures 50 < 100 instead of "100" < "50" lexicographically
+      const minColumn = isValueColumn
+        ? getValueExtraction(variableColumn, isValueColumn, "postgresql")
+        : variableColumn;
+      const minDefault =
+        defaultValue !== undefined
+          ? `COALESCE(MIN(${minColumn}), ${escapeValue(defaultValue, "postgresql")})`
+          : `MIN(${minColumn})`;
+      return {
+        sql: `${minDefault} AS ${escapeColumnName(outputKey, "postgresql")}`,
+        requiresGroupBy: false,
+      };
     },
-    "postgresql"
-  );
+  });
 }

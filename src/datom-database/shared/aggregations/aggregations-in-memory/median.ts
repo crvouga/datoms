@@ -2,7 +2,7 @@
  * Median aggregation - in-memory implementation
  */
 
-import { registerAggregation } from "../shared/registry.js";
+import { registerAggregation } from "./registry.js";
 
 export function registerMedianAggregation(): void {
   registerAggregation("median", {

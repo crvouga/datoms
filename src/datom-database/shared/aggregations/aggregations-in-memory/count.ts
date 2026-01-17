@@ -2,7 +2,7 @@
  * Count aggregation - in-memory implementation
  */
 
-import { registerAggregation } from "../shared/registry.js";
+import { registerAggregation } from "./registry.js";
 
 export function registerCountAggregation(): void {
   registerAggregation("count", {

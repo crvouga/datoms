@@ -1,16 +1,16 @@
 /**
- * Registry for aggregation functions
+ * Registry for in-memory aggregation functions
  */
 
 import type { AggregationDefinition } from "./types.js";
 
 /**
- * Registry of all aggregation functions
+ * Registry of all in-memory aggregation functions
  */
 const AGGREGATION_REGISTRY: Map<string, AggregationDefinition> = new Map();
 
 /**
- * Register an aggregation function
+ * Register an in-memory aggregation function
  */
 export function registerAggregation(
   name: string,
@@ -20,7 +20,7 @@ export function registerAggregation(
 }
 
 /**
- * Get aggregation definition
+ * Get in-memory aggregation definition
  */
 export function getAggregationDefinition(
   name: string

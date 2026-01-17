@@ -2,7 +2,7 @@
  * Parser for aggregation expressions
  */
 
-import { getAggregationDefinition } from "./registry.js";
+import { getAggregationDefinition } from "../aggregations-in-memory/registry.js";
 
 /**
  * Parse an aggregation expression - accepts both tuple format and string format for backward compatibility
