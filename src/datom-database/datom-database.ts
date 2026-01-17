@@ -10,14 +10,20 @@ import type {
   DatomInput,
   EntityId,
   QueryOptions,
+  Transaction,
   TransactionId,
   Value,
 } from "../types.js";
 import {
+  InterceptorErrorWithName,
+  QueryError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
+  TransactionError,
 } from "./errors.js";
+import { InterceptorEngine } from "./interceptor-engine.js";
+import type { ReadContext, WriteContext } from "./interceptor-types.js";
 import {
   isVariable,
   isQueryPattern,
@@ -50,12 +56,16 @@ export interface DatomReader {
   /**
    * Execute a datalog query
    * @param query Datalog query to execute
+   * @param context Optional context object for interceptors
    * @returns Query results as an array of records
    * @example
    * const results = await db.query({ find: ["?e"], where: [["?e", "name", "alice"]] });
    * //=> [{"e": 1}, {"e": 2}]
    */
-  query(query: DatalogQuery): Promise<QueryResult>;
+  query(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResult>;
 }
 
 /**
@@ -77,12 +87,16 @@ export interface DatabaseView {
   /**
    * Execute a datalog query against this database view
    * @param query Datalog query to execute
+   * @param context Optional context object for interceptors
    * @returns Query results as an array of records
    * @example
    * const dbPast = db.asOf(100);
    * const results = await dbPast.query({ find: ["?e"], where: [["?e", "name", "Alice"]] });
    */
-  query(query: DatalogQuery): Promise<QueryResult>;
+  query(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResult>;
 }
 
 /**
@@ -94,10 +108,15 @@ abstract class BaseDatabaseView implements DatabaseView {
 
   abstract datoms(options: QueryOptions): Promise<Datom[]>;
 
-  async query(query: DatalogQuery): Promise<QueryResult> {
+  async query(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResult> {
     // Views need to execute queries using their filtered datoms() method
     // We'll execute the query manually using the view's datoms() method
-    return this.executeQueryWithView(query);
+    // Note: Views don't support interceptors yet - they use the base database's interceptors
+    // through the db reference, but the context is passed through
+    return this.executeQueryWithView(query, context);
   }
 
   /**
@@ -105,7 +124,8 @@ abstract class BaseDatabaseView implements DatabaseView {
    * This ensures time-travel filters are applied correctly
    */
   private async executeQueryWithView(
-    query: DatalogQuery
+    query: DatalogQuery,
+    _context?: Record<string, unknown>
   ): Promise<QueryResult> {
     if (query.where.length === 0) {
       return [];
@@ -556,6 +576,11 @@ export interface WithResult {
 
 export abstract class DatomDatabase implements DatomReader {
   protected initialized = false;
+  public readonly interceptors: InterceptorEngine;
+
+  constructor() {
+    this.interceptors = new InterceptorEngine();
+  }
 
   /**
    * Initialize the database
@@ -595,6 +620,7 @@ export abstract class DatomDatabase implements DatomReader {
    * Execute bulk operations atomically (Datomic-like transact)
    * @param ops Array of operations, each specifying whether to add or retract a datom
    * @param metadata Optional metadata to associate with this transaction
+   * @param context Optional context object for interceptors (can contain any data)
    * @returns The transaction ID
    * @example
    * await db.transact([
@@ -602,17 +628,26 @@ export abstract class DatomDatabase implements DatomReader {
    *   { op: "retract", e: 42, a: "type", v: "cat" }
    * ]);
    *
-   * // With metadata
+   * // With metadata and context
    * await db.transact(
    *   [{ op: "add", e: 300, a: "status", v: "active" }],
-   *   { userId: "alice", reason: "status_update" }
+   *   { userId: "alice", reason: "status_update" },
+   *   { userId: "alice", syncSource: "client" }
    * );
    */
   async transact(
     ops: TransactOperations,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
+    context?: Record<string, unknown>
   ): Promise<TransactionId> {
     await this.ensureInitialized();
+
+    // Create write context
+    const ctx: WriteContext = {
+      db: this,
+      txMeta: metadata,
+      ...(context || {}),
+    };
 
     // Process operations sequentially
     const adds: DatomInput[] = [];
@@ -632,26 +667,86 @@ export abstract class DatomDatabase implements DatomReader {
       }
     }
 
-    // Apply retracts first, then adds
-    let txId: TransactionId;
-    if (retracts.length > 0) {
-      txId = await this.retractDatoms(retracts);
+    // Convert to datoms for transaction object
+    const allDatoms: Datom[] = [];
+    const latestTx = await this.getLatestTransaction();
+    const txId = latestTx + 1;
+
+    for (const retract of retracts) {
+      allDatoms.push({
+        e: retract.e,
+        a: retract.a,
+        v: retract.v,
+        tx: txId,
+        op: "retract",
+      });
     }
-    if (adds.length > 0) {
-      txId = await this.addDatoms(adds);
-    } else if (retracts.length === 0) {
+
+    for (const add of adds) {
+      allDatoms.push({
+        e: add.e,
+        a: add.a,
+        v: add.v,
+        tx: txId,
+        op: "add",
+      });
+    }
+
+    // Create transaction object
+    const tx: Transaction = {
+      datoms: allDatoms,
+      meta: metadata,
+    };
+
+    // Run before-write interceptors
+    const beforeResult = await this.interceptors.runBeforeWrite(tx, ctx);
+
+    if (beforeResult.errors.length > 0) {
+      throw new TransactionError(
+        "Transaction validation failed",
+        beforeResult.errors as InterceptorErrorWithName[]
+      );
+    }
+
+    // Apply retracts first, then adds (using the modified transaction from interceptors)
+    const finalTx = beforeResult.tx;
+    const finalRetracts = finalTx.datoms.filter((d) => d.op === "retract");
+    const finalAdds = finalTx.datoms.filter((d) => d.op === "add");
+
+    let committedTxId: TransactionId;
+    if (finalRetracts.length > 0) {
+      committedTxId = await this.retractDatoms(
+        finalRetracts.map((d) => ({ e: d.e, a: d.a, v: d.v }))
+      );
+    }
+    if (finalAdds.length > 0) {
+      committedTxId = await this.addDatoms(
+        finalAdds.map((d) => ({ e: d.e, a: d.a, v: d.v }))
+      );
+    } else if (finalRetracts.length === 0) {
       // If there are no operations, still create a new transaction ID
-      txId = await this.addDatoms([]);
+      committedTxId = await this.addDatoms([]);
     } else {
-      txId = txId!;
+      committedTxId = committedTxId!;
     }
 
     // Store metadata if provided
     if (metadata !== undefined) {
-      await this.onTransactionMetadata(txId, metadata);
+      await this.onTransactionMetadata(committedTxId, metadata);
     }
 
-    return txId;
+    // Create committed transaction object for after-write interceptors
+    const committedTx: Transaction = {
+      datoms: finalTx.datoms.map((d) => ({ ...d, tx: committedTxId })),
+      meta: metadata,
+    };
+
+    // Run after-write interceptors (fire and forget, don't block)
+    this.interceptors.runAfterWrite(committedTx, ctx).catch((err) => {
+      console.error("After-write interceptor failed:", err);
+    });
+
+    return committedTxId;
   }
 
   /**
@@ -931,12 +1026,64 @@ export abstract class DatomDatabase implements DatomReader {
   /**
    * Execute a datalog query
    * @param query Datalog query to execute
+   * @param context Optional context object for interceptors (can contain any data)
    * @returns Query results as an array of records with keys that have the question mark prefix stripped
    * @example
    * const result = await db.query({ find: ["?e"], where: [["?e", "name", "Alice"]] });
    * // result will be [{"e": 123}] not [{"?e": 123}]
+   *
+   * // With context for interceptors
+   * const result = await db.query(
+   *   { find: ["?e"], where: [["?e", "name", "Alice"]] },
+   *   { userId: "alice", syncTarget: "client" }
+   * );
    */
-  abstract query(query: DatalogQuery): Promise<QueryResult>;
+  abstract query(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResult>;
+
+  /**
+   * Helper method for implementations to handle query interceptors
+   * Extracts datoms from query execution, runs afterRead interceptors, then projects to results
+   * @param query The datalog query
+   * @param context Optional context for interceptors
+   * @param extractDatoms Function that extracts datoms from the query (before projection)
+   * @param projectToResults Function that projects filtered datoms to QueryResult
+   * @returns Query results after interceptors
+   * @internal
+   */
+  protected async executeQueryWithInterceptors(
+    query: DatalogQuery,
+    context: Record<string, unknown> | undefined,
+    extractDatoms: (query: DatalogQuery) => Promise<Datom[]>,
+    projectToResults: (datoms: Datom[], query: DatalogQuery) => QueryResult
+  ): Promise<QueryResult> {
+    // Create read context
+    const ctx: ReadContext = {
+      db: this,
+      ...(context || {}),
+    };
+
+    // Run before-read interceptors
+    const beforeResult = await this.interceptors.runBeforeRead(query, ctx);
+
+    if (beforeResult.errors.length > 0) {
+      throw new QueryError(
+        "Query blocked by interceptors",
+        beforeResult.errors as InterceptorErrorWithName[]
+      );
+    }
+
+    // Extract datoms from the modified query
+    const rawDatoms = await extractDatoms(beforeResult.query);
+
+    // Run after-read interceptors
+    const filteredDatoms = await this.interceptors.runAfterRead(rawDatoms, ctx);
+
+    // Project filtered datoms back to QueryResult
+    return projectToResults(filteredDatoms, beforeResult.query);
+  }
 
   /**
    * Create a database view showing the state at a specific transaction ID

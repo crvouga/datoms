@@ -19,7 +19,9 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
+import type { ReadContext } from "./interceptor-types.js";
 import { DatomDatabase } from "./datom-database.js";
+import { InterceptorErrorWithName, QueryError } from "./errors.js";
 import {
   isQueryPattern,
   isVariable,
@@ -296,37 +298,101 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return results.slice(offset, limit ? offset + limit : undefined);
   }
 
-  async query(query: DatalogQuery): Promise<QueryResult> {
+  async query(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResult> {
     await this.ensureInitialized();
+
+    // Create read context
+    const ctx: ReadContext = {
+      db: this,
+      ...(context || {}),
+    };
+
+    // Run before-read interceptors
+    const beforeResult = await this.interceptors.runBeforeRead(query, ctx);
+
+    if (beforeResult.errors.length > 0) {
+      throw new QueryError(
+        "Query blocked by interceptors",
+        beforeResult.errors as InterceptorErrorWithName[]
+      );
+    }
+
+    const modifiedQuery = beforeResult.query;
+
     // Simple implementation: for each where clause, query the database
     // and join the results
-    if (query.where.length === 0) {
+    if (modifiedQuery.where.length === 0) {
       return [];
     }
 
+    // Extract all datoms from all clauses for afterRead interceptors
+    const allDatomsSet = new Set<string>();
+    const allDatoms: Datom[] = [];
+
+    for (const clause of modifiedQuery.where) {
+      if (!isQueryPattern(clause)) {
+        continue;
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+      const entity = isVariable(entityVal)
+        ? undefined
+        : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal)
+        ? undefined
+        : (attributeVal as string);
+      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+      const clauseDatoms = await this.queryInternal({
+        e: entity,
+        a: attribute,
+        v: value,
+      });
+
+      for (const datom of clauseDatoms) {
+        const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
+        if (!allDatomsSet.has(key)) {
+          allDatomsSet.add(key);
+          allDatoms.push(datom);
+        }
+      }
+    }
+
+    // Run after-read interceptors
+    const filteredDatoms = await this.interceptors.runAfterRead(allDatoms, ctx);
+
+    // Now execute the query with filtered datoms
     // Start with the first clause
-    const firstClause = query.where[0];
-    const firstResults = await this.executeClause(firstClause);
+    const firstClause = modifiedQuery.where[0];
+    const firstResults = await this.executeClauseWithFilteredDatoms(
+      firstClause,
+      filteredDatoms
+    );
 
     // Join with remaining clauses
     let results = firstResults;
-    for (let i = 1; i < query.where.length; i++) {
-      const clause = query.where[i];
-      const clauseResults = await this.executeClause(clause);
+    for (let i = 1; i < modifiedQuery.where.length; i++) {
+      const clause = modifiedQuery.where[i];
+      const clauseResults = await this.executeClauseWithFilteredDatoms(
+        clause,
+        filteredDatoms
+      );
       results = joinResults(
         results,
         clauseResults,
-        query.where.slice(0, i + 1)
+        modifiedQuery.where.slice(0, i + 1)
       );
     }
 
     // Project to find variables
-    const projected = project(results, query.find, query.where);
+    const projected = project(results, modifiedQuery.find, modifiedQuery.where);
 
     // Apply ordering if specified
-    if (query.orderBy) {
+    if (modifiedQuery.orderBy) {
       projected.sort((a, b) => {
-        for (const [variable, direction] of query.orderBy!) {
+        for (const [variable, direction] of modifiedQuery.orderBy!) {
           const key = stripQuestionMark(variable);
           const aVal = a[key];
           const bVal = b[key];
@@ -344,11 +410,58 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     }
 
     // Apply limit
-    if (query.limit) {
-      return projected.slice(0, query.limit);
+    if (modifiedQuery.limit) {
+      return projected.slice(0, modifiedQuery.limit);
     }
 
     return projected;
+  }
+
+  /**
+   * Execute a clause using filtered datoms from interceptors
+   */
+  private async executeClauseWithFilteredDatoms(
+    clause: QueryClause,
+    filteredDatoms: Datom[]
+  ): Promise<Record<string, Value | Attribute>[]> {
+    if (!isQueryPattern(clause)) {
+      throw new Error("Only QueryPattern clauses are supported");
+    }
+    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+    const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+    const attribute = isVariable(attributeVal)
+      ? undefined
+      : (attributeVal as string);
+    const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+    // Filter datoms based on clause
+    let matchingDatoms = filteredDatoms;
+    if (entity !== undefined) {
+      matchingDatoms = matchingDatoms.filter((d) => d.e === entity);
+    }
+    if (attribute !== undefined) {
+      matchingDatoms = matchingDatoms.filter((d) => d.a === attribute);
+    }
+    if (value !== undefined) {
+      matchingDatoms = matchingDatoms.filter(
+        (d) => JSON.stringify(d.v) === JSON.stringify(value)
+      );
+    }
+
+    // Map datom fields to variable names from the clause
+    return matchingDatoms.map((datom) => {
+      const result: Record<string, Value | Attribute> = {};
+      if (isVariable(entityVal)) {
+        result[entityVal as string] = datom.e;
+      }
+      if (isVariable(attributeVal)) {
+        result[attributeVal as string] = datom.a;
+      }
+      if (isVariable(valueVal)) {
+        result[valueVal as string] = datom.v;
+      }
+      return result;
+    });
   }
 
   /**

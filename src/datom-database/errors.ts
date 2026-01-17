@@ -3,6 +3,15 @@
  * These provide more specific error handling than generic Error objects
  */
 
+import type { InterceptorError } from "../types.js";
+
+/**
+ * Error with interceptor name attached
+ */
+export type InterceptorErrorWithName = {
+  interceptor: string;
+} & InterceptorError;
+
 /**
  * Base error class for all datom database errors
  */
@@ -132,5 +141,51 @@ export class ConnectionPoolExhaustedError extends DatomDatabaseError {
     );
     this.name = "ConnectionPoolExhaustedError";
     Object.setPrototypeOf(this, ConnectionPoolExhaustedError.prototype);
+  }
+}
+
+/**
+ * Error thrown when a query is blocked or fails validation by interceptors
+ * @example
+ * try {
+ *   await db.query(query, context);
+ * } catch (error) {
+ *   if (error instanceof QueryError) {
+ *     // Handle interceptor errors
+ *     console.log("Validation errors:", error.errors);
+ *   }
+ * }
+ */
+export class QueryError extends DatomDatabaseError {
+  constructor(
+    message: string,
+    public readonly errors: InterceptorErrorWithName[]
+  ) {
+    super(message, "QUERY_INTERCEPTOR_ERROR");
+    this.name = "QueryError";
+    Object.setPrototypeOf(this, QueryError.prototype);
+  }
+}
+
+/**
+ * Error thrown when a transaction fails validation by interceptors
+ * @example
+ * try {
+ *   await db.transact(ops, metadata, context);
+ * } catch (error) {
+ *   if (error instanceof TransactionError) {
+ *     // Handle validation errors
+ *     console.log("Validation errors:", error.errors);
+ *   }
+ * }
+ */
+export class TransactionError extends DatomDatabaseError {
+  constructor(
+    message: string,
+    public readonly errors: InterceptorErrorWithName[]
+  ) {
+    super(message, "TRANSACTION_INTERCEPTOR_ERROR");
+    this.name = "TransactionError";
+    Object.setPrototypeOf(this, TransactionError.prototype);
   }
 }

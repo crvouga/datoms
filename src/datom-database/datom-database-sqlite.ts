@@ -9,7 +9,7 @@ import {
   isQueryPattern,
   stripQuestionMark,
 } from "./shared/datalog-helpers.js";
-import { project } from "./shared/query-helpers.js";
+import { joinResults, project } from "./shared/query-helpers.js";
 import type {
   Attribute,
   Datom,
@@ -19,12 +19,14 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
+import type { ReadContext } from "./interceptor-types.js";
 import type {
   DatalogQuery,
   QueryClause,
   QueryResult,
 } from "../datalog/datalog.js";
 import type { SQLDatabase } from "../sql-database/sql-database.js";
+import { InterceptorErrorWithName, QueryError } from "./errors.js";
 
 /**
  * SQLite database implementation
@@ -628,15 +630,37 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     });
   }
 
-  async query(query: DatalogQuery): Promise<QueryResult> {
+  async query(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResult> {
     await this.ensureInitialized();
-    if (query.where.length === 0) {
+
+    // Create read context
+    const ctx: ReadContext = {
+      db: this,
+      ...(context || {}),
+    };
+
+    // Run before-read interceptors
+    const beforeResult = await this.interceptors.runBeforeRead(query, ctx);
+
+    if (beforeResult.errors.length > 0) {
+      throw new QueryError(
+        "Query blocked by interceptors",
+        beforeResult.errors as InterceptorErrorWithName[]
+      );
+    }
+
+    const modifiedQuery = beforeResult.query;
+
+    if (modifiedQuery.where.length === 0) {
       return [];
     }
 
     // For single clause queries, use the optimized query method
-    if (query.where.length === 1) {
-      const clause = query.where[0];
+    if (modifiedQuery.where.length === 1) {
+      const clause = modifiedQuery.where[0];
       if (!isQueryPattern(clause)) {
         throw new Error("Only QueryPattern clauses are supported");
       }
@@ -656,7 +680,10 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         op: "add",
       });
 
-      const results = datoms.map((datom) => {
+      // Run after-read interceptors
+      const filteredDatoms = await this.interceptors.runAfterRead(datoms, ctx);
+
+      const results = filteredDatoms.map((datom) => {
         const result: Record<string, Value | Attribute> = {};
         if (isVariable(entityVal)) {
           result[entityVal as string] = datom.e;
@@ -670,12 +697,204 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         return result;
       });
 
-      const projected = project(results, query.find, query.where);
-      return this.applyOrderAndLimit(projected, query);
+      const projected = project(
+        results,
+        modifiedQuery.find,
+        modifiedQuery.where
+      );
+      return this.applyOrderAndLimit(projected, modifiedQuery);
     }
 
     // For multi-clause queries, build a single SQL query with JOINs
-    return this.executeDatalogWithSQL(query);
+    // Extract datoms first for afterRead interceptors
+    const allDatoms = await this.extractDatomsFromQuery(modifiedQuery);
+    const filteredDatoms = await this.interceptors.runAfterRead(allDatoms, ctx);
+
+    // Re-execute query with filtered datoms
+    return this.executeDatalogWithSQLAndFilteredDatoms(
+      modifiedQuery,
+      filteredDatoms
+    );
+  }
+
+  /**
+   * Extract all datoms that match a query (before projection)
+   */
+  private async extractDatomsFromQuery(query: DatalogQuery): Promise<Datom[]> {
+    const allDatomsSet = new Set<string>();
+    const allDatoms: Datom[] = [];
+
+    for (const clause of query.where) {
+      if (!isQueryPattern(clause)) {
+        continue;
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+      const entity = isVariable(entityVal)
+        ? undefined
+        : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal)
+        ? undefined
+        : (attributeVal as string);
+      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+      const clauseDatoms = await this.executeQuery({
+        e: entity,
+        a: attribute,
+        v: value,
+        op: "add",
+      });
+
+      for (const datom of clauseDatoms) {
+        const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
+        if (!allDatomsSet.has(key)) {
+          allDatomsSet.add(key);
+          allDatoms.push(datom);
+        }
+      }
+    }
+
+    return allDatoms;
+  }
+
+  /**
+   * Execute datalog query with filtered datoms from interceptors
+   * Uses datom-level execution to properly support afterRead interceptors
+   */
+  private async executeDatalogWithSQLAndFilteredDatoms(
+    query: DatalogQuery,
+    filteredDatoms: Datom[]
+  ): Promise<QueryResult> {
+    // Create a set of allowed datoms for filtering
+    const allowedDatomsSet = new Set<string>();
+    for (const datom of filteredDatoms) {
+      const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
+      allowedDatomsSet.add(key);
+    }
+
+    // Execute query at datom level using filtered datoms
+    if (query.where.length === 0) {
+      return [];
+    }
+
+    // Execute first clause using filtered datoms
+    const firstClause = query.where[0];
+    if (!isQueryPattern(firstClause)) {
+      throw new Error("First clause must be a QueryPattern");
+    }
+    const { e: entityVal, a: attributeVal, v: valueVal } = firstClause;
+    const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+    const attribute = isVariable(attributeVal)
+      ? undefined
+      : (attributeVal as string);
+    const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+    // Filter datoms for first clause
+    let firstDatoms = filteredDatoms;
+    if (entity !== undefined) {
+      firstDatoms = firstDatoms.filter((d) => d.e === entity);
+    }
+    if (attribute !== undefined) {
+      firstDatoms = firstDatoms.filter((d) => d.a === attribute);
+    }
+    if (value !== undefined) {
+      firstDatoms = firstDatoms.filter(
+        (d) => JSON.stringify(d.v) === JSON.stringify(value)
+      );
+    }
+
+    const firstResults = firstDatoms.map((datom) => {
+      const result: Record<string, Value | Attribute> = {};
+      if (isVariable(entityVal)) {
+        result[entityVal as string] = datom.e;
+      }
+      if (isVariable(attributeVal)) {
+        result[attributeVal as string] = datom.a;
+      }
+      if (isVariable(valueVal)) {
+        result[valueVal as string] = datom.v;
+      }
+      return result;
+    });
+
+    // Join with remaining clauses
+    let results = firstResults;
+    for (let i = 1; i < query.where.length; i++) {
+      const clause = query.where[i];
+      if (!isQueryPattern(clause)) {
+        throw new Error("Only QueryPattern clauses are supported in joins");
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+      const entity = isVariable(entityVal)
+        ? undefined
+        : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal)
+        ? undefined
+        : (attributeVal as string);
+      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+      // Filter datoms for this clause
+      let clauseDatoms = filteredDatoms;
+      if (entity !== undefined) {
+        clauseDatoms = clauseDatoms.filter((d) => d.e === entity);
+      }
+      if (attribute !== undefined) {
+        clauseDatoms = clauseDatoms.filter((d) => d.a === attribute);
+      }
+      if (value !== undefined) {
+        clauseDatoms = clauseDatoms.filter(
+          (d) => JSON.stringify(d.v) === JSON.stringify(value)
+        );
+      }
+
+      const clauseResults = clauseDatoms.map((datom) => {
+        const result: Record<string, Value | Attribute> = {};
+        if (isVariable(entityVal)) {
+          result[entityVal as string] = datom.e;
+        }
+        if (isVariable(attributeVal)) {
+          result[attributeVal as string] = datom.a;
+        }
+        if (isVariable(valueVal)) {
+          result[valueVal as string] = datom.v;
+        }
+        return result;
+      });
+
+      results = joinResults(
+        results,
+        clauseResults,
+        query.where.slice(0, i + 1)
+      );
+    }
+
+    // Project to find variables
+    const projected = project(results, query.find, query.where);
+
+    // Apply ordering if specified
+    if (query.orderBy) {
+      projected.sort((a, b) => {
+        for (const [variable, direction] of query.orderBy!) {
+          const key = stripQuestionMark(variable);
+          const aVal = a[key];
+          const bVal = b[key];
+          if (aVal === undefined && bVal === undefined) return 0;
+          if (aVal === undefined || aVal === null)
+            return direction === "asc" ? 1 : -1;
+          if (bVal === undefined || bVal === null)
+            return direction === "asc" ? -1 : 1;
+          if (aVal < bVal) return direction === "asc" ? -1 : 1;
+          if (aVal > bVal) return direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    // Apply limit if specified
+    if (query.limit !== undefined) {
+      return projected.slice(0, query.limit);
+    }
+
+    return projected;
   }
 
   private async executeDatalogWithSQL(

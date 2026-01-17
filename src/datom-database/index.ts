@@ -13,15 +13,30 @@ export type {
   DatabaseHealth,
   DatabaseHealthStatus,
   EntityId,
+  InterceptorError,
   Logger,
   OptimisticLockOptions,
   QueryExplainResult,
   QueryOptions,
+  Transaction,
   TransactionId,
   TransactionIsolationLevel,
   TransactionOptions,
   Value,
 } from "../types.js";
+
+// Interceptor types
+export type {
+  AfterReadInterceptor,
+  AfterWriteInterceptor,
+  BeforeReadInterceptor,
+  BeforeReadInterceptorResult,
+  BeforeWriteInterceptor,
+  BeforeWriteInterceptorResult,
+  Interceptor,
+  ReadContext,
+  WriteContext,
+} from "./interceptor-types.js";
 
 // DatomDatabase classes
 export { InMemoryDatomDatabase } from "./datom-database-in-memory.js";
@@ -46,8 +61,15 @@ export type { WithResult } from "./datom-database.js";
 export {
   ConnectionPoolExhaustedError,
   DatomDatabaseError,
+  QueryError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
   TransactionConflictError,
+  TransactionError,
 } from "./errors.js";
+
+// Interceptor system
+export { InterceptorEngine } from "./interceptor-engine.js";
+export { InterceptorValidator } from "./interceptor-validator.js";
+export type { InterceptorErrorWithName } from "./errors.js";

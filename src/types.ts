@@ -346,3 +346,20 @@ export interface Logger {
  * Used internally for batch query result mapping
  */
 export type BatchQueryKey = string;
+
+/**
+ * Error structure returned by interceptors
+ */
+export type InterceptorError = {
+  message: string;
+  code?: string;
+  datom?: Datom;
+};
+
+/**
+ * Transaction data structure for interceptors
+ */
+export type Transaction = {
+  datoms: Datom[];
+  meta?: Record<string, unknown>;
+};
