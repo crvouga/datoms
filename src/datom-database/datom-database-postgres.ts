@@ -21,7 +21,7 @@ import type {
 } from "../types.js";
 
 import { DatomDatabase, QueryError } from "./datom-database.js";
-import type { ReadContext } from "./hook/engine.js";
+import type { ReadContext } from "./hook/hook.js";
 import {
   isQueryPattern,
   isVariable,

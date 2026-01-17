@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { QueryTimeoutError } from "../hook/engine";
+import { QueryTimeoutError } from "../hook/hook";
 import { Fixture, FIXTURES } from "../../test/fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {

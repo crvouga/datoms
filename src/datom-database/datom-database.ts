@@ -14,7 +14,7 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
-import { DatabaseView } from "./datom-database-types.js";
+import { DatabaseView } from "./types.js";
 import {
   HookEngine,
   QueryError,
@@ -25,7 +25,7 @@ import {
   TransactionError,
   WriteContext,
   WriteResult,
-} from "./hook/engine.js";
+} from "./hook/hook.js";
 import {
   isQueryPattern,
   isVariable,
@@ -1206,4 +1206,4 @@ export {
   type ReadContext,
   type WriteContext,
   type WriteResult,
-} from "./hook/engine.js";
+} from "./hook/hook.js";

@@ -5,7 +5,7 @@
 
 import type { DatalogQuery } from "../../datalog/datalog.js";
 import type { Datom, Transaction, TransactionId } from "../../types.js";
-import { DatabaseView } from "../datom-database-types.js";
+import { DatabaseView } from "../types.js";
 
 /**
  * Error structure returned by hooks
@@ -47,7 +47,7 @@ export type WriteContext = {
  * Result from before-read hooks
  */
 export type BeforeReadResult = {
-  query: DatalogQuery;
+  query?: DatalogQuery;
   errors?: HookError[];
   stopProcessing?: boolean;
 };
@@ -366,13 +366,13 @@ export class HookEngine {
     query: DatalogQuery;
     errors: HookErrorWithName[];
   }> {
-    let result = query;
+    let nextQuery = query;
     const allErrors: HookErrorWithName[] = [];
 
     for (const hook of this.beforeRead) {
-      const hookResult = await hook.execute(result, ctx);
+      const hookResult = await hook.execute(nextQuery, ctx);
 
-      result = hookResult.query as DatalogQuery;
+      nextQuery = hookResult.query ?? nextQuery ?? query;
 
       if (hookResult.errors && hookResult.errors.length > 0) {
         for (const e of hookResult.errors) {
@@ -385,12 +385,12 @@ export class HookEngine {
         }
       }
 
-      if (hookResult.stopProcessing === true) {
+      if (hookResult.stopProcessing) {
         break;
       }
     }
 
-    return { query: result, errors: allErrors };
+    return { query: nextQuery, errors: allErrors };
   }
 
   /**
@@ -425,7 +425,7 @@ export class HookEngine {
         }
       }
 
-      if (hookResult.stopProcessing === true) {
+      if (hookResult.stopProcessing) {
         break;
       }
     }
@@ -465,7 +465,7 @@ export class HookEngine {
         }
       }
 
-      if (hookResult.stopProcessing === true) {
+      if (hookResult.stopProcessing) {
         break;
       }
     }

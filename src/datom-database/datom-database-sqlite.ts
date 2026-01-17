@@ -13,7 +13,7 @@ import type {
   Value,
 } from "../types.js";
 import { DatomDatabase } from "./datom-database.js";
-import type { ReadContext } from "./hook/engine.js";
+import type { ReadContext } from "./hook/hook.js";
 import {
   isQueryPattern,
   isVariable,

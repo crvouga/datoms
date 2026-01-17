@@ -43,5 +43,5 @@ export {
 // WithResult type (for speculative transactions)
 export type { WithResult } from "./datom-database.js";
 
-export { HookEngine } from "./hook/engine.js";
+export { HookEngine } from "./hook/hook.js";
 export { HookValidator } from "./hook/validator.js";

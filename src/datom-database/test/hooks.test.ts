@@ -8,7 +8,7 @@ import {
   BeforeWrite,
   QueryError,
   TransactionError,
-} from "../hook/engine";
+} from "../hook/hook.js";
 import { HookValidator } from "../hook/validator.js";
 
 describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {

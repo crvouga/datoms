@@ -1,4 +1,4 @@
-import type { Hook } from "../datom-database/hook/engine.js";
+import type { Hook } from "../datom-database/hook/hook.js";
 import { HookValidator } from "../datom-database/hook/validator.js";
 import { Attribute, EntityId, records, Value, type Datom } from "../datoms.js";
 
