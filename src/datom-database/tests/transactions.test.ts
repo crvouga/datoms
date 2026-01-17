@@ -15,24 +15,22 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe("Transaction API", () => {
+  describe("With API (Speculative Transactions)", () => {
     test("should execute successful transaction", async () => {
       const { db } = f;
 
       await db.transact({ add: [[1, "name", "Alice"]] });
 
-      const result = await db.transaction(async (tx) => {
-        const initial = await tx.datoms({ entity: 1 });
-        expect(initial).toHaveLength(1);
+      // Use with() to see what the transaction would look like
+      const initial = await db.datoms({ entity: 1 });
+      expect(initial).toHaveLength(1);
 
-        await tx.transact({ add: [[1, "status", "pending"]] });
-        const updated = await tx.datoms({ entity: 1 });
-        expect(updated).toHaveLength(2);
+      const withResult = await db.with({ add: [[1, "status", "pending"]] });
+      const updated = await withResult.dbAfter.datoms({ entity: 1 });
+      expect(updated).toHaveLength(2);
 
-        return "ok";
-      });
-
-      expect(result).toBe("ok");
+      // Now commit the changes
+      await db.transact({ add: [[1, "status", "pending"]] });
 
       // Verify changes are committed
       const final = await db.datoms({ entity: 1 });
@@ -44,23 +42,19 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should rollback transaction on error", async () => {
+    test("should not commit changes when using with()", async () => {
       const { db } = f;
 
       await db.transact({ add: [[1, "name", "Alice"]] });
 
-      try {
-        await db.transaction(async (tx) => {
-          await tx.transact({ add: [[1, "status", "pending"]] });
-          throw new Error("rollback");
-        });
-        throw new Error("Should have thrown an error");
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toBe("rollback");
-      }
+      // Use with() to see what the transaction would look like
+      const withResult = await db.with({ add: [[1, "status", "pending"]] });
 
-      // Verify changes were rolled back
+      // Query dbAfter to see speculative state
+      const speculative = await withResult.dbAfter.datoms({ entity: 1 });
+      expect(speculative).toHaveLength(2);
+
+      // But actual database should not be changed (with() doesn't commit)
       const final = await db.datoms({ entity: 1 });
       expect(final).toHaveLength(1);
       expect(final[0][2]).toBe("Alice");
@@ -68,31 +62,29 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should see uncommitted changes within transaction", async () => {
+    test("should see speculative changes with with()", async () => {
       const { db } = f;
 
       await db.transact({ add: [[1, "name", "Alice"]] });
 
-      await db.transaction(async (tx) => {
-        // Query before adding
-        const before = await tx.datoms({ entity: 1 });
-        expect(before).toHaveLength(1);
+      // Query before adding
+      const before = await db.datoms({ entity: 1 });
+      expect(before).toHaveLength(1);
 
-        // Add new datom
-        await tx.transact({ add: [[1, "age", 30]] });
+      // Use with() to see what adding would look like
+      const withResult = await db.with({ add: [[1, "age", 30]] });
 
-        // Query after adding - should see uncommitted change
-        const after = await tx.datoms({ entity: 1 });
-        expect(after).toHaveLength(2);
-        const values = after.map((d) => d[2]);
-        expect(values).toContain("Alice");
-        expect(values).toContain(30);
-      });
+      // Query dbAfter - should see speculative change
+      const after = await withResult.dbAfter.datoms({ entity: 1 });
+      expect(after).toHaveLength(2);
+      const values = after.map((d) => d[2]);
+      expect(values).toContain("Alice");
+      expect(values).toContain(30);
 
       await db.close();
     });
 
-    test("should handle retract within transaction", async () => {
+    test("should handle retract with with()", async () => {
       const { db } = f;
 
       await db.transact({
@@ -102,15 +94,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       });
 
-      await db.transaction(async (tx) => {
-        // Retract within transaction
-        await tx.transact({ retract: [[1, "age", 30]] });
+      // Use with() to see what retraction would look like
+      const withResult = await db.with({ retract: [[1, "age", 30]] });
 
-        // Query should not see retracted datom
-        const result = await tx.datoms({ entity: 1 });
-        expect(result).toHaveLength(1);
-        expect(result[0][2]).toBe("Alice");
-      });
+      // Query dbAfter should not see retracted datom
+      const result = await withResult.dbAfter.datoms({ entity: 1 });
+      expect(result).toHaveLength(1);
+      expect(result[0][2]).toBe("Alice");
+
+      // Now commit the retraction
+      await db.transact({ retract: [[1, "age", 30]] });
 
       // Verify retraction is committed
       const final = await db.datoms({ entity: 1 });
@@ -120,7 +113,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should handle query within transaction", async () => {
+    test("should handle query with with()", async () => {
       const { db } = f;
 
       await db.transact({
@@ -130,33 +123,40 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       });
 
-      await db.transaction(async (tx) => {
-        // Add within transaction
-        await tx.transact({ add: [[3, "name", "Charlie"]] });
+      // Use with() to see what adding would look like
+      const withResult = await db.with({ add: [[3, "name", "Charlie"]] });
 
-        // Query should see uncommitted change
-        const results = await tx.query({
-          find: ["?x"],
-          where: [["?x", "name", "?y"]],
-        });
-
-        expect(results).toHaveLength(3);
-        const entities = results.map((r) => r["x"]).sort();
-        expect(entities).toEqual([1, 2, 3]);
+      // Query dbAfter should see speculative change
+      const results = await withResult.dbAfter.query({
+        find: ["?x"],
+        where: [["?x", "name", "?y"]],
       });
+
+      expect(results).toHaveLength(3);
+      const entities = results.map((r) => r["x"]).sort();
+      expect(entities).toEqual([1, 2, 3]);
 
       await db.close();
     });
 
-    test("should handle multiple operations in transaction", async () => {
+    test("should handle multiple operations with transact()", async () => {
       const { db } = f;
 
-      await db.transaction(async (tx) => {
-        await tx.transact({ add: [[1, "name", "Alice"]] });
-        await tx.transact({ add: [[1, "age", 30]] });
-        await tx.transact({ add: [[2, "name", "Bob"]] });
-        await tx.transact({ retract: [[1, "age", 30]] });
-        await tx.transact({ add: [[1, "age", 31]] });
+      // First add initial data
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+        ],
+      });
+
+      // Then update in a single transaction: retract old age, add new age, add Bob
+      await db.transact({
+        add: [
+          [1, "age", 31],
+          [2, "name", "Bob"],
+        ],
+        retract: [[1, "age", 30]],
       });
 
       // Verify all operations were applied
@@ -174,24 +174,25 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should rollback all changes on error", async () => {
+    test("should not commit changes when using with()", async () => {
       const { db } = f;
 
       await db.transact({ add: [[1, "name", "Initial"]] });
 
-      try {
-        await db.transaction(async (tx) => {
-          await tx.transact({ add: [[1, "status", "pending"]] });
-          await tx.transact({ add: [[2, "name", "New"]] });
-          await tx.transact({ retract: [[1, "name", "Initial"]] });
-          throw new Error("fail");
-        });
-        throw new Error("Should have thrown");
-      } catch (error) {
-        // Expected
-      }
+      // Use with() to see what the transaction would look like
+      const withResult = await db.with({
+        add: [
+          [1, "status", "pending"],
+          [2, "name", "New"],
+        ],
+        retract: [[1, "name", "Initial"]],
+      });
 
-      // Verify nothing changed
+      // Query dbAfter to see speculative state
+      const speculative = await withResult.dbAfter.datoms({ entity: 1 });
+      expect(speculative.length).toBeGreaterThan(0);
+
+      // But actual database should not be changed (with() doesn't commit)
       const result = await db.datoms({ entity: 1 });
       expect(result).toHaveLength(1);
       expect(result[0][2]).toBe("Initial");
@@ -202,72 +203,69 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should handle getValue within transaction", async () => {
+    test("should handle query with with()", async () => {
       const { db } = f;
 
       await db.transact({ add: [[1, "name", "Alice"]] });
 
-      await db.transaction(async (tx) => {
-        const nameResults = await tx.query({
-          find: ["?v"],
-          where: [[1, "name", "?v"]],
-        });
-        expect(nameResults[0]?.v).toBe("Alice");
-
-        await tx.transact({ add: [[1, "age", 30]] });
-        const ageResults = await tx.query({
-          find: ["?v"],
-          where: [[1, "age", "?v"]],
-        });
-        expect(ageResults[0]?.v).toBe(30);
+      const nameResults = await db.query({
+        find: ["?v"],
+        where: [[1, "name", "?v"]],
       });
+      expect(nameResults[0]?.v).toBe("Alice");
+
+      // Use with() to see what adding age would look like
+      const withResult = await db.with({ add: [[1, "age", 30]] });
+      const ageResults = await withResult.dbAfter.query({
+        find: ["?v"],
+        where: [[1, "age", "?v"]],
+      });
+      expect(ageResults[0]?.v).toBe(30);
 
       await db.close();
     });
 
-    test("should handle datoms query within transaction", async () => {
+    test("should handle datoms query with with()", async () => {
       const { db } = f;
 
       await db.transact({ add: [[1, "name", "Alice"]] });
 
-      await db.transaction(async (tx) => {
-        let entity = await tx.datoms({ entity: 1, added: true });
-        expect(entity).toHaveLength(1);
+      let entity = await db.datoms({ entity: 1, added: true });
+      expect(entity).toHaveLength(1);
 
-        await tx.transact({ add: [[1, "age", 30]] });
-        entity = await tx.datoms({ entity: 1, added: true });
-        expect(entity).toHaveLength(2);
-      });
+      // Use with() to see what adding age would look like
+      const withResult = await db.with({ add: [[1, "age", 30]] });
+      entity = await withResult.dbAfter.datoms({ entity: 1, added: true });
+      expect(entity).toHaveLength(2);
 
       await db.close();
     });
 
-    test("should handle hasFact within transaction", async () => {
+    test("should handle hasFact with with()", async () => {
       const { db } = f;
 
       await db.transact({ add: [[1, "name", "Alice"]] });
 
-      await db.transaction(async (tx) => {
-        const nameDatoms = await tx.datoms({
-          entity: 1,
-          attribute: "name",
-          value: "Alice",
-        });
-        expect(nameDatoms.length).toBeGreaterThan(0);
-
-        await tx.transact({ add: [[1, "status", "active"]] });
-        const statusDatoms = await tx.datoms({
-          entity: 1,
-          attribute: "status",
-          value: "active",
-        });
-        expect(statusDatoms.length).toBeGreaterThan(0);
+      const nameDatoms = await db.datoms({
+        entity: 1,
+        attribute: "name",
+        value: "Alice",
       });
+      expect(nameDatoms.length).toBeGreaterThan(0);
+
+      // Use with() to see what adding status would look like
+      const withResult = await db.with({ add: [[1, "status", "active"]] });
+      const statusDatoms = await withResult.dbAfter.datoms({
+        entity: 1,
+        attribute: "status",
+        value: "active",
+      });
+      expect(statusDatoms.length).toBeGreaterThan(0);
 
       await db.close();
     });
 
-    test("should handle complex query within transaction", async () => {
+    test("should handle complex query with with()", async () => {
       const { db } = f;
 
       await db.transact({
@@ -279,28 +277,26 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       });
 
-      await db.transaction(async (tx) => {
-        // Add new employee within transaction
-        await tx.transact({
-          add: [
-            [3, "name", "Charlie"],
-            [3, "department", "Engineering"],
-          ],
-        });
-
-        // Query should see uncommitted change
-        const results = await tx.query({
-          find: ["?name"],
-          where: [
-            ["?e", "name", "?name"],
-            ["?e", "department", "Engineering"],
-          ],
-        });
-
-        expect(results).toHaveLength(2);
-        const names = results.map((r) => r["name"]).sort();
-        expect(names).toEqual(["Alice", "Charlie"]);
+      // Use with() to see what adding new employee would look like
+      const withResult = await db.with({
+        add: [
+          [3, "name", "Charlie"],
+          [3, "department", "Engineering"],
+        ],
       });
+
+      // Query dbAfter should see speculative change
+      const results = await withResult.dbAfter.query({
+        find: ["?name"],
+        where: [
+          ["?e", "name", "?name"],
+          ["?e", "department", "Engineering"],
+        ],
+      });
+
+      expect(results).toHaveLength(2);
+      const names = results.map((r) => r["name"]).sort();
+      expect(names).toEqual(["Alice", "Charlie"]);
 
       await db.close();
     });
@@ -344,234 +340,68 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(latestTx).toBe(tx2);
     });
 
-    test("should work within transactions", async () => {
+    test("should work with transact()", async () => {
       const { db } = f;
       await db.transact({ add: [[1, "name", "Alice"]] });
       const beforeTx = await db.getLatestTransaction();
 
-      await db.transaction(async (tx) => {
-        const txId = tx.getTransactionId();
-        expect(txId).toBeGreaterThan(beforeTx);
-
-        await tx.transact({ add: [[2, "name", "Bob"]] });
-        // Note: getLatestTransaction() may return the transaction ID assigned to this transaction
-        // (depending on implementation), or it may return the last committed transaction.
-        // The important thing is that after commit, it's updated.
-        const latestBeforeCommit = await db.getLatestTransaction();
-        // Should be at least beforeTx, possibly txId if implementation exposes uncommitted tx
-        expect(latestBeforeCommit).toBeGreaterThanOrEqual(beforeTx);
-      });
+      // Use transact() to commit changes
+      const txId = await db.transact({ add: [[2, "name", "Bob"]] });
+      expect(txId).toBeGreaterThan(beforeTx);
 
       // After commit, latest should be updated
       const afterTx = await db.getLatestTransaction();
       expect(afterTx).toBeGreaterThan(beforeTx);
+      expect(afterTx).toBe(txId);
     });
   });
 
-  describe("Optimistic Locking", () => {
-    test("should succeed when expectedTxId matches", async () => {
+  describe("With Result", () => {
+    test("should return dbBefore and dbAfter", async () => {
       const { db } = f;
       await db.transact({ add: [[1, "name", "Alice"]] });
-      const currentTx = await db.getLatestTransaction();
 
-      await db.transaction(
-        async (tx) => {
-          await tx.transact({ add: [[2, "name", "Bob"]] });
-        },
-        { expectedTxId: currentTx }
-      );
+      const withResult = await db.with({ add: [[1, "age", 30]] });
 
-      // Should succeed
-      const bob = await db.datoms({ entity: 2 });
-      expect(bob.length).toBeGreaterThan(0);
+      // dbBefore should show current state
+      const before = await withResult.dbBefore.datoms({ entity: 1 });
+      expect(before).toHaveLength(1);
+      expect(before[0][2]).toBe("Alice");
+
+      // dbAfter should show speculative state
+      const after = await withResult.dbAfter.datoms({ entity: 1 });
+      expect(after).toHaveLength(2);
+      const values = after.map((d) => d[2]);
+      expect(values).toContain("Alice");
+      expect(values).toContain(30);
     });
 
-    test("should throw TransactionConflictError when expectedTxId doesn't match", async () => {
-      const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]] });
-      const initialTx = await db.getLatestTransaction();
-
-      // Update database (changes txId)
-      await db.transact({ add: [[2, "name", "Bob"]] });
-
-      try {
-        await db.transaction(
-          async (tx) => {
-            await tx.transact({ add: [[3, "name", "Charlie"]] });
-          },
-          { expectedTxId: initialTx }
-        );
-        throw new Error("Should have thrown TransactionConflictError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(TransactionConflictError);
-        const conflictError = error as TransactionConflictError;
-        expect(conflictError.code).toBe("TRANSACTION_CONFLICT");
-        expect(conflictError.name).toBe("TransactionConflictError");
-        expect(conflictError.txId).toBe(initialTx);
-        expect(conflictError.conflictingTxId).toBeGreaterThan(initialTx);
-        expect(conflictError.message).toContain("conflict");
-      }
-    });
-
-    test("should retry on conflict when retry options provided", async () => {
-      const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]] });
-      const initialTx = await db.getLatestTransaction();
-
-      // Simulate concurrent update
-      setTimeout(() => {
-        db.transact({ add: [[2, "name", "Bob"]] }).catch(() => {});
-      }, 10);
-
-      // This test is tricky because we need actual concurrency
-      // For now, test that retry mechanism exists
-      let retryCount = 0;
-      try {
-        await db.transaction(
-          async (tx) => {
-            retryCount++;
-            await tx.transact({ add: [[3, "name", "Charlie"]] });
-          },
-          {
-            expectedTxId: initialTx,
-            retry: { maxRetries: 2, delayMs: 50 },
-          }
-        );
-        // If it succeeds, that's fine (no conflict occurred)
-      } catch (error) {
-        // If it fails, should be TransactionConflictError
-        expect(error).toBeInstanceOf(TransactionConflictError);
-      }
-    });
-
-    test("should not retry when maxRetries is 0", async () => {
-      const { db } = f;
-      await db.transact({ add: [[1, "name", "Alice"]] });
-      const initialTx = await db.getLatestTransaction();
-
-      // Update database
-      await db.transact({ add: [[2, "name", "Bob"]] });
-
-      let callbackExecuted = false;
-      try {
-        await db.transaction(
-          async (tx) => {
-            callbackExecuted = true;
-            await tx.transact({ add: [[3, "name", "Charlie"]] });
-          },
-          {
-            expectedTxId: initialTx,
-            retry: { maxRetries: 0, delayMs: 100 },
-          }
-        );
-        throw new Error("Should have thrown TransactionConflictError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(TransactionConflictError);
-        // Conflict is detected before callback executes, so callback should not run
-        expect(callbackExecuted).toBe(false);
-        // Verify error has correct properties
-        const conflictError = error as TransactionConflictError;
-        expect(conflictError.txId).toBe(initialTx);
-        expect(conflictError.conflictingTxId).toBeGreaterThan(initialTx);
-      }
-    });
-
-    test("should work without optimistic locking options", async () => {
+    test("should return txData", async () => {
       const { db } = f;
       await db.transact({ add: [[1, "name", "Alice"]] });
 
-      await db.transaction(async (tx) => {
-        await tx.transact({ add: [[2, "name", "Bob"]] });
+      const withResult = await db.with({
+        add: [[1, "age", 30]],
+        retract: [[1, "name", "Alice"]],
       });
 
-      // Should succeed normally
-      const bob = await db.datoms({ entity: 2 });
-      expect(bob.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe("Transaction timeouts", () => {
-    test("should complete transaction within timeout", async () => {
-      const { db } = f;
-      const result = await db.transaction(
-        async (tx) => {
-          await tx.transact({ add: [[1, "name", "Alice"]] });
-          return "success";
-        },
-        { timeoutMs: 5000 }
+      // txData should contain the datoms that would be applied
+      expect(withResult.txData.length).toBeGreaterThan(0);
+      const hasAdd = withResult.txData.some(
+        (d) => d[0] === 1 && d[1] === "age" && d[2] === 30 && d[4] === true
       );
-      expect(result).toBe("success");
-
-      const entity = await db.datoms({ entity: 1, added: true });
-      expect(entity).toHaveLength(1);
-      expect(entity[0][2]).toBe("Alice");
-    });
-
-    test("should throw QueryTimeoutError when transaction timeout exceeded", async () => {
-      const { db } = f;
-      // Use a very short timeout - may or may not trigger depending on transaction speed
-      try {
-        await db.transaction(
-          async (tx) => {
-            await tx.transact({ add: [[1, "name", "Alice"]] });
-            // Add a small delay to potentially trigger timeout
-            await new Promise((resolve) => setTimeout(resolve, 10));
-          },
-          { timeoutMs: 1 }
-        );
-        // If transaction completes quickly, that's fine - timeout is best-effort
-      } catch (error) {
-        if (error instanceof QueryTimeoutError) {
-          expect(error).toBeInstanceOf(QueryTimeoutError);
-          expect(error.timeoutMs).toBe(1);
-        } else {
-          throw error;
-        }
-      }
-    });
-
-    test("should rollback transaction on timeout", async () => {
-      const { db } = f;
-      let timeoutError: QueryTimeoutError | null = null;
-      try {
-        await db.transaction(
-          async (tx) => {
-            await tx.transact({ add: [[1, "name", "Alice"]] });
-            await new Promise((resolve) => setTimeout(resolve, 10));
-          },
-          { timeoutMs: 1 }
-        );
-        // If timeout didn't trigger, verify data was committed
-        const entity = await db.datoms({ entity: 1, added: true });
-        // Either timeout triggered (no data) or transaction completed (data exists)
-        expect(entity.length).toBeGreaterThanOrEqual(0);
-      } catch (error) {
-        if (error instanceof QueryTimeoutError) {
-          timeoutError = error;
-          // Verify rollback occurred
-          const entity = await db.datoms({ entity: 1, added: true });
-          expect(entity).toHaveLength(0);
-        } else {
-          throw error;
-        }
-      }
-      // Ensure timeout error was thrown
-      expect(timeoutError).toBeInstanceOf(QueryTimeoutError);
-    });
-
-    test("should work with isolation level option", async () => {
-      const { db } = f;
-      const result = await db.transaction(
-        async (tx) => {
-          await tx.transact({ add: [[1, "name", "Alice"]] });
-          return "success";
-        },
-        {
-          timeoutMs: 5000,
-          isolationLevel: "READ_COMMITTED",
-        }
+      expect(hasAdd).toBe(true);
+      const hasRetract = withResult.txData.some(
+        (d) =>
+          d[0] === 1 && d[1] === "name" && d[2] === "Alice" && d[4] === false
       );
-      expect(result).toBe("success");
+      expect(hasRetract).toBe(true);
+    });
+
+    test("should return tempIds (empty for now)", async () => {
+      const { db } = f;
+      const withResult = await db.with({ add: [[1, "name", "Alice"]] });
+      expect(withResult.tempIds).toEqual({});
     });
   });
 });

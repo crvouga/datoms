@@ -56,9 +56,7 @@ describe.each(FIXTURES)("Health Check (%s)", (_name, createFixture) => {
     test("should include transaction health metrics if available", async () => {
       const { db } = f;
       // Run some transactions to generate metrics
-      await db.transaction(async (tx) => {
-        await tx.transact({ add: [[1, "name", "Alice"]] });
-      });
+      await db.transact({ add: [[1, "name", "Alice"]] });
 
       const observableDb = new ObservableDatabase(db);
       const health = await observableDb.healthCheck();

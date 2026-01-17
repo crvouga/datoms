@@ -15,7 +15,6 @@ import type {
   QueryOptions,
   SchemaExport,
   TransactionId,
-  TransactionOptions,
   Value,
 } from "../types.js";
 import {
@@ -26,7 +25,6 @@ import {
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
-  TransactionConflictError,
   UniqueConstraintError,
 } from "./errors.js";
 import { MigrationRegistry } from "./migrations/migration-registry.js";
@@ -103,48 +101,6 @@ export interface TransactResult {
   addedCount: number;
   /** Number of datoms retracted */
   retractedCount: number;
-}
-
-/**
- * Transaction interface (Datomic-like minimal API)
- * Provides core operations scoped to a transaction.
- * Queries within a transaction see uncommitted changes from earlier operations in the same transaction.
- *
- * **Transaction ID Behavior:**
- * - The transaction ID is assigned when the transaction begins, before any operations
- * - `getTransactionId()` returns the ID that will be used when the transaction commits
- * - For SQL backends, the ID is generated from a sequence/counter before commit
- * - For in-memory backends, the ID is assigned immediately
- * - The ID is stable throughout the transaction lifecycle
- *
- * @example
- * await db.transaction(async (tx) => {
- *   await tx.transact({ add: [[123, "score", 10]] });
- *   // all reads see the new datom, but not yet committed to the main db
- *   const datoms = await tx.datoms({ entity: 123, attribute: "score" });
- *   const txid = tx.getTransactionId(); // Returns the ID that will be used on commit
- * });
- */
-export interface Transaction extends DatomReader {
-  /**
-   * Execute bulk operations atomically within this transaction
-   * @param ops Object containing add and/or retract arrays
-   * @example
-   * await tx.transact({
-   *   add: [[200, "name", "Carol"]],
-   *   retract: [[100, "name", "Alice"]]
-   * });
-   */
-  transact(ops: { add?: DatomInput[]; retract?: DatomInput[] }): Promise<void>;
-
-  /**
-   * Get the transaction ID for the current transaction.
-   * The transaction ID is assigned when the transaction begins and remains stable
-   * throughout the transaction. It will be the ID used when the transaction commits.
-   *
-   * @returns The transaction ID that will be used when this transaction commits
-   */
-  getTransactionId(): TransactionId;
 }
 
 /**
@@ -364,6 +320,124 @@ class SinceDatabaseView extends BaseDatabaseView {
 }
 
 /**
+ * Database view showing the current database state
+ * Used by `with()` to represent dbBefore
+ */
+class CurrentDatabaseView extends BaseDatabaseView {
+  async datoms(options: QueryOptions): Promise<Datom[]> {
+    // Validate that query has at least one filter or limit to prevent accidental full scans
+    const hasFilter =
+      options.entity !== undefined ||
+      options.attribute !== undefined ||
+      options.value !== undefined ||
+      options.tx !== undefined;
+    const hasLimit = options.limit !== undefined;
+
+    if (!hasFilter && !hasLimit) {
+      throw new QuerySafetyError(
+        "Query must include at least one filter (entity, attribute, value, tx) or a limit to prevent full table scans"
+      );
+    }
+
+    // Use the database's internal query method via the public accessor
+    return this.db._queryInternalForTransaction(options);
+  }
+}
+
+/**
+ * Database view showing speculative state with pending changes applied
+ * Merges base database state with speculative adds and retracts
+ * Used by the `with()` method for speculative transactions
+ */
+class SpeculativeDatabaseView extends BaseDatabaseView {
+  constructor(
+    db: DatomDatabase,
+    private speculativeAdds: Datom[],
+    private speculativeRetracts: Datom[]
+  ) {
+    super(db);
+  }
+
+  async datoms(options: QueryOptions): Promise<Datom[]> {
+    // Validate that query has at least one filter or limit to prevent accidental full scans
+    const hasFilter =
+      options.entity !== undefined ||
+      options.attribute !== undefined ||
+      options.value !== undefined ||
+      options.tx !== undefined;
+    const hasLimit = options.limit !== undefined;
+
+    if (!hasFilter && !hasLimit) {
+      throw new QuerySafetyError(
+        "Query must include at least one filter (entity, attribute, value, tx) or a limit to prevent full table scans"
+      );
+    }
+
+    // Get base datoms from the database
+    const baseDatoms = await this.db._queryInternalForTransaction(options);
+
+    // Create a map of base datoms by (entity, attribute, value) for efficient lookup
+    const baseMap = new Map<string, Datom>();
+    for (const datom of baseDatoms) {
+      const key = `${String(datom[0])}|${String(datom[1])}|${JSON.stringify(datom[2])}`;
+      const existing = baseMap.get(key);
+      if (!existing || datom[3] > existing[3]) {
+        baseMap.set(key, datom);
+      }
+    }
+
+    // Apply retracts first (remove matching datoms)
+    for (const retract of this.speculativeRetracts) {
+      const key = `${String(retract[0])}|${String(retract[1])}|${JSON.stringify(retract[2])}`;
+      baseMap.delete(key);
+    }
+
+    // Apply adds (add or update datoms)
+    for (const add of this.speculativeAdds) {
+      const key = `${String(add[0])}|${String(add[1])}|${JSON.stringify(add[2])}`;
+      baseMap.set(key, add);
+    }
+
+    // Convert back to array and apply filters
+    let results = Array.from(baseMap.values());
+
+    // Apply filters from options
+    if (options.entity !== undefined) {
+      results = results.filter((d) => d[0] === options.entity);
+    }
+    if (options.attribute !== undefined) {
+      results = results.filter((d) => d[1] === options.attribute);
+    }
+    if (options.value !== undefined) {
+      results = results.filter(
+        (d) => JSON.stringify(d[2]) === JSON.stringify(options.value)
+      );
+    }
+    if (options.tx !== undefined) {
+      results = results.filter((d) => d[3] === options.tx);
+    }
+
+    // Apply added filter
+    if (options.added === undefined || options.added === true) {
+      results = results.filter((d) => d[4]);
+    } else if (options.added === false) {
+      results = results.filter((d) => !d[4]);
+    }
+
+    // Apply pagination
+    const offset = options.offset ?? 0;
+    const limit = options.limit;
+    if (limit !== undefined) {
+      results = results.slice(offset, offset + limit);
+    } else if (offset > 0) {
+      results = results.slice(offset);
+    }
+
+    return results;
+  }
+}
+
+/**
  * Abstract datom database class that provides a high-level interface
  * for working with datoms and datalog queries
  * Concrete implementations: InMemoryDatabase, SQLiteDatabase, PostgreSQLDatabase
@@ -542,24 +616,42 @@ export abstract class DatomDatabase implements DatomReader {
     metadata?: Record<string, unknown>
   ): Promise<TransactionId> {
     await this.ensureInitialized();
-    return this.transaction(async (tx) => {
-      // Apply retracts first, then adds, so validation can see retracted values
-      if (ops.retract && ops.retract.length > 0) {
-        await this.validateDatoms(ops.retract, false);
-        await tx.transact({ retract: ops.retract });
-      }
-      if (ops.add && ops.add.length > 0) {
-        // Validate adds, but account for retracts in the same transaction
-        await this.validateDatoms(ops.add, true, ops.retract);
-        await tx.transact({ add: ops.add });
-      }
-      const txId = tx.getTransactionId();
-      // Store metadata if provided (implementations can override onTransactionMetadata)
-      if (metadata !== undefined) {
-        await this.onTransactionMetadata(txId, metadata);
-      }
-      return txId;
-    });
+
+    // Validate transaction data
+    // Apply retracts first, then adds, so validation can see retracted values
+    if (ops.retract && ops.retract.length > 0) {
+      await this.validateDatoms(ops.retract, false);
+    }
+    if (ops.add && ops.add.length > 0) {
+      // Validate adds, but account for retracts in the same transaction
+      await this.validateDatoms(ops.add, true, ops.retract);
+    }
+
+    // Apply retracts first, then adds
+    // Note: If both retracts and adds are present, they may get different transaction IDs
+    // depending on the implementation. For atomicity, implementations should ensure
+    // they use the same transaction ID when called sequentially.
+    let txId: TransactionId;
+    if (ops.retract && ops.retract.length > 0) {
+      txId = await this.retractDatoms(ops.retract);
+    }
+    if (ops.add && ops.add.length > 0) {
+      txId = await this.addDatoms(ops.add);
+    } else if (!ops.retract || ops.retract.length === 0) {
+      // If there are no operations, still create a new transaction ID
+      // This ensures that even empty transactions get a unique ID (useful for metadata tracking)
+      txId = await this.addDatoms([]);
+    } else {
+      // txId was set by retractDatoms above
+      txId = txId!;
+    }
+
+    // Store metadata if provided (implementations can override onTransactionMetadata)
+    if (metadata !== undefined) {
+      await this.onTransactionMetadata(txId, metadata);
+    }
+
+    return txId;
   }
 
   /**
@@ -1471,139 +1563,104 @@ export abstract class DatomDatabase implements DatomReader {
   }
 
   /**
-   * Execute a callback within a transaction.
-   * All operations performed through the transaction object will be
-   * part of the same transaction. If the callback throws an error,
-   * the transaction will be rolled back automatically.
+   * Speculatively apply transaction data to the database (Datomic-like `with`)
+   * Returns a read-only view of what the database would look like after applying
+   * the transaction without actually committing the changes.
    *
-   * **Transaction Isolation:**
-   * - Transactions use READ COMMITTED isolation by default (configurable via `isolationLevel`)
-   * - Within a transaction, all reads see uncommitted changes from earlier operations in the same transaction
-   * - Concurrent transactions do not see each other's uncommitted changes
-   * - If a transaction throws an error, all changes are automatically rolled back
-   * - Isolation levels: READ_UNCOMMITTED, READ_COMMITTED (default), REPEATABLE_READ, SERIALIZABLE
+   * **Speculative Transactions:**
+   * - `with()` is purely speculative - it does not commit any changes
+   * - Use `with()` to validate transaction data, preview changes, or build up transaction data
+   * - The returned `dbAfter` view can be queried to see what the database would look like
+   * - To actually commit changes, use `transact()` instead
    *
-   * **Optimistic Locking:**
-   * - Use `options.expectedTxId` to ensure the database hasn't changed since you last read it
-   * - If a conflict is detected, the transaction will fail with `TransactionConflictError`
-   * - Configure retries with `options.retry` to automatically retry on conflicts
+   * **Return Value:**
+   * - `dbBefore`: Read-only view of the database state before applying the transaction
+   * - `dbAfter`: Read-only view of the database state after applying the transaction (speculative)
+   * - `txData`: The datoms that would be applied by this transaction
+   * - `tempIds`: Map of temporary IDs to resolved entity IDs (empty for now)
    *
-   * **Transaction Timeouts:**
-   * - Use `options.timeoutMs` to set a per-transaction timeout
-   * - If timeout is exceeded, transaction is rolled back and `QueryTimeoutError` is thrown
-   * - Timeout starts when transaction begins, includes all operations within the callback
-   *
-   * @param callback Function that receives a transaction object
-   * @param options Optional transaction options (isolation level, timeout, optimistic locking)
-   * @returns The return value of the callback
+   * @param ops Object containing add and/or retract arrays
+   * @returns Result containing dbBefore, dbAfter, txData, and tempIds
    * @example
-   * // Basic transaction
-   * await db.transaction(async (tx) => {
-   *   await tx.transact({ add: [[101, "flag", true]] });
-   *   const datoms = await tx.datoms({ entity: 101, attribute: "flag", value: true });
+   * // Speculate on a transaction
+   * const result = await db.with({
+   *   add: [[1, "name", "Alice"]],
+   *   retract: [[1, "oldName", "Bob"]]
    * });
    *
-   * // With optimistic locking and retries
-   * await db.transaction(
-   *   async (tx) => {
-   *     await tx.transact({ add: [[101, "flag", true]] });
-   *   },
-   *   {
-   *     expectedTxId: 100,
-   *     retry: { maxRetries: 3, delayMs: 100 }
-   *   }
-   * );
+   * // Query the speculative state
+   * const datoms = await result.dbAfter.datoms({ entity: 1 });
+   * // Preview what would change
+   * console.log(result.txData);
    *
-   * // With timeout and isolation level
-   * await db.transaction(
-   *   async (tx) => {
-   *     await tx.transact({ add: [[101, "flag", true]] });
-   *   },
-   *   {
-   *     timeoutMs: 5000,
-   *     isolationLevel: "REPEATABLE_READ"
-   *   }
-   * );
+   * // To actually commit, use transact()
+   * await db.transact({ add: [[1, "name", "Alice"]] });
    */
-  async transaction<T>(
-    callback: (tx: Transaction) => Promise<T>,
-    options?: TransactionOptions
-  ): Promise<T> {
+  async with(ops: {
+    add?: DatomInput[];
+    retract?: DatomInput[];
+  }): Promise<import("../types.js").WithResult> {
     await this.ensureInitialized();
 
-    const maxRetries = options?.retry?.maxRetries ?? 0;
-    const delayMs = options?.retry?.delayMs ?? 100;
-    const timeoutMs = options?.timeoutMs;
+    // Validate transaction data
+    if (ops.retract && ops.retract.length > 0) {
+      await this.validateDatoms(ops.retract, false);
+    }
+    if (ops.add && ops.add.length > 0) {
+      await this.validateDatoms(ops.add, true, ops.retract);
+    }
 
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        // Check optimistic lock if specified
-        if (options?.expectedTxId !== undefined) {
-          const currentTxId = await this.getLatestTransaction();
-          if (currentTxId !== options.expectedTxId) {
-            throw new TransactionConflictError(
-              `Transaction conflict: expected txId ${options.expectedTxId}, but current is ${currentTxId}`,
-              options.expectedTxId,
-              currentTxId
-            );
-          }
-        }
+    // Get the next transaction ID for speculative datoms
+    const speculativeTxId = (await this.getLatestTransaction()) + 1;
 
-        // Execute transaction with timeout if specified
-        let result: T;
-        if (timeoutMs !== undefined && timeoutMs > 0) {
-          const timeoutError = new QueryTimeoutError(timeoutMs, {
-            operation: "transaction",
-          });
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => {
-              reject(timeoutError);
-            }, timeoutMs);
-          });
+    // Create speculative datoms
+    const speculativeAdds: Datom[] = [];
+    const speculativeRetracts: Datom[] = [];
 
-          // Wrap callback to race with timeout - if timeout fires,
-          // callback throws, which triggers rollback in executeTransaction
-          const timedCallback = async (tx: Transaction): Promise<T> => {
-            return await Promise.race([callback(tx), timeoutPromise]);
-          };
-
-          result = await this.executeTransaction(
-            timedCallback,
-            options?.isolationLevel
-          );
-        } else {
-          result = await this.executeTransaction(
-            callback,
-            options?.isolationLevel
-          );
-        }
-
-        return result;
-      } catch (error) {
-        // Retry on transaction conflicts if retries are configured
-        if (error instanceof TransactionConflictError && attempt < maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-          continue;
-        }
-        throw error;
+    if (ops.retract && ops.retract.length > 0) {
+      for (const datom of ops.retract) {
+        speculativeRetracts.push([
+          datom[0],
+          datom[1],
+          datom[2],
+          speculativeTxId,
+          false,
+        ] as Datom);
       }
     }
 
-    // Should never reach here, but TypeScript needs it
-    throw new Error("Transaction failed after retries");
-  }
+    if (ops.add && ops.add.length > 0) {
+      for (const datom of ops.add) {
+        speculativeAdds.push([
+          datom[0],
+          datom[1],
+          datom[2],
+          speculativeTxId,
+          true,
+        ] as Datom);
+      }
+    }
 
-  /**
-   * Internal method to execute a transaction
-   * Implementations should override this method
-   * @param callback Transaction callback
-   * @param isolationLevel Optional isolation level (default: READ_COMMITTED)
-   * @returns The result of the callback
-   */
-  protected abstract executeTransaction<T>(
-    callback: (tx: Transaction) => Promise<T>,
-    isolationLevel?: import("../types.js").TransactionIsolationLevel
-  ): Promise<T>;
+    // Create dbBefore view (current state)
+    const dbBefore = new CurrentDatabaseView(this);
+
+    // Create dbAfter view (speculative state)
+    const dbAfter = new SpeculativeDatabaseView(
+      this,
+      speculativeAdds,
+      speculativeRetracts
+    );
+
+    // Generate txData (all datoms that would be applied)
+    const txData: Datom[] = [...speculativeRetracts, ...speculativeAdds];
+
+    return {
+      dbBefore,
+      dbAfter,
+      txData,
+      tempIds: {}, // Empty for now, reserved for future tempid support
+    };
+  }
 
   /**
    * Get the current schema version

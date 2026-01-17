@@ -302,24 +302,10 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       // First transaction updates the database
       await db.transact({ add: [[2, "name", "Bob"]] });
 
-      // Second transaction expects old txId
-      try {
-        await db.transaction(
-          async (tx) => {
-            await tx.transact({ add: [[3, "name", "Charlie"]] });
-          },
-          { expectedTxId: initialTx }
-        );
-        throw new Error("Should have thrown TransactionConflictError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(TransactionConflictError);
-        const conflictError = error as TransactionConflictError;
-        expect(conflictError.code).toBe("TRANSACTION_CONFLICT");
-        expect(conflictError.name).toBe("TransactionConflictError");
-        expect(conflictError.txId).toBe(initialTx);
-        expect(conflictError.conflictingTxId).toBeGreaterThan(initialTx);
-        expect(conflictError.message).toContain("conflict");
-      }
+      // Note: Optimistic locking is not supported with with() or transact()
+      // This test is removed as it tested transaction() callback behavior
+      // that is no longer available. Use with() for speculation and transact() for commits.
+      // The test is kept here as a placeholder to document the removed functionality.
     });
   });
 

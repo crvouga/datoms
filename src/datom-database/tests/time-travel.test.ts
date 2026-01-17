@@ -148,20 +148,17 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       const tx1 = await db.transact({ add: [[1, "name", "Alice"]] });
 
-      await db.transaction(async (tx) => {
-        // Add new datom in transaction
-        await tx.transact({ add: [[1, "age", 30]] });
+      // Use with() to see what adding age would look like
+      const withResult = await db.with({ add: [[1, "age", 30]] });
 
-        // Query current state - should see uncommitted age
-        const current = await tx.datoms({ entity: 1 });
-        expect(current).toHaveLength(2);
+      // Query dbAfter - should see speculative age
+      const current = await withResult.dbAfter.datoms({ entity: 1 });
+      expect(current).toHaveLength(2);
 
-        // Query at tx1 - should only see committed name (not uncommitted age)
-        // Note: Transactions don't support asOf views directly, but we can test via the database
-        const atTx1 = await db.asOf(tx1).datoms({ entity: 1 });
-        expect(atTx1).toHaveLength(1);
-        expect(atTx1[0][1]).toBe("name");
-      });
+      // Query at tx1 - should only see committed name (not speculative age)
+      const atTx1 = await db.asOf(tx1).datoms({ entity: 1 });
+      expect(atTx1).toHaveLength(1);
+      expect(atTx1[0][1]).toBe("name");
 
       await db.close();
     });
@@ -249,13 +246,21 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       });
 
-      await db.transaction(async (tx) => {
-        const entityDatoms = await tx.datoms({ entity: 1 });
-        await tx.transact({
-          retract: entityDatoms.map((d) => [d[0], d[1], d[2]]),
-        });
-        const during = await tx.datoms({ entity: 1, added: true });
-        expect(during).toHaveLength(0);
+      const entityDatoms = await db.datoms({ entity: 1 });
+
+      // Use with() to see what retraction would look like
+      const withResult = await db.with({
+        retract: entityDatoms.map((d) => [d[0], d[1], d[2]]),
+      });
+      const during = await withResult.dbAfter.datoms({
+        entity: 1,
+        added: true,
+      });
+      expect(during).toHaveLength(0);
+
+      // Now commit the retraction
+      await db.transact({
+        retract: entityDatoms.map((d) => [d[0], d[1], d[2]]),
       });
 
       const after = await db.datoms({ entity: 1, added: true });
@@ -294,19 +299,29 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should execute bulk operations within transaction", async () => {
       const { db } = f;
-      await db.transaction(async (tx) => {
-        await tx.transact({
-          add: [
-            [1, "name", "Alice"],
-            [1, "age", 30],
-          ],
-        });
-
-        const entity = await tx.datoms({ entity: 1, added: true });
-        expect(entity).toHaveLength(2);
+      // Use with() to see what adding would look like
+      const withResult = await db.with({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+        ],
       });
 
-      const entity = await db.datoms({ entity: 1, added: true });
+      const entity = await withResult.dbAfter.datoms({
+        entity: 1,
+        added: true,
+      });
+      expect(entity).toHaveLength(2);
+
+      // Now commit the changes
+      await db.transact({
+        add: [
+          [1, "name", "Alice"],
+          [1, "age", 30],
+        ],
+      });
+
+      const finalEntity = await db.datoms({ entity: 1, added: true });
       expect(entity).toHaveLength(2);
 
       await db.close();

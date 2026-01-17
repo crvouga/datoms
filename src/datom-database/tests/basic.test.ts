@@ -138,20 +138,28 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       });
 
-      await db.transaction(async (tx) => {
-        const tagDatoms = await tx.datoms({ entity: 1, attribute: "tag" });
-        await tx.transact({
-          retract: tagDatoms.map((d) => [d[0], d[1], d[2]]),
-        });
+      const tagDatoms = await db.datoms({ entity: 1, attribute: "tag" });
 
-        // Should see retraction within transaction
-        const tags = await tx.datoms({ entity: 1, attribute: "tag" });
-        expect(tags).toHaveLength(0);
+      // Use with() to see what retraction would look like
+      const withResult = await db.with({
+        retract: tagDatoms.map((d) => [d[0], d[1], d[2]]),
       });
 
-      // Should be committed after transaction
-      const tags = await db.datoms({ entity: 1, attribute: "tag" });
+      // Should see retraction in dbAfter
+      const tags = await withResult.dbAfter.datoms({
+        entity: 1,
+        attribute: "tag",
+      });
       expect(tags).toHaveLength(0);
+
+      // Now commit the retraction
+      await db.transact({
+        retract: tagDatoms.map((d) => [d[0], d[1], d[2]]),
+      });
+
+      // Should be committed after transact
+      const finalTags = await db.datoms({ entity: 1, attribute: "tag" });
+      expect(finalTags).toHaveLength(0);
     });
 
     test("should only retract specified entity-attribute pair", async () => {
@@ -267,27 +275,33 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.transact({ add: [[1, "status", "pending"]] });
 
-      await db.transaction(async (tx) => {
-        const existing = await tx.datoms({ entity: 1, attribute: "status" });
-        await tx.transact({
-          retract: existing.map((d) => [d[0], d[1], d[2]]),
-          add: [[1, "status", "active"]],
-        });
+      const existing = await db.datoms({ entity: 1, attribute: "status" });
 
-        // Should see new value within transaction
-        const statusResults = await tx.query({
-          find: ["?v"],
-          where: [[1, "status", "?v"]],
-        });
-        expect(statusResults[0]?.v).toBe("active");
+      // Use with() to see what the upsert would look like
+      const withResult = await db.with({
+        retract: existing.map((d) => [d[0], d[1], d[2]]),
+        add: [[1, "status", "active"]],
       });
 
-      // Should be committed
-      const statusResults = await db.query({
+      // Should see new value in dbAfter
+      const statusResults = await withResult.dbAfter.query({
         find: ["?v"],
         where: [[1, "status", "?v"]],
       });
       expect(statusResults[0]?.v).toBe("active");
+
+      // Now commit the changes
+      await db.transact({
+        retract: existing.map((d) => [d[0], d[1], d[2]]),
+        add: [[1, "status", "active"]],
+      });
+
+      // Should be committed
+      const finalStatusResults = await db.query({
+        find: ["?v"],
+        where: [[1, "status", "?v"]],
+      });
+      expect(finalStatusResults[0]?.v).toBe("active");
     });
 
     test("should handle multiple upserts in sequence", async () => {
@@ -408,19 +422,24 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact({ add: [[1, "tag", "red"]] });
 
-      await db.transaction(async (tx) => {
-        await tx.transact({ add: [[1, "tag", "blue"]] });
+      // Use with() to see what adding would look like
+      const withResult = await db.with({ add: [[1, "tag", "blue"]] });
 
-        // Should see latest value within transaction
-        const datoms = await tx.datoms({ entity: 1, attribute: "tag" });
-        const sorted = datoms.sort((a, b) => b[3] - a[3]);
-        expect(sorted[0][2]).toBe("blue");
+      // Should see latest value in dbAfter
+      const datoms = await withResult.dbAfter.datoms({
+        entity: 1,
+        attribute: "tag",
       });
-
-      // After commit, should still be blue
-      const datoms = await db.datoms({ entity: 1, attribute: "tag" });
       const sorted = datoms.sort((a, b) => b[3] - a[3]);
       expect(sorted[0][2]).toBe("blue");
+
+      // Now commit the change
+      await db.transact({ add: [[1, "tag", "blue"]] });
+
+      // After commit, should still be blue
+      const finalDatoms = await db.datoms({ entity: 1, attribute: "tag" });
+      const finalSorted = finalDatoms.sort((a, b) => b[3] - a[3]);
+      expect(finalSorted[0][2]).toBe("blue");
     });
 
     test("should handle time-travel queries correctly", async () => {
