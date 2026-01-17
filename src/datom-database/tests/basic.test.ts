@@ -146,9 +146,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const tagDatoms = await db.datoms({ e: 1, a: "tag" });
 
       // Use with() to see what retraction would look like
-      const withResult = await db.with({
-        retract: tagDatoms.map((d) => ({ e: d.e, a: d.a, v: d.v })),
-      });
+      const withResult = await db.with(
+        tagDatoms.map((d) => ({ op: "retracted" as const, e: d.e, a: d.a, v: d.v }))
+      );
 
       // Should see retraction in dbAfter
       const tags = await withResult.dbAfter.datoms({
@@ -294,10 +294,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const existing = await db.datoms({ e: 1, a: "status" });
 
       // Use with() to see what the upsert would look like
-      const withResult = await db.with({
-        retract: existing.map((d) => ({ e: d.e, a: d.a, v: d.v })),
-        add: [{ e: 1, a: "status", v: "active" }],
-      });
+      const withResult = await db.with([
+        ...existing.map((d) => ({ op: "retracted" as const, e: d.e, a: d.a, v: d.v })),
+        { op: "added" as const, e: 1, a: "status", v: "active" },
+      ]);
 
       // Should see new value in dbAfter
       const statusResults = await withResult.dbAfter.query({
@@ -458,9 +458,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "added", e: 1, a: "tag", v: "red" }]);
 
       // Use with() to see what adding would look like
-      const withResult = await db.with({
-        add: [{ e: 1, a: "tag", v: "blue" }],
-      });
+      const withResult = await db.with([
+        { op: "added", e: 1, a: "tag", v: "blue" },
+      ]);
 
       // Should see latest value in dbAfter
       const datoms = await withResult.dbAfter.datoms({

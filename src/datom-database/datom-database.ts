@@ -108,7 +108,7 @@ export interface TransactResult {
  * Provides common functionality for AsOf, History, and Since views
  */
 abstract class BaseDatabaseView implements DatabaseView {
-  constructor(protected db: DatomDatabase) {}
+  constructor(protected db: DatomDatabase) { }
 
   abstract datoms(options: QueryOptions): Promise<Datom[]>;
 
@@ -896,8 +896,7 @@ export abstract class DatomDatabase implements DatomReader {
           throw new Error(
             `Cannot change type constraint for attribute "${name}": existing value ${JSON.stringify(
               datom.v
-            )} for entity "${String(datom.e)}" does not match new type "${
-              newDefinition.type
+            )} for entity "${String(datom.e)}" does not match new type "${newDefinition.type
             }". ${typeError.message}`
           );
         }
@@ -1613,14 +1612,14 @@ export abstract class DatomDatabase implements DatomReader {
    * - `txData`: The datoms that would be applied by this transaction
    * - `tempIds`: Map of temporary IDs to resolved entity IDs (empty for now)
    *
-   * @param ops Object containing add and/or retract arrays
+   * @param ops Array of transaction operations
    * @returns Result containing dbBefore, dbAfter, txData, and tempIds
    * @example
    * // Speculate on a transaction
-   * const result = await db.with({
-   *   add: [[1, "name", "Alice"]],
-   *   retract: [[1, "oldName", "Bob"]]
-   * });
+   * const result = await db.with([
+   *   { op: "added", e: 1, a: "name", v: "Alice" },
+   *   { op: "retracted", e: 1, a: "oldName", v: "Bob" }
+   * ]);
    *
    * // Query the speculative state
    * const datoms = await result.dbAfter.datoms({ entity: 1 });
@@ -1628,20 +1627,29 @@ export abstract class DatomDatabase implements DatomReader {
    * console.log(result.txData);
    *
    * // To actually commit, use transact()
-   * await db.transact({ add: [[1, "name", "Alice"]] });
+   * await db.transact([{ op: "added", e: 1, a: "name", v: "Alice" }]);
    */
-  async with(ops: {
-    add?: DatomInput[];
-    retract?: DatomInput[];
-  }): Promise<WithResult> {
+  async with(ops: TransactOperations): Promise<WithResult> {
     await this.ensureInitialized();
 
-    // Validate transaction data
-    if (ops.retract && ops.retract.length > 0) {
-      await this.validateDatoms(ops.retract, false);
+    // Separate added and retracted operations
+    const adds: DatomInput[] = [];
+    const retracts: DatomInput[] = [];
+
+    for (const op of ops) {
+      if (op.op === "added") {
+        adds.push({ e: op.e, a: op.a, v: op.v });
+      } else {
+        retracts.push({ e: op.e, a: op.a, v: op.v });
+      }
     }
-    if (ops.add && ops.add.length > 0) {
-      await this.validateDatoms(ops.add, true, ops.retract);
+
+    // Validate transaction data
+    if (retracts.length > 0) {
+      await this.validateDatoms(retracts, false);
+    }
+    if (adds.length > 0) {
+      await this.validateDatoms(adds, true, retracts);
     }
 
     // Get the next transaction ID for speculative datoms
@@ -1651,28 +1659,24 @@ export abstract class DatomDatabase implements DatomReader {
     const speculativeAdds: Datom[] = [];
     const speculativeRetracts: Datom[] = [];
 
-    if (ops.retract && ops.retract.length > 0) {
-      for (const datom of ops.retract) {
-        speculativeRetracts.push({
-          e: datom.e,
-          a: datom.a,
-          v: datom.v,
-          tx: speculativeTxId,
-          added: false,
-        });
-      }
+    for (const datom of retracts) {
+      speculativeRetracts.push({
+        e: datom.e,
+        a: datom.a,
+        v: datom.v,
+        tx: speculativeTxId,
+        added: false,
+      });
     }
 
-    if (ops.add && ops.add.length > 0) {
-      for (const datom of ops.add) {
-        speculativeAdds.push({
-          e: datom.e,
-          a: datom.a,
-          v: datom.v,
-          tx: speculativeTxId,
-          added: true,
-        });
-      }
+    for (const datom of adds) {
+      speculativeAdds.push({
+        e: datom.e,
+        a: datom.a,
+        v: datom.v,
+        tx: speculativeTxId,
+        added: true,
+      });
     }
 
     // Create dbBefore view (current state)
@@ -1832,8 +1836,7 @@ export abstract class DatomDatabase implements DatomReader {
         await this.migrate(migration.version);
       } catch (error) {
         const migrationError = new MigrationError(
-          `Migration ${migration.version} (${migration.name}) failed: ${
-            error instanceof Error ? error.message : String(error)
+          `Migration ${migration.version} (${migration.name}) failed: ${error instanceof Error ? error.message : String(error)
           }`,
           migration.version,
           error instanceof Error ? error : undefined
@@ -1892,8 +1895,7 @@ export abstract class DatomDatabase implements DatomReader {
         this.schemaVersion = migration.version - 1;
       } catch (error) {
         const rollbackError = new MigrationRollbackError(
-          `Rollback of migration ${migration.version} (${
-            migration.name
+          `Rollback of migration ${migration.version} (${migration.name
           }) failed: ${error instanceof Error ? error.message : String(error)}`,
           migration.version,
           error instanceof Error ? error : undefined
@@ -1939,8 +1941,7 @@ export abstract class DatomDatabase implements DatomReader {
       }
       // For other errors during onMigrate, wrap in MigrationError
       throw new MigrationError(
-        `Migration to version ${targetVersion} failed: ${
-          error instanceof Error ? error.message : String(error)
+        `Migration to version ${targetVersion} failed: ${error instanceof Error ? error.message : String(error)
         }`,
         targetVersion,
         error instanceof Error ? error : undefined

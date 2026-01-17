@@ -67,6 +67,7 @@ export type Datom = {
   /** The transaction ID when this datom was added */
   tx: TransactionId;
   /** The operation type (add or retract) */
+  // replace the following with op: "added" | "retracted"
   added: boolean;
 };
 

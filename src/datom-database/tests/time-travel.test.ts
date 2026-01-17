@@ -163,7 +163,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Use with() to see what adding age would look like
-      const withResult = await db.with({ add: [{ e: 1, a: "age", v: 30 }] });
+      const withResult = await db.with([{ op: "added", e: 1, a: "age", v: 30 }]);
 
       // Query dbAfter - should see speculative age
       const current = await withResult.dbAfter.datoms({ e: 1 });
@@ -274,9 +274,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const entityDatoms = await db.datoms({ e: 1 });
 
       // Use with() to see what retraction would look like
-      const withResult = await db.with({
-        retract: entityDatoms.map((d) => ({ e: d.e, a: d.a, v: d.v })),
-      });
+      const withResult = await db.with(
+        entityDatoms.map((d) => ({ op: "retracted" as const, e: d.e, a: d.a, v: d.v }))
+      );
       const during = await withResult.dbAfter.datoms({
         e: 1,
         added: true,
@@ -328,12 +328,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should execute bulk operations within transaction", async () => {
       const { db } = f;
       // Use with() to see what adding would look like
-      const withResult = await db.with({
-        add: [
-          { e: 1, a: "name", v: "Alice" },
-          { e: 1, a: "age", v: 30 },
-        ],
-      });
+      const withResult = await db.with([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+        { op: "added", e: 1, a: "age", v: 30 },
+      ]);
 
       const entity = await withResult.dbAfter.datoms({
         e: 1,

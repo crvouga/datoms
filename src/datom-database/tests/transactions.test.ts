@@ -25,9 +25,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const initial = await db.datoms({ e: 1 });
       expect(initial).toHaveLength(1);
 
-      const withResult = await db.with({
-        add: [{ e: 1, a: "status", v: "pending" }],
-      });
+      const withResult = await db.with([
+        { op: "added", e: 1, a: "status", v: "pending" },
+      ]);
       const updated = await withResult.dbAfter.datoms({ e: 1 });
       expect(updated).toHaveLength(2);
 
@@ -50,9 +50,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "added", e: 1, a: "name", v: "Alice" }]);
 
       // Use with() to see what the transaction would look like
-      const withResult = await db.with({
-        add: [{ e: 1, a: "status", v: "pending" }],
-      });
+      const withResult = await db.with([
+        { op: "added", e: 1, a: "status", v: "pending" },
+      ]);
 
       // Query dbAfter to see speculative state
       const speculative = await withResult.dbAfter.datoms({ e: 1 });
@@ -76,7 +76,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(before).toHaveLength(1);
 
       // Use with() to see what adding would look like
-      const withResult = await db.with({ add: [{ e: 1, a: "age", v: 30 }] });
+      const withResult = await db.with([{ op: "added", e: 1, a: "age", v: 30 }]);
 
       // Query dbAfter - should see speculative change
       const after = await withResult.dbAfter.datoms({ e: 1 });
@@ -97,9 +97,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Use with() to see what retraction would look like
-      const withResult = await db.with({
-        retract: [{ e: 1, a: "age", v: 30 }],
-      });
+      const withResult = await db.with([
+        { op: "retracted", e: 1, a: "age", v: 30 },
+      ]);
 
       // Query dbAfter should not see retracted datom
       const result = await withResult.dbAfter.datoms({ e: 1 });
@@ -126,9 +126,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Use with() to see what adding would look like
-      const withResult = await db.with({
-        add: [{ e: 3, a: "name", v: "Charlie" }],
-      });
+      const withResult = await db.with([
+        { op: "added", e: 3, a: "name", v: "Charlie" },
+      ]);
 
       // Query dbAfter should see speculative change
       const results = await withResult.dbAfter.query({
@@ -180,13 +180,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "added", e: 1, a: "name", v: "Initial" }]);
 
       // Use with() to see what the transaction would look like
-      const withResult = await db.with({
-        add: [
-          { e: 1, a: "status", v: "pending" },
-          { e: 2, a: "name", v: "New" },
-        ],
-        retract: [{ e: 1, a: "name", v: "Initial" }],
-      });
+      const withResult = await db.with([
+        { op: "added", e: 1, a: "status", v: "pending" },
+        { op: "added", e: 2, a: "name", v: "New" },
+        { op: "retracted", e: 1, a: "name", v: "Initial" },
+      ]);
 
       // Query dbAfter to see speculative state
       const speculative = await withResult.dbAfter.datoms({ e: 1 });
@@ -215,7 +213,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(nameResults[0]?.v).toBe("Alice");
 
       // Use with() to see what adding age would look like
-      const withResult = await db.with({ add: [{ e: 1, a: "age", v: 30 }] });
+      const withResult = await db.with([{ op: "added", e: 1, a: "age", v: 30 }]);
       const ageResults = await withResult.dbAfter.query({
         find: ["?v"],
         where: [[1, "age", "?v"]],
@@ -234,7 +232,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(entity).toHaveLength(1);
 
       // Use with() to see what adding age would look like
-      const withResult = await db.with({ add: [{ e: 1, a: "age", v: 30 }] });
+      const withResult = await db.with([{ op: "added", e: 1, a: "age", v: 30 }]);
       entity = await withResult.dbAfter.datoms({ e: 1, added: true });
       expect(entity).toHaveLength(2);
 
@@ -254,9 +252,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(nameDatoms.length).toBeGreaterThan(0);
 
       // Use with() to see what adding status would look like
-      const withResult = await db.with({
-        add: [{ e: 1, a: "status", v: "active" }],
-      });
+      const withResult = await db.with([
+        { op: "added", e: 1, a: "status", v: "active" },
+      ]);
       const statusDatoms = await withResult.dbAfter.datoms({
         e: 1,
         a: "status",
@@ -278,12 +276,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Use with() to see what adding new employee would look like
-      const withResult = await db.with({
-        add: [
-          { e: 3, a: "name", v: "Charlie" },
-          { e: 3, a: "department", v: "Engineering" },
-        ],
-      });
+      const withResult = await db.with([
+        { op: "added", e: 3, a: "name", v: "Charlie" },
+        { op: "added", e: 3, a: "department", v: "Engineering" },
+      ]);
 
       // Query dbAfter should see speculative change
       const results = await withResult.dbAfter.query({
@@ -369,7 +365,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact([{ op: "added", e: 1, a: "name", v: "Alice" }]);
 
-      const withResult = await db.with({ add: [{ e: 1, a: "age", v: 30 }] });
+      const withResult = await db.with([{ op: "added", e: 1, a: "age", v: 30 }]);
 
       // dbBefore should show current state
       const before = await withResult.dbBefore.datoms({ e: 1 });
@@ -388,10 +384,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact([{ op: "added", e: 1, a: "name", v: "Alice" }]);
 
-      const withResult = await db.with({
-        add: [{ e: 1, a: "age", v: 30 }],
-        retract: [{ e: 1, a: "name", v: "Alice" }],
-      });
+      const withResult = await db.with([
+        { op: "added", e: 1, a: "age", v: 30 },
+        { op: "retracted", e: 1, a: "name", v: "Alice" },
+      ]);
 
       // txData should contain the datoms that would be applied
       expect(withResult.txData.length).toBeGreaterThan(0);
@@ -408,9 +404,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should return tempIds (empty for now)", async () => {
       const { db } = f;
-      const withResult = await db.with({
-        add: [{ e: 1, a: "name", v: "Alice" }],
-      });
+      const withResult = await db.with([
+        { op: "added", e: 1, a: "name", v: "Alice" },
+      ]);
       expect(withResult.tempIds).toEqual({});
     });
   });
