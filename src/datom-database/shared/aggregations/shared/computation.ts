@@ -2,8 +2,8 @@
  * Aggregation computation functions
  */
 
-import type { QueryResult } from "../../../datalog/datalog.js";
-import type { Attribute, Value } from "../../../datoms.js";
+import type { QueryResult } from "../../../../datalog/datalog.js";
+import type { Attribute, Value } from "../../../../datoms.js";
 import { getAggregationDefinition } from "./registry.js";
 import { parseAggregation } from "./parser.js";
 
