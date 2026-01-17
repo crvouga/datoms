@@ -29,15 +29,15 @@ export type Attribute = string;
  * the `number` type, which is intentional and handled correctly by TypeScript.
  *
  * @example
- * // Valid values:
- * [1, "name", "Alice"]                    // string
- * [1, "age", 30]                          // number
- * [1, "active", true]                      // boolean
- * [1, "createdAt", new Date()]            // Date
- * [1, "middleName", null]                 // null
- * [1, "optional", undefined]              // undefined
- * [1, "parent", 42]                       // EntityId (number)
- * [1, "owner", "user-123"]               // EntityId (string)
+ * // Valid values in datoms:
+ * { e: 1, a: "name", v: "Alice", op: "assert" }                    // string
+ * { e: 1, a: "age", v: 30, op: "assert" }                          // number
+ * { e: 1, a: "active", v: true, op: "assert" }                      // boolean
+ * { e: 1, a: "createdAt", v: new Date(), op: "assert" }            // Date
+ * { e: 1, a: "middleName", v: null, op: "assert" }                 // null
+ * { e: 1, a: "optional", v: undefined, op: "assert" }              // undefined
+ * { e: 1, a: "parent", v: 42, op: "assert" }                       // EntityId (number)
+ * { e: 1, a: "owner", v: "user-123", op: "assert" }               // EntityId (string)
  */
 export type Value =
   | string
@@ -66,15 +66,15 @@ export type Datom = {
   a: Attribute;
   /** The value of the attribute */
   v: Value;
-  /** The transaction ID when this datom was add */
+  /** The transaction ID when this datom was added */
   tx: TransactionId;
-  /** The operation type (add or sub) */
+  /** The operation type (assert or retract) */
   op: DatomOperation;
 };
 
 /**
- * A partial datom for adding/subtracting facts (without tx and add)
- * Tuple format: [entity, attribute, value]
+ * A partial datom for asserting/retracting facts (without tx)
+ * Object format: { e: entity, a: attribute, v: value, op: operation }
  * This is more efficient and aligns with the fixed EAV structure
  */
 export type DatomInput = {
@@ -84,7 +84,7 @@ export type DatomInput = {
   a: Attribute;
   /** The value of the attribute */
   v: Value;
-  /** The operation type (add or sub) */
+  /** The operation type (assert or retract) */
   op: DatomOperation;
 };
 

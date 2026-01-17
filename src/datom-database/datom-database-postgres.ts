@@ -312,8 +312,8 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const limitClause = options.limit ? "LIMIT ?" : "";
     const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
 
-    // We need to include subions in DISTINCT ON to correctly determine the latest state.
-    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was add then sub, the subion wins.
+    // We need to include retractions in DISTINCT ON to correctly determine the latest state.
+    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was asserted then retracted, the retraction wins.
     const combinedWhereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 

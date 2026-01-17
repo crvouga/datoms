@@ -528,7 +528,7 @@ export abstract class DatomDatabase implements DatabaseView {
 
   /**
    * Execute bulk operations atomically (Datomic-like transact)
-   * @param ops Array of operations, each specifying whether to add or sub a datom
+   * @param ops Array of operations, each specifying whether to assert or retract a datom
    * @param metadata Optional metadata to associate with this transaction
    * @param context Optional context object for hooks (can contain any data)
    * @returns The transaction ID
