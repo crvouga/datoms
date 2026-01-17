@@ -6,7 +6,8 @@ import type { Attribute, EntityId, Value } from "../types.js";
 
 export type DatalogQueryVariable = `?${string}`;
 
-export type DatalogQueryAggregationVariable =
+export type DatalogQueryFindVariable =
+  | `?${string}`
   | `count(?${string})`
   | `count-distinct(?${string})`
   | `sum(?${string})`
@@ -73,7 +74,7 @@ export type QueryClause = QueryPattern | QueryOr | QueryNot;
  */
 export interface DatalogQuery {
   /** Find clause - what variables to return */
-  find: Record<string, DatalogQueryVariable | DatalogQueryAggregationVariable>;
+  find: Record<string, DatalogQueryFindVariable>;
   /** Where clause - the query patterns */
   where: QueryClause[];
   /** Optional ordering */
