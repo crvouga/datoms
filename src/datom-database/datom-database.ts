@@ -86,18 +86,6 @@ export interface DatabaseView {
 }
 
 /**
- * Result of a transaction operation
- */
-export interface TransactResult {
-  /** The transaction ID */
-  txId: TransactionId;
-  /** Number of datoms add */
-  addCount: number;
-  /** Number of datoms retract */
-  retractCount: number;
-}
-
-/**
  * Base class for database views that filter queries by transaction ID
  * Provides common functionality for AsOf, History, and Since views
  */
@@ -449,8 +437,8 @@ export type TransactOperations = Array<{
 }>;
 
 /**
- * Abstract datom database class that provides a high-level interface
- * for working with datoms and datalog queries
+ * Abstract datom database class (Datomic-like minimal API)
+ * Provides core operations: datoms, query, transact, and time-travel views
  * Concrete implementations: InMemoryDatabase, SQLiteDatabase, PostgreSQLDatabase
  *
  * **ACID Guarantees:**
@@ -549,10 +537,6 @@ export type TransactOperations = Array<{
  * // Health check
  * const health = await db.healthCheck();
  * console.log(`Database status: ${health.status}`);
- */
-/**
- * Abstract datom database class (Datomic-like minimal API)
- * Provides core operations: datoms, query, transact, and time-travel views
  */
 /**
  * Result of a speculative transaction using the `with()` method (Datomic-like)
@@ -914,46 +898,25 @@ export abstract class DatomDatabase implements DatomReader {
   }
 
   /**
-   * Validate datoms against the current schema.
-   *
-   * **Implementation Note:** This method should be called in `add()` and `retract()`
-   * implementations before writing datoms to the database. It validates:
-   * - Type constraints (if `type` is specified in the attribute definition)
-   * - Cardinality constraints (for `cardinality: "one"` attributes)
-   * - Uniqueness constraints (for `unique: true` attributes)
-   *
-   * Transaction implementations may optionally call this method on commit to validate
-   * all pending changes at once, or they may defer validation to the base class methods.
-   *
+   * Validate datoms - basic runtime checks for null/undefined (defensive programming)
+   * TypeScript guarantees types, but runtime checks catch cases where types are bypassed (e.g., `as any`)
    * @param datoms Array of datoms to validate
-   * @param isAdd Whether these datoms are being add (true) or retract (false)
-   * @throws Error if validation fails (type mismatch, cardinality violation, uniqueness violation)
-   * @example
-   * // Typical usage in add() implementation:
-   * async add(datoms: DatomInput[]): Promise<TransactionId> {
-   *   await this.ensureInitialized();
-   *   await this.validateDatoms(datoms, true);
-   *   // ... proceed with adding datoms
-   * }
+   * @param _isAdd Whether these datoms are being add (true) or retract (false)
+   * @param _retractsInSameTransaction Optional retracts in the same transaction
    */
   protected async validateDatoms(
     datoms: DatomInput[],
     _isAdd: boolean,
     _retractsInSameTransaction?: DatomInput[]
   ): Promise<void> {
-    // Schema validation removed - datoms are accepted as-is
-    if (datoms.length === 0) {
-      return;
-    }
-    // Basic validation: ensure datoms have required fields
+    // Basic runtime validation for cases where TypeScript types are bypassed
     for (const datom of datoms) {
-      if (datom.e === undefined || datom.e === null) {
+      if (datom.e === null || datom.e === undefined) {
         throw new Error("Datom must have an entity ID");
       }
-      if (datom.a === undefined || datom.a === null) {
+      if (datom.a === null || datom.a === undefined) {
         throw new Error("Datom must have an attribute");
       }
-      // Value can be null/undefined, so we don't validate it
     }
   }
 
@@ -1054,51 +1017,27 @@ export abstract class DatomDatabase implements DatomReader {
   async with(ops: TransactOperations): Promise<WithResult> {
     await this.ensureInitialized();
 
-    // Separate add and retract operations
-    const adds: DatomInput[] = [];
-    const retracts: DatomInput[] = [];
-
-    for (const op of ops) {
-      if (op.op === "add") {
-        adds.push({ e: op.e, a: op.a, v: op.v });
-      } else {
-        retracts.push({ e: op.e, a: op.a, v: op.v });
-      }
-    }
-
-    // Validate transaction data
-    if (retracts.length > 0) {
-      await this.validateDatoms(retracts, false);
-    }
-    if (adds.length > 0) {
-      await this.validateDatoms(adds, true, retracts);
-    }
-
     // Get the next transaction ID for speculative datoms
     const speculativeTxId = (await this.getLatestTransaction()) + 1;
 
-    // Create speculative datoms
+    // Process operations in sequence, creating speculative datoms directly
     const speculativeAdds: Datom[] = [];
     const speculativeRetracts: Datom[] = [];
 
-    for (const datom of retracts) {
-      speculativeRetracts.push({
-        e: datom.e,
-        a: datom.a,
-        v: datom.v,
+    for (const op of ops) {
+      const speculativeDatom: Datom = {
+        e: op.e,
+        a: op.a,
+        v: op.v,
         tx: speculativeTxId,
-        op: "retract",
-      });
-    }
+        op: op.op,
+      };
 
-    for (const datom of adds) {
-      speculativeAdds.push({
-        e: datom.e,
-        a: datom.a,
-        v: datom.v,
-        tx: speculativeTxId,
-        op: "add",
-      });
+      if (op.op === "add") {
+        speculativeAdds.push(speculativeDatom);
+      } else {
+        speculativeRetracts.push(speculativeDatom);
+      }
     }
 
     // Create dbBefore view (current state)
