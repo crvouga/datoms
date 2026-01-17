@@ -4,7 +4,7 @@
  */
 
 import type { DatalogQuery } from "../../datalog/datalog.js";
-import type { Datom, Transaction } from "../../types.js";
+import type { Datom, Transaction, TransactionId } from "../../types.js";
 import { DatabaseView } from "../datom-database-types.js";
 
 /**
@@ -63,13 +63,22 @@ export type BeforeRead = {
 };
 
 /**
+ * Result from after-read hooks
+ */
+export type AfterReadResult = {
+  datoms: Datom[];
+  errors?: HookError[];
+  stopProcessing?: boolean;
+};
+
+/**
  * After-read hook
- * Runs after query execution, can filter/transform results
+ * Runs after query execution, can filter/transform results or return errors
  */
 export type AfterRead = {
   type: "afterRead";
   name: string;
-  execute: (datoms: Datom[], ctx: ReadContext) => Promise<Datom[]>;
+  execute: (datoms: Datom[], ctx: ReadContext) => Promise<AfterReadResult>;
 };
 
 /**
@@ -92,13 +101,24 @@ export type BeforeWrite = {
 };
 
 /**
+ * Result of a successful write operation
+ * Contains the transaction ID, final datoms written, and timestamp
+ */
+export type WriteResult = {
+  txId: TransactionId;
+  datoms: Datom[];
+  timestamp: number;
+};
+
+/**
  * After-write hook
  * Runs after transaction commit, for side effects (failures don't fail transaction)
+ * Receives WriteResult containing transaction ID and final datoms written
  */
 export type AfterWrite = {
   type: "afterWrite";
   name: string;
-  execute: (tx: Transaction, ctx: WriteContext) => Promise<void>;
+  execute: (result: WriteResult, ctx: WriteContext) => Promise<void>;
 };
 
 /**
@@ -377,16 +397,40 @@ export class HookEngine {
    * Run after-read hooks (filter/transform results after execution)
    * @param datoms The datoms returned from the query
    * @param ctx Read context with database reference and additional data
-   * @returns Filtered/transformed datoms
+   * @returns Filtered/transformed datoms and any errors
    */
-  async runAfterRead(datoms: Datom[], ctx: ReadContext): Promise<Datom[]> {
+  async runAfterRead(
+    datoms: Datom[],
+    ctx: ReadContext
+  ): Promise<{
+    datoms: Datom[];
+    errors: HookErrorWithName[];
+  }> {
     let result = datoms;
+    const allErrors: HookErrorWithName[] = [];
 
     for (const hook of this.afterRead) {
-      result = await hook.execute(result, ctx);
+      const hookResult = await hook.execute(result, ctx);
+
+      result = hookResult.datoms;
+
+      if (hookResult.errors && hookResult.errors.length > 0) {
+        for (const e of hookResult.errors) {
+          allErrors.push({
+            hook: hook.name,
+            message: e.message,
+            code: e.code,
+            datom: e.datom,
+          });
+        }
+      }
+
+      if (hookResult.stopProcessing === true) {
+        break;
+      }
     }
 
-    return result;
+    return { datoms: result, errors: allErrors };
   }
 
   /**
@@ -432,13 +476,13 @@ export class HookEngine {
   /**
    * Run after-write hooks (side effects after commit)
    * Failures in after-write hooks don't fail the transaction
-   * @param tx The committed transaction
+   * @param result The write result containing transaction ID, datoms, and timestamp
    * @param ctx Write context with database reference, metadata, and additional data
    */
-  async runAfterWrite(tx: Transaction, ctx: WriteContext): Promise<void> {
+  async runAfterWrite(result: WriteResult, ctx: WriteContext): Promise<void> {
     await Promise.allSettled(
       this.afterWrite.map((hook) =>
-        hook.execute(tx, ctx).catch((err) => {
+        hook.execute(result, ctx).catch((err) => {
           console.error(`After-write hook "${hook.name}" failed:`, err);
         })
       )

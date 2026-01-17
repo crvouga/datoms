@@ -753,13 +753,20 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     }
 
     // Run after-read hooks
-    const filteredDatoms = await this.hooks.runAfterRead(allDatoms, ctx);
+    const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
+
+    if (afterResult.errors && afterResult.errors.length > 0) {
+      throw new QueryError(
+        "Query blocked by after-read hooks",
+        afterResult.errors
+      );
+    }
 
     // Now execute the query with filtered datoms
     const firstClause = modifiedQuery.where[0];
     const firstResults = await this.executeClauseWithFilteredDatoms(
       firstClause,
-      filteredDatoms
+      afterResult.datoms
     );
 
     let results = firstResults;
@@ -767,7 +774,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       const clause = modifiedQuery.where[i];
       const clauseResults = await this.executeClauseWithFilteredDatoms(
         clause,
-        filteredDatoms
+        afterResult.datoms
       );
       results = joinResults(
         results,

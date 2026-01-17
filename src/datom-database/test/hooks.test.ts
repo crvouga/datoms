@@ -60,7 +60,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         name: "test-hook",
         execute: async (datoms) => {
           called = true;
-          return datoms;
+          return { datoms };
         },
       };
 
@@ -258,7 +258,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         name: "filter-results",
         execute: async (datoms) => {
           // Filter to only return datoms with value "Alice"
-          return datoms.filter((d) => d.v === "Alice");
+          return { datoms: datoms.filter((d) => d.v === "Alice") };
         },
       };
 
@@ -285,11 +285,13 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         execute: async (datoms) => {
           // Add a transformed attribute (though this won't affect query results directly)
           // This demonstrates the hook can modify the datoms array
-          return datoms.map((d) => ({
-            ...d,
-            // Note: This transformation happens before projection, so it affects
-            // the datoms used for projection
-          }));
+          return {
+            datoms: datoms.map((d) => ({
+              ...d,
+              // Note: This transformation happens before projection, so it affects
+              // the datoms used for projection
+            })),
+          };
         },
       };
 
@@ -317,7 +319,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         type: "afterRead",
         name: "filter-1",
         execute: async (datoms) => {
-          return datoms.filter((d) => d.e !== 3);
+          return { datoms: datoms.filter((d) => d.e !== 3) };
         },
       };
 
@@ -325,7 +327,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         type: "afterRead",
         name: "filter-2",
         execute: async (datoms) => {
-          return datoms.filter((d) => d.v !== "Bob");
+          return { datoms: datoms.filter((d) => d.v !== "Bob") };
         },
       };
 
@@ -354,7 +356,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         name: "context-test",
         execute: async (datoms, ctx) => {
           receivedContext = ctx as Record<string, unknown>;
-          return datoms;
+          return { datoms };
         },
       };
 
@@ -587,9 +589,9 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       const hook: AfterWrite = {
         type: "afterWrite",
         name: "side-effect",
-        execute: async (tx) => {
+        execute: async (result) => {
           called = true;
-          receivedTx = tx;
+          receivedTx = result;
         },
       };
 
@@ -602,7 +604,10 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       expect(called).toBe(true);
       expect(receivedTx).toBeDefined();
-      expect((receivedTx as { datoms: unknown[] }).datoms).toBeDefined();
+      expect(
+        (receivedTx as { datoms: unknown[]; txId: unknown }).datoms
+      ).toBeDefined();
+      expect((receivedTx as { txId: unknown }).txId).toBeDefined();
       await db.close();
     });
 
@@ -684,7 +689,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       const hook: AfterWrite = {
         type: "afterWrite",
         name: "context-test",
-        execute: async (tx, ctx) => {
+        execute: async (result, ctx) => {
           receivedContext = ctx as Record<string, unknown>;
         },
       };

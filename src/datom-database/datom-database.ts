@@ -24,6 +24,7 @@ import {
   ReadContext,
   TransactionError,
   WriteContext,
+  WriteResult,
 } from "./hook/engine.js";
 import {
   isQueryPattern,
@@ -644,14 +645,15 @@ export abstract class DatomDatabase implements DatabaseView {
       await this.onTransactionMetadata(committedTxId, metadata);
     }
 
-    // Create committed transaction object for after-write hooks
-    const committedTx: Transaction = {
+    // Create write result for after-write hooks
+    const writeResult: WriteResult = {
+      txId: committedTxId,
       datoms: finalTx.datoms.map((d) => ({ ...d, tx: committedTxId })),
-      meta: metadata,
+      timestamp: Date.now(),
     };
 
     // Run after-write hooks (fire and forget, don't block)
-    this.hooks.runAfterWrite(committedTx, ctx).catch((err) => {
+    this.hooks.runAfterWrite(writeResult, ctx).catch((err) => {
       console.error("After-write hook failed:", err);
     });
 
@@ -985,10 +987,17 @@ export abstract class DatomDatabase implements DatabaseView {
     const rawDatoms = await extractDatoms(beforeResult.query);
 
     // Run after-read hooks
-    const filteredDatoms = await this.hooks.runAfterRead(rawDatoms, ctx);
+    const afterResult = await this.hooks.runAfterRead(rawDatoms, ctx);
+
+    if (afterResult.errors && afterResult.errors.length > 0) {
+      throw new QueryError(
+        "Query blocked by after-read hooks",
+        afterResult.errors
+      );
+    }
 
     // Project filtered datoms back to QueryResult
-    return projectToResults(filteredDatoms, beforeResult.query);
+    return projectToResults(afterResult.datoms, beforeResult.query);
   }
 
   /**
@@ -1196,4 +1205,5 @@ export {
   type HookErrorWithName,
   type ReadContext,
   type WriteContext,
+  type WriteResult,
 } from "./hook/engine.js";

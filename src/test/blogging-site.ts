@@ -46,7 +46,9 @@ export const POST_ACCESS_CONTROL: Hook = {
 
     // If no user context, block all posts
     if (!userId || !userType) {
-      return datoms.filter((d: Datom) => d.a !== POST_TITLE);
+      return {
+        datoms: datoms.filter((d: Datom) => d.a !== POST_TITLE),
+      };
     }
 
     // Get all post-related datoms
@@ -127,7 +129,9 @@ export const POST_ACCESS_CONTROL: Hook = {
     // Filter datoms to only include allowed posts
     const filteredPostDatoms = postDatoms.filter((d) => allowedPosts.has(d.e));
 
-    return [...nonPostDatoms, ...filteredPostDatoms];
+    return {
+      datoms: [...nonPostDatoms, ...filteredPostDatoms],
+    };
   },
 };
 

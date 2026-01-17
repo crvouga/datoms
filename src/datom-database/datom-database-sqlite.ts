@@ -679,9 +679,16 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       });
 
       // Run after-read hooks
-      const filteredDatoms = await this.hooks.runAfterRead(datoms, ctx);
+      const afterResult = await this.hooks.runAfterRead(datoms, ctx);
 
-      const results = filteredDatoms.map((datom) => {
+      if (afterResult.errors && afterResult.errors.length > 0) {
+        throw new QueryError(
+          "Query blocked by after-read hooks",
+          afterResult.errors
+        );
+      }
+
+      const results = afterResult.datoms.map((datom) => {
         const result: Record<string, Value | Attribute> = {};
         if (isVariable(entityVal)) {
           result[entityVal as string] = datom.e;
@@ -706,12 +713,19 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     // For multi-clause queries, build a single SQL query with JOINs
     // Extract datoms first for afterRead hooks
     const allDatoms = await this.extractDatomsFromQuery(modifiedQuery);
-    const filteredDatoms = await this.hooks.runAfterRead(allDatoms, ctx);
+    const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
+
+    if (afterResult.errors && afterResult.errors.length > 0) {
+      throw new QueryError(
+        "Query blocked by after-read hooks",
+        afterResult.errors
+      );
+    }
 
     // Re-execute query with filtered datoms
     return this.executeDatalogWithSQLAndFilteredDatoms(
       modifiedQuery,
-      filteredDatoms
+      afterResult.datoms
     );
   }
 
