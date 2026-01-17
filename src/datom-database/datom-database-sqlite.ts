@@ -19,7 +19,7 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
-import type { ReadContext } from "./interceptor-types.js";
+import type { ReadContext } from "./interceptor/types.js";
 import type {
   DatalogQuery,
   QueryClause,

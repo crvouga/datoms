@@ -36,7 +36,7 @@ export type {
   Interceptor,
   ReadContext,
   WriteContext,
-} from "./interceptor-types.js";
+} from "./interceptor/types.js";
 
 // DatomDatabase classes
 export { InMemoryDatomDatabase } from "./datom-database-in-memory.js";
@@ -70,6 +70,6 @@ export {
 } from "./errors.js";
 
 // Interceptor system
-export { InterceptorEngine } from "./interceptor-engine.js";
-export { InterceptorValidator } from "./interceptor-validator.js";
+export { InterceptorEngine } from "./interceptor/engine.js";
+export { InterceptorValidator } from "./interceptor/validator.js";
 export type { InterceptorErrorWithName } from "./errors.js";

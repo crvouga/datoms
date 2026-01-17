@@ -22,8 +22,8 @@ import {
   QueryTimeoutError,
   TransactionError,
 } from "./errors.js";
-import { InterceptorEngine } from "./interceptor-engine.js";
-import type { ReadContext, WriteContext } from "./interceptor-types.js";
+import { InterceptorEngine } from "./interceptor/engine.js";
+import type { ReadContext, WriteContext } from "./interceptor/types.js";
 import {
   isQueryPattern,
   isVariable,

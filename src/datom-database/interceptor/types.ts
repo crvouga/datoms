@@ -3,8 +3,8 @@
  * These types are separated to avoid circular dependencies with DatomDatabase
  */
 
-import type { DatalogQuery } from "../datalog/datalog.js";
-import type { Datom, InterceptorError, Transaction } from "../types.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import type { Datom, InterceptorError, Transaction } from "../../types.js";
 
 /**
  * Context passed to read interceptors

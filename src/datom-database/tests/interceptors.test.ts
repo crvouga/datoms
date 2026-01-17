@@ -5,8 +5,8 @@ import type {
   BeforeReadInterceptor,
   BeforeWriteInterceptor,
   AfterWriteInterceptor,
-} from "../interceptor-types.js";
-import { InterceptorValidator } from "../interceptor-validator.js";
+} from "../interceptor/types.js";
+import { InterceptorValidator } from "../interceptor/validator.js";
 import { QueryError, TransactionError } from "../errors.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
 

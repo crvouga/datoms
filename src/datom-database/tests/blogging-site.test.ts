@@ -6,8 +6,8 @@ import { TransactionError } from "../errors.js";
 import type {
   AfterReadInterceptor,
   BeforeWriteInterceptor,
-} from "../interceptor-types.js";
-import { InterceptorValidator } from "../interceptor-validator.js";
+} from "../interceptor/types.js";
+import { InterceptorValidator } from "../interceptor/validator.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
 
 // Schema constants

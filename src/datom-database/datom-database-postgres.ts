@@ -19,7 +19,7 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
-import type { ReadContext } from "./interceptor-types.js";
+import type { ReadContext } from "./interceptor/types.js";
 import { DatomDatabase } from "./datom-database.js";
 import { InterceptorErrorWithName, QueryError } from "./errors.js";
 import {

@@ -8,11 +8,11 @@ import type {
   BeforeReadInterceptor,
   BeforeWriteInterceptor,
   Interceptor,
-} from "./interceptor-types.js";
-import type { Datom, Transaction } from "../types.js";
-import type { DatalogQuery } from "../datalog/datalog.js";
-import type { InterceptorErrorWithName } from "./errors.js";
-import type { ReadContext, WriteContext } from "./interceptor-types.js";
+} from "./types.js";
+import type { Datom, Transaction } from "../../types.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import type { InterceptorErrorWithName } from "../errors.js";
+import type { ReadContext, WriteContext } from "./types.js";
 
 /**
  * Engine for managing and executing database interceptors

@@ -3,7 +3,7 @@
  * Provides a convenient API for building up error lists
  */
 
-import type { Datom, InterceptorError } from "../types.js";
+import type { Datom, InterceptorError } from "../../types.js";
 
 /**
  * Helper class for collecting validation errors in interceptors
