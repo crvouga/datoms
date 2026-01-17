@@ -5,7 +5,6 @@
 // Core types
 export type {
   Attribute,
-  AttributeDefinition,
   BatchQueryKey,
   ConnectionPoolConfig,
   ConnectionPoolStats,
@@ -21,7 +20,6 @@ export type {
   OptimisticLockOptions,
   QueryExplainResult,
   QueryOptions,
-  SchemaExport,
   TransactionId,
   TransactionIsolationLevel,
   TransactionOptions,
@@ -52,15 +50,12 @@ export { MigrationRegistry } from "./migrations/migration-registry.js";
 
 // Error classes
 export {
-  CardinalityError,
   ConnectionPoolExhaustedError,
   DatomDatabaseError,
-  DatomTypeError,
   MigrationError,
   MigrationRollbackError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
   TransactionConflictError,
-  UniqueConstraintError,
 } from "./errors.js";

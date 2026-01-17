@@ -192,7 +192,15 @@ export class ObservableDatabase {
         success: true,
       });
     } catch (error) {
-      // Emit error event
+      // Emit migration event with failure
+      await this.emitEvent({
+        type: "migration",
+        version: targetVersion,
+        success: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+
+      // Also emit error event
       await this.emitEvent({
         type: "error",
         error: error instanceof Error ? error : new Error(String(error)),
@@ -202,14 +210,7 @@ export class ObservableDatabase {
         },
       });
 
-      // Also emit migration event with success=false
-      await this.emitEvent({
-        type: "migration",
-        version: targetVersion,
-        success: false,
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-
+      // Re-throw the error so callers can handle it
       throw error;
     }
   }
@@ -398,21 +399,11 @@ export class ObservableDatabase {
   async getStats(): Promise<DatabaseStats> {
     const latestTx = await this.db.getLatestTransaction();
 
-    // Get schema attribute count from exportSchema
-    let schemaAttributeCount = 0;
-    try {
-      const schemaExport = await this.db.exportSchema();
-      schemaAttributeCount = schemaExport.attributes.length;
-    } catch {
-      // If exportSchema fails, schemaAttributeCount remains 0
-    }
-
     const stats: DatabaseStats = {
       totalDatoms: 0,
       totalEntities: 0,
       totalTransactions: latestTx,
       latestTransaction: latestTx,
-      schemaAttributeCount,
     };
 
     // Try to get more detailed stats (implementations can override)

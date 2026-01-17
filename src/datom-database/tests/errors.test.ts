@@ -1,16 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import {
-  CardinalityError,
   ConnectionPoolExhaustedError,
-  DatomTypeError,
   MigrationError,
   MigrationRollbackError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
   TransactionConflictError,
-  UniqueConstraintError,
 } from "../errors.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
 
@@ -24,246 +21,6 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
 
   afterEach(async () => {
     await f.afterEach();
-  });
-
-  describe("UniqueConstraintError", () => {
-    test("should throw UniqueConstraintError when adding duplicate unique values", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "email",
-        cardinality: "one",
-        type: "string",
-        unique: true,
-      });
-
-      await db.transact([
-        { op: "add", e: 1, a: "email", v: "alice@example.com" },
-      ]);
-
-      try {
-        await db.transact([
-          { op: "add", e: 2, a: "email", v: "alice@example.com" },
-        ]);
-        throw new Error("Should have thrown UniqueConstraintError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(UniqueConstraintError);
-        const uniqueError = error as UniqueConstraintError;
-        expect(uniqueError.attribute).toBe("email");
-        expect(uniqueError.value).toBe("alice@example.com");
-        expect(uniqueError.existingEntity).toBe(1);
-        expect(uniqueError.code).toBe("UNIQUE_CONSTRAINT_VIOLATION");
-        expect(uniqueError.name).toBe("UniqueConstraintError");
-      }
-    });
-
-    test("should throw UniqueConstraintError in batch operations", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "email",
-        cardinality: "one",
-        type: "string",
-        unique: true,
-      });
-
-      await db.transact([
-        { op: "add", e: 1, a: "email", v: "alice@example.com" },
-      ]);
-
-      try {
-        // Use add() directly which validates - this tests batch uniqueness checking
-        await db.transact([
-          { op: "add", e: 2, a: "email", v: "alice@example.com" }, // Duplicate - should fail
-          { op: "add", e: 3, a: "email", v: "bob@example.com" },
-        ]);
-        throw new Error("Should have thrown UniqueConstraintError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(UniqueConstraintError);
-        const uniqueError = error as UniqueConstraintError;
-        expect(uniqueError.attribute).toBe("email");
-        expect(uniqueError.value).toBe("alice@example.com");
-        expect(uniqueError.existingEntity).toBe(1);
-      }
-    });
-  });
-
-  describe("CardinalityError", () => {
-    test("should throw CardinalityError when adding multiple values in same batch", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "email",
-        cardinality: "one",
-        type: "string",
-      });
-
-      try {
-        await db.transact([
-          { op: "add", e: 1, a: "email", v: "alice@example.com" },
-          { op: "add", e: 1, a: "email", v: "alice2@example.com" },
-        ]);
-        throw new Error("Should have thrown CardinalityError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(CardinalityError);
-        const cardinalityError = error as CardinalityError;
-        expect(cardinalityError.attribute).toBe("email");
-        expect(cardinalityError.entity).toBe("1");
-        expect(cardinalityError.reason).toBe("multiple_values_in_batch");
-        expect(cardinalityError.code).toBe("CARDINALITY_VIOLATION");
-        expect(cardinalityError.name).toBe("CardinalityError");
-      }
-    });
-
-    test("should throw CardinalityError when entity already has a value", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "email",
-        cardinality: "one",
-        type: "string",
-      });
-
-      await db.transact([
-        { op: "add", e: 1, a: "email", v: "alice@example.com" },
-      ]);
-
-      try {
-        await db.transact([
-          { op: "add", e: 1, a: "email", v: "alice2@example.com" },
-        ]);
-        throw new Error("Should have thrown CardinalityError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(CardinalityError);
-        const cardinalityError = error as CardinalityError;
-        expect(cardinalityError.attribute).toBe("email");
-        expect(cardinalityError.entity).toBe("1");
-        expect(cardinalityError.reason).toBe("existing_value_conflict");
-        expect(cardinalityError.code).toBe("CARDINALITY_VIOLATION");
-      }
-    });
-  });
-
-  describe("DatomTypeError", () => {
-    test("should throw DatomTypeError for string type violation", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "name",
-        cardinality: "one",
-        type: "string",
-      });
-
-      try {
-        await db.transact([{ op: "add", e: 1, a: "name", v: 123 }]);
-        throw new Error("Should have thrown DatomTypeError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(DatomTypeError);
-        const typeError = error as DatomTypeError;
-        expect(typeError.attribute).toBe("name");
-        expect(typeError.value).toBe(123);
-        expect(typeError.expectedType).toBe("string");
-        expect(typeError.actualType).toBe("number");
-        expect(typeError.code).toBe("TYPE_CONSTRAINT_VIOLATION");
-        expect(typeError.name).toBe("DatomTypeError");
-      }
-    });
-
-    test("should throw DatomTypeError for number type violation", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "age",
-        cardinality: "one",
-        type: "number",
-      });
-
-      try {
-        await db.transact([{ op: "add", e: 1, a: "age", v: "not-a-number" }]);
-        throw new Error("Should have thrown DatomTypeError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(DatomTypeError);
-        const typeError = error as DatomTypeError;
-        expect(typeError.attribute).toBe("age");
-        expect(typeError.value).toBe("not-a-number");
-        expect(typeError.expectedType).toBe("number");
-        expect(typeError.actualType).toBe("string");
-      }
-    });
-
-    test("should throw DatomTypeError for boolean type violation", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "active",
-        cardinality: "one",
-        type: "boolean",
-      });
-
-      try {
-        await db.transact([{ op: "add", e: 1, a: "active", v: "true" }]);
-        throw new Error("Should have thrown DatomTypeError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(DatomTypeError);
-        const typeError = error as DatomTypeError;
-        expect(typeError.attribute).toBe("active");
-        expect(typeError.expectedType).toBe("boolean");
-        expect(typeError.actualType).toBe("string");
-      }
-    });
-
-    test("should throw DatomTypeError for date type violation", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "created",
-        cardinality: "one",
-        type: "date",
-      });
-
-      try {
-        await db.transact([{ op: "add", e: 1, a: "created", v: 12345 }]);
-        throw new Error("Should have thrown DatomTypeError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(DatomTypeError);
-        const typeError = error as DatomTypeError;
-        expect(typeError.attribute).toBe("created");
-        expect(typeError.expectedType).toBe("date");
-        expect(typeError.actualType).toBe("number");
-      }
-    });
-
-    test("should throw DatomTypeError for invalid date string", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "created",
-        cardinality: "one",
-        type: "date",
-      });
-
-      try {
-        await db.transact([{ op: "add", e: 1, a: "created", v: "not-a-date" }]);
-        throw new Error("Should have thrown DatomTypeError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(DatomTypeError);
-        const typeError = error as DatomTypeError;
-        expect(typeError.attribute).toBe("created");
-        expect(typeError.value).toBe("not-a-date");
-      }
-    });
-
-    test("should throw DatomTypeError for ref type violation", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "parent",
-        cardinality: "one",
-        type: "ref",
-      });
-
-      try {
-        // Use null as invalid ref (ref should be EntityId: number or string)
-        await db.transact([{ op: "add", e: 1, a: "parent", v: null as any }]);
-        throw new Error("Should have thrown DatomTypeError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(DatomTypeError);
-        const typeError = error as DatomTypeError;
-        expect(typeError.attribute).toBe("parent");
-        expect(typeError.expectedType).toBe("ref");
-        expect(typeError.actualType).toBe("object");
-      }
-    });
   });
 
   describe("QuerySafetyError", () => {
@@ -316,24 +73,15 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
   });
 
   describe("MigrationError", () => {
-    test("should throw MigrationError when attempting backward migration", async () => {
-      const { db } = f;
-      // Set initial version
-      await db.migrate(5);
-      const version = await db.getSchemaVersion();
-      expect(version).toBe(5);
-
-      try {
-        await db.migrate(3);
-        throw new Error("Should have thrown MigrationError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(MigrationError);
-        const migrationError = error as MigrationError;
-        expect(migrationError.code).toBe("MIGRATION_ERROR");
-        expect(migrationError.name).toBe("MigrationError");
-        expect(migrationError.version).toBe(3);
-        expect(migrationError.message).toContain("backwards");
-      }
+    test("should have correct error properties", () => {
+      const cause = new Error("Test error");
+      const error = new MigrationError("Migration failed", 2, cause);
+      expect(error).toBeInstanceOf(MigrationError);
+      expect(error.code).toBe("MIGRATION_ERROR");
+      expect(error.name).toBe("MigrationError");
+      expect(error.version).toBe(2);
+      expect(error.cause).toBe(cause);
+      expect(error.message).toContain("Migration failed");
     });
   });
 

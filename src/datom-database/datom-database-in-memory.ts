@@ -4,9 +4,14 @@
  * Useful for testing and small datasets
  */
 
-import { DatomDatabase } from "./datom-database.js";
+import type {
+  DatalogQuery,
+  QueryClause,
+  QueryResult,
+} from "../datalog/datalog.js";
 import type {
   Attribute,
+  DatabaseStats,
   Datom,
   DatomInput,
   EntityId,
@@ -14,14 +19,10 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
-import type {
-  DatalogQuery,
-  QueryClause,
-  QueryResult,
-} from "../datalog/datalog.js";
+import { DatomDatabase } from "./datom-database.js";
 import {
-  isVariable,
   isQueryPattern,
+  isVariable,
   stripQuestionMark,
 } from "./shared/datalog-helpers.js";
 import { joinResults, project } from "./shared/query-helpers.js";
@@ -420,7 +421,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   protected async getDetailedStats(): Promise<
     Partial<
       Pick<
-        import("../types.js").DatabaseStats,
+        DatabaseStats,
         "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics"
       >
     >

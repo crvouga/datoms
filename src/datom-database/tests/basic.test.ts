@@ -219,60 +219,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(statusResults[0]?.v).toBe("active");
     });
 
-    test("should replace value for cardinality:one attribute", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "status",
-        cardinality: "one",
-        type: "string",
-      });
-
-      await db.transact([{ op: "add", e: 1, a: "status", v: "pending" }]);
-      const existing = await db.datoms({ e: 1, a: "status" });
-      await db.transact([
-        ...existing.map((d) => ({
-          op: "retract" as const,
-          e: d.e,
-          a: d.a,
-          v: d.v,
-        })),
-        { op: "add", e: 1, a: "status", v: "active" },
-      ]);
-
-      const statusResults = await db.query({
-        find: { v: ["?v"] },
-        where: [{ e: 1, a: "status", v: "?v" }],
-      });
-      expect(statusResults[0]?.v).toBe("active");
-
-      const allStatuses = await db.datoms({ e: 1, a: "status" });
-      expect(allStatuses).toHaveLength(1);
-      expect(allStatuses[0].v).toBe("active");
-    });
-
-    test("should add value for cardinality:many attribute without retracting", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "tag",
-        cardinality: "many",
-        type: "string",
-      });
-
-      await db.transact([
-        { op: "add", e: 1, a: "tag", v: "red" },
-        { op: "add", e: 1, a: "tag", v: "blue" },
-      ]);
-
-      await db.transact([{ op: "add", e: 1, a: "tag", v: "green" }]);
-
-      const tags = await db.datoms({ e: 1, a: "tag" });
-      expect(tags).toHaveLength(3);
-      const values = tags.map((d) => d.v);
-      expect(values).toContain("red");
-      expect(values).toContain("blue");
-      expect(values).toContain("green");
-    });
-
     test("should work for undefined cardinality (treats as many)", async () => {
       const { db } = f;
       // No schema definition
@@ -288,12 +234,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should work within transactions", async () => {
       const { db } = f;
-      await db.defineAttribute({
-        name: "status",
-        cardinality: "one",
-        type: "string",
-      });
-
       await db.transact([{ op: "add", e: 1, a: "status", v: "pending" }]);
 
       const existing = await db.datoms({ e: 1, a: "status" });
@@ -333,69 +273,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: 1, a: "status", v: "?v" }],
       });
       expect(finalStatusResults[0]?.v).toBe("active");
-    });
-
-    test("should handle multiple upserts in sequence", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "status",
-        cardinality: "one",
-        type: "string",
-      });
-
-      await db.transact([{ op: "add", e: 1, a: "status", v: "pending" }]);
-      const existing1 = await db.datoms({ e: 1, a: "status" });
-      await db.transact([
-        ...existing1.map((d) => ({
-          op: "retract" as const,
-          e: d.e,
-          a: d.a,
-          v: d.v,
-        })),
-        { op: "add", e: 1, a: "status", v: "processing" },
-      ]);
-      const existing2 = await db.datoms({ e: 1, a: "status" });
-      await db.transact([
-        ...existing2.map((d) => ({
-          op: "retract" as const,
-          e: d.e,
-          a: d.a,
-          v: d.v,
-        })),
-        { op: "add" as const, e: 1, a: "status", v: "completed" },
-      ]);
-
-      const statusResults = await db.query({
-        find: { v: ["?v"] },
-        where: [{ e: 1, a: "status", v: "?v" }],
-      });
-      expect(statusResults[0]?.v).toBe("completed");
-
-      const allStatuses = await db.datoms({ e: 1, a: "status" });
-      expect(allStatuses).toHaveLength(1);
-    });
-
-    test("should work with different entity-attribute pairs", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "status",
-        cardinality: "one",
-        type: "string",
-      });
-
-      await db.transact([{ op: "add", e: 1, a: "status", v: "active" }]);
-      await db.transact([{ op: "add", e: 2, a: "status", v: "inactive" }]);
-
-      const status1Results = await db.query({
-        find: { v: ["?v"] },
-        where: [{ e: 1, a: "status", v: "?v" }],
-      });
-      const status2Results = await db.query({
-        find: { v: ["?v"] },
-        where: [{ e: 2, a: "status", v: "?v" }],
-      });
-      expect(status1Results[0]?.v).toBe("active");
-      expect(status2Results[0]?.v).toBe("inactive");
     });
   });
 
@@ -567,12 +444,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("upsertMany", () => {
     test("should upsert multiple values atomically", async () => {
       const { db } = f;
-      await db.defineAttribute({
-        name: "status",
-        cardinality: "one",
-        type: "string",
-      });
-
       await db.transact([
         { op: "add", e: 1, a: "status", v: "pending" },
         { op: "add", e: 2, a: "status", v: "active" },
@@ -597,121 +468,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(name1Results[0]?.v).toBe("Alice");
     });
 
-    test("should retract existing values for cardinality:one attributes", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "status",
-        cardinality: "one",
-        type: "string",
-      });
-
-      await db.transact([{ op: "add", e: 1, a: "status", v: "old-status" }]);
-      const existing = await db.datoms({ e: 1, a: "status" });
-      await db.transact([
-        ...existing.map((d) => ({
-          op: "retract" as const,
-          e: d.e,
-          a: d.a,
-          v: d.v,
-        })),
-        { op: "add" as const, e: 1, a: "status", v: "new-status" },
-      ]);
-
-      const statusResults = await db.query({
-        find: { v: ["?v"] },
-        where: [{ e: 1, a: "status", v: "?v" }],
-      });
-      expect(statusResults[0]?.v).toBe("new-status");
-
-      const allStatuses = await db.datoms({ e: 1, a: "status" });
-      expect(allStatuses).toHaveLength(1);
-    });
-
-    test("should not retract for cardinality:many attributes", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "tag",
-        cardinality: "many",
-        type: "string",
-      });
-
-      await db.transact([
-        { op: "add", e: 1, a: "tag", v: "red" },
-        { op: "add", e: 1, a: "tag", v: "blue" },
-      ]);
-
-      await db.transact([{ op: "add", e: 1, a: "tag", v: "green" }]);
-
-      const tags = await db.datoms({ e: 1, a: "tag" });
-      expect(tags).toHaveLength(3);
-      const values = tags.map((d) => d.v);
-      expect(values).toContain("red");
-      expect(values).toContain("blue");
-      expect(values).toContain("green");
-    });
-
     test("should handle empty array", async () => {
       const { db } = f;
       const tx = await db.transact([]);
       expect(tx).toBeGreaterThan(0);
-    });
-
-    test("should work with mixed cardinality attributes", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "status",
-        cardinality: "one",
-        type: "string",
-      });
-      await db.defineAttribute({
-        name: "tag",
-        cardinality: "many",
-        type: "string",
-      });
-
-      await db.transact([
-        { op: "add", e: 1, a: "status", v: "old" },
-        { op: "add", e: 1, a: "tag", v: "red" },
-      ]);
-
-      const statusExisting = await db.datoms({
-        e: 1,
-        a: "status",
-      });
-      await db.transact([
-        ...statusExisting.map((d) => ({
-          op: "retract" as const,
-          e: d.e,
-          a: d.a,
-          v: d.v,
-        })),
-        { op: "add" as const, e: 1, a: "status", v: "new" },
-        { op: "add" as const, e: 1, a: "tag", v: "blue" },
-      ]);
-
-      const statusResults = await db.query({
-        find: { v: ["?v"] },
-        where: [{ e: 1, a: "status", v: "?v" }],
-      });
-      expect(statusResults[0]?.v).toBe("new");
-
-      const tags = await db.datoms({ e: 1, a: "tag" });
-      expect(tags).toHaveLength(2);
-      const values = tags.map((d) => d.v);
-      expect(values).toContain("red");
-      expect(values).toContain("blue");
     });
   });
 
   describe("Integration: Entity Operations", () => {
     test("should work together: upsert, retractAttribute, getLatestValue", async () => {
       const { db } = f;
-      await db.defineAttribute({
-        name: "status",
-        cardinality: "one",
-        type: "string",
-      });
-
       // Upsert initial value
       await db.transact([{ op: "add", e: 1, a: "status", v: "pending" }]);
       const pendingDatoms = await db.datoms({ e: 1, a: "status" });

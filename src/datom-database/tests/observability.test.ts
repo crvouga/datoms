@@ -274,25 +274,6 @@ describe.each(FIXTURES)("Observability (%s)", (_name, createFixture) => {
       expect(stats).toBeDefined();
       expect(stats.latestTransaction).toBeGreaterThan(0);
       expect(stats.totalTransactions).toBe(stats.latestTransaction);
-      expect(stats.schemaAttributeCount).toBe(0);
-    });
-
-    test("should include schema attribute count", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "name",
-        cardinality: "one",
-        type: "string",
-      });
-      await db.defineAttribute({
-        name: "age",
-        cardinality: "one",
-        type: "number",
-      });
-
-      const stats = await observableDb.getStats();
-
-      expect(stats.schemaAttributeCount).toBe(2);
     });
 
     test("should track query metrics", async () => {

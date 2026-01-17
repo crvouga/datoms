@@ -360,25 +360,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should define attribute schema", async () => {
-      const { db } = f;
-      await db.defineAttribute({
-        name: "email",
-        cardinality: "one",
-        unique: true,
-        indexed: true,
-      });
-
-      const def = db.getAttributeDefinition("email");
-      expect(def).toBeDefined();
-      expect(def?.name).toBe("email");
-      expect(def?.cardinality).toBe("one");
-      expect(def?.unique).toBe(true);
-      expect(def?.indexed).toBe(true);
-
-      await db.close();
-    });
-
     test("should query history with history flag", async () => {
       const { db } = f;
       await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);

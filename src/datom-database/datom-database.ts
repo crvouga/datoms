@@ -6,26 +6,21 @@
 import type { DatalogQuery, QueryResult } from "../datalog/datalog.js";
 import type {
   Attribute,
-  AttributeDefinition,
   Datom,
   DatomInput,
   EntityId,
   Migration,
   MigrationState,
   QueryOptions,
-  SchemaExport,
   TransactionId,
   Value,
 } from "../types.js";
 import {
-  CardinalityError,
-  DatomTypeError,
   MigrationError,
   MigrationRollbackError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
-  UniqueConstraintError,
 } from "./errors.js";
 import { MigrationRegistry } from "./migrations/migration-registry.js";
 import {
@@ -468,8 +463,7 @@ export type TransactOperations = Array<{
  * **Atomicity:** All operations within a transaction are atomic - either all succeed or all fail.
  * If any operation throws an error, the entire transaction is rolled back automatically.
  *
- * **Consistency:** Schema constraints (type, cardinality, uniqueness) are enforced within transactions.
- * Invalid data cannot be committed. Transactions maintain referential integrity.
+ * **Consistency:** Transactions maintain referential integrity.
  *
  * **Isolation:** Transactions use READ COMMITTED isolation by default (configurable via `isolationLevel`).
  * - **READ COMMITTED (default):** Prevents dirty reads. Within a transaction, reads see:
@@ -508,12 +502,6 @@ export type TransactOperations = Array<{
  * - Conflicts throw `TransactionConflictError` with retry support
  * - Implementations use database-level locking (row-level or table-level) as needed
  * - Deadlock detection and resolution is backend-specific
- *
- * **Schema Enforcement:**
- * - Attributes can be used without schema definitions (schema is optional)
- * - When an attribute is defined, validation is enforced (type, cardinality, uniqueness)
- * - Use `defineAttribute()` to add schema constraints, or work without schema for flexibility
- * - Schema migrations are supported via `migrate()` and `getSchemaVersion()`
  *
  * **Observability:**
  * - Event system for monitoring transactions, queries, errors, and migrations
@@ -589,8 +577,8 @@ export interface WithResult {
 
 export abstract class DatomDatabase implements DatomReader {
   protected initialized = false;
-  protected schema: Map<string, AttributeDefinition> = new Map();
-  protected schemaVersion: number = 0;
+  /** Migration version tracking (separate from schema) */
+  protected migrationVersion: number = 0;
   /** Migration registry for managing migrations */
   protected migrationRegistry: MigrationRegistry = new MigrationRegistry();
 
@@ -659,40 +647,6 @@ export abstract class DatomDatabase implements DatomReader {
       const datom = { e: op.e, a: op.a, v: op.v };
 
       if (op.op === "add") {
-        // Check for duplicates within the same transaction batch
-        const definition = this.getAttributeDefinition(String(datom.a));
-        if (definition?.cardinality === "one") {
-          const key = `${String(datom.e)}|${String(datom.a)}`;
-          const duplicate = adds.find(
-            (a) => `${String(a.e)}|${String(a.a)}` === key
-          );
-          if (duplicate) {
-            throw new CardinalityError(
-              String(datom.a),
-              String(datom.e),
-              "multiple_values_in_batch"
-            );
-          }
-        }
-
-        // Check for uniqueness violations within the same transaction batch
-        if (definition?.unique) {
-          const valueKey = JSON.stringify(datom.v);
-          const duplicate = adds.find(
-            (a) =>
-              String(a.a) === String(datom.a) &&
-              JSON.stringify(a.v) === valueKey &&
-              String(a.e) !== String(datom.e)
-          );
-          if (duplicate) {
-            throw new UniqueConstraintError(
-              String(datom.a),
-              datom.v,
-              duplicate.e
-            );
-          }
-        }
-
         // Validate add, accounting for retracts already processed
         await this.validateDatoms([datom], true, retracts);
         adds.push(datom);
@@ -753,364 +707,6 @@ export abstract class DatomDatabase implements DatomReader {
   ): Promise<void> {
     // Optional: Override in implementations if metadata storage is needed
     // Default: no-op (metadata is ignored but still emitted in events)
-  }
-
-  /**
-   * Define an attribute schema
-   * @param definition Attribute definition
-   * @example
-   * // Basic attribute definition
-   * await db.defineAttribute({
-   *   name: "email",
-   *   type: "string",
-   *   unique: true,
-   *   cardinality: "one"
-   * });
-   *
-   * // Attribute with type constraint
-   * await db.defineAttribute({
-   *   name: "age",
-   *   type: "number",
-   *   cardinality: "one"
-   * });
-   *
-   * // Reference attribute (EntityId)
-   * await db.defineAttribute({
-   *   name: "parent",
-   *   type: "ref",
-   *   cardinality: "one"
-   * });
-   */
-  async defineAttribute(definition: AttributeDefinition): Promise<void> {
-    await this.ensureInitialized();
-    this.schema.set(definition.name, definition);
-    await this.onAttributeDefined(definition);
-  }
-
-  /**
-   * Hook for implementations to handle attribute definition
-   * (e.g., create indexes)
-   * @example
-   * // override in your subclass to handle new attribute definitions
-   * protected async onAttributeDefined(definition: AttributeDefinition) { ... }
-   */
-  protected async onAttributeDefined(
-    _definition: AttributeDefinition
-  ): Promise<void> {
-    // Override in implementations if needed
-  }
-
-  /**
-   * Get attribute definition for a given attribute name
-   * @param name Attribute name
-   * @returns Attribute definition or undefined
-   * @example
-   * const def = db.getAttributeDefinition("tag");
-   */
-  getAttributeDefinition(name: string): AttributeDefinition | undefined {
-    return this.schema.get(name);
-  }
-
-  /**
-   * Modify an existing attribute definition
-   * @param name Attribute name
-   * @param updates Partial attribute definition with fields to update
-   * @example
-   * // Change cardinality from "one" to "many"
-   * await db.modifyAttribute("tag", { cardinality: "many" });
-   *
-   * // Add uniqueness constraint
-   * await db.modifyAttribute("email", { unique: true });
-   */
-  async modifyAttribute(
-    name: string,
-    updates: Partial<Omit<AttributeDefinition, "name">>
-  ): Promise<void> {
-    await this.ensureInitialized();
-    const existing = this.schema.get(name);
-    if (!existing) {
-      throw new Error(`Attribute "${name}" is not defined`);
-    }
-    const updated: AttributeDefinition = { ...existing, ...updates };
-
-    // Validate existing data against new constraints
-    await this.validateAttributeModification(name, existing, updated);
-
-    this.schema.set(name, updated);
-    await this.onAttributeModified(name, existing, updated);
-  }
-
-  /**
-   * Validate that existing data complies with new attribute constraints.
-   * Called before modifying an attribute definition to ensure data integrity.
-   * @param name Attribute name
-   * @param oldDefinition Previous attribute definition
-   * @param newDefinition Updated attribute definition
-   * @throws Error if existing data violates new constraints
-   * @example
-   * // Validates uniqueness, cardinality changes, etc.
-   */
-  protected async validateAttributeModification(
-    name: string,
-    oldDefinition: AttributeDefinition,
-    newDefinition: AttributeDefinition
-  ): Promise<void> {
-    // Check if uniqueness constraint is being add
-    if (!oldDefinition.unique && newDefinition.unique) {
-      // Find all datoms with this attribute
-      const allDatoms = await this.queryInternal({ a: name });
-      // Group by value to check for duplicates
-      const valueToEntities = new Map<string, EntityId[]>();
-      for (const datom of allDatoms) {
-        const valueKey = JSON.stringify(datom.v);
-        if (!valueToEntities.has(valueKey)) {
-          valueToEntities.set(valueKey, []);
-        }
-        valueToEntities.get(valueKey)!.push(datom.e);
-      }
-      // Check for duplicate values across different entities
-      for (const [valueKey, entities] of valueToEntities) {
-        const uniqueEntities = new Set(entities.map((e) => String(e)));
-        if (uniqueEntities.size > 1) {
-          const value: unknown = JSON.parse(valueKey);
-          throw new Error(
-            `Cannot add uniqueness constraint to attribute "${name}": duplicate value ${JSON.stringify(
-              value
-            )} exists for entities ${Array.from(uniqueEntities).join(", ")}`
-          );
-        }
-      }
-    }
-
-    // Check if cardinality is being changed from "many" to "one"
-    if (
-      oldDefinition.cardinality === "many" &&
-      newDefinition.cardinality === "one"
-    ) {
-      // Find all entities with multiple values for this attribute
-      const allDatoms = await this.queryInternal({ a: name });
-      const entityToValues = new Map<string, Set<string>>();
-      for (const datom of allDatoms) {
-        const entityKey = String(datom.e);
-        if (!entityToValues.has(entityKey)) {
-          entityToValues.set(entityKey, new Set());
-        }
-        entityToValues.get(entityKey)!.add(JSON.stringify(datom.v));
-      }
-      // Check for entities with multiple values
-      const violations: string[] = [];
-      for (const [entityKey, values] of entityToValues) {
-        if (values.size > 1) {
-          violations.push(entityKey);
-        }
-      }
-      if (violations.length > 0) {
-        throw new Error(
-          `Cannot change cardinality from "many" to "one" for attribute "${name}": entities ${violations.join(
-            ", "
-          )} have multiple values. Retract duplicate values first.`
-        );
-      }
-    }
-
-    // Check if type constraint is being add or made more restrictive
-    if (
-      newDefinition.type !== undefined &&
-      newDefinition.type !== null &&
-      (oldDefinition.type === undefined ||
-        oldDefinition.type === null ||
-        oldDefinition.type !== newDefinition.type)
-    ) {
-      // Validate all existing values match the new type
-      const allDatoms = await this.queryInternal({ a: name });
-      for (const datom of allDatoms) {
-        const typeError = this.validateValueType(
-          datom.v,
-          newDefinition.type!,
-          name
-        );
-        if (typeError) {
-          throw new Error(
-            `Cannot change type constraint for attribute "${name}": existing value ${JSON.stringify(
-              datom.v
-            )} for entity "${String(datom.e)}" does not match new type "${
-              newDefinition.type
-            }". ${typeError.message}`
-          );
-        }
-      }
-    }
-  }
-
-  /**
-   * Hook for implementations to handle attribute modification
-   * (e.g., update indexes, validate existing data)
-   * @param name Attribute name
-   * @param oldDefinition Previous attribute definition
-   * @param newDefinition Updated attribute definition
-   * @example
-   * // Override in your subclass to handle attribute modifications
-   * protected async onAttributeModified(
-   *   name: string,
-   *   oldDefinition: AttributeDefinition,
-   *   newDefinition: AttributeDefinition
-   * ) { ... }
-   */
-  protected async onAttributeModified(
-    _name: string,
-    _oldDefinition: AttributeDefinition,
-    _newDefinition: AttributeDefinition
-  ): Promise<void> {
-    // Override in implementations if needed
-  }
-
-  /**
-   * Remove an attribute definition from the schema
-   * Note: This does not remove existing datoms, only the schema definition
-   * @param name Attribute name
-   * @example
-   * await db.removeAttribute("deprecated-field");
-   */
-  async removeAttribute(name: string): Promise<void> {
-    await this.ensureInitialized();
-    const existing = this.schema.get(name);
-    if (!existing) {
-      throw new Error(`Attribute "${name}" is not defined`);
-    }
-    this.schema.delete(name);
-    await this.onAttributeRemoved(name, existing);
-  }
-
-  /**
-   * Hook for implementations to handle attribute removal
-   * (e.g., drop indexes)
-   * @param name Attribute name
-   * @param definition The removed attribute definition
-   * @example
-   * // Override in your subclass to handle attribute removal
-   * protected async onAttributeRemoved(
-   *   name: string,
-   *   definition: AttributeDefinition
-   * ) { ... }
-   */
-  protected async onAttributeRemoved(
-    _name: string,
-    _definition: AttributeDefinition
-  ): Promise<void> {
-    // Override in implementations if needed
-  }
-
-  /**
-   * Export the current schema as a versioned schema export
-   * Useful for migrations, backups, or schema versioning
-   * @returns Versioned schema export with metadata
-   * @example
-   * const schema = db.exportSchema();
-   * // Save to file or version control
-   * await fs.writeFile("schema.json", JSON.stringify(schema, null, 2));
-   * // Schema includes: version, schemaVersion, exportedAt, and attributes
-   */
-  async exportSchema(): Promise<SchemaExport> {
-    await this.ensureInitialized();
-    const schemaVersion = await this.getSchemaVersion();
-    return {
-      version: 1, // Schema format version
-      schemaVersion,
-      exportedAt: new Date().toISOString(),
-      attributes: Array.from(this.schema.values()),
-    };
-  }
-
-  /**
-   * Import a schema from a versioned schema export or legacy array format
-   * Useful for migrations or restoring schema from backup
-   *
-   * **Backward Compatibility:** Accepts both SchemaExport objects and legacy AttributeDefinition[] arrays
-   *
-   * **Schema Evolution:** When importing a versioned schema, validates format version compatibility.
-   * Implementations can override `onSchemaVersionChange()` to handle version changes.
-   *
-   * @param input SchemaExport object or legacy AttributeDefinition[] array
-   * @example
-   * // Import versioned schema
-   * const schema = JSON.parse(await fs.readFile("schema.json", "utf-8"));
-   * await db.importSchema(schema); // SchemaExport object
-   *
-   * // Import legacy format (backward compatible)
-   * const legacySchema = JSON.parse(await fs.readFile("old-schema.json", "utf-8"));
-   * await db.importSchema(legacySchema); // AttributeDefinition[] array
-   */
-  async importSchema(
-    input: SchemaExport | AttributeDefinition[]
-  ): Promise<void> {
-    await this.ensureInitialized();
-
-    // Handle legacy format (backward compatibility)
-    if (Array.isArray(input)) {
-      // Legacy format: just an array of attribute definitions
-      this.schema.clear();
-      for (const definition of input) {
-        await this.defineAttribute(definition);
-      }
-      return;
-    }
-
-    // Versioned schema format
-    const schemaExport = input as SchemaExport;
-
-    // Validate format version (currently only version 1 is supported)
-    if (schemaExport.version !== 1) {
-      throw new Error(
-        `Unsupported schema format version: ${schemaExport.version}. Expected version 1.`
-      );
-    }
-
-    // Check if schema version is changing
-    const currentSchemaVersion = await this.getSchemaVersion();
-    const versionChanging = schemaExport.schemaVersion !== currentSchemaVersion;
-
-    if (versionChanging) {
-      await this.onSchemaVersionChange(
-        currentSchemaVersion,
-        schemaExport.schemaVersion
-      );
-    }
-
-    // Clear existing schema
-    this.schema.clear();
-
-    // Import each definition
-    for (const definition of schemaExport.attributes) {
-      await this.defineAttribute(definition);
-    }
-
-    // Update schema version if different
-    if (versionChanging) {
-      await this.migrate(schemaExport.schemaVersion);
-    }
-  }
-
-  /**
-   * Hook for implementations to handle schema version changes during import
-   * Called when importing a schema with a different schemaVersion than the current one
-   * @param oldVersion Current schema version
-   * @param newVersion New schema version from import
-   * @example
-   * // Override in your subclass to handle schema version changes:
-   * protected async onSchemaVersionChange(
-   *   oldVersion: number,
-   *   newVersion: number
-   * ): Promise<void> {
-   *   // Perform any necessary migration logic
-   *   console.log(`Schema version changing from ${oldVersion} to ${newVersion}`);
-   * }
-   */
-  protected async onSchemaVersionChange(
-    _oldVersion: number,
-    _newVersion: number
-  ): Promise<void> {
-    // Override in implementations if needed
-    // Default: no-op (schema version change is handled by migrate())
   }
 
   /**
@@ -1351,226 +947,23 @@ export abstract class DatomDatabase implements DatomReader {
    */
   protected async validateDatoms(
     datoms: DatomInput[],
-    isAdd: boolean,
-    retractsInSameTransaction?: DatomInput[]
+    _isAdd: boolean,
+    _retractsInSameTransaction?: DatomInput[]
   ): Promise<void> {
+    // Schema validation removed - datoms are accepted as-is
     if (datoms.length === 0) {
       return;
     }
-
-    // Group datoms by attribute for efficient validation
-    const byAttribute = new Map<string, DatomInput[]>();
+    // Basic validation: ensure datoms have required fields
     for (const datom of datoms) {
-      const attrKey = String(datom.a);
-      if (!byAttribute.has(attrKey)) {
-        byAttribute.set(attrKey, []);
+      if (datom.e === undefined || datom.e === null) {
+        throw new Error("Datom must have an entity ID");
       }
-      byAttribute.get(attrKey)!.push(datom);
+      if (datom.a === undefined || datom.a === null) {
+        throw new Error("Datom must have an attribute");
+      }
+      // Value can be null/undefined, so we don't validate it
     }
-
-    // Validate each attribute group
-    for (const [attrKey, attrDatoms] of byAttribute) {
-      const definition = this.getAttributeDefinition(attrKey);
-      if (!definition) {
-        // If no schema is defined, we allow any attribute but can't validate constraints
-        continue;
-      }
-
-      // Type validation (only for adds)
-      if (isAdd && definition.type !== undefined && definition.type !== null) {
-        for (const datom of attrDatoms) {
-          const { a: attribute, v: value } = datom;
-          const typeError = this.validateValueType(
-            value,
-            definition.type,
-            attribute
-          );
-          if (typeError) {
-            throw new DatomTypeError(
-              String(attribute),
-              value,
-              definition.type!,
-              typeof value
-            );
-          }
-        }
-      }
-
-      // Batch cardinality checks: group by (entity, attribute)
-      if (isAdd && definition.cardinality === "one") {
-        const entityAttributePairs = new Map<string, DatomInput>();
-        for (const datom of attrDatoms) {
-          const key = `${String(datom.e)}|${String(datom.a)}`;
-          if (entityAttributePairs.has(key)) {
-            // Multiple values for same entity-attribute pair in this batch
-            throw new CardinalityError(
-              String(datom.a),
-              String(datom.e),
-              "multiple_values_in_batch"
-            );
-          }
-          entityAttributePairs.set(key, datom);
-        }
-
-        // Batch query for existing values
-        for (const datom of entityAttributePairs.values()) {
-          // Use the original datom entity/attribute instead of splitting the key
-          // to preserve the original types (number vs string)
-          const entity = datom.e;
-          const attribute = datom.a;
-          const newValue = datom.v;
-
-          // Check if this value is being retract in the same transaction
-          const isBeingretract = retractsInSameTransaction?.some(
-            (r) =>
-              r.e === entity &&
-              String(r.a) === String(attribute) &&
-              JSON.stringify(r.v) === JSON.stringify(newValue)
-          );
-
-          // If being retract, skip validation (it's a replace operation)
-          if (isBeingretract) {
-            continue;
-          }
-
-          const existingDatoms = await this.queryInternal({
-            e: entity,
-            a: String(attribute),
-          });
-          if (existingDatoms.length > 0) {
-            // If the existing value is the same as what we're trying to add, allow it (idempotent)
-            // This is useful for imports where the same datom might appear multiple times
-            const existingValue = existingDatoms[0].v;
-            if (JSON.stringify(existingValue) !== JSON.stringify(newValue)) {
-              // Check if the existing value is being retract
-              const existingIsBeingretract = retractsInSameTransaction?.some(
-                (r) =>
-                  r.e === entity &&
-                  String(r.a) === String(attribute) &&
-                  JSON.stringify(r.v) === JSON.stringify(existingValue)
-              );
-
-              if (!existingIsBeingretract) {
-                throw new CardinalityError(
-                  String(attribute),
-                  String(entity),
-                  "existing_value_conflict"
-                );
-              }
-            }
-          }
-        }
-      }
-
-      // Batch uniqueness checks: group by (attribute, value)
-      if (isAdd && definition.unique) {
-        const valueGroups = new Map<string, DatomInput[]>();
-        for (const datom of attrDatoms) {
-          const valueKey = JSON.stringify(datom.v);
-          if (!valueGroups.has(valueKey)) {
-            valueGroups.set(valueKey, []);
-          }
-          valueGroups.get(valueKey)!.push(datom);
-        }
-
-        // Batch query for existing datoms with same attribute-value
-        for (const [valueKey, valueDatoms] of valueGroups) {
-          const value = JSON.parse(valueKey) as Value;
-          const existingDatoms = await this.datoms({
-            a: attrKey,
-            v: value,
-          });
-
-          if (existingDatoms.length > 0) {
-            const existingEntity = existingDatoms[0]?.e;
-            // Check if any of the new datoms have a different entity
-            for (const datom of valueDatoms) {
-              if (
-                existingEntity !== undefined &&
-                String(datom.e) !== String(existingEntity)
-              ) {
-                throw new UniqueConstraintError(attrKey, value, existingEntity);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Validate that a value matches the expected type for an attribute
-   * @param value The value to validate
-   * @param expectedType The expected type from the attribute definition
-   * @param attribute The attribute name (for error messages)
-   * @returns Error if type mismatch, undefined if valid
-   * @internal
-   */
-  private validateValueType(
-    value: Value,
-    expectedType: "string" | "number" | "boolean" | "date" | "ref",
-    attribute: Attribute
-  ): Error | undefined {
-    switch (expectedType) {
-      case "string":
-        if (typeof value !== "string") {
-          return new Error(
-            `Attribute "${String(
-              attribute
-            )}" expects type "string", but got ${typeof value}`
-          );
-        }
-        break;
-      case "number":
-        if (typeof value !== "number") {
-          return new Error(
-            `Attribute "${String(
-              attribute
-            )}" expects type "number", but got ${typeof value}`
-          );
-        }
-        break;
-      case "boolean":
-        if (typeof value !== "boolean") {
-          return new Error(
-            `Attribute "${String(
-              attribute
-            )}" expects type "boolean", but got ${typeof value}`
-          );
-        }
-        break;
-      case "date":
-        if (!(value instanceof Date) && typeof value !== "string") {
-          return new Error(
-            `Attribute "${String(
-              attribute
-            )}" expects type "date" (Date object or date string), but got ${typeof value}`
-          );
-        }
-        // If it's a string, try to parse it as a date
-        if (typeof value === "string") {
-          const parsed = new Date(value);
-          if (isNaN(parsed.getTime())) {
-            return new Error(
-              `Attribute "${String(
-                attribute
-              )}" expects type "date", but string "${value}" is not a valid date`
-            );
-          }
-        }
-        break;
-      case "ref":
-        // EntityId can be number or string
-        if (typeof value !== "number" && typeof value !== "string") {
-          return new Error(
-            `Attribute "${String(
-              attribute
-            )}" expects type "ref" (EntityId: number | string), but got ${typeof value}`
-          );
-        }
-        break;
-    }
-    return undefined;
   }
 
   /**
@@ -1739,20 +1132,6 @@ export abstract class DatomDatabase implements DatomReader {
   }
 
   /**
-   * Get the current schema version
-   * @returns The current schema version number
-   * @example
-   * const version = await db.getSchemaVersion();
-   * if (version < 2) {
-   *   await db.migrate(2);
-   * }
-   */
-  async getSchemaVersion(): Promise<number> {
-    await this.ensureInitialized();
-    return this.schemaVersion;
-  }
-
-  /**
    * Register a migration
    * @param migration Migration to register
    * @example
@@ -1760,10 +1139,10 @@ export abstract class DatomDatabase implements DatomReader {
    *   version: 1,
    *   name: "add_user_table",
    *   up: async (db) => {
-   *     await db.defineAttribute({ name: "email", type: "string", cardinality: "one" });
+   *     // perform migration steps
    *   },
    *   down: async (db) => {
-   *     await db.removeAttribute("email");
+   *     // rollback migration steps
    *   }
    * });
    */
@@ -1821,38 +1200,34 @@ export abstract class DatomDatabase implements DatomReader {
    * @example
    * await db.registerMigration({
    *   version: 1,
-   *   name: "add_email",
-   *   up: async (db) => { await db.defineAttribute({ name: "email", type: "string", cardinality: "one" }); },
-   *   down: async (db) => { await db.removeAttribute("email"); }
+   *   name: "add_indexes",
+   *   up: async (db) => { // perform migration },
+   *   down: async (db) => { // rollback migration }
    * });
    * await db.migrateTo(1);
    */
   async migrateTo(targetVersion: number): Promise<void> {
     await this.ensureInitialized();
 
-    const currentVersion = await this.getSchemaVersion();
-
-    if (targetVersion < currentVersion) {
+    if (targetVersion < this.migrationVersion) {
       throw new MigrationError(
-        `Cannot migrate backwards from version ${currentVersion} to ${targetVersion}. Use rollbackTo() instead.`,
+        `Cannot migrate backwards from version ${this.migrationVersion} to ${targetVersion}. Use rollbackTo() instead.`,
         targetVersion
       );
     }
 
-    if (targetVersion === currentVersion) {
+    if (targetVersion === this.migrationVersion) {
       return; // Already at target version
     }
 
-    // Get pending migrations
-    const appliedVersions = new Set<number>();
-
-    // TODO: Load applied migrations from database (implementations should override getMigrationState)
-    const pendingMigrations = this.migrationRegistry
-      .getRange(currentVersion + 1, targetVersion)
-      .filter((m) => !appliedVersions.has(m.version));
+    // Get pending migrations (only those that haven't been applied yet)
+    const pendingMigrations = this.migrationRegistry.getRange(
+      this.migrationVersion + 1,
+      targetVersion
+    );
 
     if (pendingMigrations.length === 0) {
-      // No migrations to apply, but update schema version
+      // No migrations to apply, but update migration version
       await this.migrate(targetVersion);
       return;
     }
@@ -1870,7 +1245,7 @@ export abstract class DatomDatabase implements DatomReader {
           rolledBack: false,
         });
 
-        // Update schema version
+        // Update migration version
         await this.migrate(migration.version);
       } catch (error) {
         const migrationError = new MigrationError(
@@ -1897,27 +1272,14 @@ export abstract class DatomDatabase implements DatomReader {
   async rollbackTo(targetVersion: number): Promise<void> {
     await this.ensureInitialized();
 
-    const currentVersion = await this.getSchemaVersion();
-
-    if (targetVersion > currentVersion) {
-      throw new MigrationRollbackError(
-        `Cannot rollback forward from version ${currentVersion} to ${targetVersion}. Use migrateTo() instead.`,
-        targetVersion
-      );
-    }
-
-    if (targetVersion === currentVersion) {
-      return; // Already at target version
-    }
-
     // Get migrations to rollback (in reverse order)
-    const migrationsToRollback = this.migrationRegistry
-      .getRange(targetVersion + 1, currentVersion)
-      .reverse();
+    // Note: Without schema version tracking, we rollback all migrations from highest to targetVersion
+    const allMigrations = this.migrationRegistry.getAll();
+    const migrationsToRollback = allMigrations
+      .filter((m) => m.version > targetVersion)
+      .sort((a, b) => b.version - a.version);
 
     if (migrationsToRollback.length === 0) {
-      // No migrations to rollback, but update schema version
-      await this.migrate(targetVersion);
       return;
     }
 
@@ -1928,10 +1290,6 @@ export abstract class DatomDatabase implements DatomReader {
 
         // Mark migration as rolled back
         await this.markMigrationRolledBack(migration.version);
-
-        // Update schema version directly (rollback doesn't go through migrate())
-        // This avoids the backward migration check in migrate()
-        this.schemaVersion = migration.version - 1;
       } catch (error) {
         const rollbackError = new MigrationRollbackError(
           `Rollback of migration ${migration.version} (${
@@ -1947,33 +1305,23 @@ export abstract class DatomDatabase implements DatomReader {
   }
 
   /**
-   * Migrate the database schema to a specific version
+   * Migrate the database to a specific version
    * Implementations should override this method to perform actual migrations.
-   * The base implementation only updates the schema version counter.
-   * @param targetVersion Target schema version to migrate to
+   * @param targetVersion Target version to migrate to
    * @throws MigrationError if migration fails
-   * @example
-   * // In your implementation:
-   * async migrate(version: number): Promise<void> {
-   *   await super.migrate(version);
-   *   const current = await this.getSchemaVersion();
-   *   for (let v = current + 1; v <= version; v++) {
-   *     await this.runMigration(v);
-   *   }
-   * }
    */
   async migrate(targetVersion: number): Promise<void> {
     await this.ensureInitialized();
     try {
-      if (targetVersion < this.schemaVersion) {
+      if (targetVersion < this.migrationVersion) {
         throw new MigrationError(
-          `Cannot migrate backwards from version ${this.schemaVersion} to ${targetVersion}`,
+          `Cannot migrate backwards from version ${this.migrationVersion} to ${targetVersion}`,
           targetVersion
         );
       }
 
-      await this.onMigrate(this.schemaVersion, targetVersion);
-      this.schemaVersion = targetVersion;
+      await this.onMigrate(this.migrationVersion, targetVersion);
+      this.migrationVersion = targetVersion;
     } catch (error) {
       // If error is already a MigrationError, rethrow
       if (error instanceof MigrationError) {

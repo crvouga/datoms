@@ -219,12 +219,6 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should import with validation", async () => {
       const { db } = f;
-      await db.defineAttribute({
-        name: "age",
-        cardinality: "one",
-        type: "number",
-      });
-
       await db.transact([{ op: "add", e: 1, a: "age", v: 30 }]);
 
       // Export
@@ -236,11 +230,6 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
       // Create new database
       const { db: db2 } = await createFixture();
       await db2.initialize();
-      await db2.defineAttribute({
-        name: "age",
-        cardinality: "one",
-        type: "number",
-      });
 
       // Import with validation
       async function* datomGenerator() {
@@ -344,17 +333,11 @@ describe.each(FIXTURES)("Backup & Recovery (%s)", (_name, createFixture) => {
 
     test("should handle import errors", async () => {
       const { db } = f;
-      await db.defineAttribute({
-        name: "age",
-        cardinality: "one",
-        type: "number",
-      });
-
-      // Create invalid datom (wrong type)
+      // Create invalid datom (missing attribute - will fail validation)
       const invalidDatom: Datom = {
         e: 1,
-        a: "age",
-        v: "not-a-number",
+        a: null as any, // Invalid: attribute is null
+        v: "value",
         tx: 1,
         op: "add",
       };

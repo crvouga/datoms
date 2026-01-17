@@ -153,32 +153,25 @@ export async function retractAttributeHelper(
 
 /**
  * Upsert a value for an entity-attribute pair
- * For cardinality "one" attributes, retracts existing values first
+ * Retracts existing values first, then adds the new value
  */
 export async function upsertHelper(
   datoms: DatomsProvider,
-  getAttributeDefinition: (
-    attribute: string
-  ) => { cardinality?: "one" | "many" } | undefined,
   retract: (datoms: DatomInput[]) => Promise<void>,
   add: (datoms: DatomInput[]) => Promise<void>,
   entity: EntityId,
   attribute: string,
   value: Value
 ): Promise<void> {
-  const definition = getAttributeDefinition(attribute);
-
-  // If cardinality is "one", retract existing value first
-  if (definition?.cardinality === "one") {
-    const existingValues = await getValuesHelper(datoms, entity, attribute);
-    const toRetract: DatomInput[] = existingValues.map((v) => ({
-      e: entity,
-      a: attribute,
-      v: v,
-    }));
-    if (toRetract.length > 0) {
-      await retract(toRetract);
-    }
+  // Retract existing values first
+  const existingValues = await getValuesHelper(datoms, entity, attribute);
+  const toRetract: DatomInput[] = existingValues.map((v) => ({
+    e: entity,
+    a: attribute,
+    v: v,
+  }));
+  if (toRetract.length > 0) {
+    await retract(toRetract);
   }
 
   // Add the new value

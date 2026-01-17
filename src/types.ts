@@ -111,30 +111,6 @@ export interface QueryOptions {
 }
 
 /**
- * Definition for an attribute schema
- */
-export interface AttributeDefinition {
-  /** Attribute name */
-  name: string;
-  /** Whether the attribute can have one or many values */
-  cardinality: "one" | "many";
-  /** Whether the attribute value must be unique across all entities */
-  unique?: boolean;
-  /** Whether to create an index for this attribute */
-  indexed?: boolean;
-  /** Optional type constraint for attribute values. If specified, values must match this type. Use null to allow any type. */
-  type?: "string" | "number" | "boolean" | "date" | "ref" | null;
-}
-
-/**
- * Schema for the database
- */
-export interface Schema {
-  /** Map of attribute names to their definitions */
-  attributes: Map<string, AttributeDefinition>;
-}
-
-/**
  * Database statistics for observability
  */
 export interface DatabaseStats {
@@ -146,8 +122,6 @@ export interface DatabaseStats {
   totalTransactions: number;
   /** Latest transaction ID */
   latestTransaction: TransactionId;
-  /** Number of attributes defined in schema */
-  schemaAttributeCount: number;
   /** Query performance metrics (if available) */
   queryMetrics?: {
     averageQueryTime?: number;
@@ -325,21 +299,6 @@ export interface ConnectionPoolStats {
 }
 
 /**
- * Versioned schema export format
- * Includes metadata for schema evolution and migration tracking
- */
-export interface SchemaExport {
-  /** Schema format version (for compatibility checking) */
-  version: number;
-  /** Application schema version (from getSchemaVersion()) */
-  schemaVersion: number;
-  /** ISO timestamp when schema was exported */
-  exportedAt: string;
-  /** Array of attribute definitions */
-  attributes: AttributeDefinition[];
-}
-
-/**
  * Database health status
  * Used for monitoring and operational health checks
  */
@@ -388,17 +347,6 @@ export interface DatabaseHealth {
  * Provides the operations that migrations typically need
  */
 export interface MigrationDatabase {
-  /** Define an attribute schema */
-  defineAttribute(definition: AttributeDefinition): Promise<void>;
-  /** Remove an attribute definition */
-  removeAttribute(name: string): Promise<void>;
-  /** Modify an existing attribute definition */
-  modifyAttribute(
-    name: string,
-    updates: Partial<Omit<AttributeDefinition, "name">>
-  ): Promise<void>;
-  /** Get the current schema version */
-  getSchemaVersion(): Promise<number>;
   /** Migrate to a specific schema version */
   migrate(targetVersion: number): Promise<void>;
 }
