@@ -622,14 +622,29 @@ describe.each(FIXTURES)(
 
         db.interceptors.register(interceptor);
 
-        // Transaction should succeed even if after-write interceptor fails
-        const txId = await db.transact([
-          { op: "add", e: 1, a: "name", v: "Alice" },
-        ]);
+        // Suppress console.error for this test since we expect the error
+        const originalConsoleError = console.error;
+        console.error = () => {
+          // Suppress error output during test
+        };
 
-        // Verify transaction succeeded
-        const datoms = await db.datoms({ e: 1 });
-        expect(datoms).toHaveLength(1);
+        try {
+          // Transaction should succeed even if after-write interceptor fails
+          const txId = await db.transact([
+            { op: "add", e: 1, a: "name", v: "Alice" },
+          ]);
+
+          // Wait for async after-write interceptors to complete
+          await new Promise((resolve) => setTimeout(resolve, 10));
+
+          // Verify transaction succeeded
+          const datoms = await db.datoms({ e: 1 });
+          expect(datoms).toHaveLength(1);
+        } finally {
+          // Restore console.error
+          console.error = originalConsoleError;
+        }
+
         await db.close();
       });
 
