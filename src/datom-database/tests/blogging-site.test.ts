@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { datoms, type Datom } from "../../datoms.js";
-import type { AfterRead, BeforeWrite } from "../interceptor/engine";
 import { TransactionError } from "../datom-database.js";
+import type { Interceptor } from "../interceptor/engine";
 import { InterceptorValidator } from "../interceptor/validator.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
 
@@ -40,7 +40,7 @@ const POST_STATUS_PUBLISHED = "published";
  * - Authors can see published posts from other authors
  * - Readers can only see published posts
  */
-const POST_ACCESS_CONTROL: AfterRead = {
+const POST_ACCESS_CONTROL: Interceptor = {
   type: "afterRead",
   name: "post-access-control",
   async execute(datoms, ctx) {
@@ -158,7 +158,7 @@ const POST_ACCESS_CONTROL: AfterRead = {
  * Post validator interceptor
  * Validates that posts have required fields: title, author, and status
  */
-const POST_VALIDATOR: BeforeWrite = {
+const POST_VALIDATOR: Interceptor = {
   type: "beforeWrite",
   name: "post-validator",
   async execute(tx, ctx) {
@@ -236,7 +236,7 @@ const POST_VALIDATOR: BeforeWrite = {
  * Author validator interceptor
  * Validates that post authors are either authors or admins
  */
-const AUTHOR_VALIDATOR: BeforeWrite = {
+const AUTHOR_VALIDATOR: Interceptor = {
   type: "beforeWrite",
   name: "author-validator",
   async execute(tx, ctx) {
