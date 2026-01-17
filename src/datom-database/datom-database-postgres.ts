@@ -53,7 +53,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       // Create enum type for op column (handle error if already exists)
       try {
         await this.connection.execute(`
-          CREATE TYPE datom_op AS ENUM ('add', 'sub')
+          CREATE TYPE datom_op AS ENUM ('assert', 'retract')
         `);
       } catch (error) {
         // Type already exists, ignore error
@@ -78,8 +78,8 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_e_a_tx ON ${this.tableName}(e, a, tx DESC)`,
         // Composite index for attribute+value queries
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_v_tx ON ${this.tableName}(a, v, tx DESC)`,
-        // Partial index for op='add' (most common case - only active datoms)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(e, a, tx DESC) WHERE op = 'add'`,
+        // Partial index for op='assert' (most common case - only active datoms)
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(e, a, tx DESC) WHERE op = 'assert'`,
         // GIN index for JSONB value queries (containment, key existence, etc.)
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_v_gin ON ${this.tableName} USING GIN (v)`,
         // Index on tx for transaction-based queries
@@ -268,7 +268,10 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: typeof row.op === "string" && row.op === "add" ? "add" : "sub",
+        op:
+          typeof row.op === "string" && row.op === "assert"
+            ? "assert"
+            : "retract",
       };
     });
   }
@@ -321,10 +324,10 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     // Build the op filter for after DISTINCT ON
     // Default behavior: filter to only add datoms (exclude sub)
     let opFilterAfter = "";
-    if (options.op === undefined || options.op === "add") {
-      opFilterAfter = "WHERE op = 'add'";
-    } else if (options.op === "sub") {
-      opFilterAfter = "WHERE op = 'sub'";
+    if (options.op === undefined || options.op === "assert") {
+      opFilterAfter = "WHERE op = 'assert'";
+    } else if (options.op === "retract") {
+      opFilterAfter = "WHERE op = 'retract'";
     }
 
     const sql = `
@@ -419,7 +422,10 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: typeof row.op === "string" && row.op === "add" ? "add" : "sub",
+        op:
+          typeof row.op === "string" && row.op === "assert"
+            ? "assert"
+            : "retract",
       };
     });
   }
@@ -482,7 +488,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         tx,
         op
       FROM latest_datoms
-      WHERE op = 'add'
+      WHERE op = 'assert'
       ORDER BY
         CASE 
           WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
@@ -620,7 +626,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         tx,
         op
       FROM latest_datoms
-      WHERE op = 'add'
+      WHERE op = 'assert'
       ORDER BY
         CASE 
           WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
@@ -704,7 +710,10 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: typeof row.op === "string" && row.op === "add" ? "add" : "sub",
+        op:
+          typeof row.op === "string" && row.op === "assert"
+            ? "assert"
+            : "retract",
       };
     });
   }
@@ -828,7 +837,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       e: entity,
       a: attribute,
       v: value,
-      op: "add",
+      op: "assert",
     });
   }
 
@@ -936,7 +945,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, "add"];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, "assert"];
     });
 
     await this.connection.execute(sql, params);
@@ -960,7 +969,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, "sub"];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, "retract"];
     });
 
     await this.connection.execute(sql, params);
@@ -1058,7 +1067,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       )
       SELECT COUNT(*) as count
       FROM latest_datoms
-      WHERE op = 'add'
+      WHERE op = 'assert'
     `;
     const countResult = await this.connection.query(countSql);
     const countRow = countResult[0] as Record<string, unknown> | undefined;
@@ -1072,7 +1081,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     const entitySql = `
       SELECT COUNT(DISTINCT e) as count
       FROM ${this.tableName}
-      WHERE op = 'add'
+      WHERE op = 'assert'
     `;
     const entityResult = await this.connection.query(entitySql);
     const entityRow = entityResult[0] as Record<string, unknown> | undefined;

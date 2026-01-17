@@ -19,9 +19,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should find minimum numeric value", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "age", v: 25 },
-        { op: "add", e: 2, a: "age", v: 30 },
-        { op: "add", e: 3, a: "age", v: 20 },
+        { op: "assert", e: 1, a: "age", v: 25 },
+        { op: "assert", e: 2, a: "age", v: 30 },
+        { op: "assert", e: 3, a: "age", v: 20 },
       ]);
 
       const query: DatalogQuery = {
@@ -54,7 +54,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should find minimum of single value", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "price", v: 100 }]);
+      await db.transact([{ op: "assert", e: 1, a: "price", v: 100 }]);
 
       const query: DatalogQuery = {
         find: { minimum: ["min", "?price"] },
@@ -71,9 +71,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should find minimum with negative numbers", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "value", v: 10 },
-        { op: "add", e: 2, a: "value", v: -5 },
-        { op: "add", e: 3, a: "value", v: 3 },
+        { op: "assert", e: 1, a: "value", v: 10 },
+        { op: "assert", e: 2, a: "value", v: -5 },
+        { op: "assert", e: 3, a: "value", v: 3 },
       ]);
 
       const query: DatalogQuery = {
@@ -91,9 +91,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should find minimum decimal numbers", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "price", v: 10.5 },
-        { op: "add", e: 2, a: "price", v: 5.25 },
-        { op: "add", e: 3, a: "price", v: 15.75 },
+        { op: "assert", e: 1, a: "price", v: 10.5 },
+        { op: "assert", e: 2, a: "price", v: 5.25 },
+        { op: "assert", e: 3, a: "price", v: 15.75 },
       ]);
 
       const query: DatalogQuery = {
@@ -111,9 +111,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should find minimum string values", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "name", v: "Charlie" },
-        { op: "add", e: 2, a: "name", v: "Alice" },
-        { op: "add", e: 3, a: "name", v: "Bob" },
+        { op: "assert", e: 1, a: "name", v: "Charlie" },
+        { op: "assert", e: 2, a: "name", v: "Alice" },
+        { op: "assert", e: 3, a: "name", v: "Bob" },
       ]);
 
       const query: DatalogQuery = {
@@ -131,12 +131,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should find minimum with filters", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "type", v: "product" },
-        { op: "add", e: 1, a: "price", v: 100 },
-        { op: "add", e: 2, a: "type", v: "product" },
-        { op: "add", e: 2, a: "price", v: 50 },
-        { op: "add", e: 3, a: "type", v: "service" },
-        { op: "add", e: 3, a: "price", v: 25 },
+        { op: "assert", e: 1, a: "type", v: "product" },
+        { op: "assert", e: 1, a: "price", v: 100 },
+        { op: "assert", e: 2, a: "type", v: "product" },
+        { op: "assert", e: 2, a: "price", v: 50 },
+        { op: "assert", e: 3, a: "type", v: "service" },
+        { op: "assert", e: 3, a: "price", v: 25 },
       ]);
 
       const query: DatalogQuery = {
@@ -157,9 +157,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should find minimum with duplicate values", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "value", v: 10 },
-        { op: "add", e: 2, a: "value", v: 10 },
-        { op: "add", e: 3, a: "value", v: 20 },
+        { op: "assert", e: 1, a: "value", v: 10 },
+        { op: "assert", e: 2, a: "value", v: 10 },
+        { op: "assert", e: 3, a: "value", v: 20 },
       ]);
 
       const query: DatalogQuery = {

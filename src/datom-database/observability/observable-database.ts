@@ -60,8 +60,8 @@ export class ObservableDatabase {
     ops: DatomInput[],
     metadata?: Record<string, unknown>
   ): Promise<TransactionId> {
-    const addCount = ops.filter((op) => op.op === "add").length;
-    const subCount = ops.filter((op) => op.op === "sub").length;
+    const addCount = ops.filter((op) => op.op === "assert").length;
+    const subCount = ops.filter((op) => op.op === "retract").length;
     const startTime = Date.now();
 
     try {

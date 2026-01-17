@@ -19,9 +19,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should find minimum value when values exist", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "age", v: 25 },
-        { op: "add", e: 2, a: "age", v: 30 },
-        { op: "add", e: 3, a: "age", v: 20 },
+        { op: "assert", e: 1, a: "age", v: 25 },
+        { op: "assert", e: 2, a: "age", v: 30 },
+        { op: "assert", e: 3, a: "age", v: 20 },
       ]);
 
       const query: DatalogQuery = {
@@ -53,7 +53,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should find minimum of single value", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "price", v: 100 }]);
+      await db.transact([{ op: "assert", e: 1, a: "price", v: 100 }]);
 
       const query: DatalogQuery = {
         find: { minimum: ["min", "0", "?price"] },
@@ -70,8 +70,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should find minimum with numeric default", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "value", v: 10 },
-        { op: "add", e: 2, a: "value", v: 20 },
+        { op: "assert", e: 1, a: "value", v: 10 },
+        { op: "assert", e: 2, a: "value", v: 20 },
       ]);
 
       const query: DatalogQuery = {
@@ -89,8 +89,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should use default when all values are filtered out", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "type", v: "product" },
-        { op: "add", e: 1, a: "price", v: 100 },
+        { op: "assert", e: 1, a: "type", v: "product" },
+        { op: "assert", e: 1, a: "price", v: 100 },
       ]);
 
       const query: DatalogQuery = {
@@ -111,9 +111,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should find minimum with string default", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "name", v: "Charlie" },
-        { op: "add", e: 2, a: "name", v: "Alice" },
-        { op: "add", e: 3, a: "name", v: "Bob" },
+        { op: "assert", e: 1, a: "name", v: "Charlie" },
+        { op: "assert", e: 2, a: "name", v: "Alice" },
+        { op: "assert", e: 3, a: "name", v: "Bob" },
       ]);
 
       const query: DatalogQuery = {
@@ -131,8 +131,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle default with different data types", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "value", v: 10 },
-        { op: "add", e: 2, a: "value", v: 20 },
+        { op: "assert", e: 1, a: "value", v: 10 },
+        { op: "assert", e: 2, a: "value", v: 20 },
       ]);
 
       const query: DatalogQuery = {

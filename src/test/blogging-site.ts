@@ -219,7 +219,7 @@ export const AUTHOR_VALIDATOR: Hook = {
 
     // Find all post author assignments
     for (const datom of tx.datoms) {
-      if (datom.a === POST_AUTHOR && datom.op === "add") {
+      if (datom.a === POST_AUTHOR && datom.op === "assert") {
         const authorId = datom.v as number;
         const authorDatoms = await db.datoms({ e: authorId });
         const authorRecord = records(authorDatoms)[0] || {};

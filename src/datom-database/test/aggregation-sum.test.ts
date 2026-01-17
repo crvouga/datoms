@@ -19,9 +19,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should sum numeric values", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "age", v: 25 },
-        { op: "add", e: 2, a: "age", v: 30 },
-        { op: "add", e: 3, a: "age", v: 35 },
+        { op: "assert", e: 1, a: "age", v: 25 },
+        { op: "assert", e: 2, a: "age", v: 30 },
+        { op: "assert", e: 3, a: "age", v: 35 },
       ]);
 
       const query: DatalogQuery = {
@@ -52,7 +52,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should sum single value", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "price", v: 100 }]);
+      await db.transact([{ op: "assert", e: 1, a: "price", v: 100 }]);
 
       const query: DatalogQuery = {
         find: { total: ["sum", "?price"] },
@@ -69,9 +69,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should sum negative numbers", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "value", v: 10 },
-        { op: "add", e: 2, a: "value", v: -5 },
-        { op: "add", e: 3, a: "value", v: 3 },
+        { op: "assert", e: 1, a: "value", v: 10 },
+        { op: "assert", e: 2, a: "value", v: -5 },
+        { op: "assert", e: 3, a: "value", v: 3 },
       ]);
 
       const query: DatalogQuery = {
@@ -89,9 +89,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should sum decimal numbers", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "price", v: 10.5 },
-        { op: "add", e: 2, a: "price", v: 20.25 },
-        { op: "add", e: 3, a: "price", v: 5.75 },
+        { op: "assert", e: 1, a: "price", v: 10.5 },
+        { op: "assert", e: 2, a: "price", v: 20.25 },
+        { op: "assert", e: 3, a: "price", v: 5.75 },
       ]);
 
       const query: DatalogQuery = {
@@ -109,12 +109,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should sum with filters", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "type", v: "product" },
-        { op: "add", e: 1, a: "price", v: 100 },
-        { op: "add", e: 2, a: "type", v: "product" },
-        { op: "add", e: 2, a: "price", v: 200 },
-        { op: "add", e: 3, a: "type", v: "service" },
-        { op: "add", e: 3, a: "price", v: 50 },
+        { op: "assert", e: 1, a: "type", v: "product" },
+        { op: "assert", e: 1, a: "price", v: 100 },
+        { op: "assert", e: 2, a: "type", v: "product" },
+        { op: "assert", e: 2, a: "price", v: 200 },
+        { op: "assert", e: 3, a: "type", v: "service" },
+        { op: "assert", e: 3, a: "price", v: 50 },
       ]);
 
       const query: DatalogQuery = {
@@ -135,9 +135,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should sum large numbers", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "value", v: 1000000 },
-        { op: "add", e: 2, a: "value", v: 2000000 },
-        { op: "add", e: 3, a: "value", v: 3000000 },
+        { op: "assert", e: 1, a: "value", v: 1000000 },
+        { op: "assert", e: 2, a: "value", v: 2000000 },
+        { op: "assert", e: 3, a: "value", v: 3000000 },
       ]);
 
       const query: DatalogQuery = {

@@ -19,9 +19,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should count distinct values", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "name", v: "Alice" },
-        { op: "add", e: 2, a: "name", v: "Bob" },
-        { op: "add", e: 3, a: "name", v: "Alice" },
+        { op: "assert", e: 1, a: "name", v: "Alice" },
+        { op: "assert", e: 2, a: "name", v: "Bob" },
+        { op: "assert", e: 3, a: "name", v: "Alice" },
       ]);
 
       const query: DatalogQuery = {
@@ -52,7 +52,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should count distinct single value", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       const query: DatalogQuery = {
         find: { total: ["count-distinct", "?name"] },
@@ -69,11 +69,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should count distinct numeric values", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "age", v: 25 },
-        { op: "add", e: 2, a: "age", v: 30 },
-        { op: "add", e: 3, a: "age", v: 25 },
-        { op: "add", e: 4, a: "age", v: 30 },
-        { op: "add", e: 5, a: "age", v: 35 },
+        { op: "assert", e: 1, a: "age", v: 25 },
+        { op: "assert", e: 2, a: "age", v: 30 },
+        { op: "assert", e: 3, a: "age", v: 25 },
+        { op: "assert", e: 4, a: "age", v: 30 },
+        { op: "assert", e: 5, a: "age", v: 35 },
       ]);
 
       const query: DatalogQuery = {
@@ -91,12 +91,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should count distinct with filters", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "type", v: "person" },
-        { op: "add", e: 1, a: "city", v: "NYC" },
-        { op: "add", e: 2, a: "type", v: "person" },
-        { op: "add", e: 2, a: "city", v: "LA" },
-        { op: "add", e: 3, a: "type", v: "person" },
-        { op: "add", e: 3, a: "city", v: "NYC" },
+        { op: "assert", e: 1, a: "type", v: "person" },
+        { op: "assert", e: 1, a: "city", v: "NYC" },
+        { op: "assert", e: 2, a: "type", v: "person" },
+        { op: "assert", e: 2, a: "city", v: "LA" },
+        { op: "assert", e: 3, a: "type", v: "person" },
+        { op: "assert", e: 3, a: "city", v: "NYC" },
       ]);
 
       const query: DatalogQuery = {
@@ -117,10 +117,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should count distinct different data types", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "value", v: 42 },
-        { op: "add", e: 2, a: "value", v: "test" },
-        { op: "add", e: 3, a: "value", v: 42 },
-        { op: "add", e: 4, a: "value", v: true },
+        { op: "assert", e: 1, a: "value", v: 42 },
+        { op: "assert", e: 2, a: "value", v: "test" },
+        { op: "assert", e: 3, a: "value", v: 42 },
+        { op: "assert", e: 4, a: "value", v: true },
       ]);
 
       const query: DatalogQuery = {

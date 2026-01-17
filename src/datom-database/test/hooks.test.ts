@@ -27,7 +27,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
     test("should register before-read hook", async () => {
       const { db } = f;
 
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       let called = false;
       const hook: BeforeRead = {
@@ -52,7 +52,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
     test("should register after-read hook", async () => {
       const { db } = f;
 
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       let called = false;
       const hook: AfterRead = {
@@ -88,7 +88,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       };
 
       db.hooks.register(hook);
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       expect(called).toBe(true);
       await db.close();
@@ -107,7 +107,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       };
 
       db.hooks.register(hook);
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       // Wait a bit for async after-write hooks
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -122,8 +122,8 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       const { db } = f;
 
       await db.transact([
-        { op: "add", e: 1, a: "name", v: "Alice" },
-        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "assert", e: 1, a: "name", v: "Alice" },
+        { op: "assert", e: 2, a: "name", v: "Bob" },
       ]);
 
       const hook: BeforeRead = {
@@ -248,9 +248,9 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       const { db } = f;
 
       await db.transact([
-        { op: "add", e: 1, a: "name", v: "Alice" },
-        { op: "add", e: 2, a: "name", v: "Bob" },
-        { op: "add", e: 3, a: "name", v: "Alice" },
+        { op: "assert", e: 1, a: "name", v: "Alice" },
+        { op: "assert", e: 2, a: "name", v: "Bob" },
+        { op: "assert", e: 3, a: "name", v: "Alice" },
       ]);
 
       const hook: AfterRead = {
@@ -277,7 +277,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
     test("should transform results", async () => {
       const { db } = f;
 
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       const hook: AfterRead = {
         type: "afterRead",
@@ -310,9 +310,9 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       const { db } = f;
 
       await db.transact([
-        { op: "add", e: 1, a: "name", v: "Alice" },
-        { op: "add", e: 2, a: "name", v: "Bob" },
-        { op: "add", e: 3, a: "name", v: "Charlie" },
+        { op: "assert", e: 1, a: "name", v: "Alice" },
+        { op: "assert", e: 2, a: "name", v: "Bob" },
+        { op: "assert", e: 3, a: "name", v: "Charlie" },
       ]);
 
       const hook1: AfterRead = {
@@ -347,7 +347,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
     test("should pass context to after-read hook", async () => {
       const { db } = f;
 
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       let receivedContext: Record<string, unknown> | undefined;
 
@@ -407,12 +407,12 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       // Valid email should succeed
       await db.transact([
-        { op: "add", e: 1, a: "email", v: "alice@example.com" },
+        { op: "assert", e: 1, a: "email", v: "alice@example.com" },
       ]);
 
       // Invalid email should fail
       await expect(
-        db.transact([{ op: "add", e: 2, a: "email", v: "invalid-email" }])
+        db.transact([{ op: "assert", e: 2, a: "email", v: "invalid-email" }])
       ).rejects.toThrow(TransactionError);
 
       await db.close();
@@ -437,7 +437,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
             a: "updatedAt",
             v: new Date().toISOString(),
             tx: tx.datoms[0]?.tx || 0,
-            op: "add",
+            op: "assert",
           });
 
           return {
@@ -451,7 +451,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       db.hooks.register(hook);
 
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       const datoms = await db.datoms({ e: 1 });
       const hasTimestamp = datoms.some((d) => d.a === "updatedAt");
@@ -486,7 +486,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hooks.register(hook1);
       db.hooks.register(hook2);
 
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       expect(firstCalled).toBe(true);
       expect(secondCalled).toBe(false);
@@ -510,7 +510,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hooks.register(hook);
 
       await db.transact(
-        [{ op: "add", e: 1, a: "name", v: "Alice" }],
+        [{ op: "assert", e: 1, a: "name", v: "Alice" }],
         { userId: "alice", reason: "test" },
         { source: "client", ip: "127.0.0.1" }
       );
@@ -568,11 +568,11 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hooks.register(hook2);
 
       // This should pass (no errors)
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       // This should fail with age validation error
       await expect(
-        db.transact([{ op: "add", e: 2, a: "age", v: -5 }])
+        db.transact([{ op: "assert", e: 2, a: "age", v: -5 }])
       ).rejects.toThrow(TransactionError);
 
       await db.close();
@@ -597,7 +597,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       db.hooks.register(hook);
 
-      void (await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]));
+      void (await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]));
 
       // Wait for async after-write hooks
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -632,7 +632,9 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       try {
         // Transaction should succeed even if after-write hook fails
-        void (await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]));
+        void (await db.transact([
+          { op: "assert", e: 1, a: "name", v: "Alice" },
+        ]));
 
         // Wait for async after-write hooks to complete
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -672,7 +674,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hooks.register(hook1);
       db.hooks.register(hook2);
 
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       // Wait for async after-write hooks
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -697,7 +699,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hooks.register(hook);
 
       await db.transact(
-        [{ op: "add", e: 1, a: "name", v: "Alice" }],
+        [{ op: "assert", e: 1, a: "name", v: "Alice" }],
         { userId: "alice", reason: "test" },
         { source: "client", ip: "127.0.0.1" }
       );
@@ -753,7 +755,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         a: "email",
         v: "invalid",
         tx: 1,
-        op: "add" as const,
+        op: "assert" as const,
       };
 
       validator.assert(false, "Invalid email", "INVALID_EMAIL", datom);
@@ -791,7 +793,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hooks.register(readHook);
       db.hooks.register(writeHook);
 
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
       expect(writeCalled).toBe(true);
 
       await db.query({
@@ -830,7 +832,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hooks.register(hook);
 
       try {
-        await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+        await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
         throw new Error("Should have thrown TransactionError");
       } catch (error: unknown) {
         expect(error).toBeInstanceOf(TransactionError);
@@ -882,7 +884,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hooks.register(hook2);
       db.hooks.register(hook3);
 
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       expect(executionOrder).toEqual(["first", "second", "third"]);
       await db.close();
@@ -914,7 +916,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
     test("should handle sub operations with hooks", async () => {
       const { db } = f;
 
-      await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       let called = false;
       const hook: BeforeWrite = {
@@ -922,7 +924,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         name: "sub-handler",
         execute: async (tx) => {
           called = true;
-          const subs = tx.datoms.filter((d) => d.op === "sub");
+          const subs = tx.datoms.filter((d) => d.op === "retract");
           expect(subs.length).toBeGreaterThan(0);
           return { tx };
         },
@@ -930,7 +932,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       db.hooks.register(hook);
 
-      await db.transact([{ op: "sub", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "retract", e: 1, a: "name", v: "Alice" }]);
 
       expect(called).toBe(true);
       const datoms = await db.datoms({ e: 1 });

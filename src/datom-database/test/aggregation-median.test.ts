@@ -19,9 +19,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should calculate median of odd number of values", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "age", v: 20 },
-        { op: "add", e: 2, a: "age", v: 30 },
-        { op: "add", e: 3, a: "age", v: 40 },
+        { op: "assert", e: 1, a: "age", v: 20 },
+        { op: "assert", e: 2, a: "age", v: 30 },
+        { op: "assert", e: 3, a: "age", v: 40 },
       ]);
 
       const query: DatalogQuery = {
@@ -39,10 +39,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should calculate median of even number of values", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "age", v: 20 },
-        { op: "add", e: 2, a: "age", v: 30 },
-        { op: "add", e: 3, a: "age", v: 40 },
-        { op: "add", e: 4, a: "age", v: 50 },
+        { op: "assert", e: 1, a: "age", v: 20 },
+        { op: "assert", e: 2, a: "age", v: 30 },
+        { op: "assert", e: 3, a: "age", v: 40 },
+        { op: "assert", e: 4, a: "age", v: 50 },
       ]);
 
       const query: DatalogQuery = {
@@ -76,7 +76,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     test("should calculate median of single value", async () => {
       const { db } = f;
-      await db.transact([{ op: "add", e: 1, a: "score", v: 85 }]);
+      await db.transact([{ op: "assert", e: 1, a: "score", v: 85 }]);
 
       const query: DatalogQuery = {
         find: { median: ["median", "?score"] },
@@ -93,11 +93,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should calculate median with unsorted values", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "value", v: 50 },
-        { op: "add", e: 2, a: "value", v: 10 },
-        { op: "add", e: 3, a: "value", v: 30 },
-        { op: "add", e: 4, a: "value", v: 20 },
-        { op: "add", e: 5, a: "value", v: 40 },
+        { op: "assert", e: 1, a: "value", v: 50 },
+        { op: "assert", e: 2, a: "value", v: 10 },
+        { op: "assert", e: 3, a: "value", v: 30 },
+        { op: "assert", e: 4, a: "value", v: 20 },
+        { op: "assert", e: 5, a: "value", v: 40 },
       ]);
 
       const query: DatalogQuery = {
@@ -116,10 +116,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should calculate median with duplicate values", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "value", v: 10 },
-        { op: "add", e: 2, a: "value", v: 20 },
-        { op: "add", e: 3, a: "value", v: 20 },
-        { op: "add", e: 4, a: "value", v: 30 },
+        { op: "assert", e: 1, a: "value", v: 10 },
+        { op: "assert", e: 2, a: "value", v: 20 },
+        { op: "assert", e: 3, a: "value", v: 20 },
+        { op: "assert", e: 4, a: "value", v: 30 },
       ]);
 
       const query: DatalogQuery = {
@@ -138,14 +138,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should calculate median with filters", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "type", v: "student" },
-        { op: "add", e: 1, a: "score", v: 80 },
-        { op: "add", e: 2, a: "type", v: "student" },
-        { op: "add", e: 2, a: "score", v: 90 },
-        { op: "add", e: 3, a: "type", v: "student" },
-        { op: "add", e: 3, a: "score", v: 100 },
-        { op: "add", e: 4, a: "type", v: "teacher" },
-        { op: "add", e: 4, a: "score", v: 95 },
+        { op: "assert", e: 1, a: "type", v: "student" },
+        { op: "assert", e: 1, a: "score", v: 80 },
+        { op: "assert", e: 2, a: "type", v: "student" },
+        { op: "assert", e: 2, a: "score", v: 90 },
+        { op: "assert", e: 3, a: "type", v: "student" },
+        { op: "assert", e: 3, a: "score", v: 100 },
+        { op: "assert", e: 4, a: "type", v: "teacher" },
+        { op: "assert", e: 4, a: "score", v: 95 },
       ]);
 
       const query: DatalogQuery = {
@@ -167,10 +167,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should calculate median with decimal numbers", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "price", v: 10.5 },
-        { op: "add", e: 2, a: "price", v: 20.5 },
-        { op: "add", e: 3, a: "price", v: 30.5 },
-        { op: "add", e: 4, a: "price", v: 40.5 },
+        { op: "assert", e: 1, a: "price", v: 10.5 },
+        { op: "assert", e: 2, a: "price", v: 20.5 },
+        { op: "assert", e: 3, a: "price", v: 30.5 },
+        { op: "assert", e: 4, a: "price", v: 40.5 },
       ]);
 
       const query: DatalogQuery = {

@@ -72,7 +72,7 @@ export async function importDatoms(
   for await (const datom of source) {
     // Convert Datom to DatomInput
     batch.push({ e: datom.e, a: datom.a, v: datom.v, op: datom.op });
-    batchAdd.push(datom.op === "add");
+    batchAdd.push(datom.op === "assert");
 
     if (batch.length >= batchSize) {
       // Process batch: separate add and sub datoms
@@ -108,7 +108,7 @@ export async function importDatoms(
       if (filteredadd.length > 0) {
         await db.transact(
           filteredadd.map((d) => ({
-            op: "add" as const,
+            op: "assert" as const,
             e: d.e,
             a: d.a,
             v: d.v,
@@ -118,7 +118,7 @@ export async function importDatoms(
       if (filteredsub.length > 0) {
         await db.transact(
           filteredsub.map((d) => ({
-            op: "sub" as const,
+            op: "retract" as const,
             e: d.e,
             a: d.a,
             v: d.v,
@@ -167,7 +167,7 @@ export async function importDatoms(
     if (filteredadd.length > 0) {
       await db.transact(
         filteredadd.map((d) => ({
-          op: "add" as const,
+          op: "assert" as const,
           e: d.e,
           a: d.a,
           v: d.v,
@@ -177,7 +177,7 @@ export async function importDatoms(
     if (filteredsub.length > 0) {
       await db.transact(
         filteredsub.map((d) => ({
-          op: "sub" as const,
+          op: "retract" as const,
           e: d.e,
           a: d.a,
           v: d.v,

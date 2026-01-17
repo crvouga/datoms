@@ -53,10 +53,10 @@ export type Value =
  */
 export type TransactionId = number;
 
-export type DatomOperation = "add" | "sub";
+export type DatomOperation = "assert" | "retract";
 
 /**
- * A datom represents a fact: { e: entity, a: attribute, v: value, tx: transaction, op: "add" | "sub" }
+ * A datom represents a fact: { e: entity, a: attribute, v: value, tx: transaction, op: "assert" | "retract" }
  * This is the fundamental unit of data in a datalog database
  */
 export type Datom = {
@@ -92,14 +92,14 @@ export type DatomInput = {
  * Converts records with an `entityId` property into an array of `DatomInput` objects.
  *
  * This utility function simplifies the creation of datoms from object records by automatically
- * converting each property (except `entityId`) into a datom with `op: "add"`.
+ * converting each property (except `entityId`) into a datom with `op: "assert"`.
  *
  * **Features:**
  * - Accepts variadic arguments (multiple records or arrays of records)
  * - Flattens nested arrays automatically
  * - Converts each property to a datom attribute-value pair
  * - Uses the record's `entityId` as the entity ID for all generated datoms
- * - Sets operation to `"add"` for all generated datoms
+ * - Sets operation to `"assert"` for all generated datoms
  *
  * **Type Safety:**
  * - Requires records to have an `entityId` property of type `EntityId`
@@ -120,10 +120,10 @@ export type DatomInput = {
  * });
  * // Returns:
  * // [
- * //   { e: 1, a: "entityId", v: 1, op: "add" },
- * //   { e: 1, a: "name", v: "Alice", op: "add" },
- * //   { e: 1, a: "age", v: 30, op: "add" },
- * //   { e: 1, a: "active", v: true, op: "add" }
+ * //   { e: 1, a: "entityId", v: 1, op: "assert" },
+ * //   { e: 1, a: "name", v: "Alice", op: "assert" },
+ * //   { e: 1, a: "age", v: 30, op: "assert" },
+ * //   { e: 1, a: "active", v: true, op: "assert" }
  * // ]
  *
  * @example
@@ -173,7 +173,7 @@ export const datoms = <T extends { entityId: EntityId; op?: DatomOperation }>(
           e: r.entityId,
           a: key,
           v: value as Value,
-          op: r.op ?? "add",
+          op: r.op ?? "assert",
         });
       }
       return datoms;
@@ -210,25 +210,25 @@ export const datoms = <T extends { entityId: EntityId; op?: DatomOperation }>(
  * @example
  * // Single entity from datoms
  * const result = records(
- *   { e: 1, a: "name", v: "Alice", op: "add" },
- *   { e: 1, a: "age", v: 30, op: "add" }
+ *   { e: 1, a: "name", v: "Alice", op: "assert" },
+ *   { e: 1, a: "age", v: 30, op: "assert" }
  * );
  * // Returns: [{ name: "Alice", age: 30 }]
  *
  * @example
  * // Multiple entities
  * const result = records(
- *   { e: 1, a: "name", v: "Alice", op: "add" },
- *   { e: 2, a: "name", v: "Bob", op: "add" }
+ *   { e: 1, a: "name", v: "Alice", op: "assert" },
+ *   { e: 2, a: "name", v: "Bob", op: "assert" }
  * );
  * // Returns: [{ name: "Alice" }, { name: "Bob" }]
  *
  * @example
  * // Array of datoms
  * const datoms = [
- *   { e: 1, a: "name", v: "Alice", op: "add" },
- *   { e: 1, a: "age", v: 30, op: "add" },
- *   { e: 2, a: "name", v: "Bob", op: "add" }
+ *   { e: 1, a: "name", v: "Alice", op: "assert" },
+ *   { e: 1, a: "age", v: 30, op: "assert" },
+ *   { e: 2, a: "name", v: "Bob", op: "assert" }
  * ];
  * const result = records(datoms);
  * // Returns: [{ name: "Alice", age: 30 }, { name: "Bob" }]
@@ -236,10 +236,10 @@ export const datoms = <T extends { entityId: EntityId; op?: DatomOperation }>(
  * @example
  * // Mixed datoms and arrays
  * const result = records(
- *   { e: 1, a: "name", v: "Alice", op: "add" },
+ *   { e: 1, a: "name", v: "Alice", op: "assert" },
  *   [
- *     { e: 2, a: "name", v: "Bob", op: "add" },
- *     { e: 3, a: "name", v: "Charlie", op: "add" }
+ *     { e: 2, a: "name", v: "Bob", op: "assert" },
+ *     { e: 3, a: "name", v: "Charlie", op: "assert" }
  *   ]
  * );
  * // Returns: [{ name: "Alice" }, { name: "Bob" }, { name: "Charlie" }]

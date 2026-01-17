@@ -19,8 +19,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should execute simple query", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "name", v: "Alice" },
-        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "assert", e: 1, a: "name", v: "Alice" },
+        { op: "assert", e: 2, a: "name", v: "Bob" },
       ]);
 
       const query: DatalogQuery = {
@@ -56,9 +56,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should filter by constant in where clause", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "type", v: "person" },
-        { op: "add", e: 2, a: "type", v: "car" },
-        { op: "add", e: 3, a: "type", v: "person" },
+        { op: "assert", e: 1, a: "type", v: "person" },
+        { op: "assert", e: 2, a: "type", v: "car" },
+        { op: "assert", e: 3, a: "type", v: "person" },
       ]);
 
       const query: DatalogQuery = {
@@ -75,8 +75,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle empty find clause", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "name", v: "Alice" },
-        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "assert", e: 1, a: "name", v: "Alice" },
+        { op: "assert", e: 2, a: "name", v: "Bob" },
       ]);
 
       const query: DatalogQuery = {
@@ -95,8 +95,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should handle find variables not in where clause", async () => {
       const { db } = f;
       await db.transact([
-        { op: "add", e: 1, a: "name", v: "Alice" },
-        { op: "add", e: 2, a: "name", v: "Bob" },
+        { op: "assert", e: 1, a: "name", v: "Alice" },
+        { op: "assert", e: 2, a: "name", v: "Bob" },
       ]);
 
       const query: DatalogQuery = {

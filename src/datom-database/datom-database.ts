@@ -360,10 +360,10 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
     }
 
     // Apply op filter
-    if (options.op === undefined || options.op === "add") {
-      results = results.filter((d) => d.op === "add");
-    } else if (options.op === "sub") {
-      results = results.filter((d) => d.op === "sub");
+    if (options.op === undefined || options.op === "assert") {
+      results = results.filter((d) => d.op === "assert");
+    } else if (options.op === "retract") {
+      results = results.filter((d) => d.op === "retract");
     }
 
     // Apply pagination
@@ -534,13 +534,13 @@ export abstract class DatomDatabase implements DatabaseView {
    * @returns The transaction ID
    * @example
    * await db.transact([
-   *   { op: "add", e: 300, a: "status", v: "active" },
-   *   { op: "sub", e: 42, a: "type", v: "cat" }
+   *   { op: "assert", e: 300, a: "status", v: "active" },
+   *   { op: "retract", e: 42, a: "type", v: "cat" }
    * ]);
    *
    * // With metadata and context
    * await db.transact(
-   *   [{ op: "add", e: 300, a: "status", v: "active" }],
+   *   [{ op: "assert", e: 300, a: "status", v: "active" }],
    *   { userId: "alice", reason: "status_update" },
    *   { userId: "alice", syncSource: "client" }
    * );
@@ -566,7 +566,7 @@ export abstract class DatomDatabase implements DatabaseView {
     for (const op of ops.flat()) {
       const datom = { e: op.e, a: op.a, v: op.v, op: op.op };
 
-      if (op.op === "add") {
+      if (op.op === "assert") {
         // Validate add, accounting for subs already processed
         await this.validateDatoms([datom], true, subs);
         adds.push(datom);
@@ -588,7 +588,7 @@ export abstract class DatomDatabase implements DatabaseView {
         a: sub.a,
         v: sub.v,
         tx: txId,
-        op: "sub",
+        op: "retract",
       });
     }
 
@@ -598,7 +598,7 @@ export abstract class DatomDatabase implements DatabaseView {
         a: add.a,
         v: add.v,
         tx: txId,
-        op: "add",
+        op: "assert",
       });
     }
 
@@ -620,8 +620,8 @@ export abstract class DatomDatabase implements DatabaseView {
 
     // Apply subs first, then adds (using the modified transaction from hooks)
     const finalTx = beforeResult.tx;
-    const finalSubs = finalTx.datoms.filter((d) => d.op === "sub");
-    const finalAdds = finalTx.datoms.filter((d) => d.op === "add");
+    const finalSubs = finalTx.datoms.filter((d) => d.op === "retract");
+    const finalAdds = finalTx.datoms.filter((d) => d.op === "assert");
 
     let committedTxId: TransactionId;
     if (finalSubs.length > 0) {
@@ -846,8 +846,8 @@ export abstract class DatomDatabase implements DatabaseView {
       }
     }
 
-    // Filter out sub datoms (keep only op: "add")
-    return Array.from(deduplicated.values()).filter((d) => d.op === "add");
+    // Filter out sub datoms (keep only op: "assert")
+    return Array.from(deduplicated.values()).filter((d) => d.op === "assert");
   }
 
   /**
@@ -899,8 +899,8 @@ export abstract class DatomDatabase implements DatabaseView {
       }
     }
 
-    // Filter out sub datoms (keep only op: "add")
-    return Array.from(deduplicated.values()).filter((d) => d.op === "add");
+    // Filter out sub datoms (keep only op: "assert")
+    return Array.from(deduplicated.values()).filter((d) => d.op === "assert");
   }
 
   /**
@@ -1064,8 +1064,8 @@ export abstract class DatomDatabase implements DatabaseView {
    * @example
    * // Speculate on a transaction
    * const result = await db.with([
-   *   { op: "add", e: 1, a: "name", v: "Alice" },
-   *   { op: "sub", e: 1, a: "oldName", v: "Bob" }
+   *   { op: "assert", e: 1, a: "name", v: "Alice" },
+   *   { op: "retract", e: 1, a: "oldName", v: "Bob" }
    * ]);
    *
    * // Query the speculative state
@@ -1074,7 +1074,7 @@ export abstract class DatomDatabase implements DatabaseView {
    * console.log(result.txData);
    *
    * // To actually commit, use transact()
-   * await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
+   * await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
    */
   async with(ops: DatomInput[]): Promise<WithResult> {
     await this.ensureInitialized();
@@ -1095,7 +1095,7 @@ export abstract class DatomDatabase implements DatabaseView {
         op: op.op,
       };
 
-      if (op.op === "add") {
+      if (op.op === "assert") {
         speculativeAdds.push(speculativeDatom);
       } else {
         speculativesubs.push(speculativeDatom);

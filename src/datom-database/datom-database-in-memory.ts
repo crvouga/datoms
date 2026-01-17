@@ -63,7 +63,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
         a: datom.a,
         v: datom.v,
         tx,
-        op: "add",
+        op: "assert",
       });
     }
 
@@ -80,7 +80,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
         a: datom.a,
         v: datom.v,
         tx,
-        op: "sub",
+        op: "retract",
       });
     }
 
@@ -156,11 +156,11 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Apply op filter after deduplication
     // Default behavior: filter to only added datoms (exclude subed)
-    if (options.op === undefined || options.op === "add") {
-      results = results.filter((d) => d.op === "add");
-    } else if (options.op === "sub") {
-      // If explicitly requesting subions, filter by op: "sub"
-      results = results.filter((d) => d.op === "sub");
+    if (options.op === undefined || options.op === "assert") {
+      results = results.filter((d) => d.op === "assert");
+    } else if (options.op === "retract") {
+      // If explicitly requesting subions, filter by op: "retract"
+      results = results.filter((d) => d.op === "retract");
     }
 
     // Apply pagination
@@ -206,8 +206,10 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       }
     }
 
-    // Filter out sub datoms (keep only op: "add")
-    results = Array.from(deduplicated.values()).filter((d) => d.op === "add");
+    // Filter out sub datoms (keep only op: "assert")
+    results = Array.from(deduplicated.values()).filter(
+      (d) => d.op === "assert"
+    );
 
     // Apply pagination
     const offset = options.offset ?? 0;
@@ -289,8 +291,10 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       }
     }
 
-    // Filter out sub datoms (keep only op: "add")
-    results = Array.from(deduplicated.values()).filter((d) => d.op === "add");
+    // Filter out sub datoms (keep only op: "assert")
+    results = Array.from(deduplicated.values()).filter(
+      (d) => d.op === "assert"
+    );
 
     // Apply pagination
     const offset = options.offset ?? 0;
@@ -553,7 +557,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
           (other) => other.e === d.e && other.a === d.a && other.v === d.v
         )
         .sort((a, b) => b.tx - a.tx)[0];
-      return latestVersion?.op === "add" && latestVersion.tx === d.tx;
+      return latestVersion?.op === "assert" && latestVersion.tx === d.tx;
     });
     stats.totalDatoms = addDatoms.length;
 

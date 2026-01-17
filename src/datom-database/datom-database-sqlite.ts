@@ -56,7 +56,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
           a TEXT NOT NULL,
           v TEXT NOT NULL,
           tx INTEGER NOT NULL,
-          op TEXT NOT NULL CHECK(op IN ('add', 'sub')),
+          op TEXT NOT NULL CHECK(op IN ('assert', 'retract')),
           PRIMARY KEY (e, a, v, tx, op)
         )
       `;
@@ -208,7 +208,10 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: typeof row.op === "string" && row.op === "add" ? "add" : "sub",
+        op:
+          typeof row.op === "string" && row.op === "assert"
+            ? "assert"
+            : "retract",
       };
     });
   }
@@ -248,10 +251,10 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     // Build the op filter
     let opFilter = "";
-    if (options.op === undefined || options.op === "add") {
-      opFilter = "AND op = 'add'";
-    } else if (options.op === "sub") {
-      opFilter = "AND op = 'sub'";
+    if (options.op === undefined || options.op === "assert") {
+      opFilter = "AND op = 'assert'";
+    } else if (options.op === "retract") {
+      opFilter = "AND op = 'retract'";
     }
 
     const limitClause = options.limit ? "LIMIT ?" : "";
@@ -345,7 +348,10 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: typeof row.op === "string" && row.op === "add" ? "add" : "sub",
+        op:
+          typeof row.op === "string" && row.op === "assert"
+            ? "assert"
+            : "retract",
       };
     });
   }
@@ -412,7 +418,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         tx,
         op
       FROM ranked_datoms
-      WHERE rn = 1 AND op = 'add'
+      WHERE rn = 1 AND op = 'assert'
       ORDER BY
         CASE 
           WHEN e GLOB '-[0-9]*' OR e GLOB '[0-9]*' THEN CAST(e AS INTEGER)
@@ -554,7 +560,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         tx,
         op
       FROM ranked_datoms
-      WHERE rn = 1 AND op = 'add'
+      WHERE rn = 1 AND op = 'assert'
       ORDER BY
         CASE 
           WHEN e GLOB '-[0-9]*' OR e GLOB '[0-9]*' THEN CAST(e AS INTEGER)
@@ -626,7 +632,10 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: typeof row.op === "string" && row.op === "add" ? "add" : "sub",
+        op:
+          typeof row.op === "string" && row.op === "assert"
+            ? "assert"
+            : "retract",
       };
     });
   }
@@ -675,7 +684,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         e: entity,
         a: attribute,
         v: value,
-        op: "add",
+        op: "assert",
       });
 
       // Run after-read hooks
@@ -753,7 +762,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         e: entity,
         a: attribute,
         v: value,
-        op: "add",
+        op: "assert",
       });
 
       for (const datom of clauseDatoms) {
@@ -975,7 +984,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         ${alias} AS (
           SELECT e, a, v, tx
           FROM ${alias}_ranked
-          WHERE rn = 1 AND op = 'add'
+          WHERE rn = 1 AND op = 'assert'
         )`;
 
       // Store ranked CTE separately, then the final CTE
@@ -1280,7 +1289,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, "add"];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, "assert"];
     });
 
     await this.connection.execute(sql, params);
@@ -1304,7 +1313,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, "sub"];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, "retract"];
     });
 
     await this.connection.execute(sql, params);
@@ -1400,7 +1409,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       )
       SELECT COUNT(*) as count
       FROM latest_datoms
-      WHERE rn = 1 AND op = 'add'
+      WHERE rn = 1 AND op = 'assert'
     `;
     const countResult = await this.connection.query(countSql);
     const countRow = countResult[0] as Record<string, unknown> | undefined;
@@ -1411,7 +1420,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const entitySql = `
       SELECT COUNT(DISTINCT e) as count
       FROM ${this.tableName}
-      WHERE op = 'add'
+      WHERE op = 'assert'
     `;
     const entityResult = await this.connection.query(entitySql);
     const entityRow = entityResult[0] as Record<string, unknown> | undefined;
