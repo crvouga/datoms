@@ -70,7 +70,7 @@ export async function importDatoms(
 
   for await (const datom of source) {
     // Convert Datom to DatomInput
-    batch.push({ e: datom.e, a: datom.a, v: datom.v });
+    batch.push({ e: datom.e, a: datom.a, v: datom.v, op: datom.op });
     batchAdd.push(datom.op === "add");
 
     if (batch.length >= batchSize) {

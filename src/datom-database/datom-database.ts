@@ -25,8 +25,8 @@ import {
 import { InterceptorEngine } from "./interceptor-engine.js";
 import type { ReadContext, WriteContext } from "./interceptor-types.js";
 import {
-  isVariable,
   isQueryPattern,
+  isVariable,
   stripQuestionMark,
 } from "./shared/datalog-helpers.js";
 import { joinResults, project } from "./shared/query-helpers.js";
@@ -446,17 +446,6 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
 }
 
 /**
- * Transaction operations format for transact() method
- * Array of operations, each specifying whether to add or sub a datom
- */
-export type TransactOperations = Array<{
-  op: "add" | "sub";
-  e: EntityId;
-  a: Attribute;
-  v: Value;
-}>;
-
-/**
  * Abstract datom database class (Datomic-like minimal API)
  * Provides core operations: datoms, query, transact, and time-travel views
  * Concrete implementations: InMemoryDatabase, SQLiteDatabase, PostgreSQLDatabase
@@ -634,7 +623,7 @@ export abstract class DatomDatabase implements DatomReader {
    * );
    */
   async transact(
-    ops: TransactOperations,
+    ops: DatomInput[],
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>
   ): Promise<TransactionId> {
@@ -652,7 +641,7 @@ export abstract class DatomDatabase implements DatomReader {
     const subs: DatomInput[] = [];
 
     for (const op of ops) {
-      const datom = { e: op.e, a: op.a, v: op.v };
+      const datom = { e: op.e, a: op.a, v: op.v, op: op.op };
 
       if (op.op === "add") {
         // Validate add, accounting for subs already processed
@@ -708,20 +697,20 @@ export abstract class DatomDatabase implements DatomReader {
 
     // Apply subs first, then adds (using the modified transaction from interceptors)
     const finalTx = beforeResult.tx;
-    const finalsubs = finalTx.datoms.filter((d) => d.op === "sub");
+    const finalSubs = finalTx.datoms.filter((d) => d.op === "sub");
     const finalAdds = finalTx.datoms.filter((d) => d.op === "add");
 
     let committedTxId: TransactionId;
-    if (finalsubs.length > 0) {
+    if (finalSubs.length > 0) {
       committedTxId = await this.subDatoms(
-        finalsubs.map((d) => ({ e: d.e, a: d.a, v: d.v }))
+        finalSubs.map((d) => ({ e: d.e, a: d.a, v: d.v, op: d.op }))
       );
     }
     if (finalAdds.length > 0) {
       committedTxId = await this.addDatoms(
-        finalAdds.map((d) => ({ e: d.e, a: d.a, v: d.v }))
+        finalAdds.map((d) => ({ e: d.e, a: d.a, v: d.v, op: d.op }))
       );
-    } else if (finalsubs.length === 0) {
+    } else if (finalSubs.length === 0) {
       // If there are no operations, still create a new transaction ID
       committedTxId = await this.addDatoms([]);
     } else {
@@ -1159,7 +1148,7 @@ export abstract class DatomDatabase implements DatomReader {
    * // To actually commit, use transact()
    * await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
    */
-  async with(ops: TransactOperations): Promise<WithResult> {
+  async with(ops: DatomInput[]): Promise<WithResult> {
     await this.ensureInitialized();
 
     // Get the next transaction ID for speculative datoms

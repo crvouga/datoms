@@ -70,8 +70,27 @@ export type Datom = {
   op: "add" | "sub";
 };
 
+export const datoms = <T extends { entityId: EntityId }>(
+  ...records: (T | T[])[]
+): DatomInput[] => {
+  return records.flatMap((r) =>
+    (Array.isArray(r) ? r : [r]).flatMap((r) => {
+      const datoms: DatomInput[] = [];
+      for (const [key, value] of Object.entries(r)) {
+        datoms.push({
+          e: r.entityId,
+          a: key,
+          v: value as Value,
+          op: "add",
+        });
+      }
+      return datoms;
+    })
+  );
+};
+
 /**
- * A partial datom for adding/subing facts (without tx and add)
+ * A partial datom for adding/subtracting facts (without tx and add)
  * Tuple format: [entity, attribute, value]
  * This is more efficient and aligns with the fixed EAV structure
  */
@@ -82,6 +101,8 @@ export type DatomInput = {
   a: Attribute;
   /** The value of the attribute */
   v: Value;
+  /** The operation type (add or sub) */
+  op: "add" | "sub";
 };
 
 /**

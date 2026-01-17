@@ -1,14 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
+import { datoms, type Datom } from "../../types.js";
+import type { DatomDatabase } from "../datom-database.js";
+import { TransactionError } from "../errors.js";
 import type {
   AfterReadInterceptor,
-  BeforeReadInterceptor,
   BeforeWriteInterceptor,
 } from "../interceptor-types.js";
-import type { DatomDatabase } from "../datom-database.js";
-import type { Datom } from "../../types.js";
 import { InterceptorValidator } from "../interceptor-validator.js";
-import { TransactionError } from "../errors.js";
 import { Fixture, FIXTURES } from "./fixtures.js";
 
 // Schema constants
@@ -296,11 +295,14 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should create admin user", async () => {
       const { db } = f;
 
-      await db.transact([
-        { op: "add", e: 1, a: USER_TYPE, v: USER_TYPE_ADMIN },
-        { op: "add", e: 1, a: USER_NAME, v: "Admin User" },
-        { op: "add", e: 1, a: USER_EMAIL, v: "admin@example.com" },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 1,
+          [USER_TYPE]: USER_TYPE_ADMIN,
+          [USER_NAME]: "Admin User",
+          "user/email": "admin@example.com",
+        })
+      );
 
       const results = await db.query({
         find: { e: ["?e"], name: ["?name"], email: ["?email"] },
@@ -320,11 +322,14 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should create author user", async () => {
       const { db } = f;
 
-      await db.transact([
-        { op: "add", e: 2, a: USER_TYPE, v: USER_TYPE_AUTHOR },
-        { op: "add", e: 2, a: USER_NAME, v: "Author User" },
-        { op: "add", e: 2, a: USER_EMAIL, v: "author@example.com" },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 2,
+          [USER_TYPE]: USER_TYPE_AUTHOR,
+          [USER_NAME]: "Author User",
+          "user/email": "author@example.com",
+        })
+      );
 
       const results = await db.query({
         find: { e: ["?e"], name: ["?name"] },
@@ -342,11 +347,14 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should create reader user", async () => {
       const { db } = f;
 
-      await db.transact([
-        { op: "add", e: 3, a: USER_TYPE, v: USER_TYPE_READER },
-        { op: "add", e: 3, a: USER_NAME, v: "Reader User" },
-        { op: "add", e: 3, a: USER_EMAIL, v: "reader@example.com" },
-      ]);
+      await db.transact(
+        datoms({
+          entityId: 3,
+          [USER_TYPE]: USER_TYPE_READER,
+          [USER_NAME]: "Reader User",
+          [USER_EMAIL]: "reader@example.com",
+        })
+      );
 
       const results = await db.query({
         find: { e: ["?e"], name: ["?name"] },
