@@ -117,7 +117,7 @@ export async function retractEntityHelper(
   entity: EntityId
 ): Promise<void> {
   // Get all datoms for this entity that are currently visible
-  const entityDatoms = await datoms({ e: entity, add: true }); // QueryOptions.add still works, filters by op internally
+  const entityDatoms = await datoms({ e: entity, op: "add" }); // QueryOptions.op filters by operation type
 
   // Retract all of them
   const retractions: DatomInput[] = entityDatoms.map((d) => ({

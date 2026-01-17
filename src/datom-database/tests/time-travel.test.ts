@@ -240,7 +240,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "add", e: 1, a: "email", v: "alice@example.com" },
       ]);
 
-      const before = await db.datoms({ e: 1, add: true });
+      const before = await db.datoms({ e: 1, op: "add" });
       expect(before).toHaveLength(3);
 
       const entityDatoms = await db.datoms({ e: 1 });
@@ -253,7 +253,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         }))
       );
 
-      const after = await db.datoms({ e: 1, add: true });
+      const after = await db.datoms({ e: 1, op: "add" });
       expect(after).toHaveLength(0);
 
       // Verify transaction ID was returned
@@ -283,7 +283,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       );
       const during = await withResult.dbAfter.datoms({
         e: 1,
-        add: true,
+        op: "add",
       });
       expect(during).toHaveLength(0);
 
@@ -297,7 +297,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         }))
       );
 
-      const after = await db.datoms({ e: 1, add: true });
+      const after = await db.datoms({ e: 1, op: "add" });
       expect(after).toHaveLength(0);
 
       await db.close();
@@ -314,16 +314,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(typeof tx).toBe("number");
       expect(tx).toBeGreaterThan(0);
 
-      const alice = await db.datoms({ e: 1, add: true });
+      const alice = await db.datoms({ e: 1, op: "add" });
       expect(alice).toHaveLength(1);
       expect(alice[0].v).toBe("Alice");
 
-      const bob = await db.datoms({ e: 2, add: true });
+      const bob = await db.datoms({ e: 2, op: "add" });
       expect(bob).toHaveLength(1);
       expect(bob[0].v).toBe("Bob");
 
       // Charlie should not exist (or was retract if existed)
-      const charlie = await db.datoms({ e: 3, add: true });
+      const charlie = await db.datoms({ e: 3, op: "add" });
       expect(charlie).toHaveLength(0);
 
       await db.close();
@@ -339,7 +339,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const entity = await withResult.dbAfter.datoms({
         e: 1,
-        add: true,
+        op: "add",
       });
       expect(entity).toHaveLength(2);
 
@@ -349,7 +349,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "add", e: 1, a: "age", v: 30 },
       ]);
 
-      const finalEntity = await db.datoms({ e: 1, add: true });
+      const finalEntity = await db.datoms({ e: 1, op: "add" });
       expect(entity).toHaveLength(2);
 
       await db.close();

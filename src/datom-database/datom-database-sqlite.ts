@@ -241,9 +241,9 @@ export class SQLiteDatomDatabase extends DatomDatabase {
 
     // Build the op filter
     let opFilter = "";
-    if (options.add === true || options.add === undefined) {
+    if (options.op === undefined || options.op === "add") {
       opFilter = "AND op = 'add'";
-    } else if (options.add === false) {
+    } else if (options.op === "retract") {
       opFilter = "AND op = 'retract'";
     }
 
@@ -646,7 +646,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
         e: entity,
         a: attribute,
         v: value,
-        add: true,
+        op: "add",
       });
 
       const results = datoms.map((datom) => {

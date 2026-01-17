@@ -96,8 +96,8 @@ export interface QueryOptions {
   v?: Value;
   /** Filter by transaction ID */
   tx?: TransactionId;
-  /** Only return add datoms (default: true) */
-  add?: boolean;
+  /** Filter by operation type */
+  op?: "add" | "retract";
   /** Limit the number of results */
   limit?: number;
   /** Offset for pagination */

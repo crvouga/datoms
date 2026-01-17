@@ -315,9 +315,9 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     // Build the op filter for after DISTINCT ON
     // Default behavior: filter to only add datoms (exclude retract)
     let opFilterAfter = "";
-    if (options.add === true || options.add === undefined) {
+    if (options.op === undefined || options.op === "add") {
       opFilterAfter = "WHERE op = 'add'";
-    } else if (options.add === false) {
+    } else if (options.op === "retract") {
       opFilterAfter = "WHERE op = 'retract'";
     }
 

@@ -417,10 +417,10 @@ class SpeculativeDatabaseView extends BaseDatabaseView {
       results = results.filter((d) => d.tx === options.tx);
     }
 
-    // Apply add filter
-    if (options.add === undefined || options.add === true) {
+    // Apply op filter
+    if (options.op === undefined || options.op === "add") {
       results = results.filter((d) => d.op === "add");
-    } else if (options.add === false) {
+    } else if (options.op === "retract") {
       results = results.filter((d) => d.op === "retract");
     }
 
@@ -1217,11 +1217,11 @@ export abstract class DatomDatabase implements DatomReader {
    */
   public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
     // Default implementation: use executeQuery but implementations can override
-    // to provide undeduplicated results. For now, we'll use executeQuery with add: undefined
+    // to provide undeduplicated results. For now, we'll use executeQuery with op: undefined
     // to get all datoms including retract ones, then the view will handle deduplication.
     return this.executeQuery({
       ...options,
-      add: undefined, // Get all datoms including retract
+      op: undefined, // Get all datoms including retract
     });
   }
 
@@ -1259,7 +1259,7 @@ export abstract class DatomDatabase implements DatomReader {
       }
     }
 
-    // Filter out retract datoms (keep only add: true)
+    // Filter out retract datoms (keep only op: "add")
     return Array.from(deduplicated.values()).filter((d) => d.op === "add");
   }
 
@@ -1275,7 +1275,7 @@ export abstract class DatomDatabase implements DatomReader {
     // SQL implementations should override this for better performance
     return this.getRawDatoms({
       ...options,
-      add: undefined, // Don't filter by add/retract
+      op: undefined, // Don't filter by add/retract
     });
   }
 
@@ -1312,7 +1312,7 @@ export abstract class DatomDatabase implements DatomReader {
       }
     }
 
-    // Filter out retract datoms (keep only add: true)
+    // Filter out retract datoms (keep only op: "add")
     return Array.from(deduplicated.values()).filter((d) => d.op === "add");
   }
 

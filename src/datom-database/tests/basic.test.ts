@@ -29,7 +29,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
     expect(tx).toBeGreaterThanOrEqual(1);
 
-    const entity = await db.datoms({ e: 1, add: true });
+    const entity = await db.datoms({ e: 1, op: "add" });
     expect(entity).toHaveLength(2);
     const values = entity.map((d) => d.v);
     expect(values).toContain("Alice");
@@ -52,7 +52,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     await db.transact([{ op: "add", e: 1, a: "name", v: "Alice" }]);
     await db.transact([{ op: "retract", e: 1, a: "name", v: "Alice" }]);
 
-    const entity = await db.datoms({ e: 1, add: true });
+    const entity = await db.datoms({ e: 1, op: "add" });
     expect(entity).toHaveLength(0);
   });
 

@@ -163,11 +163,11 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     }
     results = Array.from(latestDatoms.values());
 
-    // Apply add filter after deduplication
+    // Apply op filter after deduplication
     // Default behavior: filter to only added datoms (exclude retracted)
-    if (options.add === undefined || options.add === true) {
+    if (options.op === undefined || options.op === "add") {
       results = results.filter((d) => d.op === "add");
-    } else if (options.add === false) {
+    } else if (options.op === "retract") {
       // If explicitly requesting retractions, filter by op: "retract"
       results = results.filter((d) => d.op === "retract");
     }
@@ -215,7 +215,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       }
     }
 
-    // Filter out retract datoms (keep only add: true)
+    // Filter out retract datoms (keep only op: "add")
     results = Array.from(deduplicated.values()).filter((d) => d.op === "add");
 
     // Apply pagination
@@ -298,7 +298,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       }
     }
 
-    // Filter out retract datoms (keep only add: true)
+    // Filter out retract datoms (keep only op: "add")
     results = Array.from(deduplicated.values()).filter((d) => d.op === "add");
 
     // Apply pagination

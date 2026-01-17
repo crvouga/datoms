@@ -98,7 +98,7 @@ describe.each(FIXTURES)("EntityId Validation (%s)", (_name, createFixture) => {
     test("should work with number EntityIds", async () => {
       const { db } = f;
       await db.transact([{ op: "add", e: 123, a: "name", v: "Alice" }]);
-      const entity = await db.datoms({ e: 123, add: true });
+      const entity = await db.datoms({ e: 123, op: "add" });
       expect(entity).toHaveLength(1);
       expect(entity[0].e).toBe(123);
     });
@@ -106,7 +106,7 @@ describe.each(FIXTURES)("EntityId Validation (%s)", (_name, createFixture) => {
     test("should work with string EntityIds", async () => {
       const { db } = f;
       await db.transact([{ op: "add", e: "user-123", a: "name", v: "Alice" }]);
-      const entity = await db.datoms({ e: "user-123", add: true });
+      const entity = await db.datoms({ e: "user-123", op: "add" });
       expect(entity).toHaveLength(1);
       expect(entity[0].e).toBe("user-123");
     });
