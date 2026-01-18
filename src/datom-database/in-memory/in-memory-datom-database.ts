@@ -22,7 +22,7 @@ import {
   serializeEntityId,
   validateEntityId,
 } from "../../entity-id.js";
-import type { DatabaseStats, QueryOptions, Transaction } from "../../types.js";
+import type { DatabaseStats, Transaction } from "../../types.js";
 import type { WithResult } from "../datom-database.js";
 import {
   Hook,
@@ -43,7 +43,7 @@ import {
 } from "../shared/datalog-helpers.js";
 import { executeQueryOnDatoms } from "../shared/in-memory-query-executor.js";
 import { joinResults, project } from "../shared/query-results.js";
-import { DatabaseView } from "../views/database-view.js";
+import { DatabaseView, DatomsParams } from "../views/database-view.js";
 import {
   ConfiguredDatabaseView,
   type InternalDatabaseView,
@@ -312,7 +312,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     return deserializeEntityId(serialized);
   }
 
-  async datoms(options: QueryOptions): Promise<Datom[]> {
+  async datoms(options: DatomsParams): Promise<Datom[]> {
     await this.ensureInitialized();
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
@@ -358,12 +358,12 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     return results;
   }
 
-  async executeQuery(options: QueryOptions): Promise<Datom[]> {
+  async executeQuery(options: DatomsParams): Promise<Datom[]> {
     return executeQueryOnDatoms(this._datomsArray, options);
   }
 
   public async executeAsOfQuery(
-    options: QueryOptions,
+    options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this.ensureInitialized();
@@ -408,7 +408,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     return results.slice(offset, limit ? offset + limit : undefined);
   }
 
-  public async executeHistoryQuery(options: QueryOptions): Promise<Datom[]> {
+  public async executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
     await this.ensureInitialized();
 
     // Get all datoms matching filters without deduplication
@@ -449,7 +449,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
   }
 
   public async executeSinceQuery(
-    options: QueryOptions,
+    options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this.ensureInitialized();
@@ -750,7 +750,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
   }
 
   public async _executeQuery(
-    options: QueryOptions,
+    options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<Datom[]> {
     await this.ensureInitialized();

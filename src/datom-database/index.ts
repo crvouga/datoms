@@ -22,7 +22,6 @@ export type {
   Logger,
   OptimisticLockOptions,
   QueryExplainResult,
-  QueryOptions,
   Transaction,
   TransactionIsolationLevel,
   TransactionOptions,

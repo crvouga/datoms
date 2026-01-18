@@ -4,7 +4,7 @@
  */
 
 import type { Datom } from "../../datoms.js";
-import type { QueryOptions } from "../../types.js";
+import { DatomsParams } from "../views/database-view.js";
 
 /**
  * Execute a query on an array of datoms
@@ -12,7 +12,7 @@ import type { QueryOptions } from "../../types.js";
  */
 export function executeQueryOnDatoms(
   datoms: Datom[],
-  options: QueryOptions
+  options: DatomsParams
 ): Datom[] {
   let results = datoms;
 

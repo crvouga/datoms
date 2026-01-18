@@ -18,7 +18,7 @@ import {
   validateEntityId,
 } from "../../entity-id.js";
 import type { SQLDatabase } from "../../sql-database/sql-database.js";
-import type { QueryOptions, Transaction } from "../../types.js";
+import type { Transaction } from "../../types.js";
 import type { WithResult } from "../datom-database.js";
 import { DatomDatabase } from "../datom-database.js";
 import {
@@ -39,7 +39,7 @@ import {
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
 import { joinResults, project } from "../shared/query-results.js";
-import { DatabaseView } from "../views/database-view.js";
+import { DatabaseView, DatomsParams } from "../views/database-view.js";
 import {
   ConfiguredDatabaseView,
   type InternalDatabaseView,
@@ -273,7 +273,7 @@ export class SQLiteDatomDatabase
     }
   }
 
-  async datoms(options: QueryOptions): Promise<Datom[]> {
+  async datoms(options: DatomsParams): Promise<Datom[]> {
     await this.ensureInitialized();
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
@@ -392,7 +392,7 @@ export class SQLiteDatomDatabase
     return deserializeEntityId(serialized);
   }
 
-  async executeQuery(options: QueryOptions): Promise<Datom[]> {
+  async executeQuery(options: DatomsParams): Promise<Datom[]> {
     await this.ensureInitialized();
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -533,7 +533,7 @@ export class SQLiteDatomDatabase
   }
 
   public async executeAsOfQuery(
-    options: QueryOptions,
+    options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this.ensureInitialized();
@@ -616,7 +616,7 @@ export class SQLiteDatomDatabase
     return this.mapRowsToDatoms(rows);
   }
 
-  public async executeHistoryQuery(options: QueryOptions): Promise<Datom[]> {
+  public async executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
     await this.ensureInitialized();
 
     const conditions: string[] = [];
@@ -677,7 +677,7 @@ export class SQLiteDatomDatabase
   }
 
   public async executeSinceQuery(
-    options: QueryOptions,
+    options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this.ensureInitialized();
@@ -1306,7 +1306,7 @@ export class SQLiteDatomDatabase
   }
 
   public async _executeQuery(
-    options: QueryOptions,
+    options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<Datom[]> {
     await this.ensureInitialized();

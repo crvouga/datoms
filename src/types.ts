@@ -3,40 +3,7 @@
  */
 
 // Import types for use in this file
-import type {
-  Attribute,
-  Datom,
-  DatomOperation,
-  TransactionId,
-  Value,
-} from "./datoms.js";
-import { EntityId } from "./entity-id.js";
-
-/**
- * Options for querying datoms
- */
-export interface QueryOptions {
-  /** Filter by entity ID */
-  e?: EntityId;
-  /** Filter by attribute */
-  a?: Attribute;
-  /** Filter by value */
-  v?: Value;
-  /** Filter by transaction ID */
-  tx?: TransactionId;
-  /** Filter by operation type */
-  op?: DatomOperation;
-  /** Limit the number of results */
-  limit?: number;
-  /** Offset for pagination */
-  offset?: number;
-  /** Hint for which index to use (backend-specific, may be ignored) */
-  indexHint?: string | string[];
-  /** Maximum query execution time in milliseconds */
-  timeoutMs?: number;
-  /** Maximum number of results allowed (throws QueryResultSizeError if exceeded) */
-  maxResultSize?: number;
-}
+import type { Datom, TransactionId } from "./datoms.js";
 
 /**
  * Database statistics for observability
@@ -97,7 +64,7 @@ export interface ErrorEvent {
  */
 export interface QueryEvent {
   type: "query";
-  options: QueryOptions;
+  options: Record<string, unknown>;
   resultCount: number;
   duration?: number;
 }

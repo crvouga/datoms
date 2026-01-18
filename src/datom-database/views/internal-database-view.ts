@@ -6,10 +6,9 @@
 
 import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
 import type { Datom, TransactionId } from "../../datoms.js";
-import type { QueryOptions } from "../../types.js";
 import { DatomDatabase } from "../datom-database.js";
 import { validateQueryOptions } from "../shared/query-validation.js";
-import { DatabaseView } from "./database-view.js";
+import { DatabaseView, DatomsParams } from "./database-view.js";
 
 /**
  * Configuration for database views
@@ -39,7 +38,7 @@ export interface InternalDatabaseView extends DatomDatabase {
    * @internal
    */
   _executeQuery(
-    options: QueryOptions,
+    options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<Datom[]>;
 
@@ -70,7 +69,7 @@ export class ConfiguredDatabaseView implements DatabaseView {
     private viewConfig: ViewConfig
   ) {}
 
-  async datoms(options: QueryOptions): Promise<Datom[]> {
+  async datoms(options: DatomsParams): Promise<Datom[]> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     validateQueryOptions(options);
 

@@ -18,7 +18,7 @@ import type {
 import type { EntityId } from "../../entity-id.js";
 import type { SQLDatabase } from "../../sql-database/sql-database.js";
 import type { DatabaseRow } from "../../sql-database/types.js";
-import type { QueryOptions, Transaction } from "../../types.js";
+import type { Transaction } from "../../types.js";
 
 import {
   deserializeEntityId,
@@ -46,7 +46,7 @@ import {
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
 import { joinResults, project } from "../shared/query-results.js";
-import { DatabaseView } from "../views/database-view.js";
+import { DatabaseView, DatomsParams } from "../views/database-view.js";
 import {
   ConfiguredDatabaseView,
   type InternalDatabaseView,
@@ -311,7 +311,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     }
   }
 
-  async datoms(options: QueryOptions): Promise<Datom[]> {
+  async datoms(options: DatomsParams): Promise<Datom[]> {
     await this.ensureInitialized();
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
@@ -430,7 +430,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     return deserializeEntityId(serialized);
   }
 
-  async executeQuery(options: QueryOptions): Promise<Datom[]> {
+  async executeQuery(options: DatomsParams): Promise<Datom[]> {
     await this.ensureInitialized();
 
     // Note: Validation is handled by the base class query() method
@@ -585,7 +585,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   }
 
   public async executeAsOfQuery(
-    options: QueryOptions,
+    options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this.ensureInitialized();
@@ -664,7 +664,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     return this.mapRowsToDatoms(rows);
   }
 
-  public async executeHistoryQuery(options: QueryOptions): Promise<Datom[]> {
+  public async executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
     await this.ensureInitialized();
 
     const conditions: string[] = [];
@@ -725,7 +725,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   }
 
   public async executeSinceQuery(
-    options: QueryOptions,
+    options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this.ensureInitialized();
@@ -1532,43 +1532,6 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     await this.connection.execute(sql, params);
   }
 
-  private async executeClause(
-    clause: QueryClause
-  ): Promise<Record<string, Value | Attribute>[]> {
-    if (!isQueryPattern(clause)) {
-      throw new Error("Only QueryPattern clauses are supported");
-    }
-    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-    const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
-    const attribute = isVariable(attributeVal)
-      ? undefined
-      : (attributeVal as string);
-    const value = isVariable(valueVal) ? undefined : (valueVal as Value);
-
-    // Datalog queries manage their own limiting via joins, so bypass validation
-    const queryOptions: QueryOptions = {
-      ...(entity !== undefined && { e: entity }),
-      ...(attribute !== undefined && { a: attribute }),
-      ...(value !== undefined && { v: value }),
-    };
-
-    const datoms = await this.datoms(queryOptions);
-
-    return datoms.map((datom: Datom) => {
-      const result: Record<string, Value | Attribute> = {};
-      if (isVariable(entityVal)) {
-        result[entityVal as string] = datom.e;
-      }
-      if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom.a;
-      }
-      if (isVariable(valueVal)) {
-        result[valueVal as string] = datom.v;
-      }
-      return result;
-    });
-  }
-
   /**
    * Get metadata associated with a transaction
    * Default implementation returns undefined (metadata storage not implemented)
@@ -1668,7 +1631,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   }
 
   public async _executeQuery(
-    options: QueryOptions,
+    options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<Datom[]> {
     await this.ensureInitialized();
