@@ -179,6 +179,7 @@ async function main() {
                 "movie/voteAverage": ["?vote_average"],
                 "movie/voteCount": ["?vote_count"],
                 "movie/popularity": ["?popularity"],
+                "movie/genreId": ["?genre_id"],
               },
               where: [
                 { e: "?movie/id", a: "tmdb.movie/id", v: "?id" },
@@ -213,6 +214,11 @@ async function main() {
                   e: "?movie/id",
                   a: "tmdb.movie/popularity",
                   v: "?popularity",
+                },
+                {
+                  e: "?movie/id",
+                  a: "tmdb.movie/genre_id",
+                  v: "?genre_ids",
                 },
               ],
               orderBy: [["?popularity", "desc"]],

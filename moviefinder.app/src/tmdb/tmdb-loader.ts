@@ -1,4 +1,4 @@
-import type { DatomDatabase, Logger } from "../../../src";
+import type { DatomDatabase, DatomInput, Logger } from "../../../src";
 import { datoms } from "../../../src/datoms";
 import { mapKeys } from "../lib/map-keys";
 import { tmdbPrefixKey } from "./tmdb";
@@ -107,7 +107,26 @@ export class TmdbLoader {
             tmdbPrefixKey("movie", m["tmdb.movie/id"]?.toString() ?? ""),
         },
         movies
-      );
+      ).flatMap((datom): DatomInput[] => {
+        if (datom.a === "tmdb.movie/genre_ids") {
+          // Parse the genre IDs from the value, which could be a stringified array or an array.
+          const genreIds: unknown =
+            typeof datom.v === "string" ? JSON.parse(datom.v) : datom.v;
+          if (Array.isArray(genreIds)) {
+            return genreIds.map(
+              (genreId): DatomInput => ({
+                a: "tmdb.movie/genre_id",
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                v: genreId,
+                op: "assert",
+                e: datom.e,
+              })
+            );
+          }
+          return [];
+        }
+        return [datom];
+      });
 
       const transactionStartTime = Date.now();
       try {
