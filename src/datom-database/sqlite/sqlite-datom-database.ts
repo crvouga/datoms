@@ -46,7 +46,10 @@ import { AsOfDatabaseView } from "../views/as-of-database-view.js";
 import { CurrentDatabaseView } from "../views/current-database-view.js";
 import { DatabaseView } from "../views/database-view.js";
 import { HistoryDatabaseView } from "../views/history-database-view.js";
-import { InternalDatabaseView } from "../views/internal-database-view.js";
+import type {
+  InternalDatabaseView,
+  ViewConfig,
+} from "../views/internal-database-view.js";
 import { SinceDatabaseView } from "../views/since-database-view.js";
 import { SpeculativeDatabaseView } from "../views/speculative-database-view.js";
 import type { WithResult } from "../datom-database.js";
@@ -1442,5 +1445,314 @@ export class SQLiteDatomDatabase
     }
 
     return stats;
+  }
+
+  public async executeQueryWithViewConfig(
+    options: QueryOptions,
+    viewConfig: ViewConfig
+  ): Promise<Datom[]> {
+    await this.ensureInitialized();
+
+    if (viewConfig.type === "current") {
+      return this.executeQuery(options);
+    }
+    if (viewConfig.type === "asOf") {
+      return this.executeAsOfQuery(options, viewConfig.txId);
+    }
+    if (viewConfig.type === "since") {
+      return this.executeSinceQuery(options, viewConfig.txId);
+    }
+    if (viewConfig.type === "history") {
+      return this.executeHistoryQuery(options);
+    }
+    if (viewConfig.type === "speculative") {
+      // For speculative queries, we need to merge base datoms with speculative changes
+      // Get all base datoms (current state)
+      const baseDatoms = await this.executeQuery({});
+
+      // Create a map of base datoms by (entity, attribute, value) for efficient lookup
+      const baseMap = new Map<string, Datom>();
+      for (const datom of baseDatoms) {
+        const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
+        baseMap.set(key, datom);
+      }
+
+      // Apply subs first (remove matching datoms)
+      for (const sub of viewConfig.subs) {
+        const key = `${String(sub.e)}|${String(sub.a)}|${JSON.stringify(sub.v)}`;
+        baseMap.delete(key);
+      }
+
+      // Apply adds (add or update datoms)
+      for (const add of viewConfig.adds) {
+        const key = `${String(add.e)}|${String(add.a)}|${JSON.stringify(add.v)}`;
+        baseMap.set(key, add);
+      }
+
+      // Create merged datoms array
+      const mergedDatoms = Array.from(baseMap.values());
+
+      // Apply filters from options
+      let results = mergedDatoms;
+      if (options.e !== undefined) {
+        results = results.filter((d) => d.e === options.e);
+      }
+      if (options.a !== undefined) {
+        results = results.filter((d) => d.a === options.a);
+      }
+      if (options.v !== undefined) {
+        results = results.filter((d) => d.v === options.v);
+      }
+      if (options.tx !== undefined) {
+        results = results.filter((d) => d.tx === options.tx);
+      }
+      if (options.op !== undefined) {
+        results = results.filter((d) => d.op === options.op);
+      } else {
+        // Default: only assert
+        results = results.filter((d) => d.op === "assert");
+      }
+
+      // Apply pagination
+      const offset = options.offset ?? 0;
+      const limit = options.limit;
+      return results.slice(offset, limit ? offset + limit : undefined);
+    }
+
+    // TypeScript exhaustiveness check
+    const _exhaustive: never = viewConfig;
+    throw new Error(
+      `Unknown view config type: ${(_exhaustive as ViewConfig).type}`
+    );
+  }
+
+  public async executeDatalogQueryWithViewConfig(
+    query: DatalogQuery,
+    context: Record<string, unknown> | undefined,
+    viewConfig: ViewConfig
+  ): Promise<QueryResult> {
+    await this.ensureInitialized();
+
+    // Create read context
+    const ctx: ReadContext = {
+      db: this,
+      ...(context || {}),
+    };
+
+    // Run before-read hooks
+    const beforeResult = await this.hooks.runBeforeRead(query, ctx);
+
+    if (beforeResult.errors.length > 0) {
+      throw new QueryError("Query blocked by hooks", beforeResult.errors);
+    }
+
+    const modifiedQuery = beforeResult.query;
+
+    if (modifiedQuery.where.length === 0) {
+      return [];
+    }
+
+    // For single clause queries, use optimized path
+    if (modifiedQuery.where.length === 1) {
+      const clause = modifiedQuery.where[0];
+      if (!isQueryPattern(clause)) {
+        throw new Error("Only QueryPattern clauses are supported");
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+      const entity = isVariable(entityVal)
+        ? undefined
+        : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal)
+        ? undefined
+        : (attributeVal as string);
+      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+      const datoms = await this.executeQueryWithViewConfig(
+        {
+          e: entity,
+          a: attribute,
+          v: value,
+          op: "assert",
+        },
+        viewConfig
+      );
+
+      // Run after-read hooks
+      const afterResult = await this.hooks.runAfterRead(datoms, ctx);
+
+      if (afterResult.errors && afterResult.errors.length > 0) {
+        throw new QueryError(
+          "Query blocked by after-read hooks",
+          afterResult.errors
+        );
+      }
+
+      const results = afterResult.datoms.map((datom) => {
+        const result: Record<string, Value | Attribute> = {};
+        if (isVariable(entityVal)) {
+          result[entityVal as string] = datom.e;
+        }
+        if (isVariable(attributeVal)) {
+          result[attributeVal as string] = datom.a;
+        }
+        if (isVariable(valueVal)) {
+          result[valueVal as string] = datom.v;
+        }
+        return result;
+      });
+
+      const projected = project(
+        results,
+        modifiedQuery.find,
+        modifiedQuery.where
+      );
+      return this.applyOrderAndLimit(projected, modifiedQuery);
+    }
+
+    // For multi-clause queries, extract datoms first for afterRead hooks
+    const allDatomsSet = new Set<string>();
+    const allDatoms: Datom[] = [];
+
+    for (const clause of modifiedQuery.where) {
+      if (!isQueryPattern(clause)) {
+        continue;
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+      const entity = isVariable(entityVal)
+        ? undefined
+        : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal)
+        ? undefined
+        : (attributeVal as string);
+      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+      const clauseDatoms = await this.executeQueryWithViewConfig(
+        {
+          e: entity,
+          a: attribute,
+          v: value,
+          op: "assert",
+        },
+        viewConfig
+      );
+
+      for (const datom of clauseDatoms) {
+        const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
+        if (!allDatomsSet.has(key)) {
+          allDatomsSet.add(key);
+          allDatoms.push(datom);
+        }
+      }
+    }
+
+    // Run after-read hooks
+    const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
+
+    if (afterResult.errors && afterResult.errors.length > 0) {
+      throw new QueryError(
+        "Query blocked by after-read hooks",
+        afterResult.errors
+      );
+    }
+
+    // For speculative views, we need to use in-memory join logic
+    // For other views, we can use SQL-based joins
+    if (viewConfig.type === "speculative") {
+      // Use in-memory join logic for speculative queries
+      const firstClause = modifiedQuery.where[0];
+      if (!isQueryPattern(firstClause)) {
+        throw new Error("First clause must be a QueryPattern");
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = firstClause;
+      const entity = isVariable(entityVal)
+        ? undefined
+        : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal)
+        ? undefined
+        : (attributeVal as string);
+      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+      const firstDatoms = await this.executeQueryWithViewConfig(
+        {
+          e: entity,
+          a: attribute,
+          v: value,
+        },
+        viewConfig
+      );
+
+      const firstResults = firstDatoms.map((datom) => {
+        const result: Record<string, Value | Attribute> = {};
+        if (isVariable(entityVal)) {
+          result[entityVal as string] = datom.e;
+        }
+        if (isVariable(attributeVal)) {
+          result[attributeVal as string] = datom.a;
+        }
+        if (isVariable(valueVal)) {
+          result[valueVal as string] = datom.v;
+        }
+        return result;
+      });
+
+      let results = firstResults;
+      for (let i = 1; i < modifiedQuery.where.length; i++) {
+        const clause = modifiedQuery.where[i];
+        if (!isQueryPattern(clause)) {
+          throw new Error("Only QueryPattern clauses are supported in joins");
+        }
+        const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+        const entity = isVariable(entityVal)
+          ? undefined
+          : (entityVal as EntityId);
+        const attribute = isVariable(attributeVal)
+          ? undefined
+          : (attributeVal as string);
+        const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+        const clauseDatoms = await this.executeQueryWithViewConfig(
+          {
+            e: entity,
+            a: attribute,
+            v: value,
+          },
+          viewConfig
+        );
+
+        const clauseResults = clauseDatoms.map((datom) => {
+          const result: Record<string, Value | Attribute> = {};
+          if (isVariable(entityVal)) {
+            result[entityVal as string] = datom.e;
+          }
+          if (isVariable(attributeVal)) {
+            result[attributeVal as string] = datom.a;
+          }
+          if (isVariable(valueVal)) {
+            result[valueVal as string] = datom.v;
+          }
+          return result;
+        });
+
+        results = joinResults(
+          results,
+          clauseResults,
+          modifiedQuery.where.slice(0, i + 1)
+        );
+      }
+
+      const projected = project(
+        results,
+        modifiedQuery.find,
+        modifiedQuery.where
+      );
+      return this.applyOrderAndLimit(projected, modifiedQuery);
+    }
+
+    // For non-speculative views, use SQL-based query execution
+    // Re-execute query with filtered datoms
+    return this.executeDatalogWithSQLAndFilteredDatoms(
+      modifiedQuery,
+      afterResult.datoms
+    );
   }
 }

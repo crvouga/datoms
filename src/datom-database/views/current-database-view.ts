@@ -6,7 +6,10 @@
 import type { Datom } from "../../datoms.js";
 import type { QueryOptions } from "../../types.js";
 import { BaseDatabaseView } from "./base-database-view.js";
-import { InternalDatabaseView } from "./internal-database-view.js";
+import type {
+  InternalDatabaseView,
+  ViewConfig,
+} from "./internal-database-view.js";
 
 /**
  * Database view showing the current database state
@@ -17,11 +20,16 @@ export class CurrentDatabaseView extends BaseDatabaseView {
     super(db);
   }
 
+  protected getViewConfig(): ViewConfig {
+    return { type: "current" };
+  }
+
   async datoms(options: QueryOptions): Promise<Datom[]> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     this.validateQueryOptions(options);
 
-    // Use the database's internal query method via the public accessor
-    return this.db.datoms(options);
+    // Route to implementation with view config
+    const viewConfig = this.getViewConfig();
+    return this.db.executeQueryWithViewConfig(options, viewConfig);
   }
 }

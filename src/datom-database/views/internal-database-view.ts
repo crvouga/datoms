@@ -4,9 +4,22 @@
  * Not part of the public API
  */
 
+import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
 import type { Datom, TransactionId } from "../../datoms.js";
 import type { QueryOptions } from "../../types.js";
 import { DatomDatabase } from "../datom-database.js";
+
+/**
+ * Configuration for database views
+ * Views use this to pass their configuration to implementations
+ * @internal
+ */
+export type ViewConfig =
+  | { type: "current" }
+  | { type: "asOf"; txId: TransactionId }
+  | { type: "since"; txId: TransactionId }
+  | { type: "history" }
+  | { type: "speculative"; adds: Datom[]; subs: Datom[] };
 
 /**
  * Internal database view interface
@@ -72,4 +85,32 @@ export interface InternalDatabaseView extends DatomDatabase {
     options: QueryOptions,
     txId: TransactionId
   ): Promise<Datom[]>;
+
+  /**
+   * Execute a query with view configuration.
+   * This method routes queries to the appropriate implementation method based on view config.
+   * @param options Query options
+   * @param viewConfig View configuration (asOf, since, history, current, or speculative)
+   * @returns Array of matching datoms
+   * @internal
+   */
+  executeQueryWithViewConfig(
+    options: QueryOptions,
+    viewConfig: ViewConfig
+  ): Promise<Datom[]>;
+
+  /**
+   * Execute a datalog query with view configuration.
+   * This method routes datalog queries to the appropriate implementation method based on view config.
+   * @param query Datalog query to execute
+   * @param context Optional context object for hooks
+   * @param viewConfig View configuration (asOf, since, history, current, or speculative)
+   * @returns Query results as an array of records
+   * @internal
+   */
+  executeDatalogQueryWithViewConfig(
+    query: DatalogQuery,
+    context: Record<string, unknown> | undefined,
+    viewConfig: ViewConfig
+  ): Promise<QueryResult>;
 }

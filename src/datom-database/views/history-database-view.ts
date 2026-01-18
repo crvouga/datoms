@@ -6,7 +6,10 @@
 import type { Datom } from "../../datoms.js";
 import type { QueryOptions } from "../../types.js";
 import { BaseDatabaseView } from "./base-database-view.js";
-import { InternalDatabaseView } from "./internal-database-view.js";
+import type {
+  InternalDatabaseView,
+  ViewConfig,
+} from "./internal-database-view.js";
 
 /**
  * Database view showing full history (all datoms, including sub)
@@ -17,11 +20,15 @@ export class HistoryDatabaseView extends BaseDatabaseView {
     super(db);
   }
 
+  protected getViewConfig(): ViewConfig {
+    return { type: "history" };
+  }
+
   async datoms(options: QueryOptions): Promise<Datom[]> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     this.validateQueryOptions(options);
 
-    // Use implementation-specific method for optimized SQL queries
-    return this.db.executeHistoryQuery(options);
+    // Route to implementation with view config
+    return this.db.executeQueryWithViewConfig(options, this.getViewConfig());
   }
 }

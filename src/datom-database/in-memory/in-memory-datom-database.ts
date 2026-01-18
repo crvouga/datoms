@@ -47,7 +47,10 @@ import { AsOfDatabaseView } from "../views/as-of-database-view.js";
 import { CurrentDatabaseView } from "../views/current-database-view.js";
 import { DatabaseView } from "../views/database-view.js";
 import { HistoryDatabaseView } from "../views/history-database-view.js";
-import { InternalDatabaseView } from "../views/internal-database-view.js";
+import type {
+  InternalDatabaseView,
+  ViewConfig,
+} from "../views/internal-database-view.js";
 import { SinceDatabaseView } from "../views/since-database-view.js";
 import { SpeculativeDatabaseView } from "../views/speculative-database-view.js";
 
@@ -772,5 +775,205 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     }
 
     return stats;
+  }
+
+  public async executeQueryWithViewConfig(
+    options: QueryOptions,
+    viewConfig: ViewConfig
+  ): Promise<Datom[]> {
+    await this.ensureInitialized();
+
+    if (viewConfig.type === "current") {
+      return this.executeQuery(options);
+    }
+    if (viewConfig.type === "asOf") {
+      return this.executeAsOfQuery(options, viewConfig.txId);
+    }
+    if (viewConfig.type === "since") {
+      return this.executeSinceQuery(options, viewConfig.txId);
+    }
+    if (viewConfig.type === "history") {
+      return this.executeHistoryQuery(options);
+    }
+    if (viewConfig.type === "speculative") {
+      // Get all base datoms using executeHistoryQuery to bypass validation
+      // This returns all datoms including retracted ones, so we need to deduplicate
+      const allBaseDatoms = await this.executeHistoryQuery({});
+
+      // Create a map of base datoms by (entity, attribute, value) for efficient lookup
+      // Deduplicate by keeping the latest transaction for each (entity, attribute, value)
+      const baseMap = new Map<string, Datom>();
+      for (const datom of allBaseDatoms) {
+        const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
+        const existing = baseMap.get(key);
+        if (!existing || datom.tx > existing.tx) {
+          baseMap.set(key, datom);
+        }
+      }
+
+      // Filter to only asserted datoms (current state)
+      const currentStateDatoms = Array.from(baseMap.values()).filter(
+        (d) => d.op === "assert"
+      );
+
+      // Create a map for merging with speculative changes
+      const mergedMap = new Map<string, Datom>();
+      for (const datom of currentStateDatoms) {
+        const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
+        mergedMap.set(key, datom);
+      }
+
+      // Apply subs first (remove matching datoms)
+      for (const sub of viewConfig.subs) {
+        const key = `${String(sub.e)}|${String(sub.a)}|${JSON.stringify(sub.v)}`;
+        mergedMap.delete(key);
+      }
+
+      // Apply adds (add or update datoms)
+      for (const add of viewConfig.adds) {
+        const key = `${String(add.e)}|${String(add.a)}|${JSON.stringify(add.v)}`;
+        mergedMap.set(key, add);
+      }
+
+      // Create merged datoms array
+      const mergedDatoms = Array.from(mergedMap.values());
+
+      // Use the shared query execution logic
+      return executeQueryOnDatoms(mergedDatoms, options);
+    }
+
+    // TypeScript exhaustiveness check
+    const _exhaustive: never = viewConfig;
+    throw new Error(
+      `Unknown view config type: ${(_exhaustive as ViewConfig).type}`
+    );
+  }
+
+  public async executeDatalogQueryWithViewConfig(
+    query: DatalogQuery,
+    context: Record<string, unknown> | undefined,
+    viewConfig: ViewConfig
+  ): Promise<QueryResult> {
+    await this.ensureInitialized();
+
+    // Create read context
+    const ctx: ReadContext = {
+      db: this,
+      ...(context || {}),
+    };
+
+    // Run before-read hooks
+    const beforeResult = await this.hooks.runBeforeRead(query, ctx);
+
+    if (beforeResult.errors.length > 0) {
+      throw new QueryError("Query blocked by hooks", beforeResult.errors);
+    }
+
+    const modifiedQuery = beforeResult.query;
+
+    // Simple implementation: for each where clause, query the database
+    // and join the results
+    if (modifiedQuery.where.length === 0) {
+      return [];
+    }
+
+    // Extract all datoms from all clauses for afterRead hooks
+    const allDatomsSet = new Set<string>();
+    const allDatoms: Datom[] = [];
+
+    for (const clause of modifiedQuery.where) {
+      if (!isQueryPattern(clause)) {
+        continue;
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+      const entity = isVariable(entityVal)
+        ? undefined
+        : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal)
+        ? undefined
+        : (attributeVal as string);
+      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+      // Use executeQueryWithViewConfig instead of datoms()
+      const clauseDatoms = await this.executeQueryWithViewConfig(
+        {
+          e: entity,
+          a: attribute,
+          v: value,
+        },
+        viewConfig
+      );
+
+      for (const datom of clauseDatoms) {
+        const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
+        if (!allDatomsSet.has(key)) {
+          allDatomsSet.add(key);
+          allDatoms.push(datom);
+        }
+      }
+    }
+
+    // Run after-read hooks
+    const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
+
+    if (afterResult.errors && afterResult.errors.length > 0) {
+      throw new QueryError(
+        "Query blocked by after-read hooks",
+        afterResult.errors
+      );
+    }
+
+    // Now execute the query with filtered datoms
+    // Start with the first clause
+    const firstClause = modifiedQuery.where[0];
+    const firstResults = await this.executeClauseWithFilteredDatoms(
+      firstClause,
+      afterResult.datoms
+    );
+
+    // Join with remaining clauses
+    let results = firstResults;
+    for (let i = 1; i < modifiedQuery.where.length; i++) {
+      const clause = modifiedQuery.where[i];
+      const clauseResults = await this.executeClauseWithFilteredDatoms(
+        clause,
+        afterResult.datoms
+      );
+      results = joinResults(
+        results,
+        clauseResults,
+        modifiedQuery.where.slice(0, i + 1)
+      );
+    }
+
+    // Project to find variables
+    const projected = project(results, modifiedQuery.find, modifiedQuery.where);
+
+    // Apply ordering if specified
+    if (modifiedQuery.orderBy) {
+      projected.sort((a, b) => {
+        for (const [variable, direction] of modifiedQuery.orderBy!) {
+          const key = stripQuestionMark(variable);
+          const aVal = a[key];
+          const bVal = b[key];
+
+          // Handle null/undefined
+          if (aVal == null && bVal == null) continue;
+          if (aVal == null) return direction === "asc" ? -1 : 1;
+          if (bVal == null) return direction === "asc" ? 1 : -1;
+
+          if (aVal < bVal) return direction === "asc" ? -1 : 1;
+          if (aVal > bVal) return direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    // Apply limit
+    if (modifiedQuery.limit) {
+      return projected.slice(0, modifiedQuery.limit);
+    }
+
+    return projected;
   }
 }
