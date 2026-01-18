@@ -33,9 +33,7 @@ async function main() {
     destroyRetentionPolicy.start();
 
     // PostgreSQL maintenance: VACUUM ANALYZE on interval
-    const maintenanceIntervalMs = process.env.POSTGRES_MAINTENANCE_INTERVAL_MS
-      ? parseInt(process.env.POSTGRES_MAINTENANCE_INTERVAL_MS, 10)
-      : 3600000; // Default: 1 hour
+    const maintenanceIntervalMs = 1000 * 10;
     const tableName = process.env.POSTGRES_TABLE_NAME || "datoms"; // Default: "datoms"
     // Validate table name to prevent SQL injection (alphanumeric and underscores only)
     if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {

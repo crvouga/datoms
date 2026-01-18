@@ -227,14 +227,17 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
         const error = new Error(
           `Safety check failed: Found ${currentDatoms.length} current datoms in obsolete list. This should never happen.`
         );
-        this.logger?.error("Safety check failed: current datoms in obsolete list", {
-          event: "retention_policy_safety_check_failed",
-          policy: "destroy",
-          latestTx,
-          cutoffTx,
-          currentDatomsCount: currentDatoms.length,
-          error: error.message,
-        });
+        this.logger?.error(
+          "Safety check failed: current datoms in obsolete list",
+          {
+            event: "retention_policy_safety_check_failed",
+            policy: "destroy",
+            latestTx,
+            cutoffTx,
+            currentDatomsCount: currentDatoms.length,
+            error: error.message,
+          }
+        );
         throw error;
       }
 
