@@ -1,0 +1,25 @@
+{
+  "cSpell.words": [
+    "Aggs",
+    "bunx",
+    "datalog",
+    "Datom",
+    "Datomic",
+    "datoms",
+    "healthcheck",
+    "innodb",
+    "isready",
+    "mysqladmin",
+    "pdatoms",
+    "pglite",
+    "psql",
+    "tempid",
+    "undeduplicated",
+    "untuple",
+    "upserts"
+  ],
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnPaste": true,
+  "editor.formatOnSave": true,
+  "editor.formatOnType": true
+}
