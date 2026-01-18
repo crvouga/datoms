@@ -288,9 +288,7 @@ export function datalogToPostgresSQL(
   for (let i = 0; i < clauses.length; i++) {
     const clause = clauses[i];
     if (!clause || !isQueryPattern(clause)) {
-      throw new Error(
-        "Only QueryPattern clauses are supported in SQL queries"
-      );
+      throw new Error("Only QueryPattern clauses are supported in SQL queries");
     }
     const { e: entityVal, a: attributeVal, v: valueVal } = clause;
     const alias = `d${i}`;

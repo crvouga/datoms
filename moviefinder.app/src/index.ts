@@ -3,7 +3,7 @@ import {
   PostgreSQLDatomDatabase,
   SQLiteDatomDatabase,
   datalogToPostgresSQL,
-  type DatalogQuery
+  type DatalogQuery,
 } from "../../src";
 import { DestroyRetentionPolicy } from "../../src/datom-database/retention-policy";
 import { PgSQLDatabase } from "../../src/sql-database/sql-database-pg";
@@ -15,13 +15,15 @@ import { createTmdbClient } from "./tmdb/tmdb-client";
 import { TmdbLoader } from "./tmdb/tmdb-loader";
 
 async function main() {
+  const logger = createLogger();
+
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  const logger = createLogger();
+  logger.info("Starting server...", { event: "server_starting", port });
 
   try {
     const databaseUrl = process.env.DATABASE_URL;
-    if (!databaseUrl) {
+    if (!databaseUrl || databaseUrl.trim() === "") {
       logger.error("DATABASE_URL is not set");
       throw new Error("DATABASE_URL is not set");
     }
@@ -224,7 +226,7 @@ async function main() {
               orderBy: [["?popularity", "desc"]],
               limit: 25,
             };
-            const psql = datalogToPostgresSQL(q)
+            const psql = datalogToPostgresSQL(q);
             const compliedPsql = psql.params.reduce<string>((acc, param) => {
               return acc.replace(`?`, String(param));
             }, psql.sql);

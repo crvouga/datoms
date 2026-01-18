@@ -106,7 +106,7 @@ export class TmdbClient {
  */
 export function createTmdbClient(httpClient: HttpClient): TmdbClient {
   const tmdbApiReadAccessToken = process.env.TMDB_API_READ_ACCESS_TOKEN;
-  if (!tmdbApiReadAccessToken)
+  if (!tmdbApiReadAccessToken || tmdbApiReadAccessToken.trim() === "")
     throw new Error("TMDB_API_READ_ACCESS_TOKEN is not set");
   return new TmdbClient(httpClient, tmdbApiReadAccessToken);
 }
