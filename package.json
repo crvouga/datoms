@@ -38,7 +38,7 @@
     "moviefinderapp:docker:up": "cd moviefinder.app && docker-compose up -d",
     "prepublishOnly": "npm run build",
     "psql": "cd moviefinder.app && docker-compose exec postgres psql -U postgres -d postgres",
-    "server": "bun --hot moviefinder.app/src/index.ts",
+    "server": "bun --watch moviefinder.app/src/index.ts",
     "tc": "bun typecheck -- --watch",
     "test": "bun test",
     "test:e2e": "playwright test",
@@ -48,6 +48,7 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.2.0",
     "pg": "^8.11.3",
+    "pino": "^9.0.0",
     "react": "^19",
     "react-dom": "^19"
   },
