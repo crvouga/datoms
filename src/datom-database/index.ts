@@ -25,9 +25,9 @@ export type {
 } from "../types.js";
 
 // DatomDatabase classes
-export { InMemoryDatomDatabase } from "./datom-database-in-memory.js";
-export { PostgreSQLDatomDatabase } from "./datom-database-postgres.js";
-export { SQLiteDatomDatabase } from "./datom-database-sqlite.js";
+export { InMemoryDatomDatabase } from "./in-memory/datom-database-in-memory.js";
+export { PostgreSQLDatomDatabase } from "./postgres/datom-database-postgres.js";
+export { SQLiteDatomDatabase } from "./sqlite/datom-database-sqlite.js";
 export { DatomDatabase } from "./datom-database.js";
 
 // SQL connection adapter

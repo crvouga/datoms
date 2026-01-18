@@ -8,7 +8,7 @@ import type {
   DatalogQuery,
   QueryClause,
   QueryResult,
-} from "../datalog/datalog.js";
+} from "../../datalog/datalog.js";
 import type {
   Attribute,
   DatabaseStats,
@@ -18,16 +18,16 @@ import type {
   QueryOptions,
   TransactionId,
   Value,
-} from "../types.js";
+} from "../../types.js";
 
-import { DatomDatabase, QueryError } from "./datom-database.js";
-import type { ReadContext } from "./hook/hook.js";
+import { DatomDatabase, QueryError } from "../datom-database.js";
+import type { ReadContext } from "../hook/hook.js";
 import {
   isQueryPattern,
   isVariable,
   stripQuestionMark,
-} from "./shared/datalog-helpers.js";
-import { joinResults, project } from "./shared/query-helpers.js";
+} from "../shared/datalog-helpers.js";
+import { joinResults, project } from "../shared/query-helpers.js";
 
 /**
  * In-memory database implementation
@@ -547,7 +547,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
       >
     >
   > {
-    const stats: Partial<import("../types.js").DatabaseStats> = {};
+    const stats: Partial<import("../../types.js").DatabaseStats> = {};
 
     // Count total datoms (only add ones)
     const addDatoms = this._datomsArray.filter((d) => {

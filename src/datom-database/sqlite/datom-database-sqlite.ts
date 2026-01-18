@@ -11,30 +11,30 @@ import type {
   QueryOptions,
   TransactionId,
   Value,
-} from "../types.js";
-import { DatomDatabase } from "./datom-database.js";
-import type { ReadContext } from "./hook/hook.js";
+} from "../../types.js";
+import { DatomDatabase } from "../datom-database.js";
+import type { ReadContext } from "../hook/hook.js";
 import {
   isQueryPattern,
   isVariable,
   stripQuestionMark,
-} from "./shared/datalog-helpers.js";
-import { joinResults, project } from "./shared/query-helpers.js";
+} from "../shared/datalog-helpers.js";
+import { joinResults, project } from "../shared/query-helpers.js";
 import {
   aggregationToSQL,
   checkSQLAggregations,
-} from "./shared/aggregations/shared/helpers.js";
-import { parseAggregation } from "./shared/aggregations/index.js";
-import { applyAggregations } from "./shared/aggregations/index.js";
+} from "../shared/aggregations/shared/helpers.js";
+import { parseAggregation } from "../shared/aggregations/index.js";
+import { applyAggregations } from "../shared/aggregations/index.js";
 
 import type {
   DatalogQuery,
   DatalogQueryFindVariable,
   QueryClause,
   QueryResult,
-} from "../datalog/datalog.js";
-import type { SQLDatabase } from "../sql-database/sql-database.js";
-import { QueryError } from "./datom-database.js";
+} from "../../datalog/datalog.js";
+import type { SQLDatabase } from "../../sql-database/sql-database.js";
+import { QueryError } from "../datom-database.js";
 
 /**
  * SQLite database implementation
@@ -1720,12 +1720,12 @@ export class SQLiteDatomDatabase extends DatomDatabase {
   protected async getDetailedStats(): Promise<
     Partial<
       Pick<
-        import("../types.js").DatabaseStats,
+        import("../../types.js").DatabaseStats,
         "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics"
       >
     >
   > {
-    const stats: Partial<import("../types.js").DatabaseStats> = {};
+    const stats: Partial<import("../../types.js").DatabaseStats> = {};
 
     // Count total datoms (only add ones, latest version)
     const countSql = `
