@@ -2,7 +2,7 @@
  * SQLite aggregation registry - registration system for SQLite SQL aggregations
  */
 
-import type { SQLAggregationResult } from "../shared/sql-types.js";
+import type { SQLAggregationResult } from "../shared/types.js";
 
 /**
  * SQL aggregation converter function

@@ -4,7 +4,7 @@
 
 import type { QueryResult } from "../../../../datalog/datalog.js";
 import type { Attribute, Value } from "../../../../datoms.js";
-import { IN_MEMORY_AGGREGATIONS } from "../in-memory/registry.js";
+import { IN_MEMORY_AGGREGATIONS } from "./registry.js";
 import { parseAggregation } from "./parser.js";
 
 /**

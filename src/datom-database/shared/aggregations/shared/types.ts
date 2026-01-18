@@ -2,6 +2,9 @@
  * SQL aggregation types
  */
 
+/**
+ * Database type
+ */
 export type DatabaseType = "postgresql" | "sqlite";
 
 /**

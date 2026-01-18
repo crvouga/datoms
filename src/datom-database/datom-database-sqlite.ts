@@ -23,7 +23,7 @@ import { joinResults, project } from "./shared/query-helpers.js";
 import {
   aggregationToSQL,
   checkSQLAggregations,
-} from "./shared/aggregations/sql-helpers.js";
+} from "./shared/aggregations/shared/helpers.js";
 import { parseAggregation } from "./shared/aggregations/index.js";
 import { applyAggregations } from "./shared/aggregations/index.js";
 
