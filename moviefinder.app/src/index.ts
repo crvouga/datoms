@@ -2,17 +2,17 @@ import { serve } from "bun";
 import {
   PostgreSQLDatomDatabase,
   SQLiteDatomDatabase,
-  type DatalogQuery,
-  type DatomDatabase,
+  datalogToPostgresSQL,
+  type DatalogQuery
 } from "../../src";
+import { DestroyRetentionPolicy } from "../../src/datom-database/retention-policy";
 import { PgSQLDatabase } from "../../src/sql-database/sql-database-pg";
+import { SQLiteSQLDatabase } from "../../src/sql-database/sql-database-sqlite";
 import { FetchHttpClient } from "./http-client";
 import index from "./index.html";
 import { createLogger } from "./lib/logger";
 import { createTmdbClient } from "./tmdb/tmdb-client";
 import { TmdbLoader } from "./tmdb/tmdb-loader";
-import { DestroyRetentionPolicy } from "../../src/datom-database/retention-policy";
-import { SQLiteSQLDatabase } from "../../src/sql-database/sql-database-sqlite";
 
 async function main() {
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -36,13 +36,13 @@ async function main() {
     const db = false ? sqliteDb : postgresDb;
     const destroyRetentionPolicy = new DestroyRetentionPolicy(db, {
       retentionTxCount: 10,
-      intervalMs: 1000,
-      batchSize: 10_000,
+      intervalMs: 3000,
+      batchSize: 5_000,
     });
     destroyRetentionPolicy.start();
 
     // PostgreSQL maintenance: VACUUM ANALYZE on interval
-    const maintenanceIntervalMs = 1000 * 10;
+    const maintenanceIntervalMs = 1000 * 60;
     const tableName = process.env.POSTGRES_TABLE_NAME || "datoms"; // Default: "datoms"
     // Validate table name to prevent SQL injection (alphanumeric and underscores only)
     if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
@@ -224,6 +224,10 @@ async function main() {
               orderBy: [["?popularity", "desc"]],
               limit: 25,
             };
+            const psql = datalogToPostgresSQL(q)
+            const compliedPsql = psql.params.reduce<string>((acc, param) => {
+              return acc.replace(`?`, String(param));
+            }, psql.sql);
             const populateMovies = await db.query(q);
             logger.info("Movies datoms populated", {
               event: "populated_movies",
@@ -233,7 +237,7 @@ async function main() {
               event: "populated_movies_data",
               data: populateMovies,
             });
-            return Response.json([...populateMovies]);
+            return Response.json([q, compliedPsql, ...populateMovies]);
           },
         },
 

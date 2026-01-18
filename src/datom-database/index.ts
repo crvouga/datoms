@@ -29,7 +29,10 @@ export type {
 
 // DatomDatabase classes
 export { InMemoryDatomDatabase } from "./in-memory/in-memory-datom-database.js";
-export { PostgreSQLDatomDatabase } from "./postgres/postgres-datom-database.js";
+export {
+  PostgreSQLDatomDatabase,
+  datalogToPostgresSQL,
+} from "./postgres/postgres-datom-database.js";
 export { SQLiteDatomDatabase } from "./sqlite/sqlite-datom-database.js";
 export type { DatomDatabase } from "./datom-database.js";
 

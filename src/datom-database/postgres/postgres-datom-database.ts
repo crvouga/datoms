@@ -53,6 +53,493 @@ import {
 } from "./aggregations/helpers.js";
 
 /**
+ * Check if query can use pivot optimization (multiple attributes on same entity)
+ */
+function canUsePivotOptimization(clauses: QueryClause[]): boolean {
+  if (clauses.length < 2) return false;
+
+  // Check if all clauses query the same entity variable
+  let sharedEntityVar: string | null = null;
+  const attributeVars = new Set<string>();
+  const boundAttributes = new Set<string>();
+
+  for (const clause of clauses) {
+    if (!clause || !isQueryPattern(clause)) return false;
+
+    const { e: entityVal, a: attributeVal } = clause;
+
+    // Entity must be a variable (not bound)
+    if (!isVariable(entityVal)) return false;
+    const entityVar = entityVal as string;
+
+    // All clauses must share the same entity variable
+    if (sharedEntityVar === null) {
+      sharedEntityVar = entityVar;
+    } else if (sharedEntityVar !== entityVar) {
+      return false;
+    }
+
+    // Attribute must be bound (not a variable)
+    if (!isVariable(attributeVal)) {
+      boundAttributes.add(String(attributeVal));
+    } else {
+      attributeVars.add(attributeVal as string);
+    }
+  }
+
+  // Need at least 2 bound attributes to benefit from pivot
+  return boundAttributes.size >= 2;
+}
+
+/**
+ * Convert a DatalogQuery to PostgreSQL SQL
+ * Returns the SQL string and parameter array
+ */
+export function datalogToPostgresSQL(
+  query: DatalogQuery,
+  tableName: string = "datoms"
+): { sql: string; params: unknown[] } {
+  const clauses = query.where;
+  const params: unknown[] = [];
+
+  // Check if we can use pivot optimization
+  const usePivot = canUsePivotOptimization(clauses);
+
+  if (usePivot) {
+    // Build SQL using pivot optimization
+    // Collect all attributes and map them to their value variables
+    const attributes: string[] = [];
+    const attrToVar: Map<string, string> = new Map();
+    let entityVarName: string | null = null;
+
+    for (const clause of clauses) {
+      if (!clause || !isQueryPattern(clause)) {
+        throw new Error(
+          "Only QueryPattern clauses are supported in pivot queries"
+        );
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+
+      // Get entity variable (should be same for all clauses)
+      if (isVariable(entityVal)) {
+        if (entityVarName === null) {
+          entityVarName = entityVal as string;
+        }
+      }
+
+      // Collect bound attributes and their value variables
+      if (!isVariable(attributeVal)) {
+        const attr = String(attributeVal);
+        attributes.push(attr);
+        if (isVariable(valueVal)) {
+          attrToVar.set(attr, valueVal as string);
+        }
+      }
+    }
+
+    // Build single CTE with all attributes
+    const attributesList = attributes.map(() => "?").join(", ");
+    for (const attr of attributes) {
+      params.push(attr);
+    }
+
+    const cte = `
+      all_datoms AS (
+        SELECT DISTINCT ON (e, a, v)
+          e, a, v, tx
+        FROM ${tableName}
+        WHERE op = 'assert'
+          AND a IN (${attributesList})
+        ORDER BY e, a, v, tx DESC
+      )`;
+
+    // Build pivot SELECT with conditional aggregation
+    const pivotSelects: string[] = [];
+    if (entityVarName) {
+      const entityColName = stripQuestionMark(entityVarName);
+      pivotSelects.push(`e AS "${entityColName}"`);
+    }
+
+    // Add CASE WHEN for each attribute->variable mapping
+    for (const [attr, varName] of attrToVar.entries()) {
+      const varColName = stripQuestionMark(varName);
+      pivotSelects.push(`MAX(CASE WHEN a = ? THEN v END) AS "${varColName}"`);
+      params.push(attr);
+    }
+
+    // Build final SELECT columns from find clause
+    const selectColumns: string[] = [];
+    const findKeys = Object.keys(query.find);
+    const varToColumn: Map<string, string> = new Map();
+
+    // Map variables to their pivot column names (without ? prefix)
+    if (entityVarName) {
+      varToColumn.set(entityVarName, stripQuestionMark(entityVarName));
+    }
+    for (const varName of attrToVar.values()) {
+      varToColumn.set(varName, stripQuestionMark(varName));
+    }
+
+    // Build SELECT columns
+    for (const outputKey of findKeys) {
+      const expr = query.find[outputKey];
+      const agg = parseAggregation(expr);
+
+      if (agg) {
+        // Aggregation
+        const varName = agg.variable;
+        const colName = varToColumn.get(varName);
+        if (colName) {
+          const columnRef = `"${colName}"`;
+          const sqlAgg = aggregationToSQL(expr, columnRef, outputKey);
+          if (sqlAgg && sqlAgg.sql) {
+            selectColumns.push(sqlAgg.sql);
+          } else {
+            selectColumns.push(`NULL AS "${outputKey}"`);
+          }
+        } else {
+          selectColumns.push(`NULL AS "${outputKey}"`);
+        }
+      } else {
+        // Regular variable
+        let varName: string;
+        if (
+          Array.isArray(expr) &&
+          expr.length === 1 &&
+          typeof expr[0] === "string"
+        ) {
+          varName = expr[0];
+        } else if (typeof expr === "string") {
+          varName = expr;
+        } else {
+          continue;
+        }
+
+        const colName = varToColumn.get(varName);
+        if (colName) {
+          // Reference the column from the pivoted subquery
+          const columnRef = `"${colName}"`;
+          selectColumns.push(`${columnRef} AS "${outputKey}"`);
+        }
+      }
+    }
+
+    // Build GROUP BY clause for pivot subquery
+    let groupByClause = "";
+    if (entityVarName) {
+      groupByClause = `GROUP BY e`;
+    }
+
+    // Build HAVING clause to ensure we have at least one required attribute
+    const havingClause =
+      attributes.length > 0
+        ? `HAVING MAX(CASE WHEN a = ? THEN v END) IS NOT NULL`
+        : "";
+    if (havingClause) {
+      params.push(attributes[0]);
+    }
+
+    // Build ORDER BY clause
+    let orderByClause = "";
+    if (query.orderBy && query.orderBy.length > 0) {
+      const orderParts = query.orderBy
+        .map(([variable, direction]) => {
+          const colName = varToColumn.get(variable);
+          if (colName) {
+            const columnRef = `"${colName}"`;
+            return `${columnRef} ${direction.toUpperCase()}`;
+          }
+          return "";
+        })
+        .filter(Boolean);
+      if (orderParts.length > 0) {
+        orderByClause = `ORDER BY ${orderParts.join(", ")}`;
+      }
+    }
+
+    // Build LIMIT clause
+    const limitClause = query.limit ? `LIMIT ?` : "";
+    if (query.limit) {
+      params.push(query.limit);
+    }
+
+    const sql = `
+      WITH ${cte}
+      SELECT ${selectColumns.join(", ")}
+      FROM (
+        SELECT ${pivotSelects.join(", ")}
+        FROM all_datoms
+        ${groupByClause}
+        ${havingClause}
+      ) AS pivoted
+      ${orderByClause}
+      ${limitClause}
+    `;
+
+    return { sql: sql.trim(), params };
+  }
+
+  // Build SQL using regular joins
+  const ctes: string[] = [];
+  const selectColumns: string[] = [];
+  const joinConditions: string[] = [];
+
+  // Build CTEs for each clause with deduplication using DISTINCT ON
+  for (let i = 0; i < clauses.length; i++) {
+    const clause = clauses[i];
+    if (!clause || !isQueryPattern(clause)) {
+      throw new Error(
+        "Only QueryPattern clauses are supported in SQL queries"
+      );
+    }
+    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+    const alias = `d${i}`;
+
+    const conditions: string[] = [];
+
+    // Add filters for bound values
+    if (!isVariable(entityVal)) {
+      conditions.push(`e = ?`);
+      params.push(String(entityVal));
+    }
+    if (!isVariable(attributeVal)) {
+      conditions.push(`a = ?`);
+      params.push(String(attributeVal));
+    }
+    if (!isVariable(valueVal)) {
+      let value = valueVal as Value;
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      conditions.push(`v = ?::jsonb`);
+      params.push(JSON.stringify(value));
+    }
+
+    // Always filter for active datoms to use partial index
+    conditions.push(`op = 'assert'`);
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    // PostgreSQL uses DISTINCT ON for deduplication
+    const cte = `
+      ${alias} AS (
+        SELECT DISTINCT ON (e, a, v)
+          e, a, v, tx
+        FROM ${tableName}
+        ${whereClause}
+        ORDER BY e, a, v, tx DESC
+      )`;
+
+    ctes.push(cte);
+  }
+
+  // Map variables to their column references for aggregations
+  const variableToColumn: Map<string, string> = new Map();
+  for (let i = 0; i < clauses.length; i++) {
+    const clause = clauses[i];
+    if (!clause || !isQueryPattern(clause)) {
+      continue;
+    }
+    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+    const alias = `d${i}`;
+    if (isVariable(entityVal)) {
+      variableToColumn.set(entityVal as string, `${alias}.e`);
+    }
+    if (isVariable(attributeVal)) {
+      variableToColumn.set(attributeVal as string, `${alias}.a`);
+    }
+    if (isVariable(valueVal)) {
+      variableToColumn.set(valueVal as string, `${alias}.v`);
+    }
+  }
+
+  // Build JOIN conditions based on shared variables
+  const variableToClause: Map<
+    string,
+    { clauseIndex: number; field: string }[]
+  > = new Map();
+
+  for (let i = 0; i < clauses.length; i++) {
+    const clause = clauses[i];
+    if (!clause || !isQueryPattern(clause)) {
+      throw new Error(
+        "Only QueryPattern clauses are supported in JOIN conditions"
+      );
+    }
+    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+
+    if (isVariable(entityVal)) {
+      const varName = entityVal as string;
+      if (!variableToClause.has(varName)) {
+        variableToClause.set(varName, []);
+      }
+      variableToClause.get(varName)!.push({ clauseIndex: i, field: "e" });
+    }
+    if (isVariable(attributeVal)) {
+      const varName = attributeVal as string;
+      if (!variableToClause.has(varName)) {
+        variableToClause.set(varName, []);
+      }
+      variableToClause.get(varName)!.push({ clauseIndex: i, field: "a" });
+    }
+    if (isVariable(valueVal)) {
+      const varName = valueVal as string;
+      if (!variableToClause.has(varName)) {
+        variableToClause.set(varName, []);
+      }
+      variableToClause.get(varName)!.push({ clauseIndex: i, field: "v" });
+    }
+  }
+
+  // Build JOIN conditions for shared variables
+  for (const occurrences of variableToClause.values()) {
+    if (occurrences.length > 1) {
+      for (let i = 1; i < occurrences.length; i++) {
+        const prev = occurrences[i - 1];
+        const curr = occurrences[i];
+        if (!prev || !curr) continue;
+        const prevAlias = `d${prev.clauseIndex}`;
+        const currAlias = `d${curr.clauseIndex}`;
+        joinConditions.push(
+          `${prevAlias}.${prev.field} = ${currAlias}.${curr.field}`
+        );
+      }
+    }
+  }
+
+  // Build aggregation SELECT columns
+  const groupByColumns: string[] = [];
+  const findKeys = Object.keys(query.find);
+  for (const outputKey of findKeys) {
+    const expr = query.find[outputKey];
+    const agg = parseAggregation(expr);
+
+    if (agg) {
+      // This is an aggregation - convert to SQL
+      const varName = agg.variable;
+      const columnRef = variableToColumn.get(varName);
+      if (columnRef) {
+        const sqlAgg = aggregationToSQL(expr, columnRef, outputKey);
+        if (sqlAgg && sqlAgg.sql) {
+          selectColumns.push(sqlAgg.sql);
+        } else {
+          // Unsupported aggregation - return null
+          selectColumns.push(`NULL AS "${outputKey}"`);
+        }
+      } else {
+        // Variable not found - return null
+        selectColumns.push(`NULL AS "${outputKey}"`);
+      }
+    } else {
+      // Regular variable - include in SELECT and GROUP BY
+      let varName: string;
+      if (
+        Array.isArray(expr) &&
+        expr.length === 1 &&
+        typeof expr[0] === "string"
+      ) {
+        varName = expr[0];
+      } else if (typeof expr === "string") {
+        varName = expr;
+      } else {
+        continue;
+      }
+
+      const columnRef = variableToColumn.get(varName);
+      if (columnRef) {
+        selectColumns.push(`${columnRef} AS "${outputKey}"`);
+        groupByColumns.push(columnRef);
+      }
+    }
+  }
+
+  // Build the final SQL query
+  const cteClause = ctes.length > 0 ? `WITH ${ctes.join(", ")}` : "";
+  const fromClause = `FROM d0`;
+
+  // Build JOIN clauses
+  const joinClauses: string[] = [];
+  for (let i = 1; i < clauses.length; i++) {
+    const alias = `d${i}`;
+    const conditions: string[] = [];
+
+    for (const joinCond of joinConditions) {
+      if (joinCond.includes(`${alias}.`)) {
+        const parts = joinCond.split(" = ");
+        if (parts.length === 2 && parts[0] && parts[1]) {
+          if (parts[0].startsWith(`${alias}.`)) {
+            conditions.push(joinCond);
+          } else if (parts[1].startsWith(`${alias}.`)) {
+            conditions.push(`${parts[1]} = ${parts[0]}`);
+          }
+        }
+      }
+    }
+
+    if (conditions.length > 0) {
+      joinClauses.push(`JOIN ${alias} ON ${conditions.join(" AND ")}`);
+    } else {
+      joinClauses.push(`CROSS JOIN ${alias}`);
+    }
+  }
+
+  const joinClause = joinClauses.join(" ");
+
+  // Build ORDER BY clause
+  let orderByClause = "";
+  if (query.orderBy && query.orderBy.length > 0) {
+    const orderParts = query.orderBy
+      .map(([variable, direction]) => {
+        for (let i = 0; i < clauses.length; i++) {
+          const clause = clauses[i];
+          if (!clause || !isQueryPattern(clause)) {
+            continue;
+          }
+          const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+          if (entityVal === variable) {
+            return `d${i}.e ${direction.toUpperCase()}`;
+          }
+          if (attributeVal === variable) {
+            return `d${i}.a ${direction.toUpperCase()}`;
+          }
+          if (valueVal === variable) {
+            return `d${i}.v ${direction.toUpperCase()}`;
+          }
+        }
+        return "";
+      })
+      .filter(Boolean);
+    if (orderParts.length > 0) {
+      orderByClause = `ORDER BY ${orderParts.join(", ")}`;
+    }
+  }
+
+  // Build GROUP BY clause if we have aggregations with non-aggregated columns
+  let groupByClause = "";
+  if (groupByColumns.length > 0) {
+    groupByClause = `GROUP BY ${groupByColumns.join(", ")}`;
+  }
+
+  const limitClause = query.limit ? `LIMIT ?` : "";
+  if (query.limit) {
+    params.push(query.limit);
+  }
+
+  const sql = `
+    ${cteClause}
+    SELECT ${selectColumns.join(", ")}
+    ${fromClause}
+    ${joinClause}
+    ${groupByClause}
+    ${orderByClause}
+    ${limitClause}
+  `;
+
+  return { sql: sql.trim(), params };
+}
+
+/**
  * PostgreSQL database implementation
  * Accepts a SqlDatabase that implements PostgreSQL-compatible SQL
  */
@@ -1087,39 +1574,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
    * Check if query can use pivot optimization (multiple attributes on same entity)
    */
   private _canUsePivotOptimization(clauses: QueryClause[]): boolean {
-    if (clauses.length < 2) return false;
-
-    // Check if all clauses query the same entity variable
-    let sharedEntityVar: string | null = null;
-    const attributeVars = new Set<string>();
-    const boundAttributes = new Set<string>();
-
-    for (const clause of clauses) {
-      if (!clause || !isQueryPattern(clause)) return false;
-
-      const { e: entityVal, a: attributeVal } = clause;
-
-      // Entity must be a variable (not bound)
-      if (!isVariable(entityVal)) return false;
-      const entityVar = entityVal as string;
-
-      // All clauses must share the same entity variable
-      if (sharedEntityVar === null) {
-        sharedEntityVar = entityVar;
-      } else if (sharedEntityVar !== entityVar) {
-        return false;
-      }
-
-      // Attribute must be bound (not a variable)
-      if (!isVariable(attributeVal)) {
-        boundAttributes.add(String(attributeVal));
-      } else {
-        attributeVars.add(attributeVal as string);
-      }
-    }
-
-    // Need at least 2 bound attributes to benefit from pivot
-    return boundAttributes.size >= 2;
+    return canUsePivotOptimization(clauses);
   }
 
   /**
@@ -1128,177 +1583,8 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   private async _executeDatalogWithPivot(
     query: DatalogQuery
   ): Promise<QueryResult> {
-    const clauses = query.where;
-    const params: unknown[] = [];
-
-    // Collect all attributes and map them to their value variables
-    const attributes: string[] = [];
-    const attrToVar: Map<string, string> = new Map();
-    let entityVarName: string | null = null;
-
-    for (const clause of clauses) {
-      if (!clause || !isQueryPattern(clause)) {
-        throw new Error(
-          "Only QueryPattern clauses are supported in pivot queries"
-        );
-      }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-
-      // Get entity variable (should be same for all clauses)
-      if (isVariable(entityVal)) {
-        if (entityVarName === null) {
-          entityVarName = entityVal as string;
-        }
-      }
-
-      // Collect bound attributes and their value variables
-      if (!isVariable(attributeVal)) {
-        const attr = String(attributeVal);
-        attributes.push(attr);
-        if (isVariable(valueVal)) {
-          attrToVar.set(attr, valueVal as string);
-        }
-      }
-    }
-
-    // Build single CTE with all attributes
-    const attributesList = attributes.map(() => "?").join(", ");
-    for (const attr of attributes) {
-      params.push(attr);
-    }
-
-    const cte = `
-      all_datoms AS (
-        SELECT DISTINCT ON (e, a, v)
-          e, a, v, tx
-        FROM ${this.tableName}
-        WHERE op = 'assert'
-          AND a IN (${attributesList})
-        ORDER BY e, a, v, tx DESC
-      )`;
-
-    // Build pivot SELECT with conditional aggregation
-    const pivotSelects: string[] = [];
-    if (entityVarName) {
-      const entityColName = stripQuestionMark(entityVarName);
-      pivotSelects.push(`e AS "${entityColName}"`);
-    }
-
-    // Add CASE WHEN for each attribute->variable mapping
-    for (const [attr, varName] of attrToVar.entries()) {
-      const varColName = stripQuestionMark(varName);
-      pivotSelects.push(`MAX(CASE WHEN a = ? THEN v END) AS "${varColName}"`);
-      params.push(attr);
-    }
-
-    // Build final SELECT columns from find clause
-    const selectColumns: string[] = [];
-    const findKeys = Object.keys(query.find);
-    const varToColumn: Map<string, string> = new Map();
-
-    // Map variables to their pivot column names (without ? prefix)
-    if (entityVarName) {
-      varToColumn.set(entityVarName, stripQuestionMark(entityVarName));
-    }
-    for (const varName of attrToVar.values()) {
-      varToColumn.set(varName, stripQuestionMark(varName));
-    }
-
-    // Build SELECT columns
-    for (const outputKey of findKeys) {
-      const expr = query.find[outputKey];
-      const agg = parseAggregation(expr);
-
-      if (agg) {
-        // Aggregation
-        const varName = agg.variable;
-        const colName = varToColumn.get(varName);
-        if (colName) {
-          const columnRef = `"${colName}"`;
-          const sqlAgg = aggregationToSQL(expr, columnRef, outputKey);
-          if (sqlAgg && sqlAgg.sql) {
-            selectColumns.push(sqlAgg.sql);
-          } else {
-            selectColumns.push(`NULL AS "${outputKey}"`);
-          }
-        } else {
-          selectColumns.push(`NULL AS "${outputKey}"`);
-        }
-      } else {
-        // Regular variable
-        let varName: string;
-        if (
-          Array.isArray(expr) &&
-          expr.length === 1 &&
-          typeof expr[0] === "string"
-        ) {
-          varName = expr[0];
-        } else if (typeof expr === "string") {
-          varName = expr;
-        } else {
-          continue;
-        }
-
-        const colName = varToColumn.get(varName);
-        if (colName) {
-          // Reference the column from the pivoted subquery
-          const columnRef = `"${colName}"`;
-          selectColumns.push(`${columnRef} AS "${outputKey}"`);
-        }
-      }
-    }
-
-    // Build GROUP BY clause for pivot subquery
-    let groupByClause = "";
-    if (entityVarName) {
-      groupByClause = `GROUP BY e`;
-    }
-
-    // Build HAVING clause to ensure we have at least one required attribute
-    const havingClause =
-      attributes.length > 0
-        ? `HAVING MAX(CASE WHEN a = ? THEN v END) IS NOT NULL`
-        : "";
-    if (havingClause) {
-      params.push(attributes[0]);
-    }
-
-    // Build ORDER BY clause
-    let orderByClause = "";
-    if (query.orderBy && query.orderBy.length > 0) {
-      const orderParts = query.orderBy
-        .map(([variable, direction]) => {
-          const colName = varToColumn.get(variable);
-          if (colName) {
-            const columnRef = `"${colName}"`;
-            return `${columnRef} ${direction.toUpperCase()}`;
-          }
-          return "";
-        })
-        .filter(Boolean);
-      if (orderParts.length > 0) {
-        orderByClause = `ORDER BY ${orderParts.join(", ")}`;
-      }
-    }
-
-    // Build LIMIT clause
-    const limitClause = query.limit ? `LIMIT ?` : "";
-    if (query.limit) {
-      params.push(query.limit);
-    }
-
-    const sql = `
-      WITH ${cte}
-      SELECT ${selectColumns.join(", ")}
-      FROM (
-        SELECT ${pivotSelects.join(", ")}
-        FROM all_datoms
-        ${groupByClause}
-        ${havingClause}
-      ) AS pivoted
-      ${orderByClause}
-      ${limitClause}
-    `;
+    // Use the extracted SQL building function
+    const { sql, params } = datalogToPostgresSQL(query, this.tableName);
 
     const rows = await this.connection.query(sql, params);
 
@@ -1370,274 +1656,8 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   private async _executeDatalogWithSQL(
     query: DatalogQuery
   ): Promise<QueryResult> {
-    const clauses = query.where;
-    const params: unknown[] = [];
-
-    // Check if we can use pivot optimization
-    const usePivot = this._canUsePivotOptimization(clauses);
-
-    if (usePivot) {
-      return this._executeDatalogWithPivot(query);
-    }
-
-    const ctes: string[] = [];
-    const selectColumns: string[] = [];
-    const joinConditions: string[] = [];
-
-    // Build CTEs for each clause with deduplication using DISTINCT ON
-    for (let i = 0; i < clauses.length; i++) {
-      const clause = clauses[i];
-      if (!clause || !isQueryPattern(clause)) {
-        throw new Error(
-          "Only QueryPattern clauses are supported in SQL queries"
-        );
-      }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-      const alias = `d${i}`;
-
-      const conditions: string[] = [];
-
-      // Add filters for bound values
-      if (!isVariable(entityVal)) {
-        conditions.push(`e = ?`);
-        params.push(String(entityVal));
-      }
-      if (!isVariable(attributeVal)) {
-        conditions.push(`a = ?`);
-        params.push(String(attributeVal));
-      }
-      if (!isVariable(valueVal)) {
-        let value = valueVal as Value;
-        if (value === undefined) {
-          value = "__UNDEFINED__";
-        }
-        conditions.push(`v = ?::jsonb`);
-        params.push(JSON.stringify(value));
-      }
-
-      // Always filter for active datoms to use partial index
-      conditions.push(`op = 'assert'`);
-
-      const whereClause =
-        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-      // PostgreSQL uses DISTINCT ON for deduplication
-      const cte = `
-        ${alias} AS (
-          SELECT DISTINCT ON (e, a, v)
-            e, a, v, tx
-          FROM ${this.tableName}
-          ${whereClause}
-          ORDER BY e, a, v, tx DESC
-        )`;
-
-      ctes.push(cte);
-
-      // Build SELECT columns for variables (only if not aggregating)
-      // Aggregations will be handled separately
-    }
-
-    // Map variables to their column references for aggregations
-    const variableToColumn: Map<string, string> = new Map();
-    for (let i = 0; i < clauses.length; i++) {
-      const clause = clauses[i];
-      if (!clause || !isQueryPattern(clause)) {
-        continue;
-      }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-      const alias = `d${i}`;
-      if (isVariable(entityVal)) {
-        variableToColumn.set(entityVal as string, `${alias}.e`);
-      }
-      if (isVariable(attributeVal)) {
-        variableToColumn.set(attributeVal as string, `${alias}.a`);
-      }
-      if (isVariable(valueVal)) {
-        variableToColumn.set(valueVal as string, `${alias}.v`);
-      }
-    }
-
-    // Build JOIN conditions based on shared variables
-    const variableToClause: Map<
-      string,
-      { clauseIndex: number; field: string }[]
-    > = new Map();
-
-    for (let i = 0; i < clauses.length; i++) {
-      const clause = clauses[i];
-      if (!clause || !isQueryPattern(clause)) {
-        throw new Error(
-          "Only QueryPattern clauses are supported in JOIN conditions"
-        );
-      }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-
-      if (isVariable(entityVal)) {
-        const varName = entityVal as string;
-        if (!variableToClause.has(varName)) {
-          variableToClause.set(varName, []);
-        }
-        variableToClause.get(varName)!.push({ clauseIndex: i, field: "e" });
-      }
-      if (isVariable(attributeVal)) {
-        const varName = attributeVal as string;
-        if (!variableToClause.has(varName)) {
-          variableToClause.set(varName, []);
-        }
-        variableToClause.get(varName)!.push({ clauseIndex: i, field: "a" });
-      }
-      if (isVariable(valueVal)) {
-        const varName = valueVal as string;
-        if (!variableToClause.has(varName)) {
-          variableToClause.set(varName, []);
-        }
-        variableToClause.get(varName)!.push({ clauseIndex: i, field: "v" });
-      }
-    }
-
-    // Build JOIN conditions for shared variables
-    for (const occurrences of variableToClause.values()) {
-      if (occurrences.length > 1) {
-        for (let i = 1; i < occurrences.length; i++) {
-          const prev = occurrences[i - 1];
-          const curr = occurrences[i];
-          if (!prev || !curr) continue;
-          const prevAlias = `d${prev.clauseIndex}`;
-          const currAlias = `d${curr.clauseIndex}`;
-          joinConditions.push(
-            `${prevAlias}.${prev.field} = ${currAlias}.${curr.field}`
-          );
-        }
-      }
-    }
-
-    // Build aggregation SELECT columns
-    const groupByColumns: string[] = [];
-    const findKeys = Object.keys(query.find);
-    for (const outputKey of findKeys) {
-      const expr = query.find[outputKey];
-      const agg = parseAggregation(expr);
-
-      if (agg) {
-        // This is an aggregation - convert to SQL
-        const varName = agg.variable;
-        const columnRef = variableToColumn.get(varName);
-        if (columnRef) {
-          const sqlAgg = aggregationToSQL(expr, columnRef, outputKey);
-          if (sqlAgg && sqlAgg.sql) {
-            selectColumns.push(sqlAgg.sql);
-          } else {
-            // Unsupported aggregation - return null
-            selectColumns.push(`NULL AS "${outputKey}"`);
-          }
-        } else {
-          // Variable not found - return null
-          selectColumns.push(`NULL AS "${outputKey}"`);
-        }
-      } else {
-        // Regular variable - include in SELECT and GROUP BY
-        let varName: string;
-        if (
-          Array.isArray(expr) &&
-          expr.length === 1 &&
-          typeof expr[0] === "string"
-        ) {
-          varName = expr[0];
-        } else if (typeof expr === "string") {
-          varName = expr;
-        } else {
-          continue;
-        }
-
-        const columnRef = variableToColumn.get(varName);
-        if (columnRef) {
-          selectColumns.push(`${columnRef} AS "${outputKey}"`);
-          groupByColumns.push(columnRef);
-        }
-      }
-    }
-
-    // Build the final SQL query
-    const cteClause = ctes.length > 0 ? `WITH ${ctes.join(", ")}` : "";
-    const fromClause = `FROM d0`;
-
-    // Build JOIN clauses
-    const joinClauses: string[] = [];
-    for (let i = 1; i < clauses.length; i++) {
-      const alias = `d${i}`;
-      const conditions: string[] = [];
-
-      for (const joinCond of joinConditions) {
-        if (joinCond.includes(`${alias}.`)) {
-          const parts = joinCond.split(" = ");
-          if (parts.length === 2 && parts[0] && parts[1]) {
-            if (parts[0].startsWith(`${alias}.`)) {
-              conditions.push(joinCond);
-            } else if (parts[1].startsWith(`${alias}.`)) {
-              conditions.push(`${parts[1]} = ${parts[0]}`);
-            }
-          }
-        }
-      }
-
-      if (conditions.length > 0) {
-        joinClauses.push(`JOIN ${alias} ON ${conditions.join(" AND ")}`);
-      } else {
-        joinClauses.push(`CROSS JOIN ${alias}`);
-      }
-    }
-
-    const joinClause = joinClauses.join(" ");
-
-    // Build ORDER BY clause
-    let orderByClause = "";
-    if (query.orderBy && query.orderBy.length > 0) {
-      const orderParts = query.orderBy
-        .map(([variable, direction]) => {
-          for (let i = 0; i < clauses.length; i++) {
-            const clause = clauses[i];
-            if (!clause || !isQueryPattern(clause)) {
-              continue;
-            }
-            const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-            if (entityVal === variable) {
-              return `d${i}.e ${direction.toUpperCase()}`;
-            }
-            if (attributeVal === variable) {
-              return `d${i}.a ${direction.toUpperCase()}`;
-            }
-            if (valueVal === variable) {
-              return `d${i}.v ${direction.toUpperCase()}`;
-            }
-          }
-          return "";
-        })
-        .filter(Boolean);
-      if (orderParts.length > 0) {
-        orderByClause = `ORDER BY ${orderParts.join(", ")}`;
-      }
-    }
-
-    // Build GROUP BY clause if we have aggregations with non-aggregated columns
-    let groupByClause = "";
-    if (groupByColumns.length > 0) {
-      groupByClause = `GROUP BY ${groupByColumns.join(", ")}`;
-    }
-
-    const limitClause = query.limit ? `LIMIT ?` : "";
-    if (query.limit) {
-      params.push(query.limit);
-    }
-
-    const sql = `
-      ${cteClause}
-      SELECT ${selectColumns.join(", ")}
-      ${fromClause}
-      ${joinClause}
-      ${groupByClause}
-      ${orderByClause}
-      ${limitClause}
-    `;
+    // Use the extracted SQL building function
+    const { sql, params } = datalogToPostgresSQL(query, this.tableName);
 
     const rows = await this.connection.query(sql, params);
 

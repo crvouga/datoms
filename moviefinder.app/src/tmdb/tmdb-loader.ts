@@ -11,7 +11,7 @@ export class TmdbLoader {
     private readonly tmdbClient: TmdbClient,
     private readonly db: DatomDatabase,
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   async start(): Promise<void> {
     this.shouldStop = false;
@@ -44,7 +44,7 @@ export class TmdbLoader {
     let totalMoviesProcessed = 0;
 
     while (hasMore && !this.shouldStop) {
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
       const pageStartTime = Date.now();
       this.logger.debug("Fetching movies page", {
         operation: "discoverMovies",
