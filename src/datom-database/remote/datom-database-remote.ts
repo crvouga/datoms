@@ -40,21 +40,11 @@ import type { ITransport } from "./transport/transport.js";
 import { TransportError } from "./transport/transport.js";
 import type {
   DatomsRequest,
-  DatomsResponse,
   QueryRequest,
-  QueryResponse,
   TransactRequest,
-  TransactResponse,
-  GetLatestTransactionRequest,
-  GetLatestTransactionResponse,
   GetTransactionMetadataRequest,
-  GetTransactionMetadataResponse,
   GetObsoleteDatomsRequest,
-  GetObsoleteDatomsResponse,
   DeleteDatomsRequest,
-  DeleteDatomsResponse,
-  InitializeRequest,
-  InitializeResponse,
 } from "./transport/types.js";
 
 /**
@@ -76,11 +66,7 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     }
 
     try {
-      const request: InitializeRequest = { method: "initialize" };
-      const response = await this.transport.request<
-        InitializeRequest,
-        InitializeResponse
-      >("initialize", request);
+      const response = await this.transport.initialize();
       if (!response.success) {
         throw new Error("Failed to initialize remote database");
       }
@@ -167,10 +153,7 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
         metadata,
         context,
       };
-      const response = await this.transport.request<
-        TransactRequest,
-        TransactResponse
-      >("transact", request);
+      const response = await this.transport.transact(request);
 
       // Create write result for after-write hooks
       const writeResult: WriteResult = {
@@ -224,10 +207,7 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
         method: "getTransactionMetadata",
         txId,
       };
-      const response = await this.transport.request<
-        GetTransactionMetadataRequest,
-        GetTransactionMetadataResponse
-      >("getTransactionMetadata", request);
+      const response = await this.transport.getTransactionMetadata(request);
       return response.metadata;
     } catch (error) {
       if (error instanceof TransportError) {
@@ -241,13 +221,7 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     await this._ensureInitialized();
 
     try {
-      const request: GetLatestTransactionRequest = {
-        method: "getLatestTransaction",
-      };
-      const response = await this.transport.request<
-        GetLatestTransactionRequest,
-        GetLatestTransactionResponse
-      >("getLatestTransaction", request);
+      const response = await this.transport.getLatestTransaction();
       return response.txId;
     } catch (error) {
       if (error instanceof TransportError) {
@@ -265,10 +239,7 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
         method: "getObsoleteDatoms",
         cutoffTx,
       };
-      const response = await this.transport.request<
-        GetObsoleteDatomsRequest,
-        GetObsoleteDatomsResponse
-      >("getObsoleteDatoms", request);
+      const response = await this.transport.getObsoleteDatoms(request);
       return response.datoms;
     } catch (error) {
       if (error instanceof TransportError) {
@@ -286,10 +257,7 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
         method: "deleteDatoms",
         datoms,
       };
-      await this.transport.request<DeleteDatomsRequest, DeleteDatomsResponse>(
-        "deleteDatoms",
-        request
-      );
+      await this.transport.deleteDatoms(request);
     } catch (error) {
       if (error instanceof TransportError) {
         throw new Error(`Failed to delete datoms: ${error.message}`);
@@ -421,10 +389,7 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
       };
       // Note: We don't use the remote response directly because we need to
       // re-execute the query with filtered datoms from after-read hooks
-      await this.transport.request<QueryRequest, QueryResponse>(
-        "query",
-        request
-      );
+      await this.transport.query(request);
 
       // Fetch datoms for after-read hooks
       // Extract datoms from all query clauses
@@ -573,10 +538,7 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
         options,
         viewConfig,
       };
-      const response = await this.transport.request<
-        DatomsRequest,
-        DatomsResponse
-      >("datoms", request);
+      const response = await this.transport.datoms(request);
       return response.datoms;
     } catch (error) {
       if (error instanceof TransportError) {
@@ -614,10 +576,7 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
           options: { e: entityId },
           viewConfig: { type: "current" },
         };
-        const response = await this.transport.request<
-          DatomsRequest,
-          DatomsResponse
-        >("datoms", request);
+        const response = await this.transport.datoms(request);
         currentStateDatoms.push(...response.datoms);
       } catch (error) {
         // If fetching fails, continue with speculative datoms only
@@ -737,10 +696,7 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
         context,
         viewConfig,
       };
-      const response = await this.transport.request<
-        QueryRequest,
-        QueryResponse
-      >("query", request);
+      const response = await this.transport.query(request);
       return response.results;
     } catch (error) {
       if (error instanceof TransportError) {

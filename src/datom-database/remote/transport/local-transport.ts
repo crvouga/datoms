@@ -41,187 +41,158 @@ export class LocalTransport implements ITransport {
     this.backend = backend;
   }
 
-  async request<TRequest, TResponse>(
-    method: string,
-    payload: TRequest
-  ): Promise<TResponse> {
-    // Ensure backend is initialized
-    if (!this.initialized && method !== "initialize") {
-      await this.backend.initialize();
-      this.initialized = true;
-    }
+  async initialize(): Promise<InitializeResponse> {
+    await this.backend.initialize();
+    this.initialized = true;
+    return { success: true };
+  }
+
+  async datoms(request: DatomsRequest): Promise<DatomsResponse> {
+    await this._ensureInitialized();
 
     try {
-      switch (method) {
-        case "initialize": {
-          await this.backend.initialize();
-          this.initialized = true;
-          return {
-            success: true,
-          } as TResponse as InitializeResponse as TResponse;
+      // Handle speculative queries - need to merge speculative datoms with current state
+      if (request.viewConfig.type === "speculative") {
+        // For speculative queries, we need to fetch current state and merge
+        // This is handled by the RemoteDatomDatabase._executeSpeculativeQuery
+        // But we can also handle it here for completeness
+        const currentView = this._createView({ type: "current" });
+        const currentDatoms = await currentView.datoms({});
+        const speculativeDatoms = request.viewConfig.datoms;
+
+        // Merge speculative datoms with current state
+        const mergedMap = new Map<string, (typeof speculativeDatoms)[0]>();
+        for (const datom of currentDatoms) {
+          const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
+          mergedMap.set(key, datom);
         }
 
-        case "datoms": {
-          const datomsRequest = payload as DatomsRequest;
-          // Handle speculative queries - need to merge speculative datoms with current state
-          if (datomsRequest.viewConfig.type === "speculative") {
-            // For speculative queries, we need to fetch current state and merge
-            // This is handled by the RemoteDatomDatabase._executeSpeculativeQuery
-            // But we can also handle it here for completeness
-            const currentView = this._createView({ type: "current" });
-            const currentDatoms = await currentView.datoms({});
-            const speculativeDatoms = datomsRequest.viewConfig.datoms;
-
-            // Merge speculative datoms with current state
-            const mergedMap = new Map<string, (typeof speculativeDatoms)[0]>();
-            for (const datom of currentDatoms) {
-              const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
-              mergedMap.set(key, datom);
-            }
-
-            for (const speculativeDatom of speculativeDatoms) {
-              const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-              if (speculativeDatom.op === "retract") {
-                mergedMap.delete(key);
-              } else {
-                mergedMap.set(key, speculativeDatom);
-              }
-            }
-
-            const mergedDatoms = Array.from(mergedMap.values());
-            // Apply filters from options
-            let filtered = mergedDatoms;
-            if (datomsRequest.options.e !== undefined) {
-              filtered = filtered.filter(
-                (d) => d.e === datomsRequest.options.e
-              );
-            }
-            if (datomsRequest.options.a !== undefined) {
-              filtered = filtered.filter(
-                (d) => d.a === datomsRequest.options.a
-              );
-            }
-            if (datomsRequest.options.v !== undefined) {
-              filtered = filtered.filter(
-                (d) => d.v === datomsRequest.options.v
-              );
-            }
-            if (datomsRequest.options.tx !== undefined) {
-              filtered = filtered.filter(
-                (d) => d.tx === datomsRequest.options.tx
-              );
-            }
-            if (datomsRequest.options.op !== undefined) {
-              filtered = filtered.filter(
-                (d) => d.op === datomsRequest.options.op
-              );
-            }
-
-            return {
-              datoms: filtered,
-            } as TResponse as DatomsResponse as TResponse;
+        for (const speculativeDatom of speculativeDatoms) {
+          const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
+          if (speculativeDatom.op === "retract") {
+            mergedMap.delete(key);
+          } else {
+            mergedMap.set(key, speculativeDatom);
           }
-
-          const view = this._createView(datomsRequest.viewConfig);
-          const datoms = await view.datoms(datomsRequest.options);
-          return { datoms } as TResponse as DatomsResponse as TResponse;
         }
 
-        case "query": {
-          const queryRequest = payload as QueryRequest;
-          const view = this._createView(queryRequest.viewConfig);
-          const results = await view.query(
-            queryRequest.query,
-            queryRequest.context
-          );
-          return { results } as TResponse as QueryResponse as TResponse;
+        const mergedDatoms = Array.from(mergedMap.values());
+        // Apply filters from options
+        let filtered = mergedDatoms;
+        if (request.options.e !== undefined) {
+          filtered = filtered.filter((d) => d.e === request.options.e);
+        }
+        if (request.options.a !== undefined) {
+          filtered = filtered.filter((d) => d.a === request.options.a);
+        }
+        if (request.options.v !== undefined) {
+          filtered = filtered.filter((d) => d.v === request.options.v);
+        }
+        if (request.options.tx !== undefined) {
+          filtered = filtered.filter((d) => d.tx === request.options.tx);
+        }
+        if (request.options.op !== undefined) {
+          filtered = filtered.filter((d) => d.op === request.options.op);
         }
 
-        case "transact": {
-          const transactRequest = payload as TransactRequest;
-          const txId = await this.backend.transact(
-            transactRequest.ops,
-            transactRequest.metadata,
-            transactRequest.context
-          );
-          return { txId } as TResponse as TransactResponse as TResponse;
-        }
-
-        case "getLatestTransaction": {
-          const txId = await this.backend.getLatestTransaction();
-          return {
-            txId,
-          } as TResponse as GetLatestTransactionResponse as TResponse;
-        }
-
-        case "getTransactionMetadata": {
-          const metadataRequest = payload as GetTransactionMetadataRequest;
-          const metadata = await this.backend.getTransactionMetadata(
-            metadataRequest.txId
-          );
-          return {
-            metadata,
-          } as TResponse as GetTransactionMetadataResponse as TResponse;
-        }
-
-        case "registerHook": {
-          const hookRequest = payload as RegisterHookRequest;
-          this.backend.hook(hookRequest.hook);
-          return {
-            success: true,
-          } as TResponse as RegisterHookResponse as TResponse;
-        }
-
-        case "getObsoleteDatoms": {
-          const obsoleteRequest = payload as GetObsoleteDatomsRequest;
-          const datoms = await this.backend.getObsoleteDatoms(
-            obsoleteRequest.cutoffTx
-          );
-          return {
-            datoms,
-          } as TResponse as GetObsoleteDatomsResponse as TResponse;
-        }
-
-        case "deleteDatoms": {
-          const deleteRequest = payload as DeleteDatomsRequest;
-          await this.backend.deleteDatoms(deleteRequest.datoms);
-          return {
-            success: true,
-          } as TResponse as DeleteDatomsResponse as TResponse;
-        }
-
-        default:
-          throw new TransportError(
-            `Unknown method: ${method}`,
-            "UNKNOWN_METHOD"
-          );
+        return { datoms: filtered };
       }
+
+      const view = this._createView(request.viewConfig);
+      const datoms = await view.datoms(request.options);
+      return { datoms };
     } catch (error) {
-      if (error instanceof Error) {
-        // Map database errors to transport errors
-        if (error.name === "QueryTimeoutError") {
-          throw new TransportError(error.message, "QUERY_TIMEOUT", error);
-        }
-        if (error.name === "QuerySafetyError") {
-          throw new TransportError(
-            error.message,
-            "QUERY_SAFETY_VIOLATION",
-            error
-          );
-        }
-        if (error.name === "TransactionError") {
-          throw new TransportError(
-            error.message,
-            "TRANSACTION_HOOK_ERROR",
-            error
-          );
-        }
-        if (error.name === "QueryError") {
-          throw new TransportError(error.message, "QUERY_HOOK_ERROR", error);
-        }
-        throw new TransportError(error.message, "DATABASE_ERROR", error);
-      }
-      throw error;
+      throw this._mapError(error);
+    }
+  }
+
+  async query(request: QueryRequest): Promise<QueryResponse> {
+    await this._ensureInitialized();
+
+    try {
+      const view = this._createView(request.viewConfig);
+      const results = await view.query(request.query, request.context);
+      return { results };
+    } catch (error) {
+      throw this._mapError(error);
+    }
+  }
+
+  async transact(request: TransactRequest): Promise<TransactResponse> {
+    await this._ensureInitialized();
+
+    try {
+      const txId = await this.backend.transact(
+        request.ops,
+        request.metadata,
+        request.context
+      );
+      return { txId };
+    } catch (error) {
+      throw this._mapError(error);
+    }
+  }
+
+  async getLatestTransaction(): Promise<GetLatestTransactionResponse> {
+    await this._ensureInitialized();
+
+    try {
+      const txId = await this.backend.getLatestTransaction();
+      return { txId };
+    } catch (error) {
+      throw this._mapError(error);
+    }
+  }
+
+  async getTransactionMetadata(
+    request: GetTransactionMetadataRequest
+  ): Promise<GetTransactionMetadataResponse> {
+    await this._ensureInitialized();
+
+    try {
+      const metadata = await this.backend.getTransactionMetadata(request.txId);
+      return { metadata };
+    } catch (error) {
+      throw this._mapError(error);
+    }
+  }
+
+  async registerHook(
+    request: RegisterHookRequest
+  ): Promise<RegisterHookResponse> {
+    await this._ensureInitialized();
+
+    try {
+      this.backend.hook(request.hook);
+      return { success: true };
+    } catch (error) {
+      throw this._mapError(error);
+    }
+  }
+
+  async getObsoleteDatoms(
+    request: GetObsoleteDatomsRequest
+  ): Promise<GetObsoleteDatomsResponse> {
+    await this._ensureInitialized();
+
+    try {
+      const datoms = await this.backend.getObsoleteDatoms(request.cutoffTx);
+      return { datoms };
+    } catch (error) {
+      throw this._mapError(error);
+    }
+  }
+
+  async deleteDatoms(
+    request: DeleteDatomsRequest
+  ): Promise<DeleteDatomsResponse> {
+    await this._ensureInitialized();
+
+    try {
+      await this.backend.deleteDatoms(request.datoms);
+      return { success: true };
+    } catch (error) {
+      throw this._mapError(error);
     }
   }
 
@@ -230,7 +201,42 @@ export class LocalTransport implements ITransport {
     this.initialized = false;
   }
 
+  private async _ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await this.backend.initialize();
+      this.initialized = true;
+    }
+  }
+
   private _createView(viewConfig: ViewConfig) {
     return new ConfiguredDatabaseView(this.backend, viewConfig);
+  }
+
+  private _mapError(error: unknown): TransportError {
+    if (error instanceof Error) {
+      // Map database errors to transport errors
+      if (error.name === "QueryTimeoutError") {
+        return new TransportError(error.message, "QUERY_TIMEOUT", error);
+      }
+      if (error.name === "QuerySafetyError") {
+        return new TransportError(
+          error.message,
+          "QUERY_SAFETY_VIOLATION",
+          error
+        );
+      }
+      if (error.name === "TransactionError") {
+        return new TransportError(
+          error.message,
+          "TRANSACTION_HOOK_ERROR",
+          error
+        );
+      }
+      if (error.name === "QueryError") {
+        return new TransportError(error.message, "QUERY_HOOK_ERROR", error);
+      }
+      return new TransportError(error.message, "DATABASE_ERROR", error);
+    }
+    return new TransportError(String(error), "DATABASE_ERROR", error);
   }
 }

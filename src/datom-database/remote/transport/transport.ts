@@ -5,6 +5,24 @@
 
 import { QueryError, QueryTimeoutError } from "../../hook/hook.js";
 import type { DatalogQuery } from "../../../datalog/datalog.js";
+import type {
+  DatomsRequest,
+  DatomsResponse,
+  QueryRequest,
+  QueryResponse,
+  TransactRequest,
+  TransactResponse,
+  GetLatestTransactionResponse,
+  GetTransactionMetadataRequest,
+  GetTransactionMetadataResponse,
+  RegisterHookRequest,
+  RegisterHookResponse,
+  GetObsoleteDatomsRequest,
+  GetObsoleteDatomsResponse,
+  DeleteDatomsRequest,
+  DeleteDatomsResponse,
+  InitializeResponse,
+} from "./types.js";
 
 /**
  * Transport error that can be thrown by transport implementations
@@ -49,16 +67,78 @@ export class TransportError extends Error {
  */
 export interface ITransport {
   /**
-   * Send a request to the remote server and wait for a response
-   * @param method The method name (e.g., "datoms", "query", "transact")
-   * @param payload The request payload
-   * @returns The response payload
+   * Initialize the remote database connection
+   * @returns The initialization response
+   * @throws TransportError if initialization fails
+   */
+  initialize(): Promise<InitializeResponse>;
+
+  /**
+   * Query datoms from the remote database
+   * @param request The datoms query request
+   * @returns The datoms query response
    * @throws TransportError if the request fails
    */
-  request<TRequest = unknown, TResponse = unknown>(
-    method: string,
-    payload: TRequest
-  ): Promise<TResponse>;
+  datoms(request: DatomsRequest): Promise<DatomsResponse>;
+
+  /**
+   * Execute a datalog query on the remote database
+   * @param request The query request
+   * @returns The query response
+   * @throws TransportError if the request fails
+   */
+  query(request: QueryRequest): Promise<QueryResponse>;
+
+  /**
+   * Execute a transaction on the remote database
+   * @param request The transaction request
+   * @returns The transaction response
+   * @throws TransportError if the request fails
+   */
+  transact(request: TransactRequest): Promise<TransactResponse>;
+
+  /**
+   * Get the latest transaction ID from the remote database
+   * @returns The latest transaction response
+   * @throws TransportError if the request fails
+   */
+  getLatestTransaction(): Promise<GetLatestTransactionResponse>;
+
+  /**
+   * Get transaction metadata from the remote database
+   * @param request The transaction metadata request
+   * @returns The transaction metadata response
+   * @throws TransportError if the request fails
+   */
+  getTransactionMetadata(
+    request: GetTransactionMetadataRequest
+  ): Promise<GetTransactionMetadataResponse>;
+
+  /**
+   * Register a hook on the remote database
+   * @param request The hook registration request
+   * @returns The hook registration response
+   * @throws TransportError if the request fails
+   */
+  registerHook(request: RegisterHookRequest): Promise<RegisterHookResponse>;
+
+  /**
+   * Get obsolete datoms from the remote database
+   * @param request The obsolete datoms request
+   * @returns The obsolete datoms response
+   * @throws TransportError if the request fails
+   */
+  getObsoleteDatoms(
+    request: GetObsoleteDatomsRequest
+  ): Promise<GetObsoleteDatomsResponse>;
+
+  /**
+   * Delete datoms from the remote database
+   * @param request The delete datoms request
+   * @returns The delete datoms response
+   * @throws TransportError if the request fails
+   */
+  deleteDatoms(request: DeleteDatomsRequest): Promise<DeleteDatomsResponse>;
 
   /**
    * Close the transport connection and clean up resources
