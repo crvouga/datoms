@@ -17,11 +17,6 @@ import type {
   Value,
 } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
-import {
-  deserializeEntityId,
-  serializeEntityId,
-  validateEntityId,
-} from "../../entity-id.js";
 import type { DatabaseStats, Transaction } from "../../types.js";
 import type { WithResult } from "../datom-database.js";
 import {
@@ -87,7 +82,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     this.hooks.register(hook);
   }
 
-  protected async writeDatoms(datoms: DatomInput[]): Promise<TransactionId> {
+  private async _writeDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = this.nextTx++;
 
     for (const datom of datoms) {
@@ -108,7 +103,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>
   ): Promise<TransactionId> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Create write context
     const ctx: WriteContext = {
@@ -126,11 +121,11 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
 
       if (op.op === "assert") {
         // Validate add, accounting for subs already processed
-        await this.validateDatoms([datom], true, subs);
+        await this._validateDatoms([datom], true, subs);
         adds.push(datom);
       } else {
         // Validate sub
-        await this.validateDatoms([datom], false);
+        await this._validateDatoms([datom], false);
         subs.push(datom);
       }
     }
@@ -187,7 +182,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
 
     // Write all datoms (both adds and subs) in a single call
     // If there are no operations, still create a new transaction ID
-    const committedTxId = await this.writeDatoms(allFinalDatoms);
+    const committedTxId = await this._writeDatoms(allFinalDatoms);
 
     // Store metadata if provided
     if (metadata !== undefined) {
@@ -217,7 +212,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     // Default: no-op (metadata is ignored but still emitted in events)
   }
 
-  protected async validateDatoms(
+  private async _validateDatoms(
     datoms: DatomInput[],
     _isAdd: boolean,
     _subsInSameTransaction?: DatomInput[]
@@ -233,7 +228,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     }
   }
 
-  protected async ensureInitialized(): Promise<void> {
+  private async _ensureInitialized(): Promise<void> {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -252,7 +247,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
   }
 
   async with(ops: DatomInput[]): Promise<WithResult> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
     const speculativeTxId = (await this.getLatestTransaction()) + 1;
@@ -292,22 +287,9 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     };
   }
 
-  // EntityId utility methods (delegating to shared utilities)
-  // These are kept for backward compatibility but are not part of the DatomDatabase interface
-  validateEntityId(entityId: unknown): entityId is EntityId {
-    return validateEntityId(entityId);
-  }
-
-  serializeEntityId(entityId: EntityId): string {
-    return serializeEntityId(entityId);
-  }
-
-  deserializeEntityId(serialized: string): EntityId {
-    return deserializeEntityId(serialized);
-  }
 
   async datoms(options: DatomsParams): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
       options.e !== undefined ||
@@ -331,10 +313,10 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this.executeQuery(options);
+      const queryPromise = this._executeCurrentQuery(options);
       results = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      results = await this.executeQuery(options);
+      results = await this._executeCurrentQuery(options);
     }
 
     // Check result size limit if specified
@@ -352,15 +334,15 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     return results;
   }
 
-  async executeQuery(options: DatomsParams): Promise<Datom[]> {
+  private async _executeCurrentQuery(options: DatomsParams): Promise<Datom[]> {
     return executeQueryOnDatoms(this._datomsArray, options);
   }
 
-  public async executeAsOfQuery(
+  private async _executeAsOfQuery(
     options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Get all matching datoms without tx filter
     let results = this._datomsArray;
@@ -402,8 +384,8 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     return results.slice(offset, limit ? offset + limit : undefined);
   }
 
-  public async executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
-    await this.ensureInitialized();
+  private async _executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
+    await this._ensureInitialized();
 
     // Get all datoms matching filters without deduplication
     let results = this._datomsArray;
@@ -442,11 +424,11 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     return results.slice(offset, limit ? offset + limit : undefined);
   }
 
-  public async executeSinceQuery(
+  private async _executeSinceQuery(
     options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Get all matching datoms without tx filter
     let results = this._datomsArray;
@@ -491,7 +473,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResult> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Create read context
     const ctx: ReadContext = {
@@ -539,7 +521,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
       let clauseDatoms: Datom[];
       if (!hasAnyFilter) {
         // All variables - get all datoms without validation, then deduplicate and filter
-        const rawDatoms = await this.executeHistoryQuery({});
+        const rawDatoms = await this._executeHistoryQuery({});
         clauseDatoms = executeQueryOnDatoms(rawDatoms, {});
       } else {
         // Has filters - use normal datoms() method
@@ -572,7 +554,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     // Now execute the query with filtered datoms
     // Start with the first clause
     const firstClause = modifiedQuery.where[0];
-    const firstResults = await this.executeClauseWithFilteredDatoms(
+    const firstResults = await this._executeClauseWithFilteredDatoms(
       firstClause,
       afterResult.datoms
     );
@@ -581,7 +563,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     let results = firstResults;
     for (let i = 1; i < modifiedQuery.where.length; i++) {
       const clause = modifiedQuery.where[i];
-      const clauseResults = await this.executeClauseWithFilteredDatoms(
+      const clauseResults = await this._executeClauseWithFilteredDatoms(
         clause,
         afterResult.datoms
       );
@@ -626,7 +608,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
   /**
    * Execute a clause using filtered datoms from hooks
    */
-  private async executeClauseWithFilteredDatoms(
+  private async _executeClauseWithFilteredDatoms(
     clause: QueryClause,
     filteredDatoms: Datom[]
   ): Promise<Record<string, Value | Attribute>[]> {
@@ -683,22 +665,22 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
   }
 
   async getLatestTransaction(): Promise<TransactionId> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
     // nextTx is the next transaction ID to be used, so latest is one less
     return this.nextTx > 1 ? this.nextTx - 1 : 0;
   }
 
-  protected async recordQueryMetrics(duration: number): Promise<void> {
+  private async _recordQueryMetrics(duration: number): Promise<void> {
     this.queryCount++;
     this.queryTimeSum += duration;
   }
 
-  protected async recordTransactionMetrics(duration: number): Promise<void> {
+  private async _recordTransactionMetrics(duration: number): Promise<void> {
     this.transactionCount++;
     this.transactionTimeSum += duration;
   }
 
-  protected async getDetailedStats(): Promise<
+  private async _getDetailedStats(): Promise<
     Partial<
       Pick<
         DatabaseStats,
@@ -747,24 +729,24 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     if (viewConfig.type === "current") {
-      return this.executeQuery(options);
+      return this._executeCurrentQuery(options);
     }
     if (viewConfig.type === "asOf") {
-      return this.executeAsOfQuery(options, viewConfig.txId);
+      return this._executeAsOfQuery(options, viewConfig.txId);
     }
     if (viewConfig.type === "since") {
-      return this.executeSinceQuery(options, viewConfig.txId);
+      return this._executeSinceQuery(options, viewConfig.txId);
     }
     if (viewConfig.type === "history") {
-      return this.executeHistoryQuery(options);
+      return this._executeHistoryQuery(options);
     }
     if (viewConfig.type === "speculative") {
-      // Get all base datoms using executeHistoryQuery to bypass validation
+      // Get all base datoms using _executeHistoryQuery to bypass validation
       // This returns all datoms including retracted ones, so we need to deduplicate
-      const allBaseDatoms = await this.executeHistoryQuery({});
+      const allBaseDatoms = await this._executeHistoryQuery({});
 
       // Create a map of base datoms by (entity, attribute, value) for efficient lookup
       // Deduplicate by keeping the latest transaction for each (entity, attribute, value)
@@ -818,7 +800,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
   ): Promise<QueryResult> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Create read context
     const ctx: ReadContext = {
@@ -890,7 +872,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     // Now execute the query with filtered datoms
     // Start with the first clause
     const firstClause = modifiedQuery.where[0];
-    const firstResults = await this.executeClauseWithFilteredDatoms(
+    const firstResults = await this._executeClauseWithFilteredDatoms(
       firstClause,
       afterResult.datoms
     );
@@ -899,7 +881,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     let results = firstResults;
     for (let i = 1; i < modifiedQuery.where.length; i++) {
       const clause = modifiedQuery.where[i];
-      const clauseResults = await this.executeClauseWithFilteredDatoms(
+      const clauseResults = await this._executeClauseWithFilteredDatoms(
         clause,
         afterResult.datoms
       );

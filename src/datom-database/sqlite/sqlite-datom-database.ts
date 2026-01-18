@@ -12,11 +12,6 @@ import type {
   Value,
 } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
-import {
-  deserializeEntityId,
-  serializeEntityId,
-  validateEntityId,
-} from "../../entity-id.js";
 import type { SQLDatabase } from "../../sql-database/sql-database.js";
 import type { Transaction } from "../../types.js";
 import type { WithResult } from "../datom-database.js";
@@ -51,8 +46,7 @@ import {
  * Accepts a SqlDatabase that implements SQLite-compatible SQL
  */
 export class SQLiteDatomDatabase
-  implements DatomDatabase, InternalDatabaseView
-{
+  implements DatomDatabase, InternalDatabaseView {
   public readonly hooks: HookEngine;
   protected initialized = false;
   private connection: SQLDatabase;
@@ -131,9 +125,9 @@ export class SQLiteDatomDatabase
     this.hooks.register(hook);
   }
 
-  protected async writeDatoms(datoms: DatomInput[]): Promise<TransactionId> {
-    const tx = await this.getNextTransactionId();
-    await this.writeDatomsInternal(datoms, tx);
+  private async _writeDatoms(datoms: DatomInput[]): Promise<TransactionId> {
+    const tx = await this._getNextTransactionId();
+    await this._writeDatomsInternal(datoms, tx);
     return tx;
   }
 
@@ -142,7 +136,7 @@ export class SQLiteDatomDatabase
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>
   ): Promise<TransactionId> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Create write context
     const ctx: WriteContext = {
@@ -160,11 +154,11 @@ export class SQLiteDatomDatabase
 
       if (op.op === "assert") {
         // Validate add, accounting for subs already processed
-        await this.validateDatoms([datom], true, subs);
+        await this._validateDatoms([datom], true, subs);
         adds.push(datom);
       } else {
         // Validate sub
-        await this.validateDatoms([datom], false);
+        await this._validateDatoms([datom], false);
         subs.push(datom);
       }
     }
@@ -221,7 +215,7 @@ export class SQLiteDatomDatabase
 
     // Write all datoms (both adds and subs) in a single call
     // If there are no operations, still create a new transaction ID
-    const committedTxId = await this.writeDatoms(allFinalDatoms);
+    const committedTxId = await this._writeDatoms(allFinalDatoms);
 
     // Store metadata if provided
     if (metadata !== undefined) {
@@ -251,7 +245,7 @@ export class SQLiteDatomDatabase
     // Default: no-op (metadata is ignored but still emitted in events)
   }
 
-  protected async validateDatoms(
+  private async _validateDatoms(
     datoms: DatomInput[],
     _isAdd: boolean,
     _subsInSameTransaction?: DatomInput[]
@@ -267,14 +261,14 @@ export class SQLiteDatomDatabase
     }
   }
 
-  protected async ensureInitialized(): Promise<void> {
+  private async _ensureInitialized(): Promise<void> {
     if (!this.initialized) {
       await this.initialize();
     }
   }
 
   async datoms(options: DatomsParams): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
       options.e !== undefined ||
@@ -298,10 +292,10 @@ export class SQLiteDatomDatabase
         }, options.timeoutMs);
       });
 
-      const queryPromise = this.executeQuery(options);
+      const queryPromise = this._executeCurrentQuery(options);
       results = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      results = await this.executeQuery(options);
+      results = await this._executeCurrentQuery(options);
     }
 
     // Check result size limit if specified
@@ -332,7 +326,7 @@ export class SQLiteDatomDatabase
   }
 
   async with(ops: DatomInput[]): Promise<WithResult> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
     const speculativeTxId = (await this.getLatestTransaction()) + 1;
@@ -372,22 +366,9 @@ export class SQLiteDatomDatabase
     };
   }
 
-  // EntityId utility methods (delegating to shared utilities)
-  // These are kept for backward compatibility but are not part of the DatomDatabase interface
-  validateEntityId(entityId: unknown): entityId is EntityId {
-    return validateEntityId(entityId);
-  }
 
-  serializeEntityId(entityId: EntityId): string {
-    return serializeEntityId(entityId);
-  }
-
-  deserializeEntityId(serialized: string): EntityId {
-    return deserializeEntityId(serialized);
-  }
-
-  async executeQuery(options: DatomsParams): Promise<Datom[]> {
-    await this.ensureInitialized();
+  private async _executeCurrentQuery(options: DatomsParams): Promise<Datom[]> {
+    await this._ensureInitialized();
     const conditions: string[] = [];
     const params: unknown[] = [];
 
@@ -472,65 +453,14 @@ export class SQLiteDatomDatabase
     }
 
     const rows = await this.connection.query(sql, params);
-
-    const reviveValue = (value: unknown): unknown => {
-      if (typeof value === "string") {
-        if (value === "__UNDEFINED__") {
-          return undefined;
-        }
-        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
-          return new Date(value);
-        }
-      }
-      if (value === null) {
-        return null;
-      }
-      if (value === undefined) {
-        return undefined;
-      }
-      if (Array.isArray(value)) {
-        return value.map(reviveValue);
-      }
-      if (typeof value === "object" && value !== null) {
-        const revived: Record<string, unknown> = {};
-        const valueObj = value as Record<string, unknown>;
-        for (const key in valueObj) {
-          revived[key] = reviveValue(valueObj[key]);
-        }
-        return revived;
-      }
-      return value;
-    };
-
-    return rows.map((row: Record<string, unknown>) => {
-      let entity: EntityId = row.e as EntityId;
-      if (typeof entity === "string") {
-        if (/^-?\d+$/.test(entity)) {
-          entity = parseInt(entity, 10);
-        }
-      }
-
-      const parsedValue: unknown = JSON.parse(String(row.v));
-      const revivedValue = reviveValue(parsedValue) as Value;
-
-      return {
-        e: entity,
-        a: String(row.a),
-        v: revivedValue,
-        tx: Number(row.tx),
-        op:
-          typeof row.op === "string" && row.op === "assert"
-            ? "assert"
-            : "retract",
-      };
-    });
+    return this._mapRowsToDatoms(rows);
   }
 
-  public async executeAsOfQuery(
+  private async _executeAsOfQuery(
     options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -607,11 +537,11 @@ export class SQLiteDatomDatabase
     }
 
     const rows = await this.connection.query(sql, params);
-    return this.mapRowsToDatoms(rows);
+    return this._mapRowsToDatoms(rows);
   }
 
-  public async executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
-    await this.ensureInitialized();
+  private async _executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
+    await this._ensureInitialized();
 
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -667,14 +597,14 @@ export class SQLiteDatomDatabase
     }
 
     const rows = await this.connection.query(sql, params);
-    return this.mapRowsToDatoms(rows);
+    return this._mapRowsToDatoms(rows);
   }
 
-  public async executeSinceQuery(
+  private async _executeSinceQuery(
     options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -749,43 +679,14 @@ export class SQLiteDatomDatabase
     }
 
     const rows = await this.connection.query(sql, params);
-    return this.mapRowsToDatoms(rows);
+    return this._mapRowsToDatoms(rows);
   }
 
   /**
    * Helper method to map database rows to Datom objects
    * Reused across query methods
    */
-  private mapRowsToDatoms(rows: Record<string, unknown>[]): Datom[] {
-    const reviveValue = (value: unknown): unknown => {
-      if (typeof value === "string") {
-        if (value === "__UNDEFINED__") {
-          return undefined;
-        }
-        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
-          return new Date(value);
-        }
-      }
-      if (value === null) {
-        return null;
-      }
-      if (value === undefined) {
-        return undefined;
-      }
-      if (Array.isArray(value)) {
-        return value.map(reviveValue);
-      }
-      if (typeof value === "object" && value !== null) {
-        const revived: Record<string, unknown> = {};
-        const valueObj = value as Record<string, unknown>;
-        for (const key in valueObj) {
-          revived[key] = reviveValue(valueObj[key]);
-        }
-        return revived;
-      }
-      return value;
-    };
-
+  private _mapRowsToDatoms(rows: Record<string, unknown>[]): Datom[] {
     return rows.map((row: Record<string, unknown>) => {
       let entity: EntityId = row.e as EntityId;
       if (typeof entity === "string") {
@@ -795,7 +696,7 @@ export class SQLiteDatomDatabase
       }
 
       const parsedValue: unknown = JSON.parse(String(row.v));
-      const revivedValue = reviveValue(parsedValue) as Value;
+      const revivedValue = this._reviveValue(parsedValue) as Value;
 
       return {
         e: entity,
@@ -814,7 +715,7 @@ export class SQLiteDatomDatabase
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResult> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Create read context
     const ctx: ReadContext = {
@@ -850,7 +751,7 @@ export class SQLiteDatomDatabase
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const datoms = await this.executeQuery({
+      const datoms = await this._executeCurrentQuery({
         e: entity,
         a: attribute,
         v: value,
@@ -886,12 +787,12 @@ export class SQLiteDatomDatabase
         modifiedQuery.find,
         modifiedQuery.where
       );
-      return this.applyOrderAndLimit(projected, modifiedQuery);
+      return this._applyOrderAndLimit(projected, modifiedQuery);
     }
 
     // For multi-clause queries, build a single SQL query with JOINs
     // Extract datoms first for afterRead hooks
-    const allDatoms = await this.extractDatomsFromQuery(modifiedQuery);
+    const allDatoms = await this._extractDatomsFromQuery(modifiedQuery);
     const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
 
     if (afterResult.errors && afterResult.errors.length > 0) {
@@ -902,7 +803,7 @@ export class SQLiteDatomDatabase
     }
 
     // Re-execute query with filtered datoms
-    return this.executeDatalogWithSQLAndFilteredDatoms(
+    return this._executeDatalogWithSQLAndFilteredDatoms(
       modifiedQuery,
       afterResult.datoms
     );
@@ -911,7 +812,7 @@ export class SQLiteDatomDatabase
   /**
    * Extract all datoms that match a query (before projection)
    */
-  private async extractDatomsFromQuery(query: DatalogQuery): Promise<Datom[]> {
+  private async _extractDatomsFromQuery(query: DatalogQuery): Promise<Datom[]> {
     const allDatomsSet = new Set<string>();
     const allDatoms: Datom[] = [];
 
@@ -928,7 +829,7 @@ export class SQLiteDatomDatabase
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const clauseDatoms = await this.executeQuery({
+      const clauseDatoms = await this._executeCurrentQuery({
         e: entity,
         a: attribute,
         v: value,
@@ -951,7 +852,7 @@ export class SQLiteDatomDatabase
    * Execute datalog query with filtered datoms from hooks
    * Uses datom-level execution to properly support afterRead hooks
    */
-  private async executeDatalogWithSQLAndFilteredDatoms(
+  private async _executeDatalogWithSQLAndFilteredDatoms(
     query: DatalogQuery,
     filteredDatoms: Datom[]
   ): Promise<QueryResult> {
@@ -1093,7 +994,7 @@ export class SQLiteDatomDatabase
     return projected;
   }
 
-  private reviveValue(value: unknown): unknown {
+  private _reviveValue(value: unknown): unknown {
     if (typeof value === "string") {
       if (value === "__UNDEFINED__") {
         return undefined;
@@ -1108,7 +1009,7 @@ export class SQLiteDatomDatabase
       ) {
         try {
           const parsed: unknown = JSON.parse(value);
-          return this.reviveValue(parsed);
+          return this._reviveValue(parsed);
         } catch {
           // Not valid JSON, return as string
         }
@@ -1121,20 +1022,20 @@ export class SQLiteDatomDatabase
       return undefined;
     }
     if (Array.isArray(value)) {
-      return value.map((v) => this.reviveValue(v));
+      return value.map((v) => this._reviveValue(v));
     }
     if (typeof value === "object" && value !== null) {
       const revived: Record<string, unknown> = {};
       const valueObj = value as Record<string, unknown>;
       for (const key in valueObj) {
-        revived[key] = this.reviveValue(valueObj[key]);
+        revived[key] = this._reviveValue(valueObj[key]);
       }
       return revived;
     }
     return value;
   }
 
-  private applyOrderAndLimit(
+  private _applyOrderAndLimit(
     results: QueryResult,
     query: DatalogQuery
   ): QueryResult {
@@ -1163,7 +1064,7 @@ export class SQLiteDatomDatabase
     return results;
   }
 
-  private async getNextTransactionId(): Promise<TransactionId> {
+  private async _getNextTransactionId(): Promise<TransactionId> {
     // Optimized: Use INSERT ... ON CONFLICT to atomically initialize and update
     // This reduces from 3 queries to 2 queries (init+update combined, then select)
     const upsertSql = `
@@ -1185,7 +1086,7 @@ export class SQLiteDatomDatabase
     return Number(row.last_tx);
   }
 
-  private async writeDatomsInternal(
+  private async _writeDatomsInternal(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -1222,7 +1123,7 @@ export class SQLiteDatomDatabase
   }
 
   async getLatestTransaction(): Promise<TransactionId> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
     const sql = `SELECT last_tx FROM ${this.tableName}_tx WHERE id = 1`;
     const result = await this.connection.query(sql);
     if (!result || result.length === 0) {
@@ -1233,17 +1134,17 @@ export class SQLiteDatomDatabase
     return Number(row.last_tx);
   }
 
-  protected async recordQueryMetrics(duration: number): Promise<void> {
+  private async _recordQueryMetrics(duration: number): Promise<void> {
     this.queryCount++;
     this.queryTimeSum += duration;
   }
 
-  protected async recordTransactionMetrics(duration: number): Promise<void> {
+  private async _recordTransactionMetrics(duration: number): Promise<void> {
     this.transactionCount++;
     this.transactionTimeSum += duration;
   }
 
-  protected async getDetailedStats(): Promise<
+  private async _getDetailedStats(): Promise<
     Partial<
       Pick<
         import("../../types.js").DatabaseStats,
@@ -1303,24 +1204,24 @@ export class SQLiteDatomDatabase
     options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     if (viewConfig.type === "current") {
-      return this.executeQuery(options);
+      return this._executeCurrentQuery(options);
     }
     if (viewConfig.type === "asOf") {
-      return this.executeAsOfQuery(options, viewConfig.txId);
+      return this._executeAsOfQuery(options, viewConfig.txId);
     }
     if (viewConfig.type === "since") {
-      return this.executeSinceQuery(options, viewConfig.txId);
+      return this._executeSinceQuery(options, viewConfig.txId);
     }
     if (viewConfig.type === "history") {
-      return this.executeHistoryQuery(options);
+      return this._executeHistoryQuery(options);
     }
     if (viewConfig.type === "speculative") {
       // For speculative queries, we need to merge base datoms with speculative changes
       // Get all base datoms (current state)
-      const baseDatoms = await this.executeQuery({});
+      const baseDatoms = await this._executeCurrentQuery({});
 
       // Create a map of base datoms by (entity, attribute, value) for efficient lookup
       const baseMap = new Map<string, Datom>();
@@ -1381,7 +1282,7 @@ export class SQLiteDatomDatabase
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
   ): Promise<QueryResult> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Create read context
     const ctx: ReadContext = {
@@ -1456,7 +1357,7 @@ export class SQLiteDatomDatabase
         modifiedQuery.find,
         modifiedQuery.where
       );
-      return this.applyOrderAndLimit(projected, modifiedQuery);
+      return this._applyOrderAndLimit(projected, modifiedQuery);
     }
 
     // For multi-clause queries, extract datoms first for afterRead hooks
@@ -1595,12 +1496,12 @@ export class SQLiteDatomDatabase
         modifiedQuery.find,
         modifiedQuery.where
       );
-      return this.applyOrderAndLimit(projected, modifiedQuery);
+      return this._applyOrderAndLimit(projected, modifiedQuery);
     }
 
     // For non-speculative views, use SQL-based query execution
     // Re-execute query with filtered datoms
-    return this.executeDatalogWithSQLAndFilteredDatoms(
+    return this._executeDatalogWithSQLAndFilteredDatoms(
       modifiedQuery,
       afterResult.datoms
     );

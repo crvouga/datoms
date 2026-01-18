@@ -20,11 +20,6 @@ import type { SQLDatabase } from "../../sql-database/sql-database.js";
 import type { DatabaseRow } from "../../sql-database/types.js";
 import type { Transaction } from "../../types.js";
 
-import {
-  deserializeEntityId,
-  serializeEntityId,
-  validateEntityId,
-} from "../../entity-id.js";
 import type { WithResult } from "../datom-database.js";
 import {
   Hook,
@@ -152,8 +147,8 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     this.hooks.register(hook);
   }
 
-  protected async writeDatoms(datoms: DatomInput[]): Promise<TransactionId> {
-    const tx = await this.getNextTransactionId();
+  private async _writeDatoms(datoms: DatomInput[]): Promise<TransactionId> {
+    const tx = await this._getNextTransactionId();
 
     if (
       this.connection.beginTransaction &&
@@ -162,14 +157,14 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     ) {
       await this.connection.beginTransaction();
       try {
-        await this.writeDatomsInternal(datoms, tx);
+        await this._writeDatomsInternal(datoms, tx);
         await this.connection.commitTransaction();
       } catch (error) {
         await this.connection.rollbackTransaction();
         throw error;
       }
     } else {
-      await this.writeDatomsInternal(datoms, tx);
+      await this._writeDatomsInternal(datoms, tx);
     }
 
     return tx;
@@ -180,7 +175,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>
   ): Promise<TransactionId> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Create write context
     const ctx: WriteContext = {
@@ -198,11 +193,11 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
 
       if (op.op === "assert") {
         // Validate add, accounting for subs already processed
-        await this.validateDatoms([datom], true, subs);
+        await this._validateDatoms([datom], true, subs);
         adds.push(datom);
       } else {
         // Validate sub
-        await this.validateDatoms([datom], false);
+        await this._validateDatoms([datom], false);
         subs.push(datom);
       }
     }
@@ -259,7 +254,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
 
     // Write all datoms (both adds and subs) in a single call
     // If there are no operations, still create a new transaction ID
-    const committedTxId = await this.writeDatoms(allFinalDatoms);
+    const committedTxId = await this._writeDatoms(allFinalDatoms);
 
     // Store metadata if provided
     if (metadata !== undefined) {
@@ -289,7 +284,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     // Default: no-op (metadata is ignored but still emitted in events)
   }
 
-  protected async validateDatoms(
+  private async _validateDatoms(
     datoms: DatomInput[],
     _isAdd: boolean,
     _subsInSameTransaction?: DatomInput[]
@@ -305,14 +300,14 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     }
   }
 
-  protected async ensureInitialized(): Promise<void> {
+  private async _ensureInitialized(): Promise<void> {
     if (!this.initialized) {
       await this.initialize();
     }
   }
 
   async datoms(options: DatomsParams): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
       options.e !== undefined ||
@@ -336,10 +331,10 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this.executeQuery(options);
+      const queryPromise = this._executeCurrentQuery(options);
       results = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      results = await this.executeQuery(options);
+      results = await this._executeCurrentQuery(options);
     }
 
     // Check result size limit if specified
@@ -370,7 +365,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   }
 
   async with(ops: DatomInput[]): Promise<WithResult> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
     const speculativeTxId = (await this.getLatestTransaction()) + 1;
@@ -410,22 +405,9 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     };
   }
 
-  // EntityId utility methods (delegating to shared utilities)
-  // These are kept for backward compatibility but are not part of the DatomDatabase interface
-  validateEntityId(entityId: unknown): entityId is EntityId {
-    return validateEntityId(entityId);
-  }
 
-  serializeEntityId(entityId: EntityId): string {
-    return serializeEntityId(entityId);
-  }
-
-  deserializeEntityId(serialized: string): EntityId {
-    return deserializeEntityId(serialized);
-  }
-
-  async executeQuery(options: DatomsParams): Promise<Datom[]> {
-    await this.ensureInitialized();
+  private async _executeCurrentQuery(options: DatomsParams): Promise<Datom[]> {
+    await this._ensureInitialized();
 
     // Note: Validation is handled by the base class query() method
     // This method is also called by queryInternal() which bypasses validation
@@ -512,77 +494,14 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     }
 
     const rows = await this.connection.query(sql, params);
-
-    const reviveValue = (value: unknown): unknown => {
-      if (typeof value === "string") {
-        if (value === "__UNDEFINED__") {
-          return undefined;
-        }
-        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
-          return new Date(value);
-        }
-      }
-      if (value === null) {
-        return null;
-      }
-      if (value === undefined) {
-        return undefined;
-      }
-      if (Array.isArray(value)) {
-        return value.map(reviveValue);
-      }
-      if (typeof value === "object" && value !== null) {
-        const revived: Record<string, unknown> = {};
-        const valueObj = value as Record<string, unknown>;
-        for (const key in valueObj) {
-          revived[key] = reviveValue(valueObj[key]);
-        }
-        return revived;
-      }
-      return value;
-    };
-
-    return rows.map((row: DatabaseRow) => {
-      let entity: EntityId = row.e as EntityId;
-      if (typeof entity === "string") {
-        if (/^-?\d+$/.test(entity)) {
-          entity = parseInt(entity, 10);
-        }
-      }
-
-      // PostgreSQL JSONB returns as parsed object, but connection adapter may stringify it
-      // Handle both cases: already parsed or string that needs parsing
-      let parsedValue: unknown = row.v;
-      if (typeof row.v === "string") {
-        // Try to parse as JSON, but if it fails, use the string as-is
-        // This handles cases where JSONB returns simple strings directly
-        try {
-          parsedValue = JSON.parse(row.v);
-        } catch {
-          // Not valid JSON, use as plain string
-          parsedValue = row.v;
-        }
-      }
-      const revivedValue = reviveValue(parsedValue) as Value;
-
-      return {
-        e: entity,
-        a: String(row.a),
-        v: revivedValue,
-        tx: Number(row.tx),
-        op:
-          typeof row.op === "string" && row.op === "assert"
-            ? "assert"
-            : "retract",
-      };
-    });
+    return this._mapRowsToDatoms(rows);
   }
 
-  public async executeAsOfQuery(
+  private async _executeAsOfQuery(
     options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -655,11 +574,11 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     }
 
     const rows = await this.connection.query(finalSql, params);
-    return this.mapRowsToDatoms(rows);
+    return this._mapRowsToDatoms(rows);
   }
 
-  public async executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
-    await this.ensureInitialized();
+  private async _executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
+    await this._ensureInitialized();
 
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -715,14 +634,14 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     }
 
     const rows = await this.connection.query(sql, params);
-    return this.mapRowsToDatoms(rows);
+    return this._mapRowsToDatoms(rows);
   }
 
-  public async executeSinceQuery(
+  private async _executeSinceQuery(
     options: DatomsParams,
     txId: TransactionId
   ): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -793,43 +712,14 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     }
 
     const rows = await this.connection.query(finalSql, params);
-    return this.mapRowsToDatoms(rows);
+    return this._mapRowsToDatoms(rows);
   }
 
   /**
    * Helper method to map database rows to Datom objects
    * Reused across query methods
    */
-  private mapRowsToDatoms(rows: DatabaseRow[]): Datom[] {
-    const reviveValue = (value: unknown): unknown => {
-      if (typeof value === "string") {
-        if (value === "__UNDEFINED__") {
-          return undefined;
-        }
-        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
-          return new Date(value);
-        }
-      }
-      if (value === null) {
-        return null;
-      }
-      if (value === undefined) {
-        return undefined;
-      }
-      if (Array.isArray(value)) {
-        return value.map(reviveValue);
-      }
-      if (typeof value === "object" && value !== null) {
-        const revived: Record<string, unknown> = {};
-        const valueObj = value as Record<string, unknown>;
-        for (const key in valueObj) {
-          revived[key] = reviveValue(valueObj[key]);
-        }
-        return revived;
-      }
-      return value;
-    };
-
+  private _mapRowsToDatoms(rows: DatabaseRow[]): Datom[] {
     return rows.map((row: DatabaseRow) => {
       let entity: EntityId = row.e as EntityId;
       if (typeof entity === "string") {
@@ -851,7 +741,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
           parsedValue = row.v;
         }
       }
-      const revivedValue = reviveValue(parsedValue) as Value;
+      const revivedValue = this._reviveValue(parsedValue) as Value;
 
       return {
         e: entity,
@@ -866,11 +756,40 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     });
   }
 
+  private _reviveValue(value: unknown): unknown {
+    if (typeof value === "string") {
+      if (value === "__UNDEFINED__") {
+        return undefined;
+      }
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+        return new Date(value);
+      }
+    }
+    if (value === null) {
+      return null;
+    }
+    if (value === undefined) {
+      return undefined;
+    }
+    if (Array.isArray(value)) {
+      return value.map((v) => this._reviveValue(v));
+    }
+    if (typeof value === "object" && value !== null) {
+      const revived: Record<string, unknown> = {};
+      const valueObj = value as Record<string, unknown>;
+      for (const key in valueObj) {
+        revived[key] = this._reviveValue(valueObj[key]);
+      }
+      return revived;
+    }
+    return value;
+  }
+
   async query(
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResult> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Create read context
     const ctx: ReadContext = {
@@ -899,7 +818,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
       if (!isQueryPattern(clause)) {
         continue;
       }
-      const clauseDatoms = await this.executeClauseAsDatoms(clause);
+      const clauseDatoms = await this._executeClauseAsDatoms(clause);
       for (const datom of clauseDatoms) {
         const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
         if (!allDatomsSet.has(key)) {
@@ -928,7 +847,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     if (hasAggs && !allAggsSupported) {
       // Use in-memory joins and aggregations
       const firstClause = modifiedQuery.where[0];
-      const firstResults = await this.executeClauseWithFilteredDatoms(
+      const firstResults = await this._executeClauseWithFilteredDatoms(
         firstClause,
         afterResult.datoms
       );
@@ -936,7 +855,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
       let results = firstResults;
       for (let i = 1; i < modifiedQuery.where.length; i++) {
         const clause = modifiedQuery.where[i];
-        const clauseResults = await this.executeClauseWithFilteredDatoms(
+        const clauseResults = await this._executeClauseWithFilteredDatoms(
           clause,
           afterResult.datoms
         );
@@ -982,12 +901,12 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
 
     // For multi-clause queries with all aggregations supported, use SQL query building
     if (modifiedQuery.where.length > 1 && hasAggs && allAggsSupported) {
-      return this.executeDatalogWithSQL(modifiedQuery);
+      return this._executeDatalogWithSQL(modifiedQuery);
     }
 
     // Now execute the query with filtered datoms (no aggregations or single clause with supported aggregations)
     const firstClause = modifiedQuery.where[0];
-    const firstResults = await this.executeClauseWithFilteredDatoms(
+    const firstResults = await this._executeClauseWithFilteredDatoms(
       firstClause,
       afterResult.datoms
     );
@@ -995,7 +914,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     let results = firstResults;
     for (let i = 1; i < modifiedQuery.where.length; i++) {
       const clause = modifiedQuery.where[i];
-      const clauseResults = await this.executeClauseWithFilteredDatoms(
+      const clauseResults = await this._executeClauseWithFilteredDatoms(
         clause,
         afterResult.datoms
       );
@@ -1036,7 +955,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   /**
    * Execute a clause and return datoms (for hook support)
    */
-  private async executeClauseAsDatoms(clause: QueryClause): Promise<Datom[]> {
+  private async _executeClauseAsDatoms(clause: QueryClause): Promise<Datom[]> {
     if (!isQueryPattern(clause)) {
       throw new Error("Only QueryPattern clauses are supported");
     }
@@ -1047,7 +966,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
       : (attributeVal as string);
     const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    return this.executeQuery({
+    return this._executeCurrentQuery({
       e: entity,
       a: attribute,
       v: value,
@@ -1058,7 +977,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   /**
    * Execute a clause using filtered datoms from hooks
    */
-  private async executeClauseWithFilteredDatoms(
+  private async _executeClauseWithFilteredDatoms(
     clause: QueryClause,
     filteredDatoms: Datom[]
   ): Promise<Record<string, Value | Attribute>[]> {
@@ -1105,7 +1024,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   /**
    * Execute datalog query using SQL with aggregations
    */
-  private async executeDatalogWithSQL(
+  private async _executeDatalogWithSQL(
     query: DatalogQuery
   ): Promise<QueryResult> {
     const clauses = query.where;
@@ -1368,45 +1287,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     const rows = await this.connection.query(sql, params);
 
     // Convert SQL results back to QueryResult format
-    const reviveValue = (value: unknown): unknown => {
-      if (value === null || value === undefined) {
-        return value;
-      }
-      if (typeof value === "string") {
-        // For numeric strings (like aggregation results), try to convert to number first
-        // This handles cases where PostgreSQL returns COUNT(*) as a string "2"
-        if (/^-?\d+$/.test(value)) {
-          const num = parseInt(value, 10);
-          if (!isNaN(num)) {
-            return num;
-          }
-        }
-        if (/^-?\d*\.\d+$/.test(value)) {
-          const num = parseFloat(value);
-          if (!isNaN(num)) {
-            return num;
-          }
-        }
-        // Try to parse as JSON, but if it fails, use the string as-is
-        try {
-          return JSON.parse(value);
-        } catch {
-          return value;
-        }
-      }
-      if (Array.isArray(value)) {
-        return value.map(reviveValue);
-      }
-      if (typeof value === "object" && value !== null) {
-        const revived: Record<string, unknown> = {};
-        const valueObj = value as Record<string, unknown>;
-        for (const key in valueObj) {
-          revived[key] = reviveValue(valueObj[key]);
-        }
-        return revived;
-      }
-      return value;
-    };
+    // Note: Special handling for aggregation results (numeric strings)
 
     const results: Record<string, Value | Attribute>[] = rows.map(
       (row: DatabaseRow) => {
@@ -1438,7 +1319,23 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
               }
             }
           }
-          result[key] = reviveValue(value) as Value | Attribute;
+          // For aggregation results, handle numeric strings specially
+          let finalValue = value;
+          if (typeof value === "string") {
+            // For numeric strings (like aggregation results), try to convert to number first
+            if (/^-?\d+$/.test(value)) {
+              const num = parseInt(value, 10);
+              if (!isNaN(num)) {
+                finalValue = num;
+              }
+            } else if (/^-?\d*\.\d+$/.test(value)) {
+              const num = parseFloat(value);
+              if (!isNaN(num)) {
+                finalValue = num;
+              }
+            }
+          }
+          result[key] = this._reviveValue(finalValue) as Value | Attribute;
         }
         return result;
       }
@@ -1469,7 +1366,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
    * @internal - This method is for internal testing use only and should not be called in production
    */
   protected async cleanUp(): Promise<void> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
     await this.connection.execute(
       `TRUNCATE TABLE ${this.tableName}, ${this.tableName}_tx RESTART IDENTITY CASCADE`
     );
@@ -1482,7 +1379,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     await this.connection.execute(initTxSql);
   }
 
-  private async getNextTransactionId(): Promise<TransactionId> {
+  private async _getNextTransactionId(): Promise<TransactionId> {
     // PostgreSQL-optimized: Use INSERT ... ON CONFLICT ... UPDATE ... RETURNING
     // This combines initialization, update, and retrieval into a single atomic operation
     // The ON CONFLICT ensures thread-safety, and RETURNING gets the new value in one query
@@ -1502,7 +1399,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     return Number(row.last_tx);
   }
 
-  private async writeDatomsInternal(
+  private async _writeDatomsInternal(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -1539,7 +1436,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   }
 
   async getLatestTransaction(): Promise<TransactionId> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
     const sql = `SELECT last_tx FROM ${this.tableName}_tx WHERE id = 1`;
     const result = await this.connection.query(sql);
     if (!result || result.length === 0) {
@@ -1550,17 +1447,17 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     return Number(row.last_tx);
   }
 
-  protected async recordQueryMetrics(duration: number): Promise<void> {
+  private async _recordQueryMetrics(duration: number): Promise<void> {
     this.queryCount++;
     this.queryTimeSum += duration;
   }
 
-  protected async recordTransactionMetrics(duration: number): Promise<void> {
+  private async _recordTransactionMetrics(duration: number): Promise<void> {
     this.transactionCount++;
     this.transactionTimeSum += duration;
   }
 
-  protected async getDetailedStats(): Promise<
+  private async _getDetailedStats(): Promise<
     Partial<
       Pick<
         import("../../types.js").DatabaseStats,
@@ -1628,24 +1525,24 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<Datom[]> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     if (viewConfig.type === "current") {
-      return this.executeQuery(options);
+      return this._executeCurrentQuery(options);
     }
     if (viewConfig.type === "asOf") {
-      return this.executeAsOfQuery(options, viewConfig.txId);
+      return this._executeAsOfQuery(options, viewConfig.txId);
     }
     if (viewConfig.type === "since") {
-      return this.executeSinceQuery(options, viewConfig.txId);
+      return this._executeSinceQuery(options, viewConfig.txId);
     }
     if (viewConfig.type === "history") {
-      return this.executeHistoryQuery(options);
+      return this._executeHistoryQuery(options);
     }
     if (viewConfig.type === "speculative") {
       // For speculative queries, we need to merge base datoms with speculative changes
       // Get all base datoms (current state)
-      const baseDatoms = await this.executeQuery({});
+      const baseDatoms = await this._executeCurrentQuery({});
 
       // Create a map of base datoms by (entity, attribute, value) for efficient lookup
       const baseMap = new Map<string, Datom>();
@@ -1706,7 +1603,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
   ): Promise<QueryResult> {
-    await this.ensureInitialized();
+    await this._ensureInitialized();
 
     // Create read context
     const ctx: ReadContext = {
@@ -1904,7 +1801,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     if (hasAggs && !allAggsSupported) {
       // Use in-memory joins and aggregations
       const firstClause = modifiedQuery.where[0];
-      const firstResults = await this.executeClauseWithFilteredDatoms(
+      const firstResults = await this._executeClauseWithFilteredDatoms(
         firstClause,
         afterResult.datoms
       );
@@ -1912,7 +1809,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
       let results = firstResults;
       for (let i = 1; i < modifiedQuery.where.length; i++) {
         const clause = modifiedQuery.where[i];
-        const clauseResults = await this.executeClauseWithFilteredDatoms(
+        const clauseResults = await this._executeClauseWithFilteredDatoms(
           clause,
           afterResult.datoms
         );
@@ -1958,12 +1855,12 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
 
     // For multi-clause queries with all aggregations supported, use SQL query building
     if (modifiedQuery.where.length > 1 && hasAggs && allAggsSupported) {
-      return this.executeDatalogWithSQL(modifiedQuery);
+      return this._executeDatalogWithSQL(modifiedQuery);
     }
 
     // Now execute the query with filtered datoms (no aggregations or single clause with supported aggregations)
     const firstClause = modifiedQuery.where[0];
-    const firstResults = await this.executeClauseWithFilteredDatoms(
+    const firstResults = await this._executeClauseWithFilteredDatoms(
       firstClause,
       afterResult.datoms
     );
@@ -1971,7 +1868,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     let results = firstResults;
     for (let i = 1; i < modifiedQuery.where.length; i++) {
       const clause = modifiedQuery.where[i];
-      const clauseResults = await this.executeClauseWithFilteredDatoms(
+      const clauseResults = await this._executeClauseWithFilteredDatoms(
         clause,
         afterResult.datoms
       );
