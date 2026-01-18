@@ -12,10 +12,12 @@
     "isready",
     "moviefinder",
     "mysqladmin",
+    "networkidle",
     "pdatoms",
     "pglite",
     "psql",
     "tempid",
+    "tmdb",
     "undeduplicated",
     "untuple",
     "upserts"

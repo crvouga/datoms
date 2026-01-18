@@ -107,6 +107,27 @@ jobs:
       - name: Run tests
         run: bun test
 
+  e2e:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run e2e tests
+        run: bun run test:e2e
+
   build:
     runs-on: ubuntu-latest
     
@@ -155,7 +176,7 @@ jobs:
   # - feat: = minor version
   # - fix: = patch version
   publish:
-    needs: [lint, type-check, format, test, verify-build]
+    needs: [lint, type-check, format, test, e2e, verify-build]
     runs-on: ubuntu-latest
     if: false # Disabled: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     permissions:
