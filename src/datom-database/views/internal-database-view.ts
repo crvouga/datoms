@@ -4,9 +4,9 @@
  * Not part of the public API
  */
 
-import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
 import type { Datom, TransactionId } from "../../datoms.js";
 import type { QueryOptions } from "../../types.js";
+import { DatomDatabase } from "../datom-database.js";
 
 /**
  * Internal database view interface
@@ -14,31 +14,7 @@ import type { QueryOptions } from "../../types.js";
  * This interface is separate from the public DatomDatabase interface
  * @internal
  */
-export interface InternalDatabaseView {
-  /**
-   * Query datoms from the database view using query options
-   * @param options Query options (must include at least one filter or limit to prevent full scans)
-   * @returns Array of matching datoms
-   * @example
-   * const dbPast = db.asOf(100);
-   * const datoms = await dbPast.datoms({ entity: 123 });
-   */
-  datoms(options: QueryOptions): Promise<Datom[]>;
-
-  /**
-   * Execute a datalog query against this database view
-   * @param query Datalog query to execute
-   * @param context Optional context object for hooks
-   * @returns Query results as an array of records
-   * @example
-   * const dbPast = db.asOf(100);
-   * const results = await dbPast.query({ find: ["?e"], where: [["?e", "name", "Alice"]] });
-   */
-  query(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResult>;
-
+export interface InternalDatabaseView extends DatomDatabase {
   /**
    * Get raw datoms without deduplication for time-travel queries.
    * This method is used by database views to get all datoms matching filters

@@ -8,8 +8,6 @@ import type {
   QueryClause,
   QueryResult,
 } from "../../datalog/datalog.js";
-import type { SQLDatabase } from "../../sql-database/sql-database.js";
-import type { DatabaseRow } from "../../sql-database/types.js";
 import type {
   Attribute,
   Datom,
@@ -18,9 +16,16 @@ import type {
   Value,
 } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
+import type { SQLDatabase } from "../../sql-database/sql-database.js";
+import type { DatabaseRow } from "../../sql-database/types.js";
 import type { QueryOptions, Transaction } from "../../types.js";
 
-import { DatomDatabase } from "../datom-database.js";
+import {
+  deserializeEntityId,
+  serializeEntityId,
+  validateEntityId,
+} from "../../entity-id.js";
+import type { WithResult } from "../datom-database.js";
 import {
   Hook,
   HookEngine,
@@ -35,11 +40,6 @@ import {
 } from "../hook/hook.js";
 import { applyAggregations } from "../in-memory/aggregations/computation.js";
 import { parseAggregation } from "../in-memory/aggregations/parser.js";
-import {
-  deserializeEntityId,
-  serializeEntityId,
-  validateEntityId,
-} from "../../entity-id.js";
 import {
   isQueryPattern,
   isVariable,
@@ -57,15 +57,12 @@ import {
   aggregationToSQL,
   checkSQLAggregations,
 } from "./aggregations/helpers.js";
-import type { WithResult } from "../datom-database.js";
 
 /**
  * PostgreSQL database implementation
  * Accepts a SqlDatabase that implements PostgreSQL-compatible SQL
  */
-export class PostgreSQLDatomDatabase
-  implements DatomDatabase, InternalDatabaseView
-{
+export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   public readonly hooks: HookEngine;
   protected initialized = false;
   private connection: SQLDatabase;

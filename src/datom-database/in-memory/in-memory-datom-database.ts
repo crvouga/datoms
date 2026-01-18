@@ -17,8 +17,13 @@ import type {
   Value,
 } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
+import {
+  deserializeEntityId,
+  serializeEntityId,
+  validateEntityId,
+} from "../../entity-id.js";
 import type { DatabaseStats, QueryOptions, Transaction } from "../../types.js";
-import { DatomDatabase } from "../datom-database.js";
+import type { WithResult } from "../datom-database.js";
 import {
   Hook,
   HookEngine,
@@ -31,11 +36,6 @@ import {
   type WriteContext,
   type WriteResult,
 } from "../hook/hook.js";
-import {
-  deserializeEntityId,
-  serializeEntityId,
-  validateEntityId,
-} from "../../entity-id.js";
 import {
   isQueryPattern,
   isVariable,
@@ -50,15 +50,12 @@ import { HistoryDatabaseView } from "../views/history-database-view.js";
 import { InternalDatabaseView } from "../views/internal-database-view.js";
 import { SinceDatabaseView } from "../views/since-database-view.js";
 import { SpeculativeDatabaseView } from "../views/speculative-database-view.js";
-import type { WithResult } from "../datom-database.js";
 
 /**
  * In-memory database implementation
  * Stores datoms in memory using an array-based structure
  */
-export class InMemoryDatomDatabase
-  implements DatomDatabase, InternalDatabaseView
-{
+export class InMemoryDatomDatabase implements InternalDatabaseView {
   public readonly hooks: HookEngine;
   protected initialized = false;
   private _datomsArray: Datom[] = [];
