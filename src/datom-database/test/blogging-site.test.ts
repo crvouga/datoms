@@ -22,7 +22,7 @@ import {
   USER_TYPE_AUTHOR,
   USER_TYPE_READER,
 } from "./blogging-site.js";
-import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
+import { FIXTURES, type Fixture } from "./fixtures.js";
 
 describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
   let f: Fixture;

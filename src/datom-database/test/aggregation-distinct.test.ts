@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { DatalogQuery } from "../../datalog/datalog.js";
-import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
+import { FIXTURES, type Fixture } from "./fixtures.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -58,8 +58,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const distinctValue = results[0]!["distinctNames"];
       expect(
         distinctValue === null ||
-          distinctValue === undefined ||
-          (Array.isArray(distinctValue) && distinctValue.length === 0)
+        distinctValue === undefined ||
+        (Array.isArray(distinctValue) && distinctValue.length === 0)
       ).toBe(true);
 
       await db.close();

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { DatalogQuery } from "../../datalog/datalog.js";
-import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
+import { FIXTURES, type Fixture } from "./fixtures.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -67,8 +67,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Standard deviation of single value should be 0 or null/undefined
       expect(
         results[0]!["stddev"] === 0 ||
-          results[0]!["stddev"] === null ||
-          results[0]!["stddev"] === undefined
+        results[0]!["stddev"] === null ||
+        results[0]!["stddev"] === undefined
       ).toBe(true);
 
       await db.close();

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { DatalogQuery } from "../../datalog/datalog.js";
-import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
+import { FIXTURES, type Fixture } from "./fixtures.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;

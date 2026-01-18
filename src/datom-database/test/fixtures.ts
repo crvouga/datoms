@@ -1,7 +1,7 @@
 import { unlinkSync } from "fs";
-import { PgSQLDatabase } from "../../sql-database/sql-database-pg.npm-ignore.js";
-import { PGLiteSQLDatabase } from "../../sql-database/sql-database-pglite.npm-ignore.js";
-import { SQLiteSQLDatabase } from "../../sql-database/sql-database-sqlite.npm-ignore.js";
+import { PgSQLDatabase } from "../../sql-database/sql-database-pg.js";
+import { PGLiteSQLDatabase } from "../../sql-database/sql-database-pglite.js";
+import { SQLiteSQLDatabase } from "../../sql-database/sql-database-sqlite.js";
 import type { DatomDatabase } from "../datom-database.js";
 import { InMemoryDatomDatabase } from "../in-memory/in-memory-datom-database.js";
 import { PostgreSQLDatomDatabase } from "../postgres/postgres-datom-database.js";
@@ -20,8 +20,8 @@ const createInMemoryFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
@@ -38,8 +38,8 @@ const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
@@ -68,8 +68,8 @@ const createPGLiteFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
@@ -79,7 +79,7 @@ const createRemoteFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
+    beforeEach: async () => { },
     afterEach: async () => {
       await db.close();
     },

@@ -5,6 +5,8 @@
 **/*.test.js
 **/*.spec.ts
 **/*.spec.js
+**/*.e2e.ts
+**/*.e2e.js
 
 # Source files (only dist should be published)
 src/
