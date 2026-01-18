@@ -21,34 +21,6 @@ async function main() {
     logger.info("Connecting to database...", { event: "db_connecting", databaseUrl });
     const sqlDb = new PgSQLDatabase(databaseUrl);
     const db = new PostgreSQLDatomDatabase(sqlDb);
-
-    logger.info("Querying for movies datoms...", { event: "populating_movies_query" });
-    const populateMovies = await db.query({
-      find: {
-        total: ["count", "?e"],
-        id: ["?e"],
-        title: ["?title"],
-        overview: ["?overview"],
-        release_date: ["?release_date"],
-        poster_path: ["?poster_path"],
-        backdrop_path: ["?backdrop_path"],
-        vote_average: ["?vote_average"],
-        vote_count: ["?vote_count"],
-      },
-      where: [
-        { e: "?e", a: "tmdb.movie/id", v: "?id" },
-        { e: "?e", a: "tmdb.movie/title", v: "?title" },
-        { e: "?e", a: "tmdb.movie/overview", v: "?overview" },
-        { e: "?e", a: "tmdb.movie/release_date", v: "?release_date" },
-        { e: "?e", a: "tmdb.movie/poster_path", v: "?poster_path" },
-        { e: "?e", a: "tmdb.movie/backdrop_path", v: "?backdrop_path" },
-        { e: "?e", a: "tmdb.movie/vote_average", v: "?vote_average" },
-        { e: "?e", a: "tmdb.movie/vote_count", v: "?vote_count" },
-      ],
-    });
-    logger.info("Movies datoms populated", { event: "populated_movies", count: populateMovies?.length });
-    logger.debug("Movies datoms data", { event: "populated_movies_data", data: populateMovies });
-
     const httpClient = new FetchHttpClient();
     logger.info("Creating TMDB client...", { event: "tmdb_client_creating" });
     const tmdbClient = createTmdbClient(httpClient);
@@ -68,11 +40,34 @@ async function main() {
         // Serve index.html for all unmatched routes.
         "/*": index,
 
-        "/datoms": {
+        "/popular-movies": {
           async GET(_req) {
-            logger.info("Route hit", { event: "route_hit", route: "/datoms", method: "GET" });
-            const datoms = await db.datoms({ limit: 1000 });
-            return Response.json(datoms);
+            logger.info("Querying for movies datoms...", { event: "populating_movies_query" });
+            const populateMovies = await db.query({
+              find: {
+                "movie/id": ["?e"],
+                "movie/title": ["?title"],
+                "movie/overview": ["?overview"],
+                "movie/releaseDate": ["?release_date"],
+                "movie/posterPath": ["?poster_path"],
+                "movie/backdropPath": ["?backdrop_path"],
+                "movie/voteAverage": ["?vote_average"],
+                "movie/voteCount": ["?vote_count"],
+              },
+              where: [
+                { e: "?e", a: "tmdb.movie/id", v: "?id" },
+                { e: "?e", a: "tmdb.movie/title", v: "?title" },
+                { e: "?e", a: "tmdb.movie/overview", v: "?overview" },
+                { e: "?e", a: "tmdb.movie/release_date", v: "?release_date" },
+                { e: "?e", a: "tmdb.movie/poster_path", v: "?poster_path" },
+                { e: "?e", a: "tmdb.movie/backdrop_path", v: "?backdrop_path" },
+                { e: "?e", a: "tmdb.movie/vote_average", v: "?vote_average" },
+                { e: "?e", a: "tmdb.movie/vote_count", v: "?vote_count" },
+              ],
+            });
+            logger.info("Movies datoms populated", { event: "populated_movies", count: populateMovies?.length });
+            logger.debug("Movies datoms data", { event: "populated_movies_data", data: populateMovies });
+            return Response.json(populateMovies);
           },
         },
 
