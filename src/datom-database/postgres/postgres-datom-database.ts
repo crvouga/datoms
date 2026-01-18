@@ -1432,10 +1432,11 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
       `TRUNCATE TABLE ${this.tableName}, ${this.tableName}_tx RESTART IDENTITY CASCADE`
     );
     // Re-initialize transaction counter after truncate
+    // Use ON CONFLICT to handle race conditions safely
     const initTxSql = `
       INSERT INTO ${this.tableName}_tx (id, last_tx)
-      SELECT 1, 0
-      WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
+      VALUES (1, 0)
+      ON CONFLICT (id) DO UPDATE SET last_tx = 0
     `;
     await this.connection.execute(initTxSql);
   }

@@ -28,9 +28,58 @@ async function main() {
     const destroyRetentionPolicy = new DestroyRetentionPolicy(db, {
       retentionTxCount: 10,
       intervalMs: 1000,
-      batchSize: 1_000,
+      batchSize: 10_000,
     });
     destroyRetentionPolicy.start();
+
+    // PostgreSQL maintenance: VACUUM ANALYZE on interval
+    const maintenanceIntervalMs = process.env.POSTGRES_MAINTENANCE_INTERVAL_MS
+      ? parseInt(process.env.POSTGRES_MAINTENANCE_INTERVAL_MS, 10)
+      : 3600000; // Default: 1 hour
+    const tableName =
+      process.env.POSTGRES_TABLE_NAME || "datoms"; // Default: "datoms"
+    // Validate table name to prevent SQL injection (alphanumeric and underscores only)
+    if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
+      throw new Error(
+        `Invalid table name: ${tableName}. Only alphanumeric characters and underscores are allowed.`
+      );
+    }
+    const runPostgresMaintenance = async () => {
+      try {
+        logger.info("Running PostgreSQL maintenance...", {
+          event: "postgres_maintenance_start",
+          tableName,
+        });
+        // VACUUM ANALYZE on both tables to reclaim storage and update statistics
+        // VACUUM ANALYZE reclaims storage occupied by dead tuples and updates statistics
+        await sqlDb.execute(`VACUUM ANALYZE ${tableName}`);
+        await sqlDb.execute(`VACUUM ANALYZE ${tableName}_tx`);
+        logger.info("PostgreSQL maintenance completed", {
+          event: "postgres_maintenance_complete",
+          tableName,
+        });
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        logger.error("PostgreSQL maintenance error", {
+          event: "postgres_maintenance_error",
+          error: errorMessage,
+          tableName,
+        });
+      }
+    };
+    // Run maintenance immediately, then on interval
+    runPostgresMaintenance();
+    const maintenanceInterval = setInterval(
+      runPostgresMaintenance,
+      maintenanceIntervalMs
+    );
+    // Clean up interval on process exit
+    process.on("SIGTERM", () => {
+      clearInterval(maintenanceInterval);
+    });
+    process.on("SIGINT", () => {
+      clearInterval(maintenanceInterval);
+    });
     const httpClient = new FetchHttpClient();
     logger.info("Creating TMDB client...", { event: "tmdb_client_creating" });
     const tmdbClient = createTmdbClient(httpClient);
@@ -57,7 +106,7 @@ async function main() {
             });
             const populateMovies = await db.query({
               find: {
-                "movie/id": ["?e"],
+                "movie/id": ["?movie/id"],
                 "movie/title": ["?title"],
                 "movie/overview": ["?overview"],
                 "movie/releaseDate": ["?release_date"],
@@ -67,15 +116,17 @@ async function main() {
                 "movie/voteCount": ["?vote_count"],
               },
               where: [
-                { e: "?e", a: "tmdb.movie/id", v: "?id" },
-                { e: "?e", a: "tmdb.movie/title", v: "?title" },
-                { e: "?e", a: "tmdb.movie/overview", v: "?overview" },
-                { e: "?e", a: "tmdb.movie/release_date", v: "?release_date" },
-                { e: "?e", a: "tmdb.movie/poster_path", v: "?poster_path" },
-                { e: "?e", a: "tmdb.movie/backdrop_path", v: "?backdrop_path" },
-                { e: "?e", a: "tmdb.movie/vote_average", v: "?vote_average" },
-                { e: "?e", a: "tmdb.movie/vote_count", v: "?vote_count" },
+                { e: "?movie/id", a: "tmdb.movie/id", v: "?id" },
+                { e: "?movie/id", a: "tmdb.movie/title", v: "?title" },
+                { e: "?movie/id", a: "tmdb.movie/overview", v: "?overview" },
+                { e: "?movie/id", a: "tmdb.movie/release_date", v: "?release_date" },
+                { e: "?movie/id", a: "tmdb.movie/poster_path", v: "?poster_path" },
+                { e: "?movie/id", a: "tmdb.movie/backdrop_path", v: "?backdrop_path" },
+                { e: "?movie/id", a: "tmdb.movie/vote_average", v: "?vote_average" },
+                { e: "?movie/id", a: "tmdb.movie/vote_count", v: "?vote_count" },
               ],
+              orderBy: [["?vote_average", "desc"]],
+              limit: 25,
             });
             logger.info("Movies datoms populated", {
               event: "populated_movies",
