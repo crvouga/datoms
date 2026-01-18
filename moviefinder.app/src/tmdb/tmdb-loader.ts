@@ -9,7 +9,7 @@ export class TmdbLoader {
     private readonly tmdbClient: TmdbClient,
     private readonly db: DatomDatabase,
     private readonly logger: Logger
-  ) { }
+  ) {}
 
   async start(): Promise<void> {
     this.logger.info("Starting TMDB loader", { operation: "start" });
@@ -24,12 +24,13 @@ export class TmdbLoader {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
-      throw error;
     }
   }
 
   private async discoverMovies(): Promise<void> {
-    this.logger.info("Starting movie discovery", { operation: "discoverMovies" });
+    this.logger.info("Starting movie discovery", {
+      operation: "discoverMovies",
+    });
     let hasMore = true;
     let runningPage = 1;
     let totalMoviesProcessed = 0;
@@ -40,7 +41,6 @@ export class TmdbLoader {
         operation: "discoverMovies",
         page: runningPage,
       });
-
       let response;
       try {
         response = await this.tmdbClient.discoverMovies({ page: runningPage });

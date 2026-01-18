@@ -49,6 +49,10 @@ import type {
   GetLatestTransactionResponse,
   GetTransactionMetadataRequest,
   GetTransactionMetadataResponse,
+  GetObsoleteDatomsRequest,
+  GetObsoleteDatomsResponse,
+  DeleteDatomsRequest,
+  DeleteDatomsResponse,
   InitializeRequest,
   InitializeResponse,
 } from "./transport/types.js";
@@ -248,6 +252,47 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     } catch (error) {
       if (error instanceof TransportError) {
         throw new Error(`Failed to get latest transaction: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async getObsoleteDatoms(cutoffTx: TransactionId): Promise<Datom[]> {
+    await this._ensureInitialized();
+
+    try {
+      const request: GetObsoleteDatomsRequest = {
+        method: "getObsoleteDatoms",
+        cutoffTx,
+      };
+      const response = await this.transport.request<
+        GetObsoleteDatomsRequest,
+        GetObsoleteDatomsResponse
+      >("getObsoleteDatoms", request);
+      return response.datoms;
+    } catch (error) {
+      if (error instanceof TransportError) {
+        throw new Error(`Failed to get obsolete datoms: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async deleteDatoms(datoms: Datom[]): Promise<void> {
+    await this._ensureInitialized();
+
+    try {
+      const request: DeleteDatomsRequest = {
+        method: "deleteDatoms",
+        datoms,
+      };
+      await this.transport.request<DeleteDatomsRequest, DeleteDatomsResponse>(
+        "deleteDatoms",
+        request
+      );
+    } catch (error) {
+      if (error instanceof TransportError) {
+        throw new Error(`Failed to delete datoms: ${error.message}`);
       }
       throw error;
     }

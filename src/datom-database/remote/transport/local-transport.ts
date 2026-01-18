@@ -16,6 +16,10 @@ import type {
   GetLatestTransactionResponse,
   GetTransactionMetadataRequest,
   GetTransactionMetadataResponse,
+  GetObsoleteDatomsRequest,
+  GetObsoleteDatomsResponse,
+  DeleteDatomsRequest,
+  DeleteDatomsResponse,
   InitializeResponse,
   QueryRequest,
   QueryResponse,
@@ -166,6 +170,24 @@ export class LocalTransport implements ITransport {
           return {
             success: true,
           } as TResponse as RegisterHookResponse as TResponse;
+        }
+
+        case "getObsoleteDatoms": {
+          const obsoleteRequest = payload as GetObsoleteDatomsRequest;
+          const datoms = await this.backend.getObsoleteDatoms(
+            obsoleteRequest.cutoffTx
+          );
+          return {
+            datoms,
+          } as TResponse as GetObsoleteDatomsResponse as TResponse;
+        }
+
+        case "deleteDatoms": {
+          const deleteRequest = payload as DeleteDatomsRequest;
+          await this.backend.deleteDatoms(deleteRequest.datoms);
+          return {
+            success: true,
+          } as TResponse as DeleteDatomsResponse as TResponse;
         }
 
         default:

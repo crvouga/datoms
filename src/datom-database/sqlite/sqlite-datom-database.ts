@@ -1186,6 +1186,60 @@ export class SQLiteDatomDatabase
     return Number(row.last_tx);
   }
 
+  async getObsoleteDatoms(cutoffTx: TransactionId): Promise<Datom[]> {
+    await this._ensureInitialized();
+
+    if (cutoffTx <= 0) {
+      return [];
+    }
+
+    // Use a window function to find the latest transaction for each (e, a, v)
+    // Then select all datoms that are not the latest for their (e, a, v) group
+    const sql = `
+      WITH LatestDatoms AS (
+        SELECT e, a, v, MAX(tx) as max_tx
+        FROM ${this.tableName}
+        WHERE tx <= ?
+        GROUP BY e, a, v
+      )
+      SELECT d.e, d.a, d.v, d.tx, d.op
+      FROM ${this.tableName} d
+      LEFT JOIN LatestDatoms ld ON d.e = ld.e AND d.a = ld.a AND d.v = ld.v
+      WHERE d.tx <= ? AND (ld.max_tx IS NULL OR d.tx < ld.max_tx)
+      ORDER BY d.tx ASC
+    `;
+
+    const result = await this.connection.query(sql, [cutoffTx, cutoffTx]);
+    return this._mapRowsToDatoms(result);
+  }
+
+  async deleteDatoms(datoms: Datom[]): Promise<void> {
+    await this._ensureInitialized();
+
+    if (datoms.length === 0) {
+      return;
+    }
+
+    // Build DELETE statement with IN clause for each datom
+    // SQLite doesn't support multi-column IN, so we'll use OR conditions
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    for (const datom of datoms) {
+      conditions.push(`(e = ? AND a = ? AND v = ? AND tx = ? AND op = ?)`);
+      params.push(
+        String(datom.e),
+        String(datom.a),
+        JSON.stringify(datom.v),
+        datom.tx,
+        datom.op
+      );
+    }
+
+    const sql = `DELETE FROM ${this.tableName} WHERE ${conditions.join(" OR ")}`;
+    await this.connection.execute(sql, params);
+  }
+
   public async _executeQuery(
     options: DatomsParams,
     viewConfig: ViewConfig

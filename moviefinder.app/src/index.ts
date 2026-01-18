@@ -6,6 +6,7 @@ import index from "./index.html";
 import { createLogger } from "./lib/logger";
 import { createTmdbClient } from "./tmdb/tmdb-client";
 import { TmdbLoader } from "./tmdb/tmdb-loader";
+import { DestroyRetentionPolicy } from "../../src/datom-database/retention-policy";
 
 async function main() {
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -18,9 +19,18 @@ async function main() {
       logger.error("DATABASE_URL is not set");
       throw new Error("DATABASE_URL is not set");
     }
-    logger.info("Connecting to database...", { event: "db_connecting", databaseUrl });
+    logger.info("Connecting to database...", {
+      event: "db_connecting",
+      databaseUrl,
+    });
     const sqlDb = new PgSQLDatabase(databaseUrl);
     const db = new PostgreSQLDatomDatabase(sqlDb);
+    const destroyRetentionPolicy = new DestroyRetentionPolicy(db, {
+      retentionTxCount: 10,
+      intervalMs: 1000,
+      batchSize: 1_000,
+    });
+    destroyRetentionPolicy.start();
     const httpClient = new FetchHttpClient();
     logger.info("Creating TMDB client...", { event: "tmdb_client_creating" });
     const tmdbClient = createTmdbClient(httpClient);
@@ -42,7 +52,9 @@ async function main() {
 
         "/popular-movies": {
           async GET(_req) {
-            logger.info("Querying for movies datoms...", { event: "populating_movies_query" });
+            logger.info("Querying for movies datoms...", {
+              event: "populating_movies_query",
+            });
             const populateMovies = await db.query({
               find: {
                 "movie/id": ["?e"],
@@ -65,22 +77,36 @@ async function main() {
                 { e: "?e", a: "tmdb.movie/vote_count", v: "?vote_count" },
               ],
             });
-            logger.info("Movies datoms populated", { event: "populated_movies", count: populateMovies?.length });
-            logger.debug("Movies datoms data", { event: "populated_movies_data", data: populateMovies });
+            logger.info("Movies datoms populated", {
+              event: "populated_movies",
+              count: populateMovies?.length,
+            });
+            logger.debug("Movies datoms data", {
+              event: "populated_movies_data",
+              data: populateMovies,
+            });
             return Response.json(populateMovies);
           },
         },
 
         "/api/hello": {
           async GET(_req) {
-            logger.info("Route hit", { event: "route_hit", route: "/api/hello", method: "GET" });
+            logger.info("Route hit", {
+              event: "route_hit",
+              route: "/api/hello",
+              method: "GET",
+            });
             return Response.json({
               message: "Hello, world!",
               method: "GET",
             });
           },
           async PUT(_req) {
-            logger.info("Route hit", { event: "route_hit", route: "/api/hello", method: "PUT" });
+            logger.info("Route hit", {
+              event: "route_hit",
+              route: "/api/hello",
+              method: "PUT",
+            });
             return Response.json({
               message: "Hello, world!",
               method: "PUT",
@@ -89,7 +115,11 @@ async function main() {
         },
 
         "/api/hello/:name": async (req) => {
-          logger.info("Route hit", { event: "route_hit", route: "/api/hello/:name", params: req.params });
+          logger.info("Route hit", {
+            event: "route_hit",
+            route: "/api/hello/:name",
+            params: req.params,
+          });
           const name = req.params.name;
           return Response.json({
             message: `Hello, ${name}!`,
@@ -106,11 +136,17 @@ async function main() {
       },
     });
 
-    logger.info(`🚀 Server running at ${server.url}`, { event: "server_running", url: server.url.toString() });
+    logger.info(`🚀 Server running at ${server.url}`, {
+      event: "server_running",
+      url: server.url.toString(),
+    });
   } catch (err: unknown) {
     if (logger && typeof logger.error === "function") {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      logger.error("Startup error", { event: "startup_error", error: errorMessage });
+      logger.error("Startup error", {
+        event: "startup_error",
+        error: errorMessage,
+      });
     }
     throw err;
   }
@@ -120,5 +156,8 @@ main().catch((err: unknown) => {
   // global catch fallback
   const logger = createLogger();
   const errorMessage = err instanceof Error ? err.message : String(err);
-  logger.error("Uncaught error", { event: "uncaught_error", error: errorMessage });
+  logger.error("Uncaught error", {
+    event: "uncaught_error",
+    error: errorMessage,
+  });
 });

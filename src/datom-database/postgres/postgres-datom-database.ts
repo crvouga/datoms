@@ -1508,6 +1508,64 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     return Number(row.last_tx);
   }
 
+  async getObsoleteDatoms(cutoffTx: TransactionId): Promise<Datom[]> {
+    await this._ensureInitialized();
+
+    if (cutoffTx <= 0) {
+      return [];
+    }
+
+    // Use a window function to find the latest transaction for each (e, a, v)
+    // Then select all datoms that are not the latest for their (e, a, v) group
+    const sql = `
+      WITH LatestDatoms AS (
+        SELECT e, a, v, MAX(tx) as max_tx
+        FROM ${this.tableName}
+        WHERE tx <= $1
+        GROUP BY e, a, v
+      )
+      SELECT d.e, d.a, d.v, d.tx, d.op
+      FROM ${this.tableName} d
+      LEFT JOIN LatestDatoms ld ON d.e = ld.e AND d.a = ld.a AND d.v = ld.v
+      WHERE d.tx <= $2 AND (ld.max_tx IS NULL OR d.tx < ld.max_tx)
+      ORDER BY d.tx ASC
+    `;
+
+    const result = await this.connection.query(sql, [cutoffTx, cutoffTx]);
+    return this._mapRowsToDatoms(result);
+  }
+
+  async deleteDatoms(datoms: Datom[]): Promise<void> {
+    await this._ensureInitialized();
+
+    if (datoms.length === 0) {
+      return;
+    }
+
+    // Build DELETE statement with OR conditions for each datom
+    // PostgreSQL supports multi-column comparisons, but we'll use OR for clarity
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    let paramIndex = 1;
+
+    for (const datom of datoms) {
+      conditions.push(
+        `(e = $${paramIndex} AND a = $${paramIndex + 1} AND v = $${paramIndex + 2}::jsonb AND tx = $${paramIndex + 3} AND op = $${paramIndex + 4})`
+      );
+      params.push(
+        String(datom.e),
+        String(datom.a),
+        JSON.stringify(datom.v),
+        datom.tx,
+        datom.op
+      );
+      paramIndex += 5;
+    }
+
+    const sql = `DELETE FROM ${this.tableName} WHERE ${conditions.join(" OR ")}`;
+    await this.connection.execute(sql, params);
+  }
+
   public async _executeQuery(
     options: DatomsParams,
     viewConfig: ViewConfig

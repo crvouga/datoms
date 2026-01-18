@@ -719,6 +719,81 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     return this.nextTx > 1 ? this.nextTx - 1 : 0;
   }
 
+  async getObsoleteDatoms(cutoffTx: TransactionId): Promise<Datom[]> {
+    await this._ensureInitialized();
+
+    if (cutoffTx <= 0) {
+      return [];
+    }
+
+    // Get all datoms up to cutoff transaction using internal method to bypass validation
+    const allDatoms = await this._executeHistoryQuery({
+      tx: cutoffTx,
+    });
+
+    // Group datoms by (entity, attribute, value)
+    const datomsByKey = new Map<string, Datom[]>();
+    for (const datom of allDatoms) {
+      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
+      if (!datomsByKey.has(key)) {
+        datomsByKey.set(key, []);
+      }
+      datomsByKey.get(key)!.push(datom);
+    }
+
+    // For each (e, a, v) group, find the latest transaction
+    // All datoms with tx < latestTx are obsolete
+    const obsoleteDatoms: Datom[] = [];
+    for (const [_key, datoms] of datomsByKey.entries()) {
+      if (datoms.length === 0) {
+        continue;
+      }
+
+      // Sort by transaction ID descending
+      datoms.sort((a, b) => b.tx - a.tx);
+
+      // Get the latest transaction ID for this (e, a, v)
+      const latestDatom = datoms[0];
+      if (!latestDatom) {
+        continue;
+      }
+
+      // All datoms with tx < latestTx are obsolete (they've been superseded)
+      for (let i = 1; i < datoms.length; i++) {
+        const datom = datoms[i];
+        if (datom) {
+          obsoleteDatoms.push(datom);
+        }
+      }
+    }
+
+    // Remove duplicates using a unique key
+    const uniqueObsolete = new Map<string, Datom>();
+    for (const datom of obsoleteDatoms) {
+      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
+      uniqueObsolete.set(key, datom);
+    }
+
+    return Array.from(uniqueObsolete.values());
+  }
+
+  async deleteDatoms(datoms: Datom[]): Promise<void> {
+    await this._ensureInitialized();
+
+    // Create a set of keys for fast lookup
+    const keysToDelete = new Set<string>();
+    for (const datom of datoms) {
+      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
+      keysToDelete.add(key);
+    }
+
+    // Filter out datoms that match the keys to delete
+    this._datomsArray = this._datomsArray.filter((datom) => {
+      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
+      return !keysToDelete.has(key);
+    });
+  }
+
   public async _executeQuery(
     options: DatomsParams,
     viewConfig: ViewConfig

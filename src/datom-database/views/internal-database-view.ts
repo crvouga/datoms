@@ -56,6 +56,22 @@ export interface InternalDatabaseView extends DatomDatabase {
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
   ): Promise<QueryResult>;
+
+  /**
+   * Get obsolete datoms that don't affect the current state up to a cutoff transaction ID.
+   * A datom is obsolete if it has been superseded by a later transaction for the same (entity, attribute, value).
+   * @param cutoffTx Transaction ID cutoff - only datoms with tx <= cutoffTx are considered
+   * @returns Array of obsolete datoms that can be safely deleted
+   * @internal
+   */
+  getObsoleteDatoms(cutoffTx: TransactionId): Promise<Datom[]>;
+
+  /**
+   * Delete specific datoms from the database.
+   * @param datoms Array of datoms to delete (must match exactly by e, a, v, tx, op)
+   * @internal
+   */
+  deleteDatoms(datoms: Datom[]): Promise<void>;
 }
 
 /**

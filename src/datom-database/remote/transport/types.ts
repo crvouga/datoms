@@ -117,6 +117,36 @@ export interface RegisterHookResponse {
 }
 
 /**
+ * Get obsolete datoms request
+ */
+export interface GetObsoleteDatomsRequest {
+  method: "getObsoleteDatoms";
+  cutoffTx: TransactionId;
+}
+
+/**
+ * Get obsolete datoms response
+ */
+export interface GetObsoleteDatomsResponse {
+  datoms: Datom[];
+}
+
+/**
+ * Delete datoms request
+ */
+export interface DeleteDatomsRequest {
+  method: "deleteDatoms";
+  datoms: Datom[];
+}
+
+/**
+ * Delete datoms response
+ */
+export interface DeleteDatomsResponse {
+  success: boolean;
+}
+
+/**
  * Union type for all requests
  */
 export type RemoteRequest =
@@ -126,7 +156,9 @@ export type RemoteRequest =
   | TransactRequest
   | GetLatestTransactionRequest
   | GetTransactionMetadataRequest
-  | RegisterHookRequest;
+  | RegisterHookRequest
+  | GetObsoleteDatomsRequest
+  | DeleteDatomsRequest;
 
 /**
  * Union type for all responses
@@ -138,4 +170,6 @@ export type RemoteResponse =
   | TransactResponse
   | GetLatestTransactionResponse
   | GetTransactionMetadataResponse
-  | RegisterHookResponse;
+  | RegisterHookResponse
+  | GetObsoleteDatomsResponse
+  | DeleteDatomsResponse;
