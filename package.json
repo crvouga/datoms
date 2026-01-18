@@ -39,8 +39,13 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
-  "devDependencies": {
+  "dependencies": {
     "@electric-sql/pglite": "^0.2.0",
+    "pg": "^8.11.3",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^9.2.6",
@@ -54,10 +59,7 @@
     "bun-plugin-tailwind": "^0.1.2",
     "eslint": "^8.57.0",
     "madge": "^8.0.0",
-    "pg": "^8.11.3",
     "prettier": "^3.0.0",
-    "react": "^19",
-    "react-dom": "^19",
     "semantic-release": "^23.0.0",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.3.0"
