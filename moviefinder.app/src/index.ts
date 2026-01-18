@@ -8,7 +8,7 @@ import {
 import { DestroyRetentionPolicy } from "../../src/datom-database/retention-policy";
 import { PgSQLDatabase } from "../../src/sql-database/sql-database-pg";
 import { SQLiteSQLDatabase } from "../../src/sql-database/sql-database-sqlite";
-import { FetchHttpClient } from "./http-client";
+import { FetchHttpClient } from "./lib/http-client";
 import index from "./index.html";
 import { createLogger } from "./lib/logger";
 import { createTmdbClient } from "./tmdb/tmdb-client";
