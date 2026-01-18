@@ -23,7 +23,7 @@
     "check:fast": "bun format && bun typecheck && bun lint && bun cir-deps && bun test --bail && echo '✅ All fast checks passed'",
     "cir-deps": "madge --circular src/index.ts",
     "cloc": "bun x cloc src",
-    "docker": "bun docker:down && bun docker:up",
+    "docker": "bun docker:down && bun docker:up && bun moviefinderapp:docker",
     "docker:destroy": "docker-compose down -v",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
@@ -34,13 +34,16 @@
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "prepublishOnly": "npm run build",
-    "psql": "docker-compose exec postgres psql -U datoms -d datoms_test",
+    "psql": "docker-compose exec postgres psql -U postgres -d postgres",
     "server": "bun --hot moviefinder.app/src/index.ts",
     "tc": "bun typecheck -- --watch",
     "test": "bun test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "moviefinderapp:docker": "bun moviefinderapp:docker:down && bun moviefinderapp:docker:up",
+    "moviefinderapp:docker:down": "cd moviefinder.app && docker-compose down",
+    "moviefinderapp:docker:up": "cd moviefinder.app && docker-compose up -d"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.0",
