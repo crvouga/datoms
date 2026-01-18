@@ -46,6 +46,32 @@ export type Value =
   | EntityId;
 
 /**
+ * Converts an unknown input into a valid `Value` type for datoms.
+ *
+ * Checks if the provided value matches one of the supported datom value types:
+ * - string
+ * - number
+ * - boolean
+ * - Date
+ * - null
+ * - undefined
+ *
+ * If the input is not one of these types, returns `null`.
+ *
+ * @param v - The input value of unknown type.
+ * @returns The value as a `Value` type, or `null` if not compatible.
+ */
+export function value(v: unknown): Value {
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return v;
+  if (typeof v === "boolean") return v;
+  if (v instanceof Date) return v;
+  if (v === null) return null;
+  if (v === undefined) return undefined;
+  return null;
+}
+
+/**
  * A transaction ID (monotonically increasing)
  */
 export type TransactionId = number;

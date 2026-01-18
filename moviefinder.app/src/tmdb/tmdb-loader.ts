@@ -1,5 +1,5 @@
 import type { DatomDatabase, DatomInput, Logger } from "../../../src";
-import { datoms } from "../../../src/datoms";
+import { datoms, value } from "../../../src/datoms";
 import { mapKeys } from "../lib/map-keys";
 import { tmdbPrefixKey } from "./tmdb";
 import type { TmdbClient } from "./tmdb-client";
@@ -11,95 +11,71 @@ export class TmdbLoader {
     private readonly tmdbClient: TmdbClient,
     private readonly db: DatomDatabase,
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   async start(): Promise<void> {
     this.shouldStop = false;
-    this.logger.info("Starting TMDB loader", { operation: "start" });
+    this.logger.info("Starting TMDB loader");
     try {
-      await Promise.all([this.discoverMovies()]);
-      this.logger.info("TMDB loader completed successfully", {
-        operation: "complete",
-      });
+      await this.discoverMovies();
+      this.logger.info("TMDB loader completed successfully");
     } catch (error) {
       this.logger.error("TMDB loader failed", {
-        operation: "start",
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        error: this.formatError(error),
       });
+      throw error;
     }
   }
 
   stop(): void {
     this.shouldStop = true;
-    this.logger.info("Stopping TMDB loader", { operation: "stop" });
+    this.logger.info("Stopping TMDB loader");
+  }
+
+  private formatError(error: unknown): { message: string; stack?: string } {
+    return {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    };
   }
 
   private async discoverMovies(): Promise<void> {
-    this.logger.info("Starting movie discovery", {
-      operation: "discoverMovies",
-    });
-    let hasMore = true;
-    let runningPage = 1;
+    this.logger.info("Starting movie discovery");
+    let page = 1;
     let totalMoviesProcessed = 0;
 
-    while (hasMore && !this.shouldStop) {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      const pageStartTime = Date.now();
-      this.logger.debug("Fetching movies page", {
-        operation: "discoverMovies",
-        page: runningPage,
-      });
-      let response;
-      try {
-        response = await this.tmdbClient.discoverMovies({ page: runningPage });
-      } catch (error) {
-        this.logger.error("Failed to fetch movies from TMDB API", {
-          operation: "discoverMovies",
-          page: runningPage,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
+    while (!this.shouldStop) {
+      await this.delay(3000);
+      const startTime = Date.now();
+
+      const response = await this.tmdbClient
+        .discoverMovies({ page })
+        .catch((error) => {
+          this.logger.error("Failed to fetch movies", {
+            page,
+            error: this.formatError(error),
+          });
+          throw error;
         });
-        throw error;
-      }
 
       if (!response) {
-        this.logger.warn("Received null response from TMDB API", {
-          operation: "discoverMovies",
-          page: runningPage,
-        });
+        this.logger.warn("Received null response", { page });
         break;
       }
 
-      runningPage = response.page ?? 0;
+      page = response.page ?? 0;
       const totalPages = response.total_pages ?? 0;
-      hasMore = runningPage < totalPages;
+      const hasMore = page < totalPages;
 
-      this.logger.debug("Received TMDB API response", {
-        operation: "discoverMovies",
-        page: runningPage,
-        totalPages,
-        resultsCount: response.results?.length ?? 0,
-        hasMore,
-      });
-
-      if (!response.results || response.results.length === 0) {
-        this.logger.warn("No movies in response", {
-          operation: "discoverMovies",
-          page: runningPage,
-        });
-        runningPage++;
+      if (!response.results?.length) {
+        this.logger.warn("No movies in response", { page });
+        page++;
         continue;
       }
 
       const movies = response.results.map((m) =>
         mapKeys(m, (key) => tmdbPrefixKey("movie", key))
       );
-      this.logger.debug("Mapped movie keys", {
-        operation: "discoverMovies",
-        page: runningPage,
-        movieCount: movies.length,
-      });
 
       const movieDatoms = datoms(
         {
@@ -108,84 +84,58 @@ export class TmdbLoader {
         },
         movies
       ).flatMap((datom): DatomInput[] => {
-        if (datom.a === "tmdb.movie/genre_ids") {
-          // Parse the genre IDs from the value, which could be a stringified array or an array.
-          const genreIds: unknown =
-            typeof datom.v === "string" ? JSON.parse(datom.v) : datom.v;
-          if (Array.isArray(genreIds)) {
-            return genreIds.map(
-              (genreId): DatomInput => ({
-                a: "tmdb.movie/genre_id",
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                v: genreId,
-                op: "assert",
-                e: datom.e,
-              })
-            );
-          }
-          return [];
-        }
-        return [datom];
+        if (datom.a !== "tmdb.movie/genre_ids") return [datom];
+
+        const genreIds: unknown =
+          typeof datom.v === "string" ? JSON.parse(datom.v) : datom.v;
+        if (!Array.isArray(genreIds)) return [];
+
+        return genreIds.map(
+          (genreId): DatomInput => ({
+            a: "tmdb.movie/genre_id",
+            v: value(genreId),
+            op: "assert",
+            e: datom.e,
+          })
+        );
       });
 
-      const transactionStartTime = Date.now();
       try {
-        await this.db.transact(movieDatoms, {
-          createdBy: "tmdb-loader",
-        });
-        const transactionDuration = Date.now() - transactionStartTime;
+        await this.db.transact(movieDatoms, { createdBy: "tmdb-loader" });
         totalMoviesProcessed += movies.length;
-
-        this.logger.info("Transaction committed successfully", {
-          operation: "discoverMovies",
-          page: runningPage,
-          movieCount: movies.length,
-          totalMoviesProcessed,
-          transactionDurationMs: transactionDuration,
+        this.logger.info("Page processed", {
+          page,
+          movies: movies.length,
+          total: totalMoviesProcessed,
+          durationMs: Date.now() - startTime,
         });
       } catch (error) {
-        const transactionDuration = Date.now() - transactionStartTime;
         this.logger.error("Transaction failed", {
-          operation: "discoverMovies",
-          page: runningPage,
-          movieCount: movies.length,
-          transactionDurationMs: transactionDuration,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
+          page,
+          movies: movies.length,
+          error: this.formatError(error),
         });
         throw error;
       }
 
-      const pageDuration = Date.now() - pageStartTime;
-      this.logger.debug("Page processing completed", {
-        operation: "discoverMovies",
-        page: runningPage,
-        pageDurationMs: pageDuration,
-      });
-
       if (hasMore) {
-        this.logger.debug("Rate limiting delay", {
-          operation: "discoverMovies",
-          delayMs: 5000,
-        });
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await this.delay(10);
       }
 
-      runningPage++;
+      if (!hasMore) break;
+      page++;
     }
 
-    if (this.shouldStop) {
-      this.logger.info("Movie discovery stopped by user", {
-        operation: "discoverMovies",
-        totalPagesProcessed: runningPage - 1,
-        totalMoviesProcessed,
-      });
-    } else {
-      this.logger.info("Movie discovery completed", {
-        operation: "discoverMovies",
-        totalPagesProcessed: runningPage - 1,
-        totalMoviesProcessed,
-      });
-    }
+    this.logger.info(
+      this.shouldStop ? "Movie discovery stopped" : "Movie discovery completed",
+      {
+        pages: page - 1,
+        totalMovies: totalMoviesProcessed,
+      }
+    );
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
