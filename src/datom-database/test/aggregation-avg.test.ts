@@ -156,5 +156,49 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.close();
     });
+
+    test("should calculate average with zero values", async () => {
+      const { db } = f;
+      await db.transact([
+        { op: "assert", e: 1, a: "value", v: 0 },
+        { op: "assert", e: 2, a: "value", v: 0 },
+        { op: "assert", e: 3, a: "value", v: 30 },
+      ]);
+
+      const query: DatalogQuery = {
+        find: { average: ["avg", "?value"] },
+        where: [{ e: "?e", a: "value", v: "?value" }],
+      };
+
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      expect(results[0]["average"]).toBe(10);
+
+      await db.close();
+    });
+
+    test("should calculate average after updates", async () => {
+      const { db } = f;
+      await db.transact([
+        { op: "assert", e: 1, a: "score", v: 50 },
+        { op: "assert", e: 2, a: "score", v: 60 },
+        { op: "assert", e: 3, a: "score", v: 70 },
+      ]);
+
+      // Update a value (assert adds a new value, doesn't replace)
+      await db.transact([{ op: "assert", e: 1, a: "score", v: 80 }]);
+
+      const query: DatalogQuery = {
+        find: { average: ["avg", "?score"] },
+        where: [{ e: "?e", a: "score", v: "?score" }],
+      };
+
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      // Average of [50, 60, 70, 80] = 65
+      expect(results[0]["average"]).toBeCloseTo(65, 1);
+
+      await db.close();
+    });
   });
 });

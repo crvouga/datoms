@@ -173,5 +173,47 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.close();
     });
+
+    test("should find minimum with zero values", async () => {
+      const { db } = f;
+      await db.transact([
+        { op: "assert", e: 1, a: "value", v: 0 },
+        { op: "assert", e: 2, a: "value", v: 10 },
+        { op: "assert", e: 3, a: "value", v: 5 },
+      ]);
+
+      const query: DatalogQuery = {
+        find: { minimum: ["min", "?value"] },
+        where: [{ e: "?e", a: "value", v: "?value" }],
+      };
+
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      expect(results[0]["minimum"]).toBe(0);
+
+      await db.close();
+    });
+
+    test("should find minimum after updates", async () => {
+      const { db } = f;
+      await db.transact([
+        { op: "assert", e: 1, a: "price", v: 100 },
+        { op: "assert", e: 2, a: "price", v: 200 },
+      ]);
+
+      // Update to a lower value
+      await db.transact([{ op: "assert", e: 2, a: "price", v: 50 }]);
+
+      const query: DatalogQuery = {
+        find: { minimum: ["min", "?price"] },
+        where: [{ e: "?e", a: "price", v: "?price" }],
+      };
+
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      expect(results[0]["minimum"]).toBe(50);
+
+      await db.close();
+    });
   });
 });

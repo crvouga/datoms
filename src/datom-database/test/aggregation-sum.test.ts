@@ -151,5 +151,68 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.close();
     });
+
+    test("should sum zero values", async () => {
+      const { db } = f;
+      await db.transact([
+        { op: "assert", e: 1, a: "value", v: 0 },
+        { op: "assert", e: 2, a: "value", v: 0 },
+        { op: "assert", e: 3, a: "value", v: 10 },
+      ]);
+
+      const query: DatalogQuery = {
+        find: { total: ["sum", "?value"] },
+        where: [{ e: "?e", a: "value", v: "?value" }],
+      };
+
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      expect(results[0]["total"]).toBe(10);
+
+      await db.close();
+    });
+
+    test("should sum values after retraction", async () => {
+      const { db } = f;
+      await db.transact([
+        { op: "assert", e: 1, a: "price", v: 100 },
+        { op: "assert", e: 2, a: "price", v: 200 },
+        { op: "assert", e: 3, a: "price", v: 300 },
+      ]);
+
+      // Retract one value
+      await db.transact([{ op: "retract", e: 2, a: "price", v: 200 }]);
+
+      const query: DatalogQuery = {
+        find: { total: ["sum", "?price"] },
+        where: [{ e: "?e", a: "price", v: "?price" }],
+      };
+
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      expect(results[0]["total"]).toBe(400);
+
+      await db.close();
+    });
+
+    test("should sum with very small decimal numbers", async () => {
+      const { db } = f;
+      await db.transact([
+        { op: "assert", e: 1, a: "value", v: 0.0001 },
+        { op: "assert", e: 2, a: "value", v: 0.0002 },
+        { op: "assert", e: 3, a: "value", v: 0.0003 },
+      ]);
+
+      const query: DatalogQuery = {
+        find: { total: ["sum", "?value"] },
+        where: [{ e: "?e", a: "value", v: "?value" }],
+      };
+
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      expect(results[0]["total"]).toBeCloseTo(0.0006, 4);
+
+      await db.close();
+    });
   });
 });

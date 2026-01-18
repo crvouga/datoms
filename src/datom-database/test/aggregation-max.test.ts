@@ -173,5 +173,47 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.close();
     });
+
+    test("should find maximum with zero values", async () => {
+      const { db } = f;
+      await db.transact([
+        { op: "assert", e: 1, a: "value", v: 0 },
+        { op: "assert", e: 2, a: "value", v: -10 },
+        { op: "assert", e: 3, a: "value", v: 5 },
+      ]);
+
+      const query: DatalogQuery = {
+        find: { maximum: ["max", "?value"] },
+        where: [{ e: "?e", a: "value", v: "?value" }],
+      };
+
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      expect(results[0]["maximum"]).toBe(5);
+
+      await db.close();
+    });
+
+    test("should find maximum after updates", async () => {
+      const { db } = f;
+      await db.transact([
+        { op: "assert", e: 1, a: "price", v: 100 },
+        { op: "assert", e: 2, a: "price", v: 200 },
+      ]);
+
+      // Update to a higher value
+      await db.transact([{ op: "assert", e: 1, a: "price", v: 300 }]);
+
+      const query: DatalogQuery = {
+        find: { maximum: ["max", "?price"] },
+        where: [{ e: "?e", a: "price", v: "?price" }],
+      };
+
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      expect(results[0]["maximum"]).toBe(300);
+
+      await db.close();
+    });
   });
 });

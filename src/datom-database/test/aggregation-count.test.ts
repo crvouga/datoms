@@ -129,5 +129,58 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.close();
     });
+
+    test("should count after retractions", async () => {
+      const { db } = f;
+      await db.transact([
+        { op: "assert", e: 1, a: "item", v: "A" },
+        { op: "assert", e: 2, a: "item", v: "B" },
+        { op: "assert", e: 3, a: "item", v: "C" },
+        { op: "assert", e: 4, a: "item", v: "D" },
+      ]);
+
+      // Retract two items
+      await db.transact([
+        { op: "retract", e: 2, a: "item", v: "B" },
+        { op: "retract", e: 4, a: "item", v: "D" },
+      ]);
+
+      const query: DatalogQuery = {
+        find: { total: ["count", "?item"] },
+        where: [{ e: "?e", a: "item", v: "?item" }],
+      };
+
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      expect(results[0]["total"]).toBe(2);
+
+      await db.close();
+    });
+
+    test("should count with complex joins", async () => {
+      const { db } = f;
+      await db.transact([
+        { op: "assert", e: 1, a: "order", v: 100 },
+        { op: "assert", e: 1, a: "product", v: 1 },
+        { op: "assert", e: 2, a: "order", v: 100 },
+        { op: "assert", e: 2, a: "product", v: 2 },
+        { op: "assert", e: 3, a: "order", v: 200 },
+        { op: "assert", e: 3, a: "product", v: 1 },
+      ]);
+
+      const query: DatalogQuery = {
+        find: { total: ["count", "?line"] },
+        where: [
+          { e: "?line", a: "order", v: "?order" },
+          { e: "?line", a: "product", v: "?product" },
+        ],
+      };
+
+      const results = await db.query(query);
+      expect(results).toHaveLength(1);
+      expect(results[0]["total"]).toBe(3);
+
+      await db.close();
+    });
   });
 });
