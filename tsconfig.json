@@ -36,6 +36,11 @@
     "noImplicitAny": true,
     "outDir": "./dist"
   },
-  "include": ["src/**/*", "moviefinder.app/**/*", "bun-env.d.ts"],
+  "include": [
+    "src/**/*",
+    "moviefinder.app/**/*",
+    "bun-env.d.ts",
+    "playwright.config.ts"
+  ],
   "exclude": ["node_modules", "dist", "**/__tests__/**", "**/__test__/**"]
 }
