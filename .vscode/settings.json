@@ -2,6 +2,7 @@
   "cSpell.words": [
     "Aggs",
     "bunx",
+    "cloc",
     "datalog",
     "Datom",
     "Datomic",
@@ -9,6 +10,7 @@
     "healthcheck",
     "innodb",
     "isready",
+    "moviefinder",
     "mysqladmin",
     "pdatoms",
     "pglite",
