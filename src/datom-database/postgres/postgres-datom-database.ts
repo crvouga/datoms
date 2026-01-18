@@ -100,6 +100,8 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_v_tx ON ${this.tableName}(a, v, tx DESC)`,
         // Partial index for op='assert' (most common case - only active datoms)
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(e, a, tx DESC) WHERE op = 'assert'`,
+        // Optimized index for attribute-based queries (used by pivot optimization)
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_tx ON ${this.tableName}(a, tx DESC) WHERE op = 'assert'`,
         // GIN index for JSONB value queries (containment, key existence, etc.)
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_v_gin ON ${this.tableName} USING GIN (v)`,
         // Index on tx for transaction-based queries
@@ -1082,6 +1084,287 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   }
 
   /**
+   * Check if query can use pivot optimization (multiple attributes on same entity)
+   */
+  private _canUsePivotOptimization(clauses: QueryClause[]): boolean {
+    if (clauses.length < 2) return false;
+
+    // Check if all clauses query the same entity variable
+    let sharedEntityVar: string | null = null;
+    const attributeVars = new Set<string>();
+    const boundAttributes = new Set<string>();
+
+    for (const clause of clauses) {
+      if (!clause || !isQueryPattern(clause)) return false;
+
+      const { e: entityVal, a: attributeVal } = clause;
+
+      // Entity must be a variable (not bound)
+      if (!isVariable(entityVal)) return false;
+      const entityVar = entityVal as string;
+
+      // All clauses must share the same entity variable
+      if (sharedEntityVar === null) {
+        sharedEntityVar = entityVar;
+      } else if (sharedEntityVar !== entityVar) {
+        return false;
+      }
+
+      // Attribute must be bound (not a variable)
+      if (!isVariable(attributeVal)) {
+        boundAttributes.add(String(attributeVal));
+      } else {
+        attributeVars.add(attributeVal as string);
+      }
+    }
+
+    // Need at least 2 bound attributes to benefit from pivot
+    return boundAttributes.size >= 2;
+  }
+
+  /**
+   * Execute datalog query using pivot optimization (single scan, conditional aggregation)
+   */
+  private async _executeDatalogWithPivot(
+    query: DatalogQuery
+  ): Promise<QueryResult> {
+    const clauses = query.where;
+    const params: unknown[] = [];
+
+    // Collect all attributes and map them to their value variables
+    const attributes: string[] = [];
+    const attrToVar: Map<string, string> = new Map();
+    let entityVarName: string | null = null;
+
+    for (const clause of clauses) {
+      if (!clause || !isQueryPattern(clause)) {
+        throw new Error(
+          "Only QueryPattern clauses are supported in pivot queries"
+        );
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+
+      // Get entity variable (should be same for all clauses)
+      if (isVariable(entityVal)) {
+        if (entityVarName === null) {
+          entityVarName = entityVal as string;
+        }
+      }
+
+      // Collect bound attributes and their value variables
+      if (!isVariable(attributeVal)) {
+        const attr = String(attributeVal);
+        attributes.push(attr);
+        if (isVariable(valueVal)) {
+          attrToVar.set(attr, valueVal as string);
+        }
+      }
+    }
+
+    // Build single CTE with all attributes
+    const attributesList = attributes.map(() => "?").join(", ");
+    for (const attr of attributes) {
+      params.push(attr);
+    }
+
+    const cte = `
+      all_datoms AS (
+        SELECT DISTINCT ON (e, a, v)
+          e, a, v, tx
+        FROM ${this.tableName}
+        WHERE op = 'assert'
+          AND a IN (${attributesList})
+        ORDER BY e, a, v, tx DESC
+      )`;
+
+    // Build pivot SELECT with conditional aggregation
+    const pivotSelects: string[] = [];
+    if (entityVarName) {
+      const entityColName = stripQuestionMark(entityVarName);
+      pivotSelects.push(`e AS "${entityColName}"`);
+    }
+
+    // Add CASE WHEN for each attribute->variable mapping
+    for (const [attr, varName] of attrToVar.entries()) {
+      const varColName = stripQuestionMark(varName);
+      pivotSelects.push(`MAX(CASE WHEN a = ? THEN v END) AS "${varColName}"`);
+      params.push(attr);
+    }
+
+    // Build final SELECT columns from find clause
+    const selectColumns: string[] = [];
+    const findKeys = Object.keys(query.find);
+    const varToColumn: Map<string, string> = new Map();
+
+    // Map variables to their pivot column names (without ? prefix)
+    if (entityVarName) {
+      varToColumn.set(entityVarName, stripQuestionMark(entityVarName));
+    }
+    for (const varName of attrToVar.values()) {
+      varToColumn.set(varName, stripQuestionMark(varName));
+    }
+
+    // Build SELECT columns
+    for (const outputKey of findKeys) {
+      const expr = query.find[outputKey];
+      const agg = parseAggregation(expr);
+
+      if (agg) {
+        // Aggregation
+        const varName = agg.variable;
+        const colName = varToColumn.get(varName);
+        if (colName) {
+          const columnRef = `"${colName}"`;
+          const sqlAgg = aggregationToSQL(expr, columnRef, outputKey);
+          if (sqlAgg && sqlAgg.sql) {
+            selectColumns.push(sqlAgg.sql);
+          } else {
+            selectColumns.push(`NULL AS "${outputKey}"`);
+          }
+        } else {
+          selectColumns.push(`NULL AS "${outputKey}"`);
+        }
+      } else {
+        // Regular variable
+        let varName: string;
+        if (
+          Array.isArray(expr) &&
+          expr.length === 1 &&
+          typeof expr[0] === "string"
+        ) {
+          varName = expr[0];
+        } else if (typeof expr === "string") {
+          varName = expr;
+        } else {
+          continue;
+        }
+
+        const colName = varToColumn.get(varName);
+        if (colName) {
+          // Reference the column from the pivoted subquery
+          const columnRef = `"${colName}"`;
+          selectColumns.push(`${columnRef} AS "${outputKey}"`);
+        }
+      }
+    }
+
+    // Build GROUP BY clause for pivot subquery
+    let groupByClause = "";
+    if (entityVarName) {
+      groupByClause = `GROUP BY e`;
+    }
+
+    // Build HAVING clause to ensure we have at least one required attribute
+    const havingClause =
+      attributes.length > 0
+        ? `HAVING MAX(CASE WHEN a = ? THEN v END) IS NOT NULL`
+        : "";
+    if (havingClause) {
+      params.push(attributes[0]);
+    }
+
+    // Build ORDER BY clause
+    let orderByClause = "";
+    if (query.orderBy && query.orderBy.length > 0) {
+      const orderParts = query.orderBy
+        .map(([variable, direction]) => {
+          const colName = varToColumn.get(variable);
+          if (colName) {
+            const columnRef = `"${colName}"`;
+            return `${columnRef} ${direction.toUpperCase()}`;
+          }
+          return "";
+        })
+        .filter(Boolean);
+      if (orderParts.length > 0) {
+        orderByClause = `ORDER BY ${orderParts.join(", ")}`;
+      }
+    }
+
+    // Build LIMIT clause
+    const limitClause = query.limit ? `LIMIT ?` : "";
+    if (query.limit) {
+      params.push(query.limit);
+    }
+
+    const sql = `
+      WITH ${cte}
+      SELECT ${selectColumns.join(", ")}
+      FROM (
+        SELECT ${pivotSelects.join(", ")}
+        FROM all_datoms
+        ${groupByClause}
+        ${havingClause}
+      ) AS pivoted
+      ${orderByClause}
+      ${limitClause}
+    `;
+
+    const rows = await this.connection.query(sql, params);
+
+    // Convert SQL results back to QueryResult format
+    const results: Record<string, Value | Attribute>[] = rows.map(
+      (row: DatabaseRow) => {
+        const result: Record<string, Value | Attribute> = {};
+        for (const key of Object.keys(row)) {
+          let value: unknown = row[key];
+          if (typeof value === "string") {
+            if (/^-?\d+$/.test(value)) {
+              const num = parseInt(value, 10);
+              if (!isNaN(num)) {
+                value = num;
+              } else {
+                try {
+                  value = JSON.parse(value);
+                } catch {
+                  // Not valid JSON, keep as string
+                }
+              }
+            } else {
+              try {
+                value = JSON.parse(value);
+              } catch {
+                // Not valid JSON, keep as string
+              }
+            }
+          }
+          let finalValue = value;
+          if (typeof value === "string") {
+            if (/^-?\d+$/.test(value)) {
+              const num = parseInt(value, 10);
+              if (!isNaN(num)) {
+                finalValue = num;
+              }
+            } else if (/^-?\d*\.\d+$/.test(value)) {
+              const num = parseFloat(value);
+              if (!isNaN(num)) {
+                finalValue = num;
+              }
+            }
+          }
+          result[key] = this._reviveValue(finalValue) as Value | Attribute;
+        }
+        return result;
+      }
+    );
+
+    if (Object.keys(query.find).length === 0) {
+      return results;
+    }
+
+    // Map results to output keys
+    return results.map((row) => {
+      const projected: Record<string, Value | Attribute> = {};
+      for (const outputKey of Object.keys(query.find)) {
+        if (outputKey in row) {
+          projected[outputKey] = row[outputKey];
+        }
+      }
+      return projected;
+    });
+  }
+
+  /**
    * Execute datalog query using SQL with aggregations
    */
   private async _executeDatalogWithSQL(
@@ -1089,6 +1372,14 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   ): Promise<QueryResult> {
     const clauses = query.where;
     const params: unknown[] = [];
+
+    // Check if we can use pivot optimization
+    const usePivot = this._canUsePivotOptimization(clauses);
+
+    if (usePivot) {
+      return this._executeDatalogWithPivot(query);
+    }
+
     const ctes: string[] = [];
     const selectColumns: string[] = [];
     const joinConditions: string[] = [];
@@ -1123,6 +1414,9 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
         conditions.push(`v = ?::jsonb`);
         params.push(JSON.stringify(value));
       }
+
+      // Always filter for active datoms to use partial index
+      conditions.push(`op = 'assert'`);
 
       const whereClause =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";

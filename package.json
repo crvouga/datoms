@@ -37,14 +37,14 @@
     "moviefinderapp:docker:down": "cd moviefinder.app && docker-compose down",
     "moviefinderapp:docker:up": "cd moviefinder.app && docker-compose up -d",
     "prepublishOnly": "npm run build",
+    "preview": "docker build -t datoms-preview -f Dockerfile . && docker run --rm -p 8080:8080 -e NODE_ENV=production -e PORT=8080 -e DATABASE_URL=postgresql://postgres:postgres@localhost:5433/postgres datoms-preview",
     "psql": "cd moviefinder.app && docker-compose exec postgres psql -U postgres -d postgres",
     "server": "bun --watch moviefinder.app/src/index.ts",
     "tc": "bun typecheck -- --watch",
     "test": "bun test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "typecheck": "tsc --noEmit",
-    "preview": "docker build -t datoms-preview -f Dockerfile . && docker run --rm -p 8080:8080 -e NODE_ENV=production -e PORT=8080 -e DATABASE_URL=postgresql://postgres:postgres@localhost:5433/postgres datoms-preview"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.0",

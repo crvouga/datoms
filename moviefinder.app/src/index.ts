@@ -1,5 +1,10 @@
 import { serve } from "bun";
-import { PostgreSQLDatomDatabase, type DatalogQuery } from "../../src";
+import {
+  PostgreSQLDatomDatabase,
+  SQLiteDatomDatabase,
+  type DatalogQuery,
+  type DatomDatabase,
+} from "../../src";
 import { PgSQLDatabase } from "../../src/sql-database/sql-database-pg";
 import { FetchHttpClient } from "./http-client";
 import index from "./index.html";
@@ -7,6 +12,7 @@ import { createLogger } from "./lib/logger";
 import { createTmdbClient } from "./tmdb/tmdb-client";
 import { TmdbLoader } from "./tmdb/tmdb-loader";
 import { DestroyRetentionPolicy } from "../../src/datom-database/retention-policy";
+import { SQLiteSQLDatabase } from "../../src/sql-database/sql-database-sqlite";
 
 async function main() {
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -23,8 +29,11 @@ async function main() {
       event: "db_connecting",
       databaseUrl,
     });
-    const sqlDb = new PgSQLDatabase(databaseUrl);
-    const db = new PostgreSQLDatomDatabase(sqlDb);
+    const sqliteSqlDb = new SQLiteSQLDatabase(":memory:");
+    const sqliteDb = new SQLiteDatomDatabase(sqliteSqlDb);
+    const postgresSqlDb = new PgSQLDatabase(databaseUrl);
+    const postgresDb = new PostgreSQLDatomDatabase(postgresSqlDb);
+    const db = false ? sqliteDb : postgresDb;
     const destroyRetentionPolicy = new DestroyRetentionPolicy(db, {
       retentionTxCount: 10,
       intervalMs: 1000,
@@ -49,8 +58,8 @@ async function main() {
         });
         // VACUUM ANALYZE on both tables to reclaim storage and update statistics
         // VACUUM ANALYZE reclaims storage occupied by dead tuples and updates statistics
-        await sqlDb.execute(`VACUUM ANALYZE ${tableName}`);
-        await sqlDb.execute(`VACUUM ANALYZE ${tableName}_tx`);
+        await postgresSqlDb.execute(`VACUUM ANALYZE ${tableName}`);
+        await postgresSqlDb.execute(`VACUUM ANALYZE ${tableName}_tx`);
         logger.info("PostgreSQL maintenance completed", {
           event: "postgres_maintenance_complete",
           tableName,
@@ -120,7 +129,7 @@ async function main() {
 
       // Close database connections
       try {
-        await sqlDb.close();
+        await postgresSqlDb.close();
         logger.info("Database connections closed", {
           event: "database_closed",
         });
@@ -218,7 +227,7 @@ async function main() {
               event: "populated_movies_data",
               data: populateMovies,
             });
-            return Response.json([q, ...populateMovies]);
+            return Response.json([...populateMovies]);
           },
         },
 
