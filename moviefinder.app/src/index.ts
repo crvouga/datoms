@@ -70,13 +70,7 @@ async function main() {
       runPostgresMaintenance,
       maintenanceIntervalMs
     );
-    // Clean up interval on process exit
-    process.on("SIGTERM", () => {
-      clearInterval(maintenanceInterval);
-    });
-    process.on("SIGINT", () => {
-      clearInterval(maintenanceInterval);
-    });
+
     const httpClient = new FetchHttpClient();
     logger.info("Creating TMDB client...", { event: "tmdb_client_creating" });
     const tmdbClient = createTmdbClient(httpClient);
@@ -85,6 +79,70 @@ async function main() {
       throw new Error("TMDB_API_READ_ACCESS_TOKEN is not set");
     }
     const tmdbLoader = new TmdbLoader(tmdbClient, db, logger);
+
+    // Graceful shutdown handler (defined after all resources are created)
+    const shutdown = async (signal: string) => {
+      logger.info(`Received ${signal}, shutting down gracefully...`, {
+        event: "shutdown_start",
+        signal,
+      });
+
+      // Stop retention policy
+      try {
+        destroyRetentionPolicy.stop();
+        logger.info("Retention policy stopped", {
+          event: "retention_policy_stopped",
+        });
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        logger.error("Error stopping retention policy", {
+          event: "retention_policy_stop_error",
+          error: errorMessage,
+        });
+      }
+
+      // Stop TMDB loader
+      try {
+        tmdbLoader.stop();
+        logger.info("TMDB loader stopped", {
+          event: "tmdb_loader_stopped",
+        });
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        logger.error("Error stopping TMDB loader", {
+          event: "tmdb_loader_stop_error",
+          error: errorMessage,
+        });
+      }
+
+      // Clear maintenance interval
+      clearInterval(maintenanceInterval);
+
+      // Close database connections
+      try {
+        await sqlDb.close();
+        logger.info("Database connections closed", {
+          event: "database_closed",
+        });
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        logger.error("Error closing database", {
+          event: "database_close_error",
+          error: errorMessage,
+        });
+      }
+
+      logger.info("Shutdown complete", {
+        event: "shutdown_complete",
+      });
+
+      // Exit the process
+      process.exit(0);
+    };
+
+    // Register signal handlers
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT", () => shutdown("SIGINT"));
 
     logger.info("Starting TMDB loader...", { event: "tmdb_loader_start" });
     tmdbLoader.start();

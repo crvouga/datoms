@@ -5,13 +5,16 @@ import { tmdbPrefixKey } from "./tmdb";
 import type { TmdbClient } from "./tmdb-client";
 
 export class TmdbLoader {
+  private shouldStop = false;
+
   constructor(
     private readonly tmdbClient: TmdbClient,
     private readonly db: DatomDatabase,
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   async start(): Promise<void> {
+    this.shouldStop = false;
     this.logger.info("Starting TMDB loader", { operation: "start" });
     try {
       await Promise.all([this.discoverMovies()]);
@@ -27,6 +30,11 @@ export class TmdbLoader {
     }
   }
 
+  stop(): void {
+    this.shouldStop = true;
+    this.logger.info("Stopping TMDB loader", { operation: "stop" });
+  }
+
   private async discoverMovies(): Promise<void> {
     this.logger.info("Starting movie discovery", {
       operation: "discoverMovies",
@@ -35,7 +43,7 @@ export class TmdbLoader {
     let runningPage = 1;
     let totalMoviesProcessed = 0;
 
-    while (hasMore) {
+    while (hasMore && !this.shouldStop) {
       const pageStartTime = Date.now();
       this.logger.debug("Fetching movies page", {
         operation: "discoverMovies",
@@ -146,10 +154,18 @@ export class TmdbLoader {
       runningPage++;
     }
 
-    this.logger.info("Movie discovery completed", {
-      operation: "discoverMovies",
-      totalPagesProcessed: runningPage - 1,
-      totalMoviesProcessed,
-    });
+    if (this.shouldStop) {
+      this.logger.info("Movie discovery stopped by user", {
+        operation: "discoverMovies",
+        totalPagesProcessed: runningPage - 1,
+        totalMoviesProcessed,
+      });
+    } else {
+      this.logger.info("Movie discovery completed", {
+        operation: "discoverMovies",
+        totalPagesProcessed: runningPage - 1,
+        totalMoviesProcessed,
+      });
+    }
   }
 }

@@ -28,7 +28,13 @@ COPY --from=prerelease /app/src ./src
 COPY --from=prerelease /app/package.json ./
 COPY --from=prerelease /app/bun.lockb* ./
 
+ARG NODE_ENV
 ENV NODE_ENV=production
+ARG DATABASE_URL
+ENV DATABASE_URL=${DATABASE_URL}
+ARG PORT
+ENV PORT=${PORT}
+
 
 # Expose port (Railway will set PORT env var)
 EXPOSE 3000
