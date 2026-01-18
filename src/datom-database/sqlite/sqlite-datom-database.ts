@@ -51,10 +51,6 @@ export class SQLiteDatomDatabase
   protected initialized = false;
   private connection: SQLDatabase;
   private tableName: string;
-  private queryCount: number = 0;
-  private transactionCount: number = 0;
-  private queryTimeSum: number = 0;
-  private transactionTimeSum: number = 0;
 
   constructor(connection: SQLDatabase, tableName: string = "datoms") {
     this.hooks = new HookEngine();
@@ -365,7 +361,6 @@ export class SQLiteDatomDatabase
       tempIds: {}, // Empty for now, reserved for future tempid support
     };
   }
-
 
   private async _executeCurrentQuery(options: DatomsParams): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -1132,72 +1127,6 @@ export class SQLiteDatomDatabase
     }
     const row = result[0] as Record<string, unknown>;
     return Number(row.last_tx);
-  }
-
-  private async _recordQueryMetrics(duration: number): Promise<void> {
-    this.queryCount++;
-    this.queryTimeSum += duration;
-  }
-
-  private async _recordTransactionMetrics(duration: number): Promise<void> {
-    this.transactionCount++;
-    this.transactionTimeSum += duration;
-  }
-
-  private async _getDetailedStats(): Promise<
-    Partial<
-      Pick<
-        import("../../types.js").DatabaseStats,
-        "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics"
-      >
-    >
-  > {
-    const stats: Partial<import("../../types.js").DatabaseStats> = {};
-
-    // Count total datoms (only add ones, latest version)
-    const countSql = `
-      WITH latest_datoms AS (
-        SELECT e, a, v, tx, op,
-               ROW_NUMBER() OVER (PARTITION BY e, a, v ORDER BY tx DESC) as rn
-        FROM ${this.tableName}
-      )
-      SELECT COUNT(*) as count
-      FROM latest_datoms
-      WHERE rn = 1 AND op = 'assert'
-    `;
-    const countResult = await this.connection.query(countSql);
-    const countRow = countResult[0] as Record<string, unknown> | undefined;
-    stats.totalDatoms =
-      typeof countRow?.count === "number" ? countRow.count : 0;
-
-    // Count unique entities
-    const entitySql = `
-      SELECT COUNT(DISTINCT e) as count
-      FROM ${this.tableName}
-      WHERE op = 'assert'
-    `;
-    const entityResult = await this.connection.query(entitySql);
-    const entityRow = entityResult[0] as Record<string, unknown> | undefined;
-    stats.totalEntities =
-      typeof entityRow?.count === "number" ? entityRow.count : 0;
-
-    // Add query metrics if available
-    if (this.queryCount > 0) {
-      stats.queryMetrics = {
-        totalQueries: this.queryCount,
-        averageQueryTime: this.queryTimeSum / this.queryCount / 1000, // Convert to seconds
-      };
-    }
-
-    // Add transaction metrics if available
-    if (this.transactionCount > 0) {
-      stats.transactionMetrics = {
-        averageTransactionTime:
-          this.transactionTimeSum / this.transactionCount / 1000, // Convert to seconds
-      };
-    }
-
-    return stats;
   }
 
   public async _executeQuery(

@@ -691,7 +691,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       const hook: AfterWrite = {
         type: "afterWrite",
         name: "context-test",
-        execute: async (result, ctx) => {
+        execute: async (_result, ctx) => {
           receivedContext = ctx as Record<string, unknown>;
         },
       };

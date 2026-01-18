@@ -17,7 +17,7 @@ import type {
   Value,
 } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
-import type { DatabaseStats, Transaction } from "../../types.js";
+import type { Transaction } from "../../types.js";
 import type { WithResult } from "../datom-database.js";
 import {
   Hook,
@@ -54,10 +54,6 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
   protected initialized = false;
   private _datomsArray: Datom[] = [];
   private nextTx: TransactionId = 1;
-  private queryCount: number = 0;
-  private transactionCount: number = 0;
-  private queryTimeSum: number = 0;
-  private transactionTimeSum: number = 0;
 
   constructor(initialDatoms: Datom[] = []) {
     this.hooks = new HookEngine();
@@ -286,7 +282,6 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
       tempIds: {}, // Empty for now, reserved for future tempid support
     };
   }
-
 
   async datoms(options: DatomsParams): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -668,61 +663,6 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     await this._ensureInitialized();
     // nextTx is the next transaction ID to be used, so latest is one less
     return this.nextTx > 1 ? this.nextTx - 1 : 0;
-  }
-
-  private async _recordQueryMetrics(duration: number): Promise<void> {
-    this.queryCount++;
-    this.queryTimeSum += duration;
-  }
-
-  private async _recordTransactionMetrics(duration: number): Promise<void> {
-    this.transactionCount++;
-    this.transactionTimeSum += duration;
-  }
-
-  private async _getDetailedStats(): Promise<
-    Partial<
-      Pick<
-        DatabaseStats,
-        "totalDatoms" | "totalEntities" | "queryMetrics" | "transactionMetrics"
-      >
-    >
-  > {
-    const stats: Partial<import("../../types.js").DatabaseStats> = {};
-
-    // Count total datoms (only add ones)
-    const addDatoms = this._datomsArray.filter((d) => {
-      // Check if this is the latest version (not sub)
-      const latestVersion = this._datomsArray
-        .filter(
-          (other) => other.e === d.e && other.a === d.a && other.v === d.v
-        )
-        .sort((a, b) => b.tx - a.tx)[0];
-      return latestVersion?.op === "assert" && latestVersion.tx === d.tx;
-    });
-    stats.totalDatoms = addDatoms.length;
-
-    // Count unique entities
-    const uniqueEntities = new Set(addDatoms.map((d) => String(d.e)));
-    stats.totalEntities = uniqueEntities.size;
-
-    // Add query metrics if available
-    if (this.queryCount > 0) {
-      stats.queryMetrics = {
-        totalQueries: this.queryCount,
-        averageQueryTime: this.queryTimeSum / this.queryCount / 1000, // Convert to seconds
-      };
-    }
-
-    // Add transaction metrics if available
-    if (this.transactionCount > 0) {
-      stats.transactionMetrics = {
-        averageTransactionTime:
-          this.transactionTimeSum / this.transactionCount / 1000, // Convert to seconds
-      };
-    }
-
-    return stats;
   }
 
   public async _executeQuery(
