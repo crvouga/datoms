@@ -54,7 +54,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     this.initialized = false;
   }
 
-  protected async addDatoms(datoms: DatomInput[]): Promise<TransactionId> {
+  protected async writeDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = this.nextTx++;
 
     for (const datom of datoms) {
@@ -63,24 +63,7 @@ export class InMemoryDatomDatabase extends DatomDatabase {
         a: datom.a,
         v: datom.v,
         tx,
-        op: "assert",
-      });
-    }
-
-    return tx;
-  }
-
-  protected async subDatoms(datoms: DatomInput[]): Promise<TransactionId> {
-    const tx = this.nextTx++;
-
-    for (const datom of datoms) {
-      // Add subion datom
-      this._datomsArray.push({
-        e: datom.e,
-        a: datom.a,
-        v: datom.v,
-        tx,
-        op: "retract",
+        op: datom.op,
       });
     }
 

@@ -509,22 +509,13 @@ export abstract class DatomDatabase implements DatabaseView {
   abstract close(): Promise<void>;
 
   /**
-   * Implementation-specific method to add datoms after validation.
+   * Implementation-specific method to write datoms after validation.
    * Subclasses should override this method.
-   * @param datoms Array of validated datoms to add
+   * @param datoms Array of validated datoms to write (can contain both "assert" and "retract" operations)
    * @returns The transaction ID
    * @internal
    */
-  protected abstract addDatoms(datoms: DatomInput[]): Promise<TransactionId>;
-
-  /**
-   * Implementation-specific method to sub datoms after validation.
-   * Subclasses should override this method.
-   * @param datoms Array of validated datoms to sub
-   * @returns The transaction ID
-   * @internal
-   */
-  protected abstract subDatoms(datoms: DatomInput[]): Promise<TransactionId>;
+  protected abstract writeDatoms(datoms: DatomInput[]): Promise<TransactionId>;
 
   /**
    * Execute bulk operations atomically (Datomic-like transact)
@@ -618,27 +609,18 @@ export abstract class DatomDatabase implements DatabaseView {
       );
     }
 
-    // Apply subs first, then adds (using the modified transaction from hooks)
+    // Combine all datoms from the modified transaction (using the modified transaction from hooks)
     const finalTx = beforeResult.tx;
-    const finalSubs = finalTx.datoms.filter((d) => d.op === "retract");
-    const finalAdds = finalTx.datoms.filter((d) => d.op === "assert");
+    const allFinalDatoms = finalTx.datoms.map((d) => ({
+      e: d.e,
+      a: d.a,
+      v: d.v,
+      op: d.op,
+    }));
 
-    let committedTxId: TransactionId;
-    if (finalSubs.length > 0) {
-      committedTxId = await this.subDatoms(
-        finalSubs.map((d) => ({ e: d.e, a: d.a, v: d.v, op: d.op }))
-      );
-    }
-    if (finalAdds.length > 0) {
-      committedTxId = await this.addDatoms(
-        finalAdds.map((d) => ({ e: d.e, a: d.a, v: d.v, op: d.op }))
-      );
-    } else if (finalSubs.length === 0) {
-      // If there are no operations, still create a new transaction ID
-      committedTxId = await this.addDatoms([]);
-    } else {
-      committedTxId = committedTxId!;
-    }
+    // Write all datoms (both adds and subs) in a single call
+    // If there are no operations, still create a new transaction ID
+    const committedTxId = await this.writeDatoms(allFinalDatoms);
 
     // Store metadata if provided
     if (metadata !== undefined) {

@@ -125,7 +125,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     this.initialized = false;
   }
 
-  protected async addDatoms(datoms: DatomInput[]): Promise<TransactionId> {
+  protected async writeDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = await this.getNextTransactionId();
 
     if (
@@ -135,37 +135,14 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     ) {
       await this.connection.beginTransaction();
       try {
-        await this.addDatomsInternal(datoms, tx);
+        await this.writeDatomsInternal(datoms, tx);
         await this.connection.commitTransaction();
       } catch (error) {
         await this.connection.rollbackTransaction();
         throw error;
       }
     } else {
-      await this.addDatomsInternal(datoms, tx);
-    }
-
-    return tx;
-  }
-
-  protected async subDatoms(datoms: DatomInput[]): Promise<TransactionId> {
-    const tx = await this.getNextTransactionId();
-
-    if (
-      this.connection.beginTransaction &&
-      this.connection.commitTransaction &&
-      this.connection.rollbackTransaction
-    ) {
-      await this.connection.beginTransaction();
-      try {
-        await this.subDatomsInternal(datoms, tx);
-        await this.connection.commitTransaction();
-      } catch (error) {
-        await this.connection.rollbackTransaction();
-        throw error;
-      }
-    } else {
-      await this.subDatomsInternal(datoms, tx);
+      await this.writeDatomsInternal(datoms, tx);
     }
 
     return tx;
@@ -1360,7 +1337,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     return Number(row.last_tx);
   }
 
-  private async addDatomsInternal(
+  private async writeDatomsInternal(
     datoms: DatomInput[],
     tx: TransactionId
   ): Promise<void> {
@@ -1378,31 +1355,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
       if (value === undefined) {
         value = "__UNDEFINED__";
       }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, "assert"];
-    });
-
-    await this.connection.execute(sql, params);
-  }
-
-  private async subDatomsInternal(
-    datoms: DatomInput[],
-    tx: TransactionId
-  ): Promise<void> {
-    if (datoms.length === 0) return;
-
-    const placeholders = datoms.map(() => "(?, ?, ?, ?, ?)").join(", ");
-    const sql = `
-      INSERT INTO ${this.tableName} (e, a, v, tx, op)
-      VALUES ${placeholders}
-      ON CONFLICT DO NOTHING
-    `;
-
-    const params = datoms.flatMap((d) => {
-      let value = d.v;
-      if (value === undefined) {
-        value = "__UNDEFINED__";
-      }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, "retract"];
+      return [String(d.e), String(d.a), JSON.stringify(value), tx, d.op];
     });
 
     await this.connection.execute(sql, params);
