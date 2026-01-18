@@ -853,5 +853,58 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.close();
     });
+
+    test("should handle asOf queries with future transaction IDs", async () => {
+      const { db } = f;
+      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{ op: "assert", e: 1, a: "age", v: 30 }]);
+      const tx3 = await db.transact([
+        { op: "assert", e: 2, a: "name", v: "Bob" },
+      ]);
+
+      // Get the latest transaction ID
+      const latestTx = await db.getLatestTransaction();
+      expect(latestTx).toBeGreaterThanOrEqual(tx3);
+
+      // Query at current state (should match asOf with latestTx)
+      const current = await db.datoms({ e: 1 });
+      expect(current.length).toBeGreaterThanOrEqual(2);
+
+      // Query asOf with latestTx - should return current state
+      const atLatest = await db.asOf(latestTx).datoms({ e: 1 });
+      expect(atLatest.length).toBeGreaterThanOrEqual(2);
+      const attributesAtLatest = atLatest.map((d) => d.a);
+      expect(attributesAtLatest).toContain("name");
+      expect(attributesAtLatest).toContain("age");
+
+      // Query asOf with a future transaction ID (larger than latest)
+      // Should return current state (all datoms have tx <= futureTx)
+      const futureTx = latestTx + 1000;
+      const atFuture = await db.asOf(futureTx).datoms({ e: 1 });
+      expect(atFuture.length).toBeGreaterThanOrEqual(2);
+      const attributesAtFuture = atFuture.map((d) => d.a);
+      expect(attributesAtFuture).toContain("name");
+      expect(attributesAtFuture).toContain("age");
+
+      // Verify that asOf(futureTx) returns the same as current state
+      expect(atFuture.length).toBe(atLatest.length);
+      const valuesAtFuture = atFuture.map((d) => d.v).sort();
+      const valuesAtLatest = atLatest.map((d) => d.v).sort();
+      expect(valuesAtFuture).toEqual(valuesAtLatest);
+
+      // Query asOf with future transaction ID using datalog query
+      const queryAtFuture = await db.asOf(futureTx).query({
+        find: { name: ["?name"], age: ["?age"] },
+        where: [
+          { e: 1, a: "name", v: "?name" },
+          { e: 1, a: "age", v: "?age" },
+        ],
+      });
+      expect(queryAtFuture.length).toBeGreaterThanOrEqual(1);
+      expect(queryAtFuture[0]?.name).toBe("Alice");
+      expect(queryAtFuture[0]?.age).toBe(30);
+
+      await db.close();
+    });
   });
 });
