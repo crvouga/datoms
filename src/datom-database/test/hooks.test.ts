@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 import {
-  AfterRead,
-  AfterWrite,
-  BeforeRead,
-  BeforeWrite,
   QueryError,
   TransactionError,
+  type AfterRead,
+  type AfterWrite,
+  type BeforeRead,
+  type BeforeWrite,
 } from "../hook/hook.js";
 import { HookValidator } from "../hook/validator.js";
 
@@ -147,7 +147,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].v).toBe("Alice");
+      expect(results[0]!.v).toBe("Alice");
       await db.close();
     });
 
@@ -340,7 +340,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].e).toBe(1);
+      expect(results[0]!.e).toBe(1);
       await db.close();
     });
 
@@ -838,10 +838,10 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         expect(error).toBeInstanceOf(TransactionError);
         if (error instanceof TransactionError) {
           expect(error.errors).toHaveLength(2);
-          expect(error.errors[0].hook).toBe("error-test");
-          expect(error.errors[0].message).toBe("Validation failed");
-          expect(error.errors[0].code).toBe("VALIDATION_ERROR");
-          expect(error.errors[1].message).toBe("Another error");
+          expect(error.errors[0]!.hook).toBe("error-test");
+          expect(error.errors[0]!.message).toBe("Validation failed");
+          expect(error.errors[0]!.code).toBe("VALIDATION_ERROR");
+          expect(error.errors[1]!.message).toBe("Another error");
         }
       }
 

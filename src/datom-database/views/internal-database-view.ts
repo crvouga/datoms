@@ -6,9 +6,9 @@
 
 import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
 import type { Datom, TransactionId } from "../../datoms.js";
-import { DatomDatabase } from "../datom-database.js";
+import type { DatomDatabase } from "../datom-database.js";
 import { validateQueryOptions } from "../shared/query-validation.js";
-import { DatabaseView, DatomsParams } from "./database-view.js";
+import type { DatabaseView, DatomsParams } from "./database-view.js";
 
 /**
  * Configuration for database views

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { DatalogQuery } from "../../datalog/datalog.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -32,7 +32,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 20, variance = ((10-20)^2 + (20-20)^2 + (30-20)^2) / 3 = (100 + 0 + 100) / 3 = 66.67
-      expect(results[0]["variance"]).toBeCloseTo(66.67, 1);
+      expect(results[0]!["variance"]).toBeCloseTo(66.67, 1);
 
       await db.close();
     });
@@ -47,7 +47,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(
-        results[0]["variance"] === null || results[0]["variance"] === undefined
+        results[0]!["variance"] === null ||
+          results[0]!["variance"] === undefined
       ).toBe(true);
 
       await db.close();
@@ -66,9 +67,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Variance of single value should be 0 or null/undefined
       expect(
-        results[0]["variance"] === 0 ||
-          results[0]["variance"] === null ||
-          results[0]["variance"] === undefined
+        results[0]!["variance"] === 0 ||
+          results[0]!["variance"] === null ||
+          results[0]!["variance"] === undefined
       ).toBe(true);
 
       await db.close();
@@ -90,7 +91,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Variance of identical values should be 0
-      expect(results[0]["variance"]).toBe(0);
+      expect(results[0]!["variance"]).toBe(0);
 
       await db.close();
     });
@@ -111,7 +112,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 0, variance = ((-10-0)^2 + (0-0)^2 + (10-0)^2) / 3 = (100 + 0 + 100) / 3 = 66.67
-      expect(results[0]["variance"]).toBeCloseTo(66.67, 1);
+      expect(results[0]!["variance"]).toBeCloseTo(66.67, 1);
 
       await db.close();
     });
@@ -132,7 +133,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 20.5, variance = ((10.5-20.5)^2 + (20.5-20.5)^2 + (30.5-20.5)^2) / 3 = (100 + 0 + 100) / 3 = 66.67
-      expect(results[0]["variance"]).toBeCloseTo(66.67, 1);
+      expect(results[0]!["variance"]).toBeCloseTo(66.67, 1);
 
       await db.close();
     });
@@ -161,7 +162,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 90, variance = ((80-90)^2 + (90-90)^2 + (100-90)^2) / 3 = (100 + 0 + 100) / 3 = 66.67
-      expect(results[0]["variance"]).toBeCloseTo(66.67, 1);
+      expect(results[0]!["variance"]).toBeCloseTo(66.67, 1);
 
       await db.close();
     });
@@ -184,7 +185,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 3, variance = ((1-3)^2 + (2-3)^2 + (3-3)^2 + (4-3)^2 + (5-3)^2) / 5 = (4 + 1 + 0 + 1 + 4) / 5 = 2
-      expect(results[0]["variance"]).toBeCloseTo(2, 1);
+      expect(results[0]!["variance"]).toBeCloseTo(2, 1);
 
       await db.close();
     });

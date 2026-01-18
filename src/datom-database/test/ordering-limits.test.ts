@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { DatalogQuery } from "../../datalog/datalog.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -33,8 +33,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(2);
-      expect(results[0]["s"]).toBe(400);
-      expect(results[1]["s"]).toBe(250);
+      expect(results[0]!["s"]).toBe(400);
+      expect(results[1]!["s"]).toBe(250);
 
       await db.close();
     });
@@ -69,11 +69,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(3);
-      expect(results[0].score).toBe(200); // Charlie first (highest score)
-      expect(results[1].score).toBe(100); // Bob second (same score, younger)
-      expect(results[1].age).toBe(25);
-      expect(results[2].score).toBe(100); // Alice third (same score, older)
-      expect(results[2].age).toBe(30);
+      expect(results[0]!.score).toBe(200); // Charlie first (highest score)
+      expect(results[1]!.score).toBe(100); // Bob second (same score, younger)
+      expect(results[1]!.age).toBe(25);
+      expect(results[2]!.score).toBe(100); // Alice third (same score, older)
+      expect(results[2]!.age).toBe(30);
 
       await db.close();
     });
@@ -134,8 +134,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         limit: 2,
       });
       expect(results).toHaveLength(2);
-      expect(results[0]["s"]).toBe(400);
-      expect(results[1]["s"]).toBe(300);
+      expect(results[0]!["s"]).toBe(400);
+      expect(results[1]!["s"]).toBe(300);
 
       await db.close();
     });
@@ -178,10 +178,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const resultsWithScore = await db.query(queryWithScoreInFind);
       expect(resultsWithScore).toHaveLength(2);
-      expect(resultsWithScore[0].name).toBe("Bob");
-      expect(resultsWithScore[0].score).toBe(200);
-      expect(resultsWithScore[1].name).toBe("Alice");
-      expect(resultsWithScore[1].score).toBe(100);
+      expect(resultsWithScore[0]!.name).toBe("Bob");
+      expect(resultsWithScore[0]!.score).toBe(200);
+      expect(resultsWithScore[1]!.name).toBe("Alice");
+      expect(resultsWithScore[1]!.score).toBe(100);
 
       await db.close();
     });

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { DatalogQuery } from "../../datalog/datalog.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -33,8 +33,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(2);
-      expect(results[0]["x"]).toBe(1);
-      expect(results[1]["x"]).toBe(2);
+      expect(results[0]!["x"]).toBe(1);
+      expect(results[1]!["x"]).toBe(2);
 
       await db.close();
     });
@@ -87,7 +87,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(2);
       // Empty find should return all variables from where clause
-      expect(Object.keys(results[0]).length).toBeGreaterThan(0);
+      expect(Object.keys(results[0]!).length).toBeGreaterThan(0);
 
       await db.close();
     });
@@ -107,8 +107,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(2);
       // Missing variable should be undefined
-      expect(results[0]["x"]).toBeDefined();
-      expect(results[0]["missing"]).toBeUndefined();
+      expect(results[0]!["x"]).toBeDefined();
+      expect(results[0]!["missing"]).toBeUndefined();
       expect(results[1]?.["x"]).toBeDefined();
       expect(results[1]?.["missing"]).toBeUndefined();
 

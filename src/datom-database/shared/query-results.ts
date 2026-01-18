@@ -71,7 +71,7 @@ export function project(
     findKeys.some((outputKey) => {
       const expr = find[outputKey];
       const agg = parseAggregation(expr);
-      return agg && outputKey in results[0];
+      return agg && results[0] && outputKey in results[0];
     });
 
   // Helper function to project a single row

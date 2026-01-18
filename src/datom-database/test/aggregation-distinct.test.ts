@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { DatalogQuery } from "../../datalog/datalog.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -32,7 +32,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Should return an array or set of distinct values
-      const distinctValue = results[0]["distinctNames"];
+      const distinctValue = results[0]!["distinctNames"];
       expect(distinctValue).toBeDefined();
       // Implementation may return array, set, or comma-separated string
       if (Array.isArray(distinctValue)) {
@@ -55,7 +55,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const distinctValue = results[0]["distinctNames"];
+      const distinctValue = results[0]!["distinctNames"];
       expect(
         distinctValue === null ||
           distinctValue === undefined ||
@@ -76,7 +76,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const distinctValue = results[0]["distinctNames"];
+      const distinctValue = results[0]!["distinctNames"];
       if (Array.isArray(distinctValue)) {
         const arr = distinctValue as unknown;
         expect(arr).toEqual(["Alice"]);
@@ -104,7 +104,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const distinctValue = results[0]["distinctAges"];
+      const distinctValue = results[0]!["distinctAges"];
       if (Array.isArray(distinctValue)) {
         const sorted = distinctValue.sort() as unknown;
         expect(sorted).toEqual([25, 30, 35]);
@@ -138,7 +138,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const distinctValue = results[0]["distinctCities"];
+      const distinctValue = results[0]!["distinctCities"];
       if (Array.isArray(distinctValue)) {
         const sorted = distinctValue.sort() as unknown;
         expect(sorted).toEqual(["LA", "NYC"]);
@@ -165,7 +165,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const distinctValue = results[0]["distinctValues"];
+      const distinctValue = results[0]!["distinctValues"];
       expect(distinctValue).toBeDefined();
       if (Array.isArray(distinctValue)) {
         expect(distinctValue.length).toBe(3);

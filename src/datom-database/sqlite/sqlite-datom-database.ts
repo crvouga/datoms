@@ -14,16 +14,15 @@ import type {
 import type { EntityId } from "../../entity-id.js";
 import type { SQLDatabase } from "../../sql-database/sql-database.js";
 import type { Transaction } from "../../types.js";
-import type { WithResult } from "../datom-database.js";
-import { DatomDatabase } from "../datom-database.js";
+import type { DatomDatabase, WithResult } from "../datom-database.js";
 import {
-  Hook,
   HookEngine,
   QueryError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
   TransactionError,
+  type Hook,
   type ReadContext,
   type WriteContext,
   type WriteResult,
@@ -34,7 +33,7 @@ import {
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
 import { joinResults, project } from "../shared/query-results.js";
-import { DatabaseView, DatomsParams } from "../views/database-view.js";
+import type { DatabaseView, DatomsParams } from "../views/database-view.js";
 import {
   ConfiguredDatabaseView,
   type InternalDatabaseView,
@@ -792,7 +791,7 @@ export class SQLiteDatomDatabase
     // For single clause queries, use the optimized query method
     if (modifiedQuery.where.length === 1) {
       const clause = modifiedQuery.where[0];
-      if (!isQueryPattern(clause)) {
+      if (!clause || !isQueryPattern(clause)) {
         throw new Error("Only QueryPattern clauses are supported");
       }
       const { e: entityVal, a: attributeVal, v: valueVal } = clause;
@@ -923,7 +922,7 @@ export class SQLiteDatomDatabase
 
     // Execute first clause using filtered datoms
     const firstClause = query.where[0];
-    if (!isQueryPattern(firstClause)) {
+    if (!firstClause || !isQueryPattern(firstClause)) {
       throw new Error("First clause must be a QueryPattern");
     }
     const { e: entityVal, a: attributeVal, v: valueVal } = firstClause;
@@ -965,7 +964,7 @@ export class SQLiteDatomDatabase
     let results = firstResults;
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
-      if (!isQueryPattern(clause)) {
+      if (!clause || !isQueryPattern(clause)) {
         throw new Error("Only QueryPattern clauses are supported in joins");
       }
       const { e: entityVal, a: attributeVal, v: valueVal } = clause;
@@ -1245,7 +1244,7 @@ export class SQLiteDatomDatabase
     // For single clause queries, use optimized path
     if (modifiedQuery.where.length === 1) {
       const clause = modifiedQuery.where[0];
-      if (!isQueryPattern(clause)) {
+      if (!clause || !isQueryPattern(clause)) {
         throw new Error("Only QueryPattern clauses are supported");
       }
       const { e: entityVal, a: attributeVal, v: valueVal } = clause;
@@ -1350,7 +1349,7 @@ export class SQLiteDatomDatabase
     if (viewConfig.type === "speculative") {
       // Use in-memory join logic for speculative queries
       const firstClause = modifiedQuery.where[0];
-      if (!isQueryPattern(firstClause)) {
+      if (!firstClause || !isQueryPattern(firstClause)) {
         throw new Error("First clause must be a QueryPattern");
       }
       const { e: entityVal, a: attributeVal, v: valueVal } = firstClause;
@@ -1388,7 +1387,7 @@ export class SQLiteDatomDatabase
       let results = firstResults;
       for (let i = 1; i < modifiedQuery.where.length; i++) {
         const clause = modifiedQuery.where[i];
-        if (!isQueryPattern(clause)) {
+        if (!clause || !isQueryPattern(clause)) {
           throw new Error("Only QueryPattern clauses are supported in joins");
         }
         const { e: entityVal, a: attributeVal, v: valueVal } = clause;

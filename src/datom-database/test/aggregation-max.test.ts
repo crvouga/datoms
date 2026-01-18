@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { DatalogQuery } from "../../datalog/datalog.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -31,7 +31,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["maximum"]).toBe(30);
+      expect(results[0]!["maximum"]).toBe(30);
 
       await db.close();
     });
@@ -46,7 +46,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(
-        results[0]["maximum"] === null || results[0]["maximum"] === undefined
+        results[0]!["maximum"] === null || results[0]!["maximum"] === undefined
       ).toBe(true);
 
       await db.close();
@@ -63,7 +63,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["maximum"]).toBe(100);
+      expect(results[0]!["maximum"]).toBe(100);
 
       await db.close();
     });
@@ -83,7 +83,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["maximum"]).toBe(-5);
+      expect(results[0]!["maximum"]).toBe(-5);
 
       await db.close();
     });
@@ -103,7 +103,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["maximum"]).toBe(15.75);
+      expect(results[0]!["maximum"]).toBe(15.75);
 
       await db.close();
     });
@@ -123,7 +123,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["maximum"]).toBe("Charlie");
+      expect(results[0]!["maximum"]).toBe("Charlie");
 
       await db.close();
     });
@@ -149,7 +149,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["maximum"]).toBe(200);
+      expect(results[0]!["maximum"]).toBe(200);
 
       await db.close();
     });
@@ -169,7 +169,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["maximum"]).toBe(20);
+      expect(results[0]!["maximum"]).toBe(20);
 
       await db.close();
     });
@@ -189,7 +189,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["maximum"]).toBe(5);
+      expect(results[0]!["maximum"]).toBe(5);
 
       await db.close();
     });
@@ -211,7 +211,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["maximum"]).toBe(300);
+      expect(results[0]!["maximum"]).toBe(300);
 
       await db.close();
     });

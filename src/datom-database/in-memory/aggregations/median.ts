@@ -16,7 +16,7 @@ IN_MEMORY_AGGREGATIONS.set("median", {
     const mid = Math.floor(sorted.length / 2);
     if (sorted.length % 2 === 0) {
       // Even number of values: average of two middle values
-      return (sorted[mid - 1] + sorted[mid]) / 2;
+      return ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
     } else {
       // Odd number of values: middle value
       return sorted[mid];

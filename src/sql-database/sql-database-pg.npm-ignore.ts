@@ -5,7 +5,8 @@
  * and should not be included in the main library bundle.
  */
 
-import { Pool, PoolClient } from "pg";
+import { Pool } from "pg";
+import type { PoolClient } from "pg";
 import type { SQLDatabase } from "./sql-database.js";
 import type { DatabaseRow, SQLParams } from "./types.js";
 

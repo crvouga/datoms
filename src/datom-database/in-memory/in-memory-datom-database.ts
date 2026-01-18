@@ -20,13 +20,13 @@ import type { EntityId } from "../../entity-id.js";
 import type { Transaction } from "../../types.js";
 import type { WithResult } from "../datom-database.js";
 import {
-  Hook,
   HookEngine,
   QueryError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
   TransactionError,
+  type Hook,
   type ReadContext,
   type WriteContext,
   type WriteResult,
@@ -38,7 +38,7 @@ import {
 } from "../shared/datalog-helpers.js";
 import { executeQueryOnDatoms } from "../shared/in-memory-query-executor.js";
 import { joinResults, project } from "../shared/query-results.js";
-import { DatabaseView, DatomsParams } from "../views/database-view.js";
+import type { DatabaseView, DatomsParams } from "../views/database-view.js";
 import {
   ConfiguredDatabaseView,
   type InternalDatabaseView,
@@ -599,6 +599,9 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     // Now execute the query with filtered datoms
     // Start with the first clause
     const firstClause = modifiedQuery.where[0];
+    if (!firstClause) {
+      return [];
+    }
     const firstResults = await this._executeClauseWithFilteredDatoms(
       firstClause,
       afterResult.datoms
@@ -608,6 +611,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     let results = firstResults;
     for (let i = 1; i < modifiedQuery.where.length; i++) {
       const clause = modifiedQuery.where[i];
+      if (!clause) continue;
       const clauseResults = await this._executeClauseWithFilteredDatoms(
         clause,
         afterResult.datoms
@@ -821,6 +825,9 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     // Now execute the query with filtered datoms
     // Start with the first clause
     const firstClause = modifiedQuery.where[0];
+    if (!firstClause) {
+      return [];
+    }
     const firstResults = await this._executeClauseWithFilteredDatoms(
       firstClause,
       afterResult.datoms
@@ -830,6 +837,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     let results = firstResults;
     for (let i = 1; i < modifiedQuery.where.length; i++) {
       const clause = modifiedQuery.where[i];
+      if (!clause) continue;
       const clauseResults = await this._executeClauseWithFilteredDatoms(
         clause,
         afterResult.datoms

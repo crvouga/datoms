@@ -1,6 +1,11 @@
-import { Attribute, records, Value, type Datom } from "../../datoms.js";
+import {
+  records,
+  type Attribute,
+  type Datom,
+  type Value,
+} from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
-import { DatomDatabase } from "../datom-database.js";
+import type { DatomDatabase } from "../datom-database.js";
 import type { Hook } from "../hook/hook.js";
 import { HookValidator } from "../hook/validator.js";
 
@@ -80,7 +85,7 @@ export const POST_ACCESS_CONTROL: Hook = {
       const entityDatoms = postDatoms.filter((d) => d.e === postId);
       const entityRecords = records(entityDatoms);
       if (entityRecords.length > 0) {
-        postData.set(postId, entityRecords[0]);
+        postData.set(postId, entityRecords[0]!);
       }
     }
 

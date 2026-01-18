@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -60,7 +60,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // But actual database should not be changed (with() doesn't commit)
       const final = await db.datoms({ e: 1 });
       expect(final).toHaveLength(1);
-      expect(final[0].v).toBe("Alice");
+      expect(final[0]!.v).toBe("Alice");
 
       await db.close();
     });
@@ -105,7 +105,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query dbAfter should not see sub datom
       const result = await withResult.dbAfter.datoms({ e: 1 });
       expect(result).toHaveLength(1);
-      expect(result[0].v).toBe("Alice");
+      expect(result[0]!.v).toBe("Alice");
 
       // Now commit the subion
       await db.transact([{ op: "retract", e: 1, a: "age", v: 30 }]);
@@ -113,7 +113,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Verify subion is committed
       const final = await db.datoms({ e: 1 });
       expect(final).toHaveLength(1);
-      expect(final[0].v).toBe("Alice");
+      expect(final[0]!.v).toBe("Alice");
 
       await db.close();
     });
@@ -170,7 +170,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const bob = await db.datoms({ e: 2 });
       expect(bob).toHaveLength(1);
-      expect(bob[0].v).toBe("Bob");
+      expect(bob[0]!.v).toBe("Bob");
 
       await db.close();
     });
@@ -194,7 +194,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // But actual database should not be changed (with() doesn't commit)
       const result = await db.datoms({ e: 1 });
       expect(result).toHaveLength(1);
-      expect(result[0].v).toBe("Initial");
+      expect(result[0]!.v).toBe("Initial");
 
       const entity2 = await db.datoms({ e: 2 });
       expect(entity2).toHaveLength(0);
@@ -377,7 +377,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // dbBefore should show current state
       const before = await withResult.dbBefore.datoms({ e: 1 });
       expect(before).toHaveLength(1);
-      expect(before[0].v).toBe("Alice");
+      expect(before[0]!.v).toBe("Alice");
 
       // dbAfter should show speculative state
       const after = await withResult.dbAfter.datoms({ e: 1 });

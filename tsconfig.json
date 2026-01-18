@@ -37,8 +37,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "noImplicitAny": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
+    "outDir": "./dist"
   },
   "include": ["src/**/*", "moviefinder.app/**/*", "bun-env.d.ts"],
   "exclude": [

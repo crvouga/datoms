@@ -2,7 +2,7 @@ import { unlinkSync } from "fs";
 import { PgSQLDatabase } from "../../sql-database/sql-database-pg.npm-ignore.js";
 import { PGLiteSQLDatabase } from "../../sql-database/sql-database-pglite.npm-ignore.js";
 import { SQLiteSQLDatabase } from "../../sql-database/sql-database-sqlite.npm-ignore.js";
-import { DatomDatabase } from "../datom-database.js";
+import type { DatomDatabase } from "../datom-database.js";
 import { InMemoryDatomDatabase } from "../in-memory/in-memory-datom-database.js";
 import { PostgreSQLDatomDatabase } from "../postgres/postgres-datom-database.js";
 import { RemoteDatomDatabase } from "../remote/datom-database-remote.js";

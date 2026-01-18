@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { QueryTimeoutError } from "../hook/hook";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -24,7 +24,7 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
         timeoutMs: 5000,
       });
       expect(results).toHaveLength(1);
-      expect(results[0].v).toBe("Alice");
+      expect(results[0]!.v).toBe("Alice");
     });
 
     test("should throw QueryTimeoutError when timeout exceeded", async () => {
@@ -59,7 +59,7 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
         timeoutMs: 1000,
       });
       expect(results).toHaveLength(1);
-      expect(results[0].v).toBe("Alice");
+      expect(results[0]!.v).toBe("Alice");
     });
 
     test("should work with pagination", async () => {

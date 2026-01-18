@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { DatalogQuery } from "../../datalog/datalog.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -31,7 +31,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["median"]).toBe(30);
+      expect(results[0]!["median"]).toBe(30);
 
       await db.close();
     });
@@ -53,7 +53,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Median of [20, 30, 40, 50] is average of 30 and 40 = 35
-      expect(results[0]["median"]).toBe(35);
+      expect(results[0]!["median"]).toBe(35);
 
       await db.close();
     });
@@ -68,7 +68,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(
-        results[0]["median"] === null || results[0]["median"] === undefined
+        results[0]!["median"] === null || results[0]!["median"] === undefined
       ).toBe(true);
 
       await db.close();
@@ -85,7 +85,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["median"]).toBe(85);
+      expect(results[0]!["median"]).toBe(85);
 
       await db.close();
     });
@@ -108,7 +108,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Sorted: [10, 20, 30, 40, 50], median = 30
-      expect(results[0]["median"]).toBe(30);
+      expect(results[0]!["median"]).toBe(30);
 
       await db.close();
     });
@@ -130,7 +130,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Sorted: [10, 20, 20, 30], median = average of 20 and 20 = 20
-      expect(results[0]["median"]).toBe(20);
+      expect(results[0]!["median"]).toBe(20);
 
       await db.close();
     });
@@ -159,7 +159,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Sorted: [80, 90, 100], median = 90
-      expect(results[0]["median"]).toBe(90);
+      expect(results[0]!["median"]).toBe(90);
 
       await db.close();
     });
@@ -181,7 +181,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       // Median of [10.5, 20.5, 30.5, 40.5] = average of 20.5 and 30.5 = 25.5
-      expect(results[0]["median"]).toBeCloseTo(25.5, 2);
+      expect(results[0]!["median"]).toBeCloseTo(25.5, 2);
 
       await db.close();
     });

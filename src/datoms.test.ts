@@ -27,8 +27,8 @@ describe("datoms", () => {
       });
 
       expect(result).toHaveLength(2);
-      expect(result[0].e).toBe("user-123");
-      expect(result[1].e).toBe("user-123");
+      expect(result[0]!.e).toBe("user-123");
+      expect(result[1]!.e).toBe("user-123");
     });
 
     test("should handle all value types", () => {
@@ -200,7 +200,7 @@ describe("datoms", () => {
   describe("type safety", () => {
     test("should return DatomInput[] type", () => {
       const result = datoms({ entityId: 1, name: "Alice" });
-      const first: DatomInput = result[0];
+      const first: DatomInput = result[0]!;
       expect(first).toBeDefined();
       expect(first.e).toBeDefined();
       expect(first.a).toBeDefined();

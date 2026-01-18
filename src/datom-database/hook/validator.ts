@@ -4,7 +4,7 @@
  */
 
 import type { Datom } from "../../datoms.js";
-import { HookError } from "./hook.js";
+import type { HookError } from "./hook.js";
 
 /**
  * Helper class for collecting validation errors in hooks

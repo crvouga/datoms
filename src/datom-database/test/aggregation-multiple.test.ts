@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { DatalogQuery } from "../../datalog/datalog.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -37,11 +37,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["total"]).toBe(600);
-      expect(results[0]["average"]).toBe(200);
-      expect(results[0]["maximum"]).toBe(300);
-      expect(results[0]["minimum"]).toBe(100);
-      expect(results[0]["count"]).toBe(3);
+      expect(results[0]!["total"]).toBe(600);
+      expect(results[0]!["average"]).toBe(200);
+      expect(results[0]!["maximum"]).toBe(300);
+      expect(results[0]!["minimum"]).toBe(100);
+      expect(results[0]!["count"]).toBe(3);
 
       await db.close();
     });
@@ -68,10 +68,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["average"]).toBe(30);
-      expect(results[0]["median"]).toBe(30);
-      expect(results[0]["variance"]).toBeCloseTo(200, 1);
-      expect(results[0]["stddev"]).toBeCloseTo(14.14, 1);
+      expect(results[0]!["average"]).toBe(30);
+      expect(results[0]!["median"]).toBe(30);
+      expect(results[0]!["variance"]).toBeCloseTo(200, 1);
+      expect(results[0]!["stddev"]).toBeCloseTo(14.14, 1);
 
       await db.close();
     });
@@ -102,10 +102,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["totalPrice"]).toBe(600);
-      expect(results[0]["totalQuantity"]).toBe(10);
-      expect(results[0]["avgPrice"]).toBe(200);
-      expect(results[0]["maxQuantity"]).toBe(5);
+      expect(results[0]!["totalPrice"]).toBe(600);
+      expect(results[0]!["totalQuantity"]).toBe(10);
+      expect(results[0]!["avgPrice"]).toBe(200);
+      expect(results[0]!["maxQuantity"]).toBe(5);
 
       await db.close();
     });
@@ -136,10 +136,10 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["count"]).toBe(2);
-      expect(results[0]["total"]).toBe(300);
-      expect(results[0]["average"]).toBe(150);
-      expect(results[0]["maximum"]).toBe(200);
+      expect(results[0]!["count"]).toBe(2);
+      expect(results[0]!["total"]).toBe(300);
+      expect(results[0]!["average"]).toBe(150);
+      expect(results[0]!["maximum"]).toBe(200);
 
       await db.close();
     });
@@ -164,9 +164,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["distinctCount"]).toBe(3);
-      expect(results[0]["totalCount"]).toBe(4);
-      const distinctNames = results[0]["distinctNames"];
+      expect(results[0]!["distinctCount"]).toBe(3);
+      expect(results[0]!["totalCount"]).toBe(4);
+      const distinctNames = results[0]!["distinctNames"];
       if (Array.isArray(distinctNames)) {
         expect(distinctNames.length).toBe(3);
         expect([...distinctNames].sort()).toStrictEqual([
@@ -194,18 +194,18 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["total"]).toBe(0);
-      expect(results[0]["count"]).toBe(0);
+      expect(results[0]!["total"]).toBe(0);
+      expect(results[0]!["count"]).toBe(0);
       expect(
-        results[0]["average"] === null ||
-          results[0]["average"] === undefined ||
-          results[0]["average"] === 0
+        results[0]!["average"] === null ||
+          results[0]!["average"] === undefined ||
+          results[0]!["average"] === 0
       ).toBe(true);
       expect(
-        results[0]["maximum"] === null || results[0]["maximum"] === undefined
+        results[0]!["maximum"] === null || results[0]!["maximum"] === undefined
       ).toBe(true);
       expect(
-        results[0]["minimum"] === null || results[0]["minimum"] === undefined
+        results[0]!["minimum"] === null || results[0]!["minimum"] === undefined
       ).toBe(true);
 
       await db.close();
@@ -232,9 +232,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["count"]).toBe(5);
-      const sample = results[0]["sample"];
-      const random = results[0]["random"];
+      expect(results[0]!["count"]).toBe(5);
+      const sample = results[0]!["sample"];
+      const random = results[0]!["random"];
       expect(Array.isArray(sample)).toBe(true);
       expect(Array.isArray(random)).toBe(true);
       expect((sample as unknown as number[]).length).toBe(3);

@@ -22,7 +22,7 @@ import {
   USER_TYPE_AUTHOR,
   USER_TYPE_READER,
 } from "./blogging-site.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -59,8 +59,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].name).toBe("Admin User");
-      expect(results[0].email).toBe("admin@example.com");
+      expect(results[0]!.name).toBe("Admin User");
+      expect(results[0]!.email).toBe("admin@example.com");
       await db.close();
     });
 
@@ -85,7 +85,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].name).toBe("Author User");
+      expect(results[0]!.name).toBe("Author User");
       await db.close();
     });
 
@@ -110,7 +110,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].name).toBe("Reader User");
+      expect(results[0]!.name).toBe("Reader User");
       await db.close();
     });
   });
@@ -150,8 +150,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].title).toBe("My First Post");
-      expect(results[0].status).toBe(POST_STATUS_DRAFT);
+      expect(results[0]!.title).toBe("My First Post");
+      expect(results[0]!.status).toBe(POST_STATUS_DRAFT);
       await db.close();
     });
 
@@ -198,7 +198,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].status).toBe(POST_STATUS_PUBLISHED);
+      expect(results[0]!.status).toBe(POST_STATUS_PUBLISHED);
       await db.close();
     });
 
@@ -247,8 +247,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].title).toBe("Updated Title");
-      expect(results[0].content).toBe("Updated Content");
+      expect(results[0]!.title).toBe("Updated Title");
+      expect(results[0]!.content).toBe("Updated Content");
       await db.close();
     });
   });
@@ -294,8 +294,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       expect(results).toHaveLength(1);
-      expect(results[0].title).toBe("Draft Post");
-      expect(results[0].status).toBe(POST_STATUS_DRAFT);
+      expect(results[0]!.title).toBe("Draft Post");
+      expect(results[0]!.status).toBe(POST_STATUS_DRAFT);
       await db.close();
     });
 
@@ -392,7 +392,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       expect(results).toHaveLength(1);
-      expect(results[0].title).toBe("Published Post");
+      expect(results[0]!.title).toBe("Published Post");
       await db.close();
     });
 
@@ -451,8 +451,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       expect(results).toHaveLength(1);
-      expect(results[0].title).toBe("Published Post");
-      expect(results[0].status).toBe(POST_STATUS_PUBLISHED);
+      expect(results[0]!.title).toBe("Published Post");
+      expect(results[0]!.status).toBe(POST_STATUS_PUBLISHED);
       await db.close();
     });
 
@@ -552,7 +552,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].title).toBe("Valid Post");
+      expect(results[0]!.title).toBe("Valid Post");
       await db.close();
     });
 
@@ -621,7 +621,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].name).toBe("javascript");
+      expect(results[0]!.name).toBe("javascript");
       await db.close();
     });
 
@@ -738,7 +738,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].title).toBe("JS Post");
+      expect(results[0]!.title).toBe("JS Post");
       await db.close();
     });
   });
@@ -821,7 +821,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results.length).toBeGreaterThanOrEqual(2); // At least 2 results (one per tag)
-      const firstResult = results[0];
+      const firstResult = results[0]!;
       expect(firstResult.title).toBe("My Blog Post");
       expect(firstResult.content).toBe("Updated content");
       expect(firstResult.status).toBe(POST_STATUS_PUBLISHED);

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { DatalogQuery } from "../../datalog/datalog.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -41,9 +41,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["total"]).toBe(600);
-      expect(results[0]["average"]).toBe(200);
-      expect(results[0]["count"]).toBe(3);
+      expect(results[0]!["total"]).toBe(600);
+      expect(results[0]!["average"]).toBe(200);
+      expect(results[0]!["count"]).toBe(3);
 
       await db.close();
     });
@@ -74,8 +74,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["orderCount"]).toBe(3);
-      expect(results[0]["customerCount"]).toBe(2);
+      expect(results[0]!["orderCount"]).toBe(3);
+      expect(results[0]!["customerCount"]).toBe(2);
 
       await db.close();
     });
@@ -109,9 +109,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["total"]).toBe(300);
-      expect(results[0]["average"]).toBe(150);
-      expect(results[0]["maxPrice"]).toBe(200);
+      expect(results[0]!["total"]).toBe(300);
+      expect(results[0]!["average"]).toBe(150);
+      expect(results[0]!["maxPrice"]).toBe(200);
 
       await db.close();
     });
@@ -144,9 +144,9 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["childCount"]).toBe(2);
-      expect(results[0]["childTotal"]).toBe(125);
-      expect(results[0]["childAvg"]).toBe(62.5);
+      expect(results[0]!["childCount"]).toBe(2);
+      expect(results[0]!["childTotal"]).toBe(125);
+      expect(results[0]!["childAvg"]).toBe(62.5);
 
       await db.close();
     });
@@ -172,8 +172,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]["total"]).toBe(0);
-      expect(results[0]["count"]).toBe(0);
+      expect(results[0]!["total"]).toBe(0);
+      expect(results[0]!["count"]).toBe(0);
 
       await db.close();
     });

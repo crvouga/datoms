@@ -5,8 +5,8 @@
 
 import type { Datom, DatomInput, TransactionId } from "../datoms.js";
 import type { EntityId } from "../entity-id.js";
-import { Hook } from "./hook/hook.js";
-import { DatabaseView } from "./views/database-view.js";
+import type { Hook } from "./hook/hook.js";
+import type { DatabaseView } from "./views/database-view.js";
 
 /**
  * Datom database interface (Datomic-like minimal API)

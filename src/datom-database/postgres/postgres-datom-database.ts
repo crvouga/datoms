@@ -22,13 +22,13 @@ import type { Transaction } from "../../types.js";
 
 import type { WithResult } from "../datom-database.js";
 import {
-  Hook,
   HookEngine,
   QueryError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
   TransactionError,
+  type Hook,
   type ReadContext,
   type WriteContext,
   type WriteResult,
@@ -41,7 +41,7 @@ import {
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
 import { joinResults, project } from "../shared/query-results.js";
-import { DatabaseView, DatomsParams } from "../views/database-view.js";
+import type { DatabaseView, DatomsParams } from "../views/database-view.js";
 import {
   ConfiguredDatabaseView,
   type InternalDatabaseView,
@@ -899,6 +899,9 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     if (hasAggs && !allAggsSupported) {
       // Use in-memory joins and aggregations
       const firstClause = modifiedQuery.where[0];
+      if (!firstClause) {
+        return [];
+      }
       const firstResults = await this._executeClauseWithFilteredDatoms(
         firstClause,
         afterResult.datoms
@@ -907,6 +910,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
       let results = firstResults;
       for (let i = 1; i < modifiedQuery.where.length; i++) {
         const clause = modifiedQuery.where[i];
+        if (!clause) continue;
         const clauseResults = await this._executeClauseWithFilteredDatoms(
           clause,
           afterResult.datoms
@@ -958,6 +962,9 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
 
     // Now execute the query with filtered datoms (no aggregations or single clause with supported aggregations)
     const firstClause = modifiedQuery.where[0];
+    if (!firstClause) {
+      return [];
+    }
     const firstResults = await this._executeClauseWithFilteredDatoms(
       firstClause,
       afterResult.datoms
@@ -966,6 +973,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     let results = firstResults;
     for (let i = 1; i < modifiedQuery.where.length; i++) {
       const clause = modifiedQuery.where[i];
+      if (!clause) continue;
       const clauseResults = await this._executeClauseWithFilteredDatoms(
         clause,
         afterResult.datoms
@@ -1088,7 +1096,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     // Build CTEs for each clause with deduplication using DISTINCT ON
     for (let i = 0; i < clauses.length; i++) {
       const clause = clauses[i];
-      if (!isQueryPattern(clause)) {
+      if (!clause || !isQueryPattern(clause)) {
         throw new Error(
           "Only QueryPattern clauses are supported in SQL queries"
         );
@@ -1139,7 +1147,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     const variableToColumn: Map<string, string> = new Map();
     for (let i = 0; i < clauses.length; i++) {
       const clause = clauses[i];
-      if (!isQueryPattern(clause)) {
+      if (!clause || !isQueryPattern(clause)) {
         continue;
       }
       const { e: entityVal, a: attributeVal, v: valueVal } = clause;
@@ -1163,7 +1171,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
 
     for (let i = 0; i < clauses.length; i++) {
       const clause = clauses[i];
-      if (!isQueryPattern(clause)) {
+      if (!clause || !isQueryPattern(clause)) {
         throw new Error(
           "Only QueryPattern clauses are supported in JOIN conditions"
         );
@@ -1199,6 +1207,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
         for (let i = 1; i < occurrences.length; i++) {
           const prev = occurrences[i - 1];
           const curr = occurrences[i];
+          if (!prev || !curr) continue;
           const prevAlias = `d${prev.clauseIndex}`;
           const currAlias = `d${curr.clauseIndex}`;
           joinConditions.push(
@@ -1267,7 +1276,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
       for (const joinCond of joinConditions) {
         if (joinCond.includes(`${alias}.`)) {
           const parts = joinCond.split(" = ");
-          if (parts.length === 2) {
+          if (parts.length === 2 && parts[0] && parts[1]) {
             if (parts[0].startsWith(`${alias}.`)) {
               conditions.push(joinCond);
             } else if (parts[1].startsWith(`${alias}.`)) {
@@ -1293,7 +1302,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
         .map(([variable, direction]) => {
           for (let i = 0; i < clauses.length; i++) {
             const clause = clauses[i];
-            if (!isQueryPattern(clause)) {
+            if (!clause || !isQueryPattern(clause)) {
               continue;
             }
             const { e: entityVal, a: attributeVal, v: valueVal } = clause;
@@ -1608,7 +1617,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     if (viewConfig.type === "speculative") {
       // Use in-memory join logic for speculative queries
       const firstClause = modifiedQuery.where[0];
-      if (!isQueryPattern(firstClause)) {
+      if (!firstClause || !isQueryPattern(firstClause)) {
         throw new Error("First clause must be a QueryPattern");
       }
       const { e: entityVal, a: attributeVal, v: valueVal } = firstClause;
@@ -1646,7 +1655,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
       let results = firstResults;
       for (let i = 1; i < modifiedQuery.where.length; i++) {
         const clause = modifiedQuery.where[i];
-        if (!isQueryPattern(clause)) {
+        if (!clause || !isQueryPattern(clause)) {
           throw new Error("Only QueryPattern clauses are supported in joins");
         }
         const { e: entityVal, a: attributeVal, v: valueVal } = clause;
@@ -1731,6 +1740,9 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     if (hasAggs && !allAggsSupported) {
       // Use in-memory joins and aggregations
       const firstClause = modifiedQuery.where[0];
+      if (!firstClause) {
+        return [];
+      }
       const firstResults = await this._executeClauseWithFilteredDatoms(
         firstClause,
         afterResult.datoms
@@ -1739,6 +1751,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
       let results = firstResults;
       for (let i = 1; i < modifiedQuery.where.length; i++) {
         const clause = modifiedQuery.where[i];
+        if (!clause) continue;
         const clauseResults = await this._executeClauseWithFilteredDatoms(
           clause,
           afterResult.datoms
@@ -1790,6 +1803,9 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
 
     // Now execute the query with filtered datoms (no aggregations or single clause with supported aggregations)
     const firstClause = modifiedQuery.where[0];
+    if (!firstClause) {
+      return [];
+    }
     const firstResults = await this._executeClauseWithFilteredDatoms(
       firstClause,
       afterResult.datoms
@@ -1798,6 +1814,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     let results = firstResults;
     for (let i = 1; i < modifiedQuery.where.length; i++) {
       const clause = modifiedQuery.where[i];
+      if (!clause) continue;
       const clauseResults = await this._executeClauseWithFilteredDatoms(
         clause,
         afterResult.datoms

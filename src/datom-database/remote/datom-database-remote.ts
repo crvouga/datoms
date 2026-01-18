@@ -28,7 +28,7 @@ import {
 import { joinResults, project } from "../shared/query-results.js";
 import type { QueryClause } from "../../datalog/datalog.js";
 import type { Attribute } from "../../datoms.js";
-import { DatabaseView, DatomsParams } from "../views/database-view.js";
+import type { DatabaseView, DatomsParams } from "../views/database-view.js";
 import {
   ConfiguredDatabaseView,
   type InternalDatabaseView,
@@ -36,7 +36,8 @@ import {
 } from "../views/internal-database-view.js";
 import type { WithResult } from "../datom-database.js";
 import type { Hook } from "../hook/hook.js";
-import { ITransport, TransportError } from "./transport/transport.js";
+import type { ITransport } from "./transport/transport.js";
+import { TransportError } from "./transport/transport.js";
 import type {
   DatomsRequest,
   DatomsResponse,
@@ -445,6 +446,9 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
       // Re-execute query with filtered datoms from hooks
       // Start with the first clause
       const firstClause = modifiedQuery.where[0];
+      if (!firstClause) {
+        return [];
+      }
       const firstResults = await this._executeClauseWithFilteredDatoms(
         firstClause,
         afterResult.datoms
@@ -454,6 +458,7 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
       let results = firstResults;
       for (let i = 1; i < modifiedQuery.where.length; i++) {
         const clause = modifiedQuery.where[i];
+        if (!clause) continue;
         const clauseResults = await this._executeClauseWithFilteredDatoms(
           clause,
           afterResult.datoms

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { DatalogQuery } from "../../datalog/datalog.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -31,7 +31,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const sampleValues = results[0]["sample"];
+      const sampleValues = results[0]!["sample"];
       expect(sampleValues).toBeDefined();
       expect(Array.isArray(sampleValues)).toBe(true);
       expect((sampleValues as unknown as number[]).length).toBe(2);
@@ -56,7 +56,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(
-        results[0]["sample"] === null || results[0]["sample"] === undefined
+        results[0]!["sample"] === null || results[0]!["sample"] === undefined
       ).toBe(true);
 
       await db.close();
@@ -77,7 +77,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const sampleValue = results[0]["sample"];
+      const sampleValue = results[0]!["sample"];
       expect(sampleValue).toBeDefined();
       expect([10, 20, 30]).toContain(sampleValue as number);
       expect(Array.isArray(sampleValue)).toBe(false);
@@ -99,7 +99,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const sampleValues = results[0]["sample"];
+      const sampleValues = results[0]!["sample"];
       expect(Array.isArray(sampleValues)).toBe(true);
       expect((sampleValues as unknown as number[]).length).toBe(2);
       expect((sampleValues as unknown as number[]).sort()).toEqual([10, 20]);
@@ -124,7 +124,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const sampleValues = results[0]["sample"];
+      const sampleValues = results[0]!["sample"];
       expect(Array.isArray(sampleValues)).toBe(true);
       expect((sampleValues as unknown as number[]).length).toBe(3);
       // Check no duplicates
@@ -149,7 +149,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const sampleValues = results[0]["sample"];
+      const sampleValues = results[0]!["sample"];
       expect(Array.isArray(sampleValues)).toBe(true);
       expect((sampleValues as unknown as string[]).length).toBe(2);
       (sampleValues as unknown as string[]).forEach((val) => {
@@ -180,7 +180,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const results = await db.query(query);
       expect(results).toHaveLength(1);
-      const sampleValues = results[0]["sample"];
+      const sampleValues = results[0]!["sample"];
       expect(Array.isArray(sampleValues)).toBe(true);
       expect((sampleValues as unknown as number[]).length).toBe(2);
       expect((sampleValues as unknown as number[]).sort()).toEqual([100, 200]);

@@ -6,7 +6,7 @@
 import type { DatalogQuery } from "../../datalog/datalog.js";
 import type { Datom, TransactionId } from "../../datoms.js";
 import type { Transaction } from "../../types.js";
-import { DatabaseView } from "../views/database-view.js";
+import type { DatabaseView } from "../views/database-view.js";
 
 /**
  * Error structure returned by hooks

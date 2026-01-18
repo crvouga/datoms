@@ -4,7 +4,7 @@
  */
 
 import type { Datom } from "../../datoms.js";
-import { DatomsParams } from "../views/database-view.js";
+import type { DatomsParams } from "../views/database-view.js";
 
 /**
  * Execute a query on an array of datoms

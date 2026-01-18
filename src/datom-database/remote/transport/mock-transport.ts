@@ -8,7 +8,8 @@ import type {
   ViewConfig,
 } from "../../views/internal-database-view.js";
 import { ConfiguredDatabaseView } from "../../views/internal-database-view.js";
-import { ITransport, TransportError } from "./transport.js";
+import type { ITransport } from "./transport.js";
+import { TransportError } from "./transport.js";
 import type {
   DatomsRequest,
   DatomsResponse,

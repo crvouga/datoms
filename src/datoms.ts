@@ -2,7 +2,7 @@
  * Core datom types and utilities
  */
 
-import { EntityId } from "./entity-id";
+import type { EntityId } from "./entity-id";
 
 /**
  * An attribute name (e.g., "name", "age", "email", "user/type", "user/email", "user/name")

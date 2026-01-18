@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { DatalogQuery } from "../../datalog/datalog.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
+import { FIXTURES, type Fixture } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -30,8 +30,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query at tx1 - should only see name
       const atTx1 = await db.asOf(tx1).datoms({ e: 1 });
       expect(atTx1).toHaveLength(1);
-      expect(atTx1[0].a).toBe("name");
-      expect(atTx1[0].v).toBe("Alice");
+      expect(atTx1[0]!.a).toBe("name");
+      expect(atTx1[0]!.v).toBe("Alice");
 
       // Query at tx2 - should see name and age
       const atTx2 = await db.asOf(tx2).datoms({ e: 1 });
@@ -62,7 +62,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query at tx3 - should only see name (age was sub)
       const atTx3 = await db.asOf(tx3).datoms({ e: 1 });
       expect(atTx3).toHaveLength(1);
-      expect(atTx3[0].a).toBe("name");
+      expect(atTx3[0]!.a).toBe("name");
 
       await db.close();
     });
@@ -98,7 +98,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const entityAtTx1 = await db.asOf(tx1).datoms({ e: 1 });
       expect(entityAtTx1).toHaveLength(1);
-      expect(entityAtTx1[0].a).toBe("name");
+      expect(entityAtTx1[0]!.a).toBe("name");
 
       const entityAtTx2 = await db.asOf(tx2).datoms({ e: 1 });
       expect(entityAtTx2).toHaveLength(2);
@@ -173,7 +173,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query at tx1 - should only see committed name (not speculative age)
       const atTx1 = await db.asOf(tx1).datoms({ e: 1 });
       expect(atTx1).toHaveLength(1);
-      expect(atTx1[0].a).toBe("name");
+      expect(atTx1[0]!.a).toBe("name");
 
       await db.close();
     });
@@ -323,11 +323,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const alice = await db.datoms({ e: 1, op: "assert" });
       expect(alice).toHaveLength(1);
-      expect(alice[0].v).toBe("Alice");
+      expect(alice[0]!.v).toBe("Alice");
 
       const bob = await db.datoms({ e: 2, op: "assert" });
       expect(bob).toHaveLength(1);
-      expect(bob[0].v).toBe("Bob");
+      expect(bob[0]!.v).toBe("Bob");
 
       // Charlie should not exist (or was sub if existed)
       const charlie = await db.datoms({ e: 3, op: "assert" });
@@ -433,8 +433,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query changes since tx3 - should only see updated name
       const sinceTx3 = await db.since(tx3).datoms({ e: 1 });
       expect(sinceTx3).toHaveLength(1);
-      expect(sinceTx3[0].a).toBe("name");
-      expect(sinceTx3[0].v).toBe("Alice Updated");
+      expect(sinceTx3[0]!.a).toBe("name");
+      expect(sinceTx3[0]!.v).toBe("Alice Updated");
 
       await db.close();
     });
@@ -519,7 +519,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         a: "name",
       });
       expect(sinceTx2Name).toHaveLength(1);
-      expect(sinceTx2Name[0].v).toBe("Alice Updated");
+      expect(sinceTx2Name[0]!.v).toBe("Alice Updated");
 
       await db.close();
     });
@@ -592,7 +592,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         limit: 2,
       });
       expect(limited).toHaveLength(2);
-      expect(limited[0].v).toBe("Alice"); // First change
+      expect(limited[0]!.v).toBe("Alice"); // First change
 
       // Test offset
       const offset = await db.history().datoms({
@@ -695,7 +695,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         // If implementation picks subion during deduplication, verify green at tx3
         const atTx3Check = await db.asOf(tx3).datoms({ e: 1, a: "tag" });
         expect(atTx3Check.length).toBeGreaterThanOrEqual(1);
-        expect(atTx3Check[0].v).toBe("green");
+        expect(atTx3Check[0]!.v).toBe("green");
       }
 
       // Query changes since tx2 - should see green (add after tx2)
@@ -781,7 +781,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         a: "parent",
       });
       expect(sinceTx1.length).toBeGreaterThanOrEqual(1);
-      expect(sinceTx1[0].v).toBe(20);
+      expect(sinceTx1[0]!.v).toBe(20);
 
       // Query changes since tx1 for all entities
       const allSinceTx1 = await db.since(tx1).datoms({ a: "parent" });
@@ -813,7 +813,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query changes since tx1 - should see age
       const sinceTx1 = await db.since(tx1).datoms({ e: 1 });
       expect(sinceTx1.length).toBeGreaterThanOrEqual(1);
-      expect(sinceTx1[0].a).toBe("age");
+      expect(sinceTx1[0]!.a).toBe("age");
 
       await db.close();
     });
