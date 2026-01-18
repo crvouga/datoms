@@ -3,16 +3,10 @@
  * Provides a high-level interface for working with datoms and datalog queries
  */
 
-import type {
-  Datom,
-  DatomInput,
-  EntityId,
-  QueryOptions,
-  TransactionId,
-} from "../types.js";
+import type { Datom, DatomInput, TransactionId } from "../datoms.js";
+import type { EntityId } from "../entity-id.js";
 import { Hook } from "./hook/hook.js";
 import { DatabaseView } from "./views/database-view.js";
-import { InternalDatabaseView } from "./views/internal-database-view.js";
 
 /**
  * Datom database interface (Datomic-like minimal API)
@@ -97,7 +91,7 @@ import { InternalDatabaseView } from "./views/internal-database-view.js";
  * const health = await db.healthCheck();
  * console.log(`Database status: ${health.status}`);
  */
-export interface DatomDatabase extends InternalDatabaseView {
+export interface DatomDatabase extends DatabaseView {
   /**
    * Initialize the database
    * @example
@@ -198,23 +192,6 @@ export interface DatomDatabase extends InternalDatabaseView {
   getLatestTransaction(): Promise<TransactionId>;
 
   /**
-   * Get raw datoms without deduplication for time-travel queries.
-   * This method is used by database views to get all datoms matching filters
-   * before applying time-travel specific deduplication logic.
-   * Implementations must provide backend-specific logic to return undeduplicated results.
-   * @internal
-   */
-  getRawDatoms(options: QueryOptions): Promise<Datom[]>;
-
-  /**
-   * Execute the actual query (implemented by implementations)
-   * @example
-   * // Implement in your custom DB class
-   * protected async executeQuery(options: QueryOptions): Promise<Datom[]> { ... }
-   */
-  executeQuery(options: QueryOptions): Promise<Datom[]>;
-
-  /**
    * Create a database view showing the state at a specific transaction ID
    * Returns a read-only view that filters all queries to only include datoms
    * with transaction ID <= txId
@@ -285,35 +262,6 @@ export interface DatomDatabase extends InternalDatabaseView {
    * await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
    */
   with(ops: DatomInput[]): Promise<WithResult>;
-
-  /**
-   * Validate an EntityId value
-   * Checks that the EntityId is a valid type (number or string)
-   * @param entityId EntityId to validate
-   * @returns True if valid
-   * @throws Error if invalid
-   * @example
-   * db.validateEntityId(123); // OK
-   * db.validateEntityId("user-123"); // OK
-   * db.validateEntityId(null); // Throws error
-   */
-  validateEntityId(entityId: unknown): entityId is EntityId;
-
-  /**
-   * Serialize an EntityId to a string for storage
-   * @param entityId EntityId to serialize
-   * @returns Serialized string representation
-   * @internal
-   */
-  serializeEntityId(entityId: EntityId): string;
-
-  /**
-   * Deserialize a string to an EntityId
-   * @param serialized Serialized string representation
-   * @returns Deserialized EntityId
-   * @internal
-   */
-  deserializeEntityId(serialized: string): EntityId;
 }
 
 /**

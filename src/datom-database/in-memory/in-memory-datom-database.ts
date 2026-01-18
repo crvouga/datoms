@@ -11,15 +11,13 @@ import type {
 } from "../../datalog/datalog.js";
 import type {
   Attribute,
-  DatabaseStats,
   Datom,
   DatomInput,
-  EntityId,
-  QueryOptions,
-  Transaction,
   TransactionId,
   Value,
-} from "../../types.js";
+} from "../../datoms.js";
+import type { EntityId } from "../../entity-id.js";
+import type { DatabaseStats, QueryOptions, Transaction } from "../../types.js";
 import { DatomDatabase } from "../datom-database.js";
 import {
   Hook,
@@ -34,6 +32,11 @@ import {
   type WriteResult,
 } from "../hook/hook.js";
 import {
+  deserializeEntityId,
+  serializeEntityId,
+  validateEntityId,
+} from "../../entity-id.js";
+import {
   isQueryPattern,
   isVariable,
   stripQuestionMark,
@@ -44,6 +47,7 @@ import { AsOfDatabaseView } from "../views/as-of-database-view.js";
 import { CurrentDatabaseView } from "../views/current-database-view.js";
 import { DatabaseView } from "../views/database-view.js";
 import { HistoryDatabaseView } from "../views/history-database-view.js";
+import { InternalDatabaseView } from "../views/internal-database-view.js";
 import { SinceDatabaseView } from "../views/since-database-view.js";
 import { SpeculativeDatabaseView } from "../views/speculative-database-view.js";
 import type { WithResult } from "../datom-database.js";
@@ -52,7 +56,9 @@ import type { WithResult } from "../datom-database.js";
  * In-memory database implementation
  * Stores datoms in memory using an array-based structure
  */
-export class InMemoryDatomDatabase implements DatomDatabase {
+export class InMemoryDatomDatabase
+  implements DatomDatabase, InternalDatabaseView
+{
   public readonly hooks: HookEngine;
   protected initialized = false;
   private _datomsArray: Datom[] = [];
@@ -296,26 +302,18 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     };
   }
 
+  // EntityId utility methods (delegating to shared utilities)
+  // These are kept for backward compatibility but are not part of the DatomDatabase interface
   validateEntityId(entityId: unknown): entityId is EntityId {
-    if (typeof entityId === "number" || typeof entityId === "string") {
-      return true;
-    }
-    throw new Error(
-      `Invalid EntityId type: expected number or string, got ${typeof entityId}`
-    );
+    return validateEntityId(entityId);
   }
 
   serializeEntityId(entityId: EntityId): string {
-    return String(entityId);
+    return serializeEntityId(entityId);
   }
 
   deserializeEntityId(serialized: string): EntityId {
-    // Try to parse as number first
-    const num = Number(serialized);
-    if (!isNaN(num) && isFinite(num) && String(num) === serialized) {
-      return num;
-    }
-    return serialized;
+    return deserializeEntityId(serialized);
   }
 
   async datoms(options: QueryOptions): Promise<Datom[]> {

@@ -3,7 +3,8 @@
  * Filters queries to only include datoms with tx > txId
  */
 
-import type { Datom, QueryOptions, TransactionId } from "../../types.js";
+import type { Datom, TransactionId } from "../../datoms.js";
+import type { QueryOptions } from "../../types.js";
 import { BaseDatabaseView } from "./base-database-view.js";
 import { InternalDatabaseView } from "./internal-database-view.js";
 

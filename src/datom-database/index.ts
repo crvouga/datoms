@@ -2,26 +2,30 @@
  * Database module entry point
  */
 
-// Core types
+// Core types from datoms.js
 export type {
   Attribute,
+  Datom,
+  DatomInput,
+  TransactionId,
+  Value,
+} from "../datoms.js";
+// Core types from entity-id.js
+export type { EntityId } from "../entity-id.js";
+// Types from types.js
+export type {
   BatchQueryKey,
   ConnectionPoolConfig,
   ConnectionPoolStats,
   DatabaseHealth,
   DatabaseHealthStatus,
-  Datom,
-  DatomInput,
-  EntityId,
   Logger,
   OptimisticLockOptions,
   QueryExplainResult,
   QueryOptions,
   Transaction,
-  TransactionId,
   TransactionIsolationLevel,
   TransactionOptions,
-  Value,
 } from "../types.js";
 
 // DatomDatabase classes

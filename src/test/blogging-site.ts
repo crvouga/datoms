@@ -1,6 +1,8 @@
+import { DatomDatabase } from "../datom-database/datom-database.js";
 import type { Hook } from "../datom-database/hook/hook.js";
 import { HookValidator } from "../datom-database/hook/validator.js";
-import { Attribute, EntityId, records, Value, type Datom } from "../datoms.js";
+import { Attribute, records, Value, type Datom } from "../datoms.js";
+import type { EntityId } from "../entity-id.js";
 
 // Schema constants
 export const USER_TYPE = "user/type";
@@ -242,4 +244,10 @@ export const AUTHOR_VALIDATOR: Hook = {
 
     return { tx };
   },
+};
+
+export const registerHooks = (db: DatomDatabase) => {
+  db.hook(POST_ACCESS_CONTROL);
+  db.hook(POST_VALIDATOR);
+  db.hook(AUTHOR_VALIDATOR);
 };

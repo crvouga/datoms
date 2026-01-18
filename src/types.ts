@@ -2,26 +2,15 @@
  * Core types for the datoms database
  */
 
-// Re-export core datom types and utilities from datoms module
-export { datoms, records } from "./datoms.js";
-export type {
-  Attribute,
-  Datom,
-  DatomInput,
-  EntityId,
-  TransactionId,
-  Value,
-} from "./datoms.js";
-
 // Import types for use in this file
 import type {
   Attribute,
   Datom,
   DatomOperation,
-  EntityId,
   TransactionId,
   Value,
 } from "./datoms.js";
+import { EntityId } from "./entity-id.js";
 
 /**
  * Options for querying datoms

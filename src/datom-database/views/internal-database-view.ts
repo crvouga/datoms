@@ -1,15 +1,18 @@
 /**
- * Abstract datom database class for working with datoms
- * Provides a high-level interface for working with datoms and datalog queries
+ * Internal database view interface for implementation details
+ * Used internally by database views and implementations
+ * Not part of the public API
  */
 
 import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
-import type { Datom, QueryOptions, TransactionId } from "../../types.js";
+import type { Datom, TransactionId } from "../../datoms.js";
+import type { QueryOptions } from "../../types.js";
 
 /**
- * Read-only database view for time-travel queries (Datomic-like)
- * Provides minimal interface for querying historical or filtered database states
- * Views are immutable and cannot modify the database
+ * Internal database view interface
+ * Contains methods needed by database views and internal operations
+ * This interface is separate from the public DatomDatabase interface
+ * @internal
  */
 export interface InternalDatabaseView {
   /**
@@ -35,6 +38,26 @@ export interface InternalDatabaseView {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResult>;
+
+  /**
+   * Get raw datoms without deduplication for time-travel queries.
+   * This method is used by database views to get all datoms matching filters
+   * before applying time-travel specific deduplication logic.
+   * Implementations must provide backend-specific logic to return undeduplicated results.
+   * @param options Query options
+   * @returns Array of matching datoms without deduplication
+   * @internal
+   */
+  getRawDatoms(options: QueryOptions): Promise<Datom[]>;
+
+  /**
+   * Execute the actual query (implemented by implementations)
+   * This is the core query execution method used internally.
+   * @param options Query options
+   * @returns Array of matching datoms
+   * @internal
+   */
+  executeQuery(options: QueryOptions): Promise<Datom[]>;
 
   /**
    * Execute an asOf query - returns datoms with tx <= txId, deduplicated by (entity, attribute).

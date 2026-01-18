@@ -4,7 +4,8 @@
  */
 
 import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
-import type { Datom, QueryOptions } from "../../types.js";
+import type { Datom } from "../../datoms.js";
+import type { QueryOptions } from "../../types.js";
 
 /**
  * Read-only database view for time-travel queries (Datomic-like)

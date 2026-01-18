@@ -3,7 +3,8 @@
  * Used by `with()` to represent dbBefore
  */
 
-import type { Datom, QueryOptions } from "../../types.js";
+import type { Datom } from "../../datoms.js";
+import type { QueryOptions } from "../../types.js";
 import { BaseDatabaseView } from "./base-database-view.js";
 import { InternalDatabaseView } from "./internal-database-view.js";
 

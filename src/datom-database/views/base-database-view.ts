@@ -4,13 +4,9 @@
  */
 
 import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
-import type {
-  Attribute,
-  Datom,
-  EntityId,
-  QueryOptions,
-  Value,
-} from "../../types.js";
+import type { Attribute, Datom, Value } from "../../datoms.js";
+import type { EntityId } from "../../entity-id.js";
+import type { QueryOptions } from "../../types.js";
 import { QuerySafetyError } from "../hook/hook.js";
 import {
   isQueryPattern,

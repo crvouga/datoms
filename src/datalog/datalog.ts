@@ -2,7 +2,8 @@
  * Datalog query interface and parser
  */
 
-import type { Attribute, EntityId, Value } from "../datoms.js";
+import type { Attribute, Value } from "../datoms.js";
+import type { EntityId } from "../entity-id.js";
 
 export type DatalogQueryVariable = `?${string}`;
 

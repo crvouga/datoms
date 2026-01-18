@@ -14,12 +14,11 @@ import type {
   Attribute,
   Datom,
   DatomInput,
-  EntityId,
-  QueryOptions,
-  Transaction,
   TransactionId,
   Value,
-} from "../../types.js";
+} from "../../datoms.js";
+import type { EntityId } from "../../entity-id.js";
+import type { QueryOptions, Transaction } from "../../types.js";
 
 import { DatomDatabase } from "../datom-database.js";
 import {
@@ -37,6 +36,11 @@ import {
 import { applyAggregations } from "../in-memory/aggregations/computation.js";
 import { parseAggregation } from "../in-memory/aggregations/parser.js";
 import {
+  deserializeEntityId,
+  serializeEntityId,
+  validateEntityId,
+} from "../../entity-id.js";
+import {
   isQueryPattern,
   isVariable,
   stripQuestionMark,
@@ -46,6 +50,7 @@ import { AsOfDatabaseView } from "../views/as-of-database-view.js";
 import { CurrentDatabaseView } from "../views/current-database-view.js";
 import { DatabaseView } from "../views/database-view.js";
 import { HistoryDatabaseView } from "../views/history-database-view.js";
+import { InternalDatabaseView } from "../views/internal-database-view.js";
 import { SinceDatabaseView } from "../views/since-database-view.js";
 import { SpeculativeDatabaseView } from "../views/speculative-database-view.js";
 import {
@@ -58,7 +63,9 @@ import type { WithResult } from "../datom-database.js";
  * PostgreSQL database implementation
  * Accepts a SqlDatabase that implements PostgreSQL-compatible SQL
  */
-export class PostgreSQLDatomDatabase implements DatomDatabase {
+export class PostgreSQLDatomDatabase
+  implements DatomDatabase, InternalDatabaseView
+{
   public readonly hooks: HookEngine;
   protected initialized = false;
   private connection: SQLDatabase;
@@ -413,26 +420,18 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     };
   }
 
+  // EntityId utility methods (delegating to shared utilities)
+  // These are kept for backward compatibility but are not part of the DatomDatabase interface
   validateEntityId(entityId: unknown): entityId is EntityId {
-    if (typeof entityId === "number" || typeof entityId === "string") {
-      return true;
-    }
-    throw new Error(
-      `Invalid EntityId type: expected number or string, got ${typeof entityId}`
-    );
+    return validateEntityId(entityId);
   }
 
   serializeEntityId(entityId: EntityId): string {
-    return String(entityId);
+    return serializeEntityId(entityId);
   }
 
   deserializeEntityId(serialized: string): EntityId {
-    // Try to parse as number first
-    const num = Number(serialized);
-    if (!isNaN(num) && isFinite(num) && String(num) === serialized) {
-      return num;
-    }
-    return serialized;
+    return deserializeEntityId(serialized);
   }
 
   public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {

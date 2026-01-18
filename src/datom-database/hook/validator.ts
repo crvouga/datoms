@@ -3,7 +3,7 @@
  * Provides a convenient API for building up error lists
  */
 
-import type { Datom } from "../../types.js";
+import type { Datom } from "../../datoms.js";
 import { HookError } from "./hook.js";
 
 /**

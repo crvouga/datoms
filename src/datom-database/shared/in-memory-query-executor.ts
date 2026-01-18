@@ -3,7 +3,8 @@
  * Extracted to avoid circular dependencies between InMemoryDatomDatabase and SpeculativeDatabaseView
  */
 
-import type { Datom, QueryOptions } from "../../types.js";
+import type { Datom } from "../../datoms.js";
+import type { QueryOptions } from "../../types.js";
 
 /**
  * Execute a query on an array of datoms

@@ -2,10 +2,7 @@
  * Core datom types and utilities
  */
 
-/**
- * A unique identifier for an entity
- */
-export type EntityId = number | string;
+import { EntityId } from "./entity-id";
 
 /**
  * An attribute name (e.g., "name", "age", "email", "user/type", "user/email", "user/name")

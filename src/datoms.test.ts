@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { datoms, records, type DatomInput, type EntityId } from "./datoms.js";
+import { datoms, records, type DatomInput } from "./datoms.js";
+import type { EntityId } from "./entity-id.js";
 
 describe("datoms", () => {
   describe("single record", () => {
