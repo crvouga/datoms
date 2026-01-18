@@ -58,8 +58,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const distinctValue = results[0]!["distinctNames"];
       expect(
         distinctValue === null ||
-        distinctValue === undefined ||
-        (Array.isArray(distinctValue) && distinctValue.length === 0)
+          distinctValue === undefined ||
+          (Array.isArray(distinctValue) && distinctValue.length === 0)
       ).toBe(true);
 
       await db.close();

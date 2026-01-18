@@ -198,8 +198,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["count"]).toBe(0);
       expect(
         results[0]!["average"] === null ||
-        results[0]!["average"] === undefined ||
-        results[0]!["average"] === 0
+          results[0]!["average"] === undefined ||
+          results[0]!["average"] === 0
       ).toBe(true);
       expect(
         results[0]!["maximum"] === null || results[0]!["maximum"] === undefined

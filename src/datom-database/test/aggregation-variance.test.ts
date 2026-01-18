@@ -48,7 +48,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       expect(
         results[0]!["variance"] === null ||
-        results[0]!["variance"] === undefined
+          results[0]!["variance"] === undefined
       ).toBe(true);
 
       await db.close();
@@ -68,8 +68,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Variance of single value should be 0 or null/undefined
       expect(
         results[0]!["variance"] === 0 ||
-        results[0]!["variance"] === null ||
-        results[0]!["variance"] === undefined
+          results[0]!["variance"] === null ||
+          results[0]!["variance"] === undefined
       ).toBe(true);
 
       await db.close();

@@ -48,8 +48,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Average of empty set could be null, undefined, or 0 depending on implementation
       expect(
         results[0]!["average"] === null ||
-        results[0]!["average"] === undefined ||
-        results[0]!["average"] === 0
+          results[0]!["average"] === undefined ||
+          results[0]!["average"] === 0
       ).toBe(true);
 
       await db.close();
