@@ -11,6 +11,71 @@ import type { SQLDatabase } from "./sql-database.js";
 import type { DatabaseRow, SQLParams } from "./types.js";
 
 /**
+ * SSL configuration for PostgreSQL connection
+ */
+type SSLConfig =
+  | false
+  | {
+    rejectUnauthorized?: boolean;
+    ca?: string;
+  };
+
+/**
+ * Result of parsing connection string for SSL config
+ */
+interface ParsedConnectionConfig {
+  connectionString: string;
+  ssl?: SSLConfig;
+}
+
+/**
+ * Parse connection string and extract SSL configuration
+ */
+function parseSSLConfig(connectionString: string): ParsedConnectionConfig {
+  const url = new URL(connectionString);
+  const sslMode = url.searchParams.get("sslmode");
+  const sslRootCert = url.searchParams.get("sslrootcert");
+
+  // Remove SSL params from URL as we'll handle them in Pool config
+  url.searchParams.delete("sslmode");
+  url.searchParams.delete("sslrootcert");
+  const cleanConnectionString = url.toString();
+
+  // Configure SSL based on parameters
+  if (sslMode === "require" || sslMode === "verify-full" || sslMode === "verify-ca") {
+    const sslConfig: SSLConfig = {
+      rejectUnauthorized: sslMode === "verify-full" || sslMode === "verify-ca",
+    };
+
+    // Handle sslrootcert=system - use Node's default CA certificates
+    // When sslrootcert is "system" or not provided, use default CA store
+    if (sslRootCert && sslRootCert !== "system") {
+      // If a specific cert file is provided, use it
+      sslConfig.ca = sslRootCert;
+    }
+    // If sslrootcert=system or not specified, don't set ca property
+    // This allows Node.js to use its default CA certificates
+
+    return {
+      connectionString: cleanConnectionString,
+      ssl: sslConfig,
+    };
+  }
+
+  // No SSL or disable SSL
+  if (sslMode === "disable") {
+    return {
+      connectionString: cleanConnectionString,
+      ssl: false,
+    };
+  }
+
+  return {
+    connectionString: cleanConnectionString,
+  };
+}
+
+/**
  * PostgreSQL connection wrapper that implements SqlConnection interface
  */
 export class PgSQLDatabase implements SQLDatabase {
@@ -20,10 +85,19 @@ export class PgSQLDatabase implements SQLDatabase {
   private closed: boolean = false;
 
   constructor(connectionString: string) {
-    this.pool = new Pool({
-      connectionString,
+    const parsed = parseSSLConfig(connectionString);
+    const poolConfig: {
+      connectionString: string;
+      max: number;
+      ssl?: SSLConfig;
+    } = {
+      connectionString: parsed.connectionString,
       max: 1, // Use single connection for test isolation
-    });
+    };
+    if (parsed.ssl !== undefined) {
+      poolConfig.ssl = parsed.ssl;
+    }
+    this.pool = new Pool(poolConfig);
   }
 
   /**

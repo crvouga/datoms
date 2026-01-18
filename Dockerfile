@@ -1,44 +1,22 @@
-# Use Bun official image
-FROM oven/bun:1 AS base
+FROM oven/bun:1-alpine
+
+RUN apk add --no-cache curl
+
 WORKDIR /app
 
-# Install dependencies into temp directory
-# This will cache them and speed up future builds
-FROM base AS install
-RUN mkdir -p /temp/dev
-COPY package.json bun.lockb* /temp/dev/
-RUN cd /temp/dev && bun install --frozen-lockfile
+COPY package.json bun.lock bunfig.toml ./
 
-# Install with --production (exclude devDependencies)
-RUN mkdir -p /temp/prod
-COPY package.json bun.lockb* /temp/prod/
-RUN cd /temp/prod && bun install --frozen-lockfile --production
+RUN bun install --frozen-lockfile
 
-# Copy node_modules from temp directory
-# Then copy all (non-ignored) project files into the image
-FROM base AS prerelease
-COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
 
-# Copy production dependencies and source code into final image
-FROM base AS release
-COPY --from=install /temp/prod/node_modules node_modules
-COPY --from=prerelease /app/moviefinder.app ./moviefinder.app
-COPY --from=prerelease /app/src ./src
-COPY --from=prerelease /app/package.json ./
-COPY --from=prerelease /app/bun.lockb* ./
+ARG NODE_ENV=production
+ARG PORT=8080
 
-ARG NODE_ENV
-ENV NODE_ENV=production
-ARG DATABASE_URL
-ENV DATABASE_URL=${DATABASE_URL}
-ARG PORT
+ENV NODE_ENV=${NODE_ENV}
 ENV PORT=${PORT}
 
+EXPOSE ${PORT}
 
-# Expose port (Railway will set PORT env var)
-EXPOSE 3000
-
-# Run the app
-WORKDIR /app
 CMD ["bun", "run", "moviefinder.app/src/index.ts"]
+

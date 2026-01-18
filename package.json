@@ -38,7 +38,7 @@
     "moviefinderapp:docker:down": "cd moviefinder.app && docker-compose down",
     "moviefinderapp:docker:up": "cd moviefinder.app && docker-compose up -d",
     "prepublishOnly": "npm run build",
-    "preview": "docker build -t datoms-preview -f Dockerfile . && docker run --name datoms-preview --rm --env-file .env -p 8080:8080 datoms-preview",
+    "preview": "docker build --no-cache -t datoms-preview -f Dockerfile . && docker run --name datoms-preview --rm --env-file .env -p 8080:8080 datoms-preview",
     "psql": "cd moviefinder.app && docker-compose exec postgres psql -U postgres -d postgres",
     "server": "bun --watch moviefinder.app/src/index.ts",
     "tc": "bun typecheck -- --watch",
