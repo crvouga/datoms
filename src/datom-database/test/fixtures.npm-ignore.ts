@@ -1,11 +1,11 @@
 import { unlinkSync } from "fs";
-import { PgSQLDatabase } from "../sql-database/sql-database-pg.npm-ignore.js";
-import { PGLiteSQLDatabase } from "../sql-database/sql-database-pglite.npm-ignore.js";
-import { SQLiteSQLDatabase } from "../sql-database/sql-database-sqlite.npm-ignore.js";
-import { PostgreSQLDatomDatabase } from "../datom-database/postgres/postgres-datom-database.js";
-import { InMemoryDatomDatabase } from "../datom-database/in-memory/in-memory-datom-database.js";
-import { SQLiteDatomDatabase } from "../datom-database/sqlite/sqlite-datom-database.js";
-import { DatomDatabase } from "../datom-database/datom-database.js";
+import { PgSQLDatabase } from "../../sql-database/sql-database-pg.npm-ignore.js";
+import { PGLiteSQLDatabase } from "../../sql-database/sql-database-pglite.npm-ignore.js";
+import { SQLiteSQLDatabase } from "../../sql-database/sql-database-sqlite.npm-ignore.js";
+import { PostgreSQLDatomDatabase } from "../postgres/postgres-datom-database.js";
+import { InMemoryDatomDatabase } from "../in-memory/in-memory-datom-database.js";
+import { SQLiteDatomDatabase } from "../sqlite/sqlite-datom-database.js";
+import { DatomDatabase } from "../datom-database.js";
 
 export type Fixture = {
   db: DatomDatabase;

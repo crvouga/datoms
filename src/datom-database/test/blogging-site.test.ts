@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-
-import { TransactionError } from "../datom-database/hook/hook.js";
-import { datoms } from "../datoms.js";
+import { datoms } from "../../datoms.js";
+import { TransactionError } from "../hook/hook.js";
 import {
   AUTHOR_VALIDATOR,
   POST_ACCESS_CONTROL,

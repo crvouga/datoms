@@ -1,8 +1,8 @@
-import { DatomDatabase } from "../datom-database/datom-database.js";
-import type { Hook } from "../datom-database/hook/hook.js";
-import { HookValidator } from "../datom-database/hook/validator.js";
-import { Attribute, records, Value, type Datom } from "../datoms.js";
-import type { EntityId } from "../entity-id.js";
+import { Attribute, records, Value, type Datom } from "../../datoms.js";
+import type { EntityId } from "../../entity-id.js";
+import { DatomDatabase } from "../datom-database.js";
+import type { Hook } from "../hook/hook.js";
+import { HookValidator } from "../hook/validator.js";
 
 // Schema constants
 export const USER_TYPE = "user/type";
