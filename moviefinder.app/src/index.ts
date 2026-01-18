@@ -36,8 +36,7 @@ async function main() {
     const maintenanceIntervalMs = process.env.POSTGRES_MAINTENANCE_INTERVAL_MS
       ? parseInt(process.env.POSTGRES_MAINTENANCE_INTERVAL_MS, 10)
       : 3600000; // Default: 1 hour
-    const tableName =
-      process.env.POSTGRES_TABLE_NAME || "datoms"; // Default: "datoms"
+    const tableName = process.env.POSTGRES_TABLE_NAME || "datoms"; // Default: "datoms"
     // Validate table name to prevent SQL injection (alphanumeric and underscores only)
     if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
       throw new Error(
@@ -119,11 +118,31 @@ async function main() {
                 { e: "?movie/id", a: "tmdb.movie/id", v: "?id" },
                 { e: "?movie/id", a: "tmdb.movie/title", v: "?title" },
                 { e: "?movie/id", a: "tmdb.movie/overview", v: "?overview" },
-                { e: "?movie/id", a: "tmdb.movie/release_date", v: "?release_date" },
-                { e: "?movie/id", a: "tmdb.movie/poster_path", v: "?poster_path" },
-                { e: "?movie/id", a: "tmdb.movie/backdrop_path", v: "?backdrop_path" },
-                { e: "?movie/id", a: "tmdb.movie/vote_average", v: "?vote_average" },
-                { e: "?movie/id", a: "tmdb.movie/vote_count", v: "?vote_count" },
+                {
+                  e: "?movie/id",
+                  a: "tmdb.movie/release_date",
+                  v: "?release_date",
+                },
+                {
+                  e: "?movie/id",
+                  a: "tmdb.movie/poster_path",
+                  v: "?poster_path",
+                },
+                {
+                  e: "?movie/id",
+                  a: "tmdb.movie/backdrop_path",
+                  v: "?backdrop_path",
+                },
+                {
+                  e: "?movie/id",
+                  a: "tmdb.movie/vote_average",
+                  v: "?vote_average",
+                },
+                {
+                  e: "?movie/id",
+                  a: "tmdb.movie/vote_count",
+                  v: "?vote_count",
+                },
               ],
               orderBy: [["?vote_average", "desc"]],
               limit: 25,
