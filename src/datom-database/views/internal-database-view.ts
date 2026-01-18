@@ -29,17 +29,6 @@ export type ViewConfig =
  */
 export interface InternalDatabaseView extends DatomDatabase {
   /**
-   * Get raw datoms without deduplication for time-travel queries.
-   * This method is used by database views to get all datoms matching filters
-   * before applying time-travel specific deduplication logic.
-   * Implementations must provide backend-specific logic to return undeduplicated results.
-   * @param options Query options
-   * @returns Array of matching datoms without deduplication
-   * @internal
-   */
-  getRawDatoms(options: QueryOptions): Promise<Datom[]>;
-
-  /**
    * Execute the actual query (implemented by implementations)
    * This is the core query execution method used internally.
    * @param options Query options

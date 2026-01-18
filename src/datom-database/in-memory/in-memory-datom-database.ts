@@ -362,30 +362,6 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     return results;
   }
 
-  public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
-    // Get all datoms matching filters without deduplication
-    let results = this._datomsArray;
-
-    // Apply filters
-    if (options.e !== undefined) {
-      results = results.filter((d) => d.e === options.e);
-    }
-    if (options.a !== undefined) {
-      results = results.filter((d) => d.a === options.a);
-    }
-    if (options.v !== undefined) {
-      results = results.filter((d) => d.v === options.v);
-    }
-    if (options.tx !== undefined) {
-      results = results.filter((d) => d.tx === options.tx);
-    }
-
-    // Don't filter by add - return all datoms including sub
-    // The view will handle filtering and deduplication
-
-    return results;
-  }
-
   async executeQuery(options: QueryOptions): Promise<Datom[]> {
     return executeQueryOnDatoms(this._datomsArray, options);
   }
@@ -565,7 +541,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      // When all positions are variables, use getRawDatoms to bypass validation
+      // When all positions are variables, use executeHistoryQuery to bypass validation
       // then apply deduplication and filtering to get current state
       const hasAnyFilter =
         entity !== undefined || attribute !== undefined || value !== undefined;
@@ -573,7 +549,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
       let clauseDatoms: Datom[];
       if (!hasAnyFilter) {
         // All variables - get all datoms without validation, then deduplicate and filter
-        const rawDatoms = await this.getRawDatoms({});
+        const rawDatoms = await this.executeHistoryQuery({});
         clauseDatoms = executeQueryOnDatoms(rawDatoms, {});
       } else {
         // Has filters - use normal datoms() method
