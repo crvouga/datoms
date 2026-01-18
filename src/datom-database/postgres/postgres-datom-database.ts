@@ -46,16 +46,12 @@ import {
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
 import { joinResults, project } from "../shared/query-results.js";
-import { AsOfDatabaseView } from "../views/as-of-database-view.js";
-import { CurrentDatabaseView } from "../views/current-database-view.js";
 import { DatabaseView } from "../views/database-view.js";
-import { HistoryDatabaseView } from "../views/history-database-view.js";
-import type {
-  InternalDatabaseView,
-  ViewConfig,
+import {
+  ConfiguredDatabaseView,
+  type InternalDatabaseView,
+  type ViewConfig,
 } from "../views/internal-database-view.js";
-import { SinceDatabaseView } from "../views/since-database-view.js";
-import { SpeculativeDatabaseView } from "../views/speculative-database-view.js";
 import {
   aggregationToSQL,
   checkSQLAggregations,
@@ -362,15 +358,15 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   }
 
   asOf(txId: TransactionId): DatabaseView {
-    return new AsOfDatabaseView(this, txId);
+    return new ConfiguredDatabaseView(this, { type: "asOf", txId });
   }
 
   history(): DatabaseView {
-    return new HistoryDatabaseView(this);
+    return new ConfiguredDatabaseView(this, { type: "history" });
   }
 
   since(txId: TransactionId): DatabaseView {
-    return new SinceDatabaseView(this, txId);
+    return new ConfiguredDatabaseView(this, { type: "since", txId });
   }
 
   async with(ops: DatomInput[]): Promise<WithResult> {
@@ -400,14 +396,14 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     }
 
     // Create dbBefore view (current state)
-    const dbBefore = new CurrentDatabaseView(this);
+    const dbBefore = new ConfiguredDatabaseView(this, { type: "current" });
 
     // Create dbAfter view (speculative state)
-    const dbAfter = new SpeculativeDatabaseView(
-      this,
-      speculativeAsserts,
-      speculativeRetracts
-    );
+    const dbAfter = new ConfiguredDatabaseView(this, {
+      type: "speculative",
+      adds: speculativeAsserts,
+      subs: speculativeRetracts,
+    });
 
     // Generate txData (all datoms that would be applied)
     const txData: Datom[] = [...speculativeRetracts, ...speculativeAsserts];
@@ -1671,7 +1667,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     return stats;
   }
 
-  public async executeQueryWithViewConfig(
+  public async _executeQuery(
     options: QueryOptions,
     viewConfig: ViewConfig
   ): Promise<Datom[]> {
@@ -1750,7 +1746,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     );
   }
 
-  public async executeDatalogQueryWithViewConfig(
+  public async _executeDatalogQuery(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
@@ -1793,7 +1789,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const clauseDatoms = await this.executeQueryWithViewConfig(
+      const clauseDatoms = await this._executeQuery(
         {
           e: entity,
           a: attribute,
@@ -1842,7 +1838,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const firstDatoms = await this.executeQueryWithViewConfig(
+      const firstDatoms = await this._executeQuery(
         {
           e: entity,
           a: attribute,
@@ -1880,7 +1876,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
           : (attributeVal as string);
         const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-        const clauseDatoms = await this.executeQueryWithViewConfig(
+        const clauseDatoms = await this._executeQuery(
           {
             e: entity,
             a: attribute,

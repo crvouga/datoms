@@ -3,12 +3,7 @@
  * Accepts a SqlConnection interface for SQLite-compatible databases
  */
 
-import type {
-  DatalogQuery,
-  QueryClause,
-  QueryResult,
-} from "../../datalog/datalog.js";
-import type { SQLDatabase } from "../../sql-database/sql-database.js";
+import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
 import type {
   Attribute,
   Datom,
@@ -17,7 +12,14 @@ import type {
   Value,
 } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
+import {
+  deserializeEntityId,
+  serializeEntityId,
+  validateEntityId,
+} from "../../entity-id.js";
+import type { SQLDatabase } from "../../sql-database/sql-database.js";
 import type { QueryOptions, Transaction } from "../../types.js";
+import type { WithResult } from "../datom-database.js";
 import { DatomDatabase } from "../datom-database.js";
 import {
   Hook,
@@ -32,27 +34,17 @@ import {
   type WriteResult,
 } from "../hook/hook.js";
 import {
-  deserializeEntityId,
-  serializeEntityId,
-  validateEntityId,
-} from "../../entity-id.js";
-import {
   isQueryPattern,
   isVariable,
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
 import { joinResults, project } from "../shared/query-results.js";
-import { AsOfDatabaseView } from "../views/as-of-database-view.js";
-import { CurrentDatabaseView } from "../views/current-database-view.js";
 import { DatabaseView } from "../views/database-view.js";
-import { HistoryDatabaseView } from "../views/history-database-view.js";
-import type {
-  InternalDatabaseView,
-  ViewConfig,
+import {
+  ConfiguredDatabaseView,
+  type InternalDatabaseView,
+  type ViewConfig,
 } from "../views/internal-database-view.js";
-import { SinceDatabaseView } from "../views/since-database-view.js";
-import { SpeculativeDatabaseView } from "../views/speculative-database-view.js";
-import type { WithResult } from "../datom-database.js";
 
 /**
  * SQLite database implementation
@@ -328,15 +320,15 @@ export class SQLiteDatomDatabase
   }
 
   asOf(txId: TransactionId): DatabaseView {
-    return new AsOfDatabaseView(this, txId);
+    return new ConfiguredDatabaseView(this, { type: "asOf", txId });
   }
 
   history(): DatabaseView {
-    return new HistoryDatabaseView(this);
+    return new ConfiguredDatabaseView(this, { type: "history" });
   }
 
   since(txId: TransactionId): DatabaseView {
-    return new SinceDatabaseView(this, txId);
+    return new ConfiguredDatabaseView(this, { type: "since", txId });
   }
 
   async with(ops: DatomInput[]): Promise<WithResult> {
@@ -366,14 +358,14 @@ export class SQLiteDatomDatabase
     }
 
     // Create dbBefore view (current state)
-    const dbBefore = new CurrentDatabaseView(this);
+    const dbBefore = new ConfiguredDatabaseView(this, { type: "current" });
 
     // Create dbAfter view (speculative state)
-    const dbAfter = new SpeculativeDatabaseView(
-      this,
-      speculativeAsserts,
-      speculativeRetracts
-    );
+    const dbAfter = new ConfiguredDatabaseView(this, {
+      type: "speculative",
+      adds: speculativeAsserts,
+      subs: speculativeRetracts,
+    });
 
     // Generate txData (all datoms that would be applied)
     const txData: Datom[] = [...speculativeRetracts, ...speculativeAsserts];
@@ -1223,43 +1215,6 @@ export class SQLiteDatomDatabase
     await this.connection.execute(sql, params);
   }
 
-  private async executeClause(
-    clause: QueryClause
-  ): Promise<Record<string, Value | Attribute>[]> {
-    if (!isQueryPattern(clause)) {
-      throw new Error("Only QueryPattern clauses are supported");
-    }
-    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-    const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
-    const attribute = isVariable(attributeVal)
-      ? undefined
-      : (attributeVal as string);
-    const value = isVariable(valueVal) ? undefined : (valueVal as Value);
-
-    // Datalog queries manage their own limiting via joins, so bypass validation
-    const queryOptions: QueryOptions = {
-      ...(entity !== undefined && { e: entity }),
-      ...(attribute !== undefined && { a: attribute }),
-      ...(value !== undefined && { v: value }),
-    };
-
-    const datoms = await this.datoms(queryOptions);
-
-    return datoms.map((datom: Datom) => {
-      const result: Record<string, Value | Attribute> = {};
-      if (isVariable(entityVal)) {
-        result[entityVal as string] = datom.e;
-      }
-      if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom.a;
-      }
-      if (isVariable(valueVal)) {
-        result[valueVal as string] = datom.v;
-      }
-      return result;
-    });
-  }
-
   /**
    * Get metadata associated with a transaction
    * Default implementation returns undefined (metadata storage not implemented)
@@ -1350,7 +1305,7 @@ export class SQLiteDatomDatabase
     return stats;
   }
 
-  public async executeQueryWithViewConfig(
+  public async _executeQuery(
     options: QueryOptions,
     viewConfig: ViewConfig
   ): Promise<Datom[]> {
@@ -1429,7 +1384,7 @@ export class SQLiteDatomDatabase
     );
   }
 
-  public async executeDatalogQueryWithViewConfig(
+  public async _executeDatalogQuery(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
@@ -1470,7 +1425,7 @@ export class SQLiteDatomDatabase
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const datoms = await this.executeQueryWithViewConfig(
+      const datoms = await this._executeQuery(
         {
           e: entity,
           a: attribute,
@@ -1529,7 +1484,7 @@ export class SQLiteDatomDatabase
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const clauseDatoms = await this.executeQueryWithViewConfig(
+      const clauseDatoms = await this._executeQuery(
         {
           e: entity,
           a: attribute,
@@ -1575,7 +1530,7 @@ export class SQLiteDatomDatabase
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const firstDatoms = await this.executeQueryWithViewConfig(
+      const firstDatoms = await this._executeQuery(
         {
           e: entity,
           a: attribute,
@@ -1613,7 +1568,7 @@ export class SQLiteDatomDatabase
           : (attributeVal as string);
         const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-        const clauseDatoms = await this.executeQueryWithViewConfig(
+        const clauseDatoms = await this._executeQuery(
           {
             e: entity,
             a: attribute,

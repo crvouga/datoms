@@ -8,6 +8,8 @@ import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
 import type { Datom, TransactionId } from "../../datoms.js";
 import type { QueryOptions } from "../../types.js";
 import { DatomDatabase } from "../datom-database.js";
+import { validateQueryOptions } from "../shared/query-validation.js";
+import { DatabaseView } from "./database-view.js";
 
 /**
  * Configuration for database views
@@ -29,53 +31,6 @@ export type ViewConfig =
  */
 export interface InternalDatabaseView extends DatomDatabase {
   /**
-   * Execute the actual query (implemented by implementations)
-   * This is the core query execution method used internally.
-   * @param options Query options
-   * @returns Array of matching datoms
-   * @internal
-   */
-  executeQuery(options: QueryOptions): Promise<Datom[]>;
-
-  /**
-   * Execute an asOf query - returns datoms with tx <= txId, deduplicated by (entity, attribute).
-   * This method is called by AsOfDatabaseView to leverage database-native query optimization.
-   * Implementations must provide backend-specific logic for efficient time-travel queries.
-   * @param options Query options
-   * @param txId Transaction ID to query as-of
-   * @returns Array of matching datoms deduplicated by (entity, attribute)
-   * @internal
-   */
-  executeAsOfQuery(
-    options: QueryOptions,
-    txId: TransactionId
-  ): Promise<Datom[]>;
-
-  /**
-   * Execute a history query - returns all datoms including sub, without deduplication.
-   * This method is called by HistoryDatabaseView to leverage database-native query optimization.
-   * Implementations must provide backend-specific logic for efficient history queries.
-   * @param options Query options
-   * @returns Array of all matching datoms (including sub)
-   * @internal
-   */
-  executeHistoryQuery(options: QueryOptions): Promise<Datom[]>;
-
-  /**
-   * Execute a since query - returns datoms with tx > txId, deduplicated by (entity, attribute, value).
-   * This method is called by SinceDatabaseView to leverage database-native query optimization.
-   * Implementations must provide backend-specific logic for efficient since queries.
-   * @param options Query options
-   * @param txId Transaction ID - only changes after this will be included
-   * @returns Array of matching datoms deduplicated by (entity, attribute, value)
-   * @internal
-   */
-  executeSinceQuery(
-    options: QueryOptions,
-    txId: TransactionId
-  ): Promise<Datom[]>;
-
-  /**
    * Execute a query with view configuration.
    * This method routes queries to the appropriate implementation method based on view config.
    * @param options Query options
@@ -83,7 +38,7 @@ export interface InternalDatabaseView extends DatomDatabase {
    * @returns Array of matching datoms
    * @internal
    */
-  executeQueryWithViewConfig(
+  _executeQuery(
     options: QueryOptions,
     viewConfig: ViewConfig
   ): Promise<Datom[]>;
@@ -97,9 +52,36 @@ export interface InternalDatabaseView extends DatomDatabase {
    * @returns Query results as an array of records
    * @internal
    */
-  executeDatalogQueryWithViewConfig(
+  _executeDatalogQuery(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
   ): Promise<QueryResult>;
+}
+
+/**
+ * Database view that is configured with a view config
+ * Used to create database views with specific configurations
+ * @internal
+ */
+export class ConfiguredDatabaseView implements DatabaseView {
+  constructor(
+    private db: InternalDatabaseView,
+    private viewConfig: ViewConfig
+  ) {}
+
+  async datoms(options: QueryOptions): Promise<Datom[]> {
+    // Validate that query has at least one filter or limit to prevent accidental full scans
+    validateQueryOptions(options);
+
+    // Route to implementation with view config
+    return this.db._executeQuery(options, this.viewConfig);
+  }
+
+  async query(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResult> {
+    return this.db._executeDatalogQuery(query, context, this.viewConfig);
+  }
 }
