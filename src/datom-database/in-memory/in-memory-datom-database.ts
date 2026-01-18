@@ -16,30 +16,57 @@ import type {
   DatomInput,
   EntityId,
   QueryOptions,
+  Transaction,
   TransactionId,
   Value,
 } from "../../types.js";
-
-import { DatomDatabase, QueryError } from "../datom-database.js";
-import type { ReadContext } from "../hook/hook.js";
+import { DatomDatabase } from "../datom-database.js";
+import {
+  Hook,
+  HookEngine,
+  QueryError,
+  QueryResultSizeError,
+  QuerySafetyError,
+  QueryTimeoutError,
+  TransactionError,
+  type ReadContext,
+  type WriteContext,
+  type WriteResult,
+} from "../hook/hook.js";
 import {
   isQueryPattern,
   isVariable,
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
+import { executeQueryOnDatoms } from "../shared/in-memory-query-executor.js";
 import { joinResults, project } from "../shared/query-results.js";
+import { AsOfDatabaseView } from "../views/as-of-database-view.js";
+import { CurrentDatabaseView } from "../views/current-database-view.js";
+import { DatabaseView } from "../views/database-view.js";
+import { HistoryDatabaseView } from "../views/history-database-view.js";
+import { SinceDatabaseView } from "../views/since-database-view.js";
+import { SpeculativeDatabaseView } from "../views/speculative-database-view.js";
+import type { WithResult } from "../datom-database.js";
 
 /**
  * In-memory database implementation
  * Stores datoms in memory using an array-based structure
  */
-export class InMemoryDatomDatabase extends DatomDatabase {
+export class InMemoryDatomDatabase implements DatomDatabase {
+  public readonly hooks: HookEngine;
+  protected initialized = false;
   private _datomsArray: Datom[] = [];
   private nextTx: TransactionId = 1;
   private queryCount: number = 0;
   private transactionCount: number = 0;
   private queryTimeSum: number = 0;
   private transactionTimeSum: number = 0;
+
+  constructor(initialDatoms: Datom[] = []) {
+    this.hooks = new HookEngine();
+    this._datomsArray = initialDatoms;
+    this.nextTx = Math.max(...initialDatoms.map((d) => d.tx)) + 1;
+  }
 
   async initialize(): Promise<void> {
     if (!this.initialized) {
@@ -52,6 +79,10 @@ export class InMemoryDatomDatabase extends DatomDatabase {
   async close(): Promise<void> {
     this._datomsArray = [];
     this.initialized = false;
+  }
+
+  hook(hook: Hook): void {
+    this.hooks.register(hook);
   }
 
   protected async writeDatoms(datoms: DatomInput[]): Promise<TransactionId> {
@@ -70,9 +101,267 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return tx;
   }
 
+  async transact(
+    ops: (DatomInput | DatomInput[])[],
+    metadata?: Record<string, unknown>,
+    context?: Record<string, unknown>
+  ): Promise<TransactionId> {
+    await this.ensureInitialized();
+
+    // Create write context
+    const ctx: WriteContext = {
+      db: this,
+      txMeta: metadata,
+      ...(context || {}),
+    };
+
+    // Process operations sequentially
+    const adds: DatomInput[] = [];
+    const subs: DatomInput[] = [];
+
+    for (const op of ops.flat()) {
+      const datom = { e: op.e, a: op.a, v: op.v, op: op.op };
+
+      if (op.op === "assert") {
+        // Validate add, accounting for subs already processed
+        await this.validateDatoms([datom], true, subs);
+        adds.push(datom);
+      } else {
+        // Validate sub
+        await this.validateDatoms([datom], false);
+        subs.push(datom);
+      }
+    }
+
+    // Convert to datoms for transaction object
+    const allDatoms: Datom[] = [];
+    const latestTx = await this.getLatestTransaction();
+    const txId = latestTx + 1;
+
+    for (const sub of subs) {
+      allDatoms.push({
+        e: sub.e,
+        a: sub.a,
+        v: sub.v,
+        tx: txId,
+        op: "retract",
+      });
+    }
+
+    for (const add of adds) {
+      allDatoms.push({
+        e: add.e,
+        a: add.a,
+        v: add.v,
+        tx: txId,
+        op: "assert",
+      });
+    }
+
+    // Create transaction object
+    const tx: Transaction = {
+      datoms: allDatoms,
+      meta: metadata,
+    };
+
+    // Run before-write hooks
+    const beforeResult = await this.hooks.runBeforeWrite(tx, ctx);
+
+    if (beforeResult.errors.length > 0) {
+      throw new TransactionError(
+        "Transaction validation failed",
+        beforeResult.errors
+      );
+    }
+
+    // Combine all datoms from the modified transaction (using the modified transaction from hooks)
+    const finalTx = beforeResult.tx;
+    const allFinalDatoms = finalTx.datoms.map((d) => ({
+      e: d.e,
+      a: d.a,
+      v: d.v,
+      op: d.op,
+    }));
+
+    // Write all datoms (both adds and subs) in a single call
+    // If there are no operations, still create a new transaction ID
+    const committedTxId = await this.writeDatoms(allFinalDatoms);
+
+    // Store metadata if provided
+    if (metadata !== undefined) {
+      await this.onTransactionMetadata(committedTxId, metadata);
+    }
+
+    // Create write result for after-write hooks
+    const writeResult: WriteResult = {
+      txId: committedTxId,
+      datoms: finalTx.datoms.map((d) => ({ ...d, tx: committedTxId })),
+      timestamp: Date.now(),
+    };
+
+    // Run after-write hooks (fire and forget, don't block)
+    this.hooks.runAfterWrite(writeResult, ctx).catch((err) => {
+      console.error("After-write hook failed:", err);
+    });
+
+    return committedTxId;
+  }
+
+  async onTransactionMetadata(
+    _txId: TransactionId,
+    _metadata: Record<string, unknown>
+  ): Promise<void> {
+    // Optional: Override in implementations if metadata storage is needed
+    // Default: no-op (metadata is ignored but still emitted in events)
+  }
+
+  protected async validateDatoms(
+    datoms: DatomInput[],
+    _isAdd: boolean,
+    _subsInSameTransaction?: DatomInput[]
+  ): Promise<void> {
+    // Basic runtime validation for cases where TypeScript types are bypassed
+    for (const datom of datoms) {
+      if (datom.e === null || datom.e === undefined) {
+        throw new Error("Datom must have an entity ID");
+      }
+      if (datom.a === null || datom.a === undefined) {
+        throw new Error("Datom must have an attribute");
+      }
+    }
+  }
+
+  protected async ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+  }
+
+  asOf(txId: TransactionId): DatabaseView {
+    return new AsOfDatabaseView(this, txId);
+  }
+
+  history(): DatabaseView {
+    return new HistoryDatabaseView(this);
+  }
+
+  since(txId: TransactionId): DatabaseView {
+    return new SinceDatabaseView(this, txId);
+  }
+
+  async with(ops: DatomInput[]): Promise<WithResult> {
+    await this.ensureInitialized();
+
+    // Get the next transaction ID for speculative datoms
+    const speculativeTxId = (await this.getLatestTransaction()) + 1;
+
+    // Process operations in sequence, creating speculative datoms directly
+    const speculativeAsserts: Datom[] = [];
+    const speculativeRetracts: Datom[] = [];
+
+    for (const op of ops) {
+      const speculativeDatom: Datom = {
+        e: op.e,
+        a: op.a,
+        v: op.v,
+        tx: speculativeTxId,
+        op: op.op,
+      };
+
+      if (op.op === "assert") {
+        speculativeAsserts.push(speculativeDatom);
+      } else {
+        speculativeRetracts.push(speculativeDatom);
+      }
+    }
+
+    // Create dbBefore view (current state)
+    const dbBefore = new CurrentDatabaseView(this);
+
+    // Create dbAfter view (speculative state)
+    const dbAfter = new SpeculativeDatabaseView(
+      this,
+      speculativeAsserts,
+      speculativeRetracts
+    );
+
+    // Generate txData (all datoms that would be applied)
+    const txData: Datom[] = [...speculativeRetracts, ...speculativeAsserts];
+
+    return {
+      dbBefore,
+      dbAfter,
+      txData,
+      tempIds: {}, // Empty for now, reserved for future tempid support
+    };
+  }
+
+  validateEntityId(entityId: unknown): entityId is EntityId {
+    if (typeof entityId === "number" || typeof entityId === "string") {
+      return true;
+    }
+    throw new Error(
+      `Invalid EntityId type: expected number or string, got ${typeof entityId}`
+    );
+  }
+
+  serializeEntityId(entityId: EntityId): string {
+    return String(entityId);
+  }
+
+  deserializeEntityId(serialized: string): EntityId {
+    // Try to parse as number first
+    const num = Number(serialized);
+    if (!isNaN(num) && isFinite(num) && String(num) === serialized) {
+      return num;
+    }
+    return serialized;
+  }
+
   async datoms(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
-    return super.datoms(options);
+    // Validate that query has at least one filter or limit to prevent accidental full scans
+    const hasFilter =
+      options.e !== undefined ||
+      options.a !== undefined ||
+      options.v !== undefined ||
+      options.tx !== undefined;
+    const hasLimit = options.limit !== undefined;
+
+    if (!hasFilter && !hasLimit) {
+      throw new QuerySafetyError(
+        "Query must include at least one filter (entity, attribute, value, tx) or a limit to prevent full table scans"
+      );
+    }
+
+    // Execute query with timeout if specified
+    let results: Datom[];
+    if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new QueryTimeoutError(options.timeoutMs!, options));
+        }, options.timeoutMs);
+      });
+
+      const queryPromise = this.executeQuery(options);
+      results = await Promise.race([queryPromise, timeoutPromise]);
+    } else {
+      results = await this.executeQuery(options);
+    }
+
+    // Check result size limit if specified
+    if (
+      options.maxResultSize !== undefined &&
+      results.length > options.maxResultSize
+    ) {
+      throw new QueryResultSizeError(
+        results.length,
+        options.maxResultSize,
+        options
+      );
+    }
+
+    return results;
   }
 
   public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
@@ -99,59 +388,8 @@ export class InMemoryDatomDatabase extends DatomDatabase {
     return results;
   }
 
-  protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
-    let results = this._datomsArray;
-
-    // Apply filters
-    if (options.e !== undefined) {
-      results = results.filter((d) => d.e === options.e);
-    }
-    if (options.a !== undefined) {
-      results = results.filter((d) => d.a === options.a);
-    }
-    if (options.v !== undefined) {
-      results = results.filter((d) => d.v === options.v);
-    }
-    if (options.tx !== undefined) {
-      results = results.filter((d) => d.tx === options.tx);
-    }
-
-    // Handle subions: for each unique (entity, attribute, value) combination,
-    // keep only the most recent transaction
-    // This ensures that sub datoms are not returned when querying
-    // and supports multi-valued attributes (multiple values per attribute)
-    // Always deduplicate first, then apply add filter
-
-    // Normal query: deduplicate and filter
-    // Deduplicate by (entity, attribute, value) to support multi-valued attributes
-    const latestDatoms = new Map<string, Datom>();
-    for (const datom of results) {
-      // Use (entity, attribute, value) key for regular queries to support multi-valued attributes
-      const key = `${String(datom.e)}|${String(
-        datom.a
-      )}|${JSON.stringify(datom.v)}`;
-      const existing = latestDatoms.get(key);
-      if (!existing || datom.tx > existing.tx) {
-        latestDatoms.set(key, datom);
-      }
-    }
-    results = Array.from(latestDatoms.values());
-
-    // Apply op filter after deduplication
-    // Default behavior: filter to only added datoms (exclude subed)
-    if (options.op === undefined || options.op === "assert") {
-      results = results.filter((d) => d.op === "assert");
-    } else if (options.op === "retract") {
-      // If explicitly requesting subions, filter by op: "retract"
-      results = results.filter((d) => d.op === "retract");
-    }
-
-    // Apply pagination
-    const offset = options.offset ?? 0;
-    const limit = options.limit;
-    const paginated = results.slice(offset, limit ? offset + limit : undefined);
-
-    return paginated;
+  async executeQuery(options: QueryOptions): Promise<Datom[]> {
+    return executeQueryOnDatoms(this._datomsArray, options);
   }
 
   public async executeAsOfQuery(
@@ -329,11 +567,24 @@ export class InMemoryDatomDatabase extends DatomDatabase {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const clauseDatoms = await this.queryInternal({
-        e: entity,
-        a: attribute,
-        v: value,
-      });
+      // When all positions are variables, use getRawDatoms to bypass validation
+      // then apply deduplication and filtering to get current state
+      const hasAnyFilter =
+        entity !== undefined || attribute !== undefined || value !== undefined;
+
+      let clauseDatoms: Datom[];
+      if (!hasAnyFilter) {
+        // All variables - get all datoms without validation, then deduplicate and filter
+        const rawDatoms = await this.getRawDatoms({});
+        clauseDatoms = executeQueryOnDatoms(rawDatoms, {});
+      } else {
+        // Has filters - use normal datoms() method
+        clauseDatoms = await this.datoms({
+          e: entity,
+          a: attribute,
+          v: value,
+        });
+      }
 
       for (const datom of clauseDatoms) {
         const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
@@ -441,45 +692,6 @@ export class InMemoryDatomDatabase extends DatomDatabase {
 
     // Map datom fields to variable names from the clause
     return matchingDatoms.map((datom) => {
-      const result: Record<string, Value | Attribute> = {};
-      if (isVariable(entityVal)) {
-        result[entityVal as string] = datom.e;
-      }
-      if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom.a;
-      }
-      if (isVariable(valueVal)) {
-        result[valueVal as string] = datom.v;
-      }
-      return result;
-    });
-  }
-
-  /**
-   * Execute a single query clause
-   */
-  private async executeClause(
-    clause: QueryClause
-  ): Promise<Record<string, Value | Attribute>[]> {
-    if (!isQueryPattern(clause)) {
-      throw new Error("Only QueryPattern clauses are supported");
-    }
-    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-    const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
-    const attribute = isVariable(attributeVal)
-      ? undefined
-      : (attributeVal as string);
-    const value = isVariable(valueVal) ? undefined : (valueVal as Value);
-
-    // Datalog queries manage their own limiting via joins, so bypass validation
-    const datoms = await this.queryInternal({
-      e: entity,
-      a: attribute,
-      v: value,
-    });
-
-    // Map datom fields to variable names from the clause
-    return datoms.map((datom) => {
       const result: Record<string, Value | Attribute> = {};
       if (isVariable(entityVal)) {
         result[entityVal as string] = datom.e;

@@ -15,33 +15,53 @@ import type {
   DatomInput,
   EntityId,
   QueryOptions,
+  Transaction,
   TransactionId,
   Value,
 } from "../../types.js";
-import { DatomDatabase, QueryError } from "../datom-database.js";
-import type { ReadContext } from "../hook/hook.js";
+import { DatomDatabase } from "../datom-database.js";
+import {
+  Hook,
+  HookEngine,
+  QueryError,
+  QueryResultSizeError,
+  QuerySafetyError,
+  QueryTimeoutError,
+  TransactionError,
+  type ReadContext,
+  type WriteContext,
+  type WriteResult,
+} from "../hook/hook.js";
 import {
   isQueryPattern,
   isVariable,
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
 import { joinResults, project } from "../shared/query-results.js";
+import { AsOfDatabaseView } from "../views/as-of-database-view.js";
+import { CurrentDatabaseView } from "../views/current-database-view.js";
+import { DatabaseView } from "../views/database-view.js";
+import { HistoryDatabaseView } from "../views/history-database-view.js";
+import { SinceDatabaseView } from "../views/since-database-view.js";
+import { SpeculativeDatabaseView } from "../views/speculative-database-view.js";
+import type { WithResult } from "../datom-database.js";
 
 /**
  * SQLite database implementation
  * Accepts a SqlDatabase that implements SQLite-compatible SQL
  */
-export class SQLiteDatomDatabase extends DatomDatabase {
+export class SQLiteDatomDatabase implements DatomDatabase {
+  public readonly hooks: HookEngine;
+  protected initialized = false;
   private connection: SQLDatabase;
   private tableName: string;
-  protected initialized = false;
   private queryCount: number = 0;
   private transactionCount: number = 0;
   private queryTimeSum: number = 0;
   private transactionTimeSum: number = 0;
 
   constructor(connection: SQLDatabase, tableName: string = "datoms") {
-    super();
+    this.hooks = new HookEngine();
     this.connection = connection;
     this.tableName = tableName;
   }
@@ -105,10 +125,277 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     this.initialized = false;
   }
 
+  hook(hook: Hook): void {
+    this.hooks.register(hook);
+  }
+
   protected async writeDatoms(datoms: DatomInput[]): Promise<TransactionId> {
     const tx = await this.getNextTransactionId();
     await this.writeDatomsInternal(datoms, tx);
     return tx;
+  }
+
+  async transact(
+    ops: (DatomInput | DatomInput[])[],
+    metadata?: Record<string, unknown>,
+    context?: Record<string, unknown>
+  ): Promise<TransactionId> {
+    await this.ensureInitialized();
+
+    // Create write context
+    const ctx: WriteContext = {
+      db: this,
+      txMeta: metadata,
+      ...(context || {}),
+    };
+
+    // Process operations sequentially
+    const adds: DatomInput[] = [];
+    const subs: DatomInput[] = [];
+
+    for (const op of ops.flat()) {
+      const datom = { e: op.e, a: op.a, v: op.v, op: op.op };
+
+      if (op.op === "assert") {
+        // Validate add, accounting for subs already processed
+        await this.validateDatoms([datom], true, subs);
+        adds.push(datom);
+      } else {
+        // Validate sub
+        await this.validateDatoms([datom], false);
+        subs.push(datom);
+      }
+    }
+
+    // Convert to datoms for transaction object
+    const allDatoms: Datom[] = [];
+    const latestTx = await this.getLatestTransaction();
+    const txId = latestTx + 1;
+
+    for (const sub of subs) {
+      allDatoms.push({
+        e: sub.e,
+        a: sub.a,
+        v: sub.v,
+        tx: txId,
+        op: "retract",
+      });
+    }
+
+    for (const add of adds) {
+      allDatoms.push({
+        e: add.e,
+        a: add.a,
+        v: add.v,
+        tx: txId,
+        op: "assert",
+      });
+    }
+
+    // Create transaction object
+    const tx: Transaction = {
+      datoms: allDatoms,
+      meta: metadata,
+    };
+
+    // Run before-write hooks
+    const beforeResult = await this.hooks.runBeforeWrite(tx, ctx);
+
+    if (beforeResult.errors.length > 0) {
+      throw new TransactionError(
+        "Transaction validation failed",
+        beforeResult.errors
+      );
+    }
+
+    // Combine all datoms from the modified transaction (using the modified transaction from hooks)
+    const finalTx = beforeResult.tx;
+    const allFinalDatoms = finalTx.datoms.map((d) => ({
+      e: d.e,
+      a: d.a,
+      v: d.v,
+      op: d.op,
+    }));
+
+    // Write all datoms (both adds and subs) in a single call
+    // If there are no operations, still create a new transaction ID
+    const committedTxId = await this.writeDatoms(allFinalDatoms);
+
+    // Store metadata if provided
+    if (metadata !== undefined) {
+      await this.onTransactionMetadata(committedTxId, metadata);
+    }
+
+    // Create write result for after-write hooks
+    const writeResult: WriteResult = {
+      txId: committedTxId,
+      datoms: finalTx.datoms.map((d) => ({ ...d, tx: committedTxId })),
+      timestamp: Date.now(),
+    };
+
+    // Run after-write hooks (fire and forget, don't block)
+    this.hooks.runAfterWrite(writeResult, ctx).catch((err) => {
+      console.error("After-write hook failed:", err);
+    });
+
+    return committedTxId;
+  }
+
+  async onTransactionMetadata(
+    _txId: TransactionId,
+    _metadata: Record<string, unknown>
+  ): Promise<void> {
+    // Optional: Override in implementations if metadata storage is needed
+    // Default: no-op (metadata is ignored but still emitted in events)
+  }
+
+  protected async validateDatoms(
+    datoms: DatomInput[],
+    _isAdd: boolean,
+    _subsInSameTransaction?: DatomInput[]
+  ): Promise<void> {
+    // Basic runtime validation for cases where TypeScript types are bypassed
+    for (const datom of datoms) {
+      if (datom.e === null || datom.e === undefined) {
+        throw new Error("Datom must have an entity ID");
+      }
+      if (datom.a === null || datom.a === undefined) {
+        throw new Error("Datom must have an attribute");
+      }
+    }
+  }
+
+  protected async ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+  }
+
+  async datoms(options: QueryOptions): Promise<Datom[]> {
+    await this.ensureInitialized();
+    // Validate that query has at least one filter or limit to prevent accidental full scans
+    const hasFilter =
+      options.e !== undefined ||
+      options.a !== undefined ||
+      options.v !== undefined ||
+      options.tx !== undefined;
+    const hasLimit = options.limit !== undefined;
+
+    if (!hasFilter && !hasLimit) {
+      throw new QuerySafetyError(
+        "Query must include at least one filter (entity, attribute, value, tx) or a limit to prevent full table scans"
+      );
+    }
+
+    // Execute query with timeout if specified
+    let results: Datom[];
+    if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new QueryTimeoutError(options.timeoutMs!, options));
+        }, options.timeoutMs);
+      });
+
+      const queryPromise = this.executeQuery(options);
+      results = await Promise.race([queryPromise, timeoutPromise]);
+    } else {
+      results = await this.executeQuery(options);
+    }
+
+    // Check result size limit if specified
+    if (
+      options.maxResultSize !== undefined &&
+      results.length > options.maxResultSize
+    ) {
+      throw new QueryResultSizeError(
+        results.length,
+        options.maxResultSize,
+        options
+      );
+    }
+
+    return results;
+  }
+
+  asOf(txId: TransactionId): DatabaseView {
+    return new AsOfDatabaseView(this, txId);
+  }
+
+  history(): DatabaseView {
+    return new HistoryDatabaseView(this);
+  }
+
+  since(txId: TransactionId): DatabaseView {
+    return new SinceDatabaseView(this, txId);
+  }
+
+  async with(ops: DatomInput[]): Promise<WithResult> {
+    await this.ensureInitialized();
+
+    // Get the next transaction ID for speculative datoms
+    const speculativeTxId = (await this.getLatestTransaction()) + 1;
+
+    // Process operations in sequence, creating speculative datoms directly
+    const speculativeAsserts: Datom[] = [];
+    const speculativeRetracts: Datom[] = [];
+
+    for (const op of ops) {
+      const speculativeDatom: Datom = {
+        e: op.e,
+        a: op.a,
+        v: op.v,
+        tx: speculativeTxId,
+        op: op.op,
+      };
+
+      if (op.op === "assert") {
+        speculativeAsserts.push(speculativeDatom);
+      } else {
+        speculativeRetracts.push(speculativeDatom);
+      }
+    }
+
+    // Create dbBefore view (current state)
+    const dbBefore = new CurrentDatabaseView(this);
+
+    // Create dbAfter view (speculative state)
+    const dbAfter = new SpeculativeDatabaseView(
+      this,
+      speculativeAsserts,
+      speculativeRetracts
+    );
+
+    // Generate txData (all datoms that would be applied)
+    const txData: Datom[] = [...speculativeRetracts, ...speculativeAsserts];
+
+    return {
+      dbBefore,
+      dbAfter,
+      txData,
+      tempIds: {}, // Empty for now, reserved for future tempid support
+    };
+  }
+
+  validateEntityId(entityId: unknown): entityId is EntityId {
+    if (typeof entityId === "number" || typeof entityId === "string") {
+      return true;
+    }
+    throw new Error(
+      `Invalid EntityId type: expected number or string, got ${typeof entityId}`
+    );
+  }
+
+  serializeEntityId(entityId: EntityId): string {
+    return String(entityId);
+  }
+
+  deserializeEntityId(serialized: string): EntityId {
+    // Try to parse as number first
+    const num = Number(serialized);
+    if (!isNaN(num) && isFinite(num) && String(num) === serialized) {
+      return num;
+    }
+    return serialized;
   }
 
   public async getRawDatoms(options: QueryOptions): Promise<Datom[]> {
@@ -208,7 +495,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     });
   }
 
-  protected async executeQuery(options: QueryOptions): Promise<Datom[]> {
+  async executeQuery(options: QueryOptions): Promise<Datom[]> {
     await this.ensureInitialized();
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -1051,7 +1338,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
       ...(value !== undefined && { v: value }),
     };
 
-    const datoms = await this.queryInternal(queryOptions);
+    const datoms = await this.datoms(queryOptions);
 
     return datoms.map((datom: Datom) => {
       const result: Record<string, Value | Attribute> = {};

@@ -5,7 +5,7 @@
 
 import type { DatalogQuery } from "../../datalog/datalog.js";
 import type { Datom, Transaction, TransactionId } from "../../types.js";
-import { DatabaseView } from "../types.js";
+import { DatabaseView } from "../views/database-view.js";
 
 /**
  * Error structure returned by hooks
@@ -143,16 +143,6 @@ export class DatomDatabaseError extends Error {
 /**
  * Error thrown when a transaction conflict occurs
  * Useful for optimistic locking scenarios
- * @example
- * try {
- *   await db.transaction(async (tx) => {
- *     // Long-running transaction that conflicts with another
- *   });
- * } catch (error) {
- *   if (error instanceof TransactionConflictError) {
- *     // Retry the transaction
- *   }
- * }
  */
 export class TransactionConflictError extends DatomDatabaseError {
   constructor(

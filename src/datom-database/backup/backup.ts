@@ -4,6 +4,7 @@
  */
 
 import type { DatomDatabase } from "../datom-database.js";
+import { executeQueryOnDatoms } from "../shared/in-memory-query-executor.js";
 import type { QueryOptions } from "../../types.js";
 import type { Datom, DatomInput } from "../../datoms.js";
 
@@ -35,9 +36,26 @@ export async function* exportDatoms(
   options?: QueryOptions
 ): AsyncIterable<Datom> {
   await db.initialize();
-  // Use queryInternal to bypass safety checks for export (explicit operation)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-  const datoms = await (db as any).queryInternal(options || {});
+
+  // When no options provided or all filters are undefined, use getRawDatoms to bypass validation
+  // then apply deduplication and filtering to get current state
+  const opts = options || {};
+  const hasAnyFilter =
+    opts.e !== undefined ||
+    opts.a !== undefined ||
+    opts.v !== undefined ||
+    opts.tx !== undefined;
+
+  let datoms: Datom[];
+  if (!hasAnyFilter && opts.limit === undefined) {
+    // No filters and no limit - use getRawDatoms to bypass validation, then process
+    const rawDatoms = await db.getRawDatoms({});
+    datoms = executeQueryOnDatoms(rawDatoms, opts);
+  } else {
+    // Has filters or limit - use normal datoms() method
+    datoms = await db.datoms(opts);
+  }
+
   for (const datom of datoms) {
     yield datom;
   }

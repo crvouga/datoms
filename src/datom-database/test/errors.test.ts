@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
+import { Fixture, FIXTURES } from "../../test/fixtures.npm-ignore.js";
 import {
   ConnectionPoolExhaustedError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
-} from "../datom-database.js";
-import { Fixture, FIXTURES } from "../../test/fixtures.npm-ignore.js";
+} from "../hook/hook.js";
 
 describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
   let f: Fixture;

@@ -3,8 +3,8 @@
  * Provides a high-level interface for working with datoms and datalog queries
  */
 
-import type { DatalogQuery, QueryResult } from "../datalog/datalog.js";
-import type { Datom, QueryOptions } from "../types.js";
+import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
+import type { Datom, QueryOptions } from "../../types.js";
 
 /**
  * Read-only database view for time-travel queries (Datomic-like)

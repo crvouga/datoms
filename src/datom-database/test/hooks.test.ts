@@ -39,7 +39,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
       await db.query({
         find: { e: ["?e"] },
         where: [{ e: "?e", a: "name", v: "Alice" }],
@@ -64,7 +64,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
       await db.query({
         find: { e: ["?e"] },
         where: [{ e: 1, a: "name", v: "?v" }],
@@ -87,7 +87,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       expect(called).toBe(true);
@@ -106,7 +106,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       // Wait a bit for async after-write hooks
@@ -140,7 +140,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
       const results = await db.query({
         find: { v: ["?v"] },
         where: [{ e: "?e", a: "name", v: "?v" }],
@@ -165,7 +165,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       await expect(
         db.query({
@@ -201,8 +201,8 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook1);
-      db.hooks.register(hook2);
+      db.hook(hook1);
+      db.hook(hook2);
 
       await db.query({
         find: { e: ["?e"] },
@@ -228,7 +228,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       await db.query(
         { find: { e: ["?e"] }, where: [{ e: "?e", a: "name", v: "Alice" }] },
@@ -262,7 +262,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       const results = await db.query({
         find: { e: ["?e"], v: ["?v"] },
@@ -295,7 +295,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       const results = await db.query({
         find: { e: ["?e"] },
@@ -331,8 +331,8 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook1);
-      db.hooks.register(hook2);
+      db.hook(hook1);
+      db.hook(hook2);
 
       const results = await db.query({
         find: { e: ["?e"] },
@@ -360,7 +360,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       await db.query(
         { find: { e: ["?e"] }, where: [{ e: 1, a: "name", v: "?v" }] },
@@ -403,7 +403,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       // Valid email should succeed
       await db.transact([
@@ -449,7 +449,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
@@ -483,8 +483,8 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook1);
-      db.hooks.register(hook2);
+      db.hook(hook1);
+      db.hook(hook2);
 
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
@@ -507,7 +507,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       await db.transact(
         [{ op: "assert", e: 1, a: "name", v: "Alice" }],
@@ -564,8 +564,8 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook1);
-      db.hooks.register(hook2);
+      db.hook(hook1);
+      db.hook(hook2);
 
       // This should pass (no errors)
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
@@ -595,7 +595,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       void (await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]));
 
@@ -622,7 +622,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       // Suppress console.error for this test since we expect the error
       const originalConsoleError = console.error;
@@ -671,8 +671,8 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook1);
-      db.hooks.register(hook2);
+      db.hook(hook1);
+      db.hook(hook2);
 
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
@@ -696,7 +696,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       await db.transact(
         [{ op: "assert", e: 1, a: "name", v: "Alice" }],
@@ -790,8 +790,8 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(readHook);
-      db.hooks.register(writeHook);
+      db.hook(readHook);
+      db.hook(writeHook);
 
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
       expect(writeCalled).toBe(true);
@@ -829,7 +829,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       try {
         await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
@@ -880,9 +880,9 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook1);
-      db.hooks.register(hook2);
-      db.hooks.register(hook3);
+      db.hook(hook1);
+      db.hook(hook2);
+      db.hook(hook3);
 
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
@@ -904,7 +904,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       // Empty transaction (should still create a transaction ID)
       await db.transact([]);
@@ -930,7 +930,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         },
       };
 
-      db.hooks.register(hook);
+      db.hook(hook);
 
       await db.transact([{ op: "retract", e: 1, a: "name", v: "Alice" }]);
 

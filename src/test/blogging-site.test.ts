@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { TransactionError } from "../datom-database/datom-database.js";
-import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
+import { TransactionError } from "../datom-database/hook/hook.js";
 import { datoms } from "../datoms.js";
 import {
   AUTHOR_VALIDATOR,
@@ -24,6 +23,7 @@ import {
   USER_TYPE_AUTHOR,
   USER_TYPE_READER,
 } from "./blogging-site.js";
+import { Fixture, FIXTURES } from "./fixtures.npm-ignore.js";
 
 describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -280,7 +280,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Register hook to filter posts based on user role
-      db.hooks.register(POST_ACCESS_CONTROL);
+      db.hook(POST_ACCESS_CONTROL);
 
       // Query as the author
       const results = await db.query(
@@ -333,7 +333,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Register hook
-      db.hooks.register(POST_ACCESS_CONTROL);
+      db.hook(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should NOT see author 2's draft)
       const results = await db.query(
@@ -381,7 +381,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Register hook
-      db.hooks.register(POST_ACCESS_CONTROL);
+      db.hook(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should see author 2's published post)
       const results = await db.query(
@@ -437,7 +437,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Register hook
-      db.hooks.register(POST_ACCESS_CONTROL);
+      db.hook(POST_ACCESS_CONTROL);
 
       // Query as reader (should only see published post)
       const results = await db.query(
@@ -497,7 +497,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Register hook
-      db.hooks.register(POST_ACCESS_CONTROL);
+      db.hook(POST_ACCESS_CONTROL);
 
       // Query as admin (should see all posts)
       const results = await db.query(
@@ -522,7 +522,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should validate post has required fields", async () => {
       const { db } = f;
 
-      db.hooks.register(POST_VALIDATOR);
+      db.hook(POST_VALIDATOR);
 
       // Try to create post without title (should fail)
       await expect(
@@ -560,7 +560,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
     test("should validate author exists", async () => {
       const { db } = f;
 
-      db.hooks.register(AUTHOR_VALIDATOR);
+      db.hook(AUTHOR_VALIDATOR);
 
       // Try to create post with non-existent author (should fail)
       await expect(
