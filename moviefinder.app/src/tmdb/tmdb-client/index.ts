@@ -1,7 +1,4 @@
-import {
-  FetchHttpClient,
-  type HttpClient,
-} from "moviefinder.app/src/http-client";
+import { type HttpClient } from "../../http-client";
 
 const BASE_URL = "https://api.themoviedb.org/3";
 
@@ -57,7 +54,9 @@ export class TmdbClient {
    * @see {@link https://developer.themoviedb.org/docs/getting-started/introduction TMDB API Documentation}
    */
   constructor(httpClient: HttpClient, tmdbApiReadAccessToken: string) {
-    this.httpClient = httpClient.init(BASE_URL, {
+    // Ensure baseURL ends with / for proper path resolution
+    const baseURL = BASE_URL.endsWith("/") ? BASE_URL : `${BASE_URL}/`;
+    this.httpClient = httpClient.init(baseURL, {
       headers: {
         Authorization: `Bearer ${tmdbApiReadAccessToken}`,
       },
@@ -86,15 +85,15 @@ export class TmdbClient {
     "primary_release_date.lte"?: string;
     [key: string]: string | number | undefined;
   }): Promise<Nullish<DiscoverMoviesResponse>> {
-    const url = new URL("/discover/movie", BASE_URL);
+    const searchParams = new URLSearchParams();
     for (const [key, value] of Object.entries(params ?? {})) {
       if (!value) continue;
-      url.searchParams.append(key, String(value));
+      searchParams.append(key, String(value));
     }
-    // Pass relative path since httpClient already has baseURL configured
-    return this.httpClient.get<Nullish<DiscoverMoviesResponse>>(
-      url.pathname + url.search
-    );
+    const queryString = searchParams.toString();
+    // Pass relative path (baseURL ends with / so this will be appended correctly)
+    const path = `discover/movie${queryString ? `?${queryString}` : ""}`;
+    return this.httpClient.get<Nullish<DiscoverMoviesResponse>>(path);
   }
 }
 
@@ -105,12 +104,9 @@ export class TmdbClient {
  * @throws {Error} If TMDB_API_READ_ACCESS_TOKEN environment variable is not set
  * @see {@link https://developer.themoviedb.org/docs/getting-started/introduction TMDB API Documentation}
  */
-export function createTmdbClient(): TmdbClient | null {
+export function createTmdbClient(httpClient: HttpClient): TmdbClient {
   const tmdbApiReadAccessToken = process.env.TMDB_API_READ_ACCESS_TOKEN;
-  if (!tmdbApiReadAccessToken) {
-    console.error("TMDB_API_READ_ACCESS_TOKEN is not set");
-    return null;
-  }
-  const httpClient = new FetchHttpClient();
+  if (!tmdbApiReadAccessToken)
+    throw new Error("TMDB_API_READ_ACCESS_TOKEN is not set");
   return new TmdbClient(httpClient, tmdbApiReadAccessToken);
 }

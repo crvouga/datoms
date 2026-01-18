@@ -1,4 +1,5 @@
 import { unlinkSync } from "fs";
+import { DATABASE_URL } from "../../env.js";
 import { PgSQLDatabase } from "../../sql-database/sql-database-pg.js";
 import { PGLiteSQLDatabase } from "../../sql-database/sql-database-pglite.js";
 import { SQLiteSQLDatabase } from "../../sql-database/sql-database-sqlite.js";
@@ -44,9 +45,7 @@ const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
 };
 
 const createPostgresFixture = async (): Promise<Fixture> => {
-  const connectionString =
-    "postgresql://datoms:datoms@localhost:5432/datoms_test";
-  const connection = new PgSQLDatabase(connectionString);
+  const connection = new PgSQLDatabase(DATABASE_URL);
   const db = new PostgreSQLDatomDatabase(connection);
   await db.initialize();
   return {

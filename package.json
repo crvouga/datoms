@@ -37,7 +37,7 @@
     "moviefinderapp:docker:down": "cd moviefinder.app && docker-compose down",
     "moviefinderapp:docker:up": "cd moviefinder.app && docker-compose up -d",
     "prepublishOnly": "npm run build",
-    "psql": "docker-compose exec postgres psql -U postgres -d postgres",
+    "psql": "cd moviefinder.app && docker-compose exec postgres psql -U postgres -d postgres",
     "server": "bun --hot moviefinder.app/src/index.ts",
     "tc": "bun typecheck -- --watch",
     "test": "bun test",

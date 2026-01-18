@@ -152,11 +152,14 @@ describe("datoms", () => {
     });
 
     test("should handle record with numeric keys", () => {
-      const result = datoms({
-        entityId: 1,
-        "0": "zero",
-        "1": "one",
-      });
+      const result = datoms(
+        { e: (r) => r.entityId },
+        {
+          entityId: 1,
+          "0": "zero",
+          "1": "one",
+        }
+      );
 
       expect(result).toHaveLength(3);
       expect(result.find((d: DatomInput) => d.a === "0")?.v).toBe("zero");
@@ -164,12 +167,15 @@ describe("datoms", () => {
     });
 
     test("should handle record with special characters in keys", () => {
-      const result = datoms({
-        entityId: 1,
-        "user/name": "Alice",
-        "user.email": "alice@example.com",
-        "user-name": "Alice",
-      });
+      const result = datoms(
+        { e: (r) => r.entityId },
+        {
+          entityId: 1,
+          "user/name": "Alice",
+          "user.email": "alice@example.com",
+          "user-name": "Alice",
+        }
+      );
 
       expect(result).toHaveLength(4);
       expect(result.find((d: DatomInput) => d.a === "user/name")?.v).toBe(
@@ -184,10 +190,15 @@ describe("datoms", () => {
     });
 
     test("should preserve entityId in datoms", () => {
-      const result = datoms({
-        entityId: 1,
-        name: "Alice",
-      });
+      const result = datoms(
+        {
+          e: (r) => r.entityId,
+        },
+        {
+          entityId: 1,
+          name: "Alice",
+        }
+      );
 
       // entityId should appear as both the entity (e) and as an attribute
       const entityIdDatom = result.find((d: DatomInput) => d.a === "entityId");
@@ -199,7 +210,10 @@ describe("datoms", () => {
 
   describe("type safety", () => {
     test("should return DatomInput[] type", () => {
-      const result = datoms({ entityId: 1, name: "Alice" });
+      const result = datoms(
+        { e: (r) => r.entityId },
+        { entityId: 1, name: "Alice" }
+      );
       const first: DatomInput = result[0]!;
       expect(first).toBeDefined();
       expect(first.e).toBeDefined();
@@ -387,7 +401,7 @@ describe("records", () => {
   describe("round-trip conversion", () => {
     test("should convert records to datoms and back", () => {
       const original = { entityId: 1, name: "Alice", age: 30 };
-      const datomsArray = datoms(original);
+      const datomsArray = datoms({ e: (r) => r.entityId }, original);
       const reconstructed = records(datomsArray);
 
       expect(reconstructed).toHaveLength(1);
@@ -404,7 +418,7 @@ describe("records", () => {
         { entityId: 1, name: "Alice" },
         { entityId: 2, name: "Bob" },
       ];
-      const datomsArray = datoms(original);
+      const datomsArray = datoms({ e: (r) => r.entityId }, original);
       const reconstructed = records(datomsArray);
 
       expect(reconstructed).toHaveLength(2);

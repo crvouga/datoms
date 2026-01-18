@@ -149,6 +149,10 @@ export type DatomInput = {
  * // Returns datoms for all three entities
  *
  * @example
+ * // Usage with template function
+ * const datoms = datoms({ e: (r) => r.id }, { id: 1, name: "Alice" });
+ *
+ * @example
  * // Usage in a transaction
  * await db.transact(
  *   datoms({
@@ -159,24 +163,89 @@ export type DatomInput = {
  *   })
  * );
  */
-export const datoms = <T extends { entityId: EntityId; op?: DatomOperation }>(
-  ...records: (T | T[])[]
-): DatomInput[] => {
-  return records.flatMap((r) =>
-    (Array.isArray(r) ? r : [r]).flatMap((r) => {
-      const datoms: DatomInput[] = [];
-      for (const [key, value] of Object.entries(r)) {
-        datoms.push({
-          e: r.entityId,
-          a: key,
-          v: value as Value,
-          op: r.op ?? "assert",
-        });
-      }
-      return datoms;
-    })
-  );
-};
+
+// Overload for records with entityId property
+export function datoms<
+  T extends Record<string, unknown> & { entityId: EntityId },
+>(...records: (T | T[] | null | undefined)[]): DatomInput[];
+
+// Overload for template function
+export function datoms<T extends Record<string, unknown>>(
+  datomTemplate: { e: (r: T) => EntityId; op?: DatomOperation },
+  ...records: (
+    | T
+    | null
+    | undefined
+    | (T | null | undefined)[]
+    | null
+    | undefined
+  )[]
+): DatomInput[];
+
+// Implementation
+export function datoms<T extends Record<string, unknown>>(
+  first:
+    | T
+    | T[]
+    | { e: (r: T) => EntityId; op?: DatomOperation }
+    | null
+    | undefined,
+  ...rest: (T | T[] | null | undefined)[]
+): DatomInput[] {
+  // Check if first argument is a template object
+  if (
+    first != null &&
+    typeof first === "object" &&
+    !Array.isArray(first) &&
+    "e" in first &&
+    typeof first.e === "function"
+  ) {
+    // Template function API
+    const template = first as { e: (r: T) => EntityId; op?: DatomOperation };
+    const records = rest;
+    return records.flatMap((r) =>
+      (Array.isArray(r) ? r : [r]).flatMap((r) => {
+        if (r == null) return [];
+        if (typeof r !== "object") return [];
+        const datoms: DatomInput[] = [];
+        for (const [key, value] of Object.entries(r)) {
+          datoms.push({
+            e: template.e(r as T),
+            a: key,
+            v: value as Value,
+            op: template.op ?? "assert",
+          });
+        }
+        return datoms;
+      })
+    );
+  } else {
+    // entityId API - first argument is a record or array
+    const records = [first, ...rest];
+    return records.flatMap((r) =>
+      (Array.isArray(r) ? r : [r]).flatMap((r) => {
+        if (r == null) return [];
+        if (typeof r !== "object") return [];
+        if (!("entityId" in r)) {
+          throw new Error(
+            "Record must have an 'entityId' property or use template function API"
+          );
+        }
+        const entityId = r.entityId as EntityId;
+        const datoms: DatomInput[] = [];
+        for (const [key, value] of Object.entries(r)) {
+          datoms.push({
+            e: entityId,
+            a: key,
+            v: value as Value,
+            op: "assert",
+          });
+        }
+        return datoms;
+      })
+    );
+  }
+}
 
 /**
  * Converts an array of `DatomInput` objects back into records grouped by entity.
