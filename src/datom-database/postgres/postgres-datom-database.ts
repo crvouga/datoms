@@ -75,7 +75,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
         await this.connection.execute(`
           CREATE TYPE datom_op AS ENUM ('assert', 'retract')
         `);
-      } catch (error) {
+      } catch (_error) {
         // Type already exists, ignore error
         // PostgreSQL doesn't support IF NOT EXISTS for CREATE TYPE
       }
