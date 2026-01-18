@@ -19,7 +19,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "check": "bun format && bun typecheck && bun lint && bun cir-deps && bun test --bail && echo '✅ All checks passed'",
+    "check": "bun run check:fast && bun test:e2e && echo '✅ All checks passed'",
+    "check:fast": "bun format && bun typecheck && bun lint && bun cir-deps && bun test --bail && echo '✅ All fast checks passed'",
     "cir-deps": "madge --circular src/index.ts",
     "cloc": "bun x cloc src",
     "docker": "bun docker:down && bun docker:up",
@@ -48,6 +49,7 @@
     "react-dom": "^19"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^9.2.6",
@@ -58,7 +60,6 @@
     "@types/react-dom": "^19",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "@playwright/test": "^1.48.0",
     "bun-plugin-tailwind": "^0.1.2",
     "eslint": "^8.57.0",
     "madge": "^8.0.0",
