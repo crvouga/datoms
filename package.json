@@ -29,10 +29,13 @@
     "docker:logs": "docker-compose logs -f",
     "docker:ps": "docker-compose ps",
     "docker:up": "docker-compose up -d",
-    "format": "bun x sort-package-json && prettier --write \"src/**/*.{ts,tsx,json}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\"",
+    "format": "bun x sort-package-json && prettier --write \"**/*.{ts,tsx,json}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json}\"",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
+    "moviefinderapp:docker": "bun moviefinderapp:docker:down && bun moviefinderapp:docker:up",
+    "moviefinderapp:docker:down": "cd moviefinder.app && docker-compose down",
+    "moviefinderapp:docker:up": "cd moviefinder.app && docker-compose up -d",
     "prepublishOnly": "npm run build",
     "psql": "docker-compose exec postgres psql -U postgres -d postgres",
     "server": "bun --hot moviefinder.app/src/index.ts",
@@ -40,10 +43,7 @@
     "test": "bun test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "typecheck": "tsc --noEmit",
-    "moviefinderapp:docker": "bun moviefinderapp:docker:down && bun moviefinderapp:docker:up",
-    "moviefinderapp:docker:down": "cd moviefinder.app && docker-compose down",
-    "moviefinderapp:docker:up": "cd moviefinder.app && docker-compose up -d"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.0",

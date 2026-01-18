@@ -20,7 +20,9 @@ test.describe("Moviefinder App", () => {
     await expect(heading).toBeVisible();
 
     // Verify the app has rendered content (check for the description text)
-    const description = page.getByText(/Edit.*src\/App\.tsx.*and save to test HMR/);
+    const description = page.getByText(
+      /Edit.*src\/App\.tsx.*and save to test HMR/
+    );
     await expect(description).toBeVisible();
   });
 });
