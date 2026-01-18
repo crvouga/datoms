@@ -2,7 +2,7 @@
  * Distinct aggregation - in-memory implementation
  */
 
-import type { Value } from "../../../../datoms.js";
+import type { Value } from "../../../datoms.js";
 import { IN_MEMORY_AGGREGATIONS } from "./registry.js";
 
 IN_MEMORY_AGGREGATIONS.set("distinct", {

@@ -4,11 +4,13 @@
 
 import type { QueryClause, QueryResult } from "../../datalog/datalog.js";
 import type { Attribute, Value } from "../../datoms.js";
+// Import aggregations to ensure they're registered
+import "../in-memory/aggregations/index.js";
 import {
-  hasAggregations,
   applyAggregations,
-  parseAggregation,
-} from "./aggregations/index.js";
+  hasAggregations,
+} from "../in-memory/aggregations/computation.js";
+import { parseAggregation } from "../in-memory/aggregations/parser.js";
 import { stripQuestionMark } from "./datalog-helpers.js";
 
 /**

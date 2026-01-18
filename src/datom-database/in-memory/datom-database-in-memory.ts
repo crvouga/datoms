@@ -27,7 +27,7 @@ import {
   isVariable,
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
-import { joinResults, project } from "../shared/query-helpers.js";
+import { joinResults, project } from "../shared/query-results.js";
 
 /**
  * In-memory database implementation

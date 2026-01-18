@@ -14,7 +14,6 @@ import type {
   TransactionId,
   Value,
 } from "../types.js";
-import { DatabaseView } from "./types.js";
 import {
   HookEngine,
   QueryError,
@@ -31,7 +30,8 @@ import {
   isVariable,
   stripQuestionMark,
 } from "./shared/datalog-helpers.js";
-import { joinResults, project } from "./shared/query-helpers.js";
+import { joinResults, project } from "./shared/query-results.js";
+import { DatabaseView } from "./types.js";
 
 /**
  * Base class for database views that filter queries by transaction ID

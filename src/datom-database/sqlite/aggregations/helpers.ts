@@ -2,7 +2,7 @@
  * SQLite SQL helper functions
  */
 
-import { parseAggregation } from "../in-memory/parser.js";
+import { parseAggregation } from "../../in-memory/aggregations/parser.js";
 import { SQLITE_AGGREGATIONS } from "./registry.js";
 import type { SQLAggregationResult } from "./types.js";
 

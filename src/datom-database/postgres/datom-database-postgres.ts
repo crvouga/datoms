@@ -22,18 +22,18 @@ import type {
 
 import { DatomDatabase, QueryError } from "../datom-database.js";
 import type { ReadContext } from "../hook/hook.js";
+import { applyAggregations } from "../in-memory/aggregations/computation.js";
+import { parseAggregation } from "../in-memory/aggregations/parser.js";
 import {
   isQueryPattern,
   isVariable,
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
-import { joinResults, project } from "../shared/query-helpers.js";
+import { joinResults, project } from "../shared/query-results.js";
 import {
   aggregationToSQL,
   checkSQLAggregations,
-} from "../shared/aggregations/postgres/helpers.js";
-import { parseAggregation } from "../shared/aggregations/index.js";
-import { applyAggregations } from "../shared/aggregations/index.js";
+} from "./aggregations/helpers.js";
 
 /**
  * PostgreSQL database implementation

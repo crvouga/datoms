@@ -3,7 +3,7 @@
  * Returns N random values with replacement (can return duplicates)
  */
 
-import type { Attribute, Value } from "../../../../datoms.js";
+import type { Attribute, Value } from "../../../datoms.js";
 import { IN_MEMORY_AGGREGATIONS } from "./registry.js";
 
 IN_MEMORY_AGGREGATIONS.set("rand", {

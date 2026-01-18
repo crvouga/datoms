@@ -1,11 +1,11 @@
 /**
- * Max aggregation - in-memory implementation
+ * Min aggregation - in-memory implementation
  */
 
-import type { Attribute, Value } from "../../../../datoms.js";
+import type { Attribute, Value } from "../../../datoms.js";
 import { IN_MEMORY_AGGREGATIONS } from "./registry.js";
 
-IN_MEMORY_AGGREGATIONS.set("max", {
+IN_MEMORY_AGGREGATIONS.set("min", {
   compute: (values, defaultValue) => {
     if (values.length === 0) {
       return defaultValue !== undefined ? defaultValue : null;
@@ -20,7 +20,7 @@ IN_MEMORY_AGGREGATIONS.set("max", {
       if (a === null || a === undefined || b === null || b === undefined) {
         return a ?? b ?? null;
       }
-      return (a > b ? a : b) as Value;
+      return (a < b ? a : b) as Value;
     }) as Value;
   },
   supportsDefault: true,
