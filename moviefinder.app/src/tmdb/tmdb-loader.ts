@@ -9,7 +9,7 @@ export class TmdbLoader {
     private readonly tmdbClient: TmdbClient,
     private readonly db: DatomDatabase,
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   async start(): Promise<void> {
     this.logger.info("Starting TMDB loader", { operation: "start" });
@@ -140,7 +140,7 @@ export class TmdbLoader {
           operation: "discoverMovies",
           delayMs: 5000,
         });
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
 
       runningPage++;

@@ -1,6 +1,13 @@
 /**
  * Destroy retention policy implementation
  * Permanently deletes obsolete historic datoms without archiving
+ *
+ * Safety guarantees:
+ * - Never deletes current datoms (always keeps at least retentionTxCount transactions)
+ * - Requires retentionTxCount >= 1 to prevent deleting all history
+ * - Validates that cutoffTx < latestTx before deletion
+ * - Includes runtime safety checks to prevent deleting current datoms
+ * - Only prunes history, never deletes all transactions
  */
 
 import { createLogger } from "../../../moviefinder.app/src/lib/logger.js";
@@ -23,8 +30,12 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
     private readonly config: RetentionPolicyConfig,
     private readonly logger: Logger = createLogger()
   ) {
-    if (config.retentionTxCount < 0) {
-      throw new Error("retentionTxCount must be non-negative");
+    // Ensure we always keep at least 1 transaction worth of history
+    // This prevents accidentally deleting all history
+    if (config.retentionTxCount < 1) {
+      throw new Error(
+        "retentionTxCount must be at least 1 to ensure history is never fully deleted"
+      );
     }
     if (!config.intervalMs && !config.cronExpression) {
       throw new Error("Either intervalMs or cronExpression must be provided");
@@ -150,22 +161,50 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
       }
 
       // Calculate cutoff transaction ID
+      // Ensure we always keep at least retentionTxCount transactions
+      // This means cutoffTx must be strictly less than latestTx
+      // If latestTx < retentionTxCount, we keep everything (cutoffTx = 0)
       const cutoffTx = Math.max(0, latestTx - this.config.retentionTxCount);
+
+      // Safety check: Never delete current datoms
+      // Ensure cutoffTx is strictly less than latestTx to avoid deleting current transaction
+      if (cutoffTx >= latestTx) {
+        this.logger?.info(
+          "Cutoff transaction would delete current datoms, skipping retention",
+          {
+            event: "retention_policy_cutoff_too_high",
+            policy: "destroy",
+            latestTx,
+            retentionTxCount: this.config.retentionTxCount,
+            cutoffTx,
+          }
+        );
+        return {
+          datomsProcessed: 0,
+          datomsDeleted: 0,
+          cutoffTx: 0,
+        };
+      }
+
       this.logger?.debug("Calculated cutoff transaction", {
         event: "retention_policy_cutoff_calculated",
         policy: "destroy",
         latestTx,
         retentionTxCount: this.config.retentionTxCount,
         cutoffTx,
+        transactionsToKeep: latestTx - cutoffTx,
       });
 
       if (cutoffTx === 0) {
-        this.logger?.info("Cutoff transaction is 0, skipping retention", {
-          event: "retention_policy_cutoff_zero",
-          policy: "destroy",
-          latestTx,
-          retentionTxCount: this.config.retentionTxCount,
-        });
+        this.logger?.info(
+          "Cutoff transaction is 0, keeping all history (not enough transactions to prune)",
+          {
+            event: "retention_policy_cutoff_zero",
+            policy: "destroy",
+            latestTx,
+            retentionTxCount: this.config.retentionTxCount,
+          }
+        );
         return {
           datomsProcessed: 0,
           datomsDeleted: 0,
@@ -174,17 +213,41 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
       }
 
       // Get obsolete datoms
+      // getObsoleteDatoms only returns datoms with tx <= cutoffTx, so it will never
+      // return current datoms (which have tx = latestTx)
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
       const obsoleteDatoms: Datom[] =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         await this.sourceDb.getObsoleteDatoms(cutoffTx);
+
+      // Safety check: Verify no current datoms are included
+      // This is a defensive check - getObsoleteDatoms should never return these
+      const currentDatoms = obsoleteDatoms.filter((d) => d.tx >= latestTx);
+      if (currentDatoms.length > 0) {
+        const error = new Error(
+          `Safety check failed: Found ${currentDatoms.length} current datoms in obsolete list. This should never happen.`
+        );
+        this.logger?.error("Safety check failed: current datoms in obsolete list", {
+          event: "retention_policy_safety_check_failed",
+          policy: "destroy",
+          latestTx,
+          cutoffTx,
+          currentDatomsCount: currentDatoms.length,
+          error: error.message,
+        });
+        throw error;
+      }
+
       const batchSize = this.config.batchSize ?? 1000;
 
       this.logger?.info("Retrieved obsolete datoms", {
         event: "retention_policy_obsolete_datoms_retrieved",
         policy: "destroy",
         cutoffTx,
+        latestTx,
         obsoleteDatomsCount: obsoleteDatoms.length,
         batchSize,
+        transactionsToKeep: latestTx - cutoffTx,
       });
 
       let deleted = 0;
@@ -203,6 +266,27 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
           batchSize: batch.length,
           cutoffTx,
         });
+
+        // Safety check: Verify batch doesn't contain current datoms before deletion
+        const batchCurrentDatoms = batch.filter((d) => d.tx >= latestTx);
+        if (batchCurrentDatoms.length > 0) {
+          const error = new Error(
+            `Safety check failed: Attempted to delete ${batchCurrentDatoms.length} current datoms in batch ${batchNumber}. This should never happen.`
+          );
+          this.logger?.error(
+            "Safety check failed: current datoms in deletion batch",
+            {
+              event: "retention_policy_batch_safety_check_failed",
+              policy: "destroy",
+              batchNumber,
+              latestTx,
+              cutoffTx,
+              currentDatomsCount: batchCurrentDatoms.length,
+              error: error.message,
+            }
+          );
+          throw error;
+        }
 
         // Delete batch from source database
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
