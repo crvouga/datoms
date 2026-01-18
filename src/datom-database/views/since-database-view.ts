@@ -3,9 +3,11 @@
  * Filters queries to only include datoms with tx > txId
  */
 
+import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
 import type { Datom, TransactionId } from "../../datoms.js";
 import type { QueryOptions } from "../../types.js";
-import { BaseDatabaseView } from "./base-database-view.js";
+import { validateQueryOptions } from "../shared/query-validation.js";
+import type { DatabaseView } from "./database-view.js";
 import type {
   InternalDatabaseView,
   ViewConfig,
@@ -15,23 +17,33 @@ import type {
  * Database view showing only changes after a specific transaction ID (since query)
  * Filters queries to only include datoms with tx > txId
  */
-export class SinceDatabaseView extends BaseDatabaseView {
-  constructor(
-    db: InternalDatabaseView,
-    private txId: TransactionId
-  ) {
-    super(db);
-  }
+export class SinceDatabaseView implements DatabaseView {
+  private viewConfig: ViewConfig;
 
-  protected getViewConfig(): ViewConfig {
-    return { type: "since", txId: this.txId };
+  constructor(
+    private db: InternalDatabaseView,
+    txId: TransactionId
+  ) {
+    this.viewConfig = { type: "since", txId };
   }
 
   async datoms(options: QueryOptions): Promise<Datom[]> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
-    this.validateQueryOptions(options);
+    validateQueryOptions(options);
 
     // Route to implementation with view config
-    return this.db.executeQueryWithViewConfig(options, this.getViewConfig());
+    return this.db.executeQueryWithViewConfig(options, this.viewConfig);
+  }
+
+  async query(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResult> {
+    // Route query to implementation with view config
+    return this.db.executeDatalogQueryWithViewConfig(
+      query,
+      context,
+      this.viewConfig
+    );
   }
 }

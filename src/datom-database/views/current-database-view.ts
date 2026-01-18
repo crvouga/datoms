@@ -3,9 +3,11 @@
  * Used by `with()` to represent dbBefore
  */
 
+import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
 import type { Datom } from "../../datoms.js";
 import type { QueryOptions } from "../../types.js";
-import { BaseDatabaseView } from "./base-database-view.js";
+import { validateQueryOptions } from "../shared/query-validation.js";
+import type { DatabaseView } from "./database-view.js";
 import type {
   InternalDatabaseView,
   ViewConfig,
@@ -15,21 +17,30 @@ import type {
  * Database view showing the current database state
  * Used by `with()` to represent dbBefore
  */
-export class CurrentDatabaseView extends BaseDatabaseView {
-  constructor(db: InternalDatabaseView) {
-    super(db);
-  }
+export class CurrentDatabaseView implements DatabaseView {
+  private viewConfig: ViewConfig;
 
-  protected getViewConfig(): ViewConfig {
-    return { type: "current" };
+  constructor(private db: InternalDatabaseView) {
+    this.viewConfig = { type: "current" };
   }
 
   async datoms(options: QueryOptions): Promise<Datom[]> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
-    this.validateQueryOptions(options);
+    validateQueryOptions(options);
 
     // Route to implementation with view config
-    const viewConfig = this.getViewConfig();
-    return this.db.executeQueryWithViewConfig(options, viewConfig);
+    return this.db.executeQueryWithViewConfig(options, this.viewConfig);
+  }
+
+  async query(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResult> {
+    // Route query to implementation with view config
+    return this.db.executeDatalogQueryWithViewConfig(
+      query,
+      context,
+      this.viewConfig
+    );
   }
 }
