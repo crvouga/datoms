@@ -6,7 +6,7 @@ import type { DatomDatabase } from "../datom-database.js";
 import { InMemoryDatomDatabase } from "../in-memory/in-memory-datom-database.js";
 import { PostgreSQLDatomDatabase } from "../postgres/postgres-datom-database.js";
 import { RemoteDatomDatabase } from "../remote/datom-database-remote.js";
-import { MockTransport } from "../remote/transport/mock-transport.js";
+import { LocalTransport } from "../remote/transport/local-transport.js";
 import { SQLiteDatomDatabase } from "../sqlite/sqlite-datom-database.js";
 
 export type Fixture = {
@@ -20,8 +20,8 @@ const createInMemoryFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
@@ -38,8 +38,8 @@ const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
@@ -68,18 +68,18 @@ const createPGLiteFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
 const createRemoteFixture = async (): Promise<Fixture> => {
-  const transport = new MockTransport(new InMemoryDatomDatabase());
+  const transport = new LocalTransport(new InMemoryDatomDatabase());
   const db = new RemoteDatomDatabase(transport);
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
+    beforeEach: async () => { },
     afterEach: async () => {
       await db.close();
     },

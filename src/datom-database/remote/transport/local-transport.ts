@@ -29,7 +29,7 @@ import type {
  * Mock transport that uses an in-memory database as backend
  * Useful for testing RemoteDatomDatabase without a real server
  */
-export class MockTransport implements ITransport {
+export class LocalTransport implements ITransport {
   private backend: InternalDatabaseView;
   private initialized = false;
 
