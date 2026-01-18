@@ -146,12 +146,25 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Verify build output exists
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "Error: dist directory does not exist"
+            exit 1
+          fi
+          if [ ! -f "dist/index.js" ] || [ ! -f "dist/index.d.ts" ]; then
+            echo "Error: Required build files are missing"
+            ls -la dist/ || true
+            exit 1
+          fi
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
           retention-days: 1
+          if-no-files-found: error
 
   verify-build:
     runs-on: ubuntu-latest
