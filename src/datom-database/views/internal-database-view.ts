@@ -20,7 +20,7 @@ export type ViewConfig =
   | { type: "asOf"; txId: TransactionId }
   | { type: "since"; txId: TransactionId }
   | { type: "history" }
-  | { type: "speculative"; adds: Datom[]; subs: Datom[] };
+  | { type: "speculative"; datoms: Datom[] };
 
 /**
  * Internal database view interface

@@ -376,8 +376,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     const speculativeTxId = (await this.getLatestTransaction()) + 1;
 
     // Process operations in sequence, creating speculative datoms directly
-    const speculativeAsserts: Datom[] = [];
-    const speculativeRetracts: Datom[] = [];
+    const speculativeDatoms: Datom[] = [];
 
     for (const op of ops) {
       const speculativeDatom: Datom = {
@@ -388,11 +387,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
         op: op.op,
       };
 
-      if (op.op === "assert") {
-        speculativeAsserts.push(speculativeDatom);
-      } else {
-        speculativeRetracts.push(speculativeDatom);
-      }
+      speculativeDatoms.push(speculativeDatom);
     }
 
     // Create dbBefore view (current state)
@@ -401,12 +396,11 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     // Create dbAfter view (speculative state)
     const dbAfter = new ConfiguredDatabaseView(this, {
       type: "speculative",
-      adds: speculativeAsserts,
-      subs: speculativeRetracts,
+      datoms: speculativeDatoms,
     });
 
     // Generate txData (all datoms that would be applied)
-    const txData: Datom[] = [...speculativeRetracts, ...speculativeAsserts];
+    const txData: Datom[] = [...speculativeDatoms];
 
     return {
       dbBefore,
@@ -1660,16 +1654,14 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
         baseMap.set(key, datom);
       }
 
-      // Apply subs first (remove matching datoms)
-      for (const sub of viewConfig.subs) {
-        const key = `${String(sub.e)}|${String(sub.a)}|${JSON.stringify(sub.v)}`;
-        baseMap.delete(key);
-      }
-
-      // Apply adds (add or update datoms)
-      for (const add of viewConfig.adds) {
-        const key = `${String(add.e)}|${String(add.a)}|${JSON.stringify(add.v)}`;
-        baseMap.set(key, add);
+      // Apply speculative datoms (retracts remove, asserts add/update)
+      for (const speculativeDatom of viewConfig.datoms) {
+        const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
+        if (speculativeDatom.op === "retract") {
+          baseMap.delete(key);
+        } else {
+          baseMap.set(key, speculativeDatom);
+        }
       }
 
       // Create merged datoms array
