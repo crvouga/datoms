@@ -44,6 +44,7 @@ export class TmdbLoader {
     let totalMoviesProcessed = 0;
 
     while (hasMore && !this.shouldStop) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
       const pageStartTime = Date.now();
       this.logger.debug("Fetching movies page", {
         operation: "discoverMovies",
