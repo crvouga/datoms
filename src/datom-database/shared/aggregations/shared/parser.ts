@@ -2,7 +2,7 @@
  * Parser for aggregation expressions
  */
 
-import { getAggregationDefinition } from "../aggregations-in-memory/registry.js";
+import { IN_MEMORY_AGGREGATIONS } from "../in-memory/registry.js";
 
 /**
  * Parse an aggregation expression - accepts both tuple format and string format for backward compatibility
@@ -30,7 +30,7 @@ export function parseAggregation(
       // Aggregation with one arg: ["count", "?age"] or ["min", "?age"] or ["max", "?age"]
       const funcName = expr[0] as string;
       const variable = expr[1] as string;
-      const def = getAggregationDefinition(funcName);
+      const def = IN_MEMORY_AGGREGATIONS.get(funcName);
       if (def && variable.startsWith("?")) {
         // Check if this aggregation requires a seed (should be 3-element array)
         if (def.requiresSeed) {
@@ -44,7 +44,7 @@ export function parseAggregation(
       const funcName = expr[0] as string;
       const defaultValue = expr[1] as string | number;
       const variable = expr[2] as string;
-      const def = getAggregationDefinition(funcName);
+      const def = IN_MEMORY_AGGREGATIONS.get(funcName);
       if (
         def &&
         (def.supportsDefault || def.requiresSeed) &&
@@ -72,7 +72,7 @@ export function parseAggregation(
   if (!match) return null;
 
   const [, funcName, args] = match;
-  const def = getAggregationDefinition(funcName);
+  const def = IN_MEMORY_AGGREGATIONS.get(funcName);
 
   if (!def) {
     return null;

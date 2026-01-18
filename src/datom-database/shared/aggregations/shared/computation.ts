@@ -4,7 +4,7 @@
 
 import type { QueryResult } from "../../../../datalog/datalog.js";
 import type { Attribute, Value } from "../../../../datoms.js";
-import { getAggregationDefinition } from "../aggregations-in-memory/registry.js";
+import { IN_MEMORY_AGGREGATIONS } from "../in-memory/registry.js";
 import { parseAggregation } from "./parser.js";
 
 /**
@@ -37,7 +37,7 @@ export function applyAggregations(
         .map((row) => row[varName])
         .filter((v) => v !== undefined && v !== null);
 
-      const def = getAggregationDefinition(agg.type);
+      const def = IN_MEMORY_AGGREGATIONS.get(agg.type);
       if (def) {
         const result = def.compute(values, agg.defaultValue);
         // If result is a string that matches a numeric default value, convert to number
