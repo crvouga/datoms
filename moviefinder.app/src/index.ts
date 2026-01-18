@@ -1,5 +1,5 @@
 import { serve } from "bun";
-import { PostgreSQLDatomDatabase } from "../../src";
+import { PostgreSQLDatomDatabase, type DatalogQuery } from "../../src";
 import { PgSQLDatabase } from "../../src/sql-database/sql-database-pg";
 import { FetchHttpClient } from "./http-client";
 import index from "./index.html";
@@ -103,7 +103,7 @@ async function main() {
             logger.info("Querying for movies datoms...", {
               event: "populating_movies_query",
             });
-            const populateMovies = await db.query({
+            const q: DatalogQuery = {
               find: {
                 "movie/id": ["?movie/id"],
                 "movie/title": ["?title"],
@@ -113,6 +113,7 @@ async function main() {
                 "movie/backdropPath": ["?backdrop_path"],
                 "movie/voteAverage": ["?vote_average"],
                 "movie/voteCount": ["?vote_count"],
+                "movie/popularity": ["?popularity"],
               },
               where: [
                 { e: "?movie/id", a: "tmdb.movie/id", v: "?id" },
@@ -143,10 +144,16 @@ async function main() {
                   a: "tmdb.movie/vote_count",
                   v: "?vote_count",
                 },
+                {
+                  e: "?movie/id",
+                  a: "tmdb.movie/popularity",
+                  v: "?popularity",
+                }
               ],
-              orderBy: [["?vote_average", "desc"]],
+              orderBy: [["?popularity", "desc"]],
               limit: 25,
-            });
+            }
+            const populateMovies = await db.query(q);
             logger.info("Movies datoms populated", {
               event: "populated_movies",
               count: populateMovies?.length,
@@ -155,7 +162,9 @@ async function main() {
               event: "populated_movies_data",
               data: populateMovies,
             });
-            return Response.json(populateMovies);
+            return Response.json([
+              q,
+              ...populateMovies]);
           },
         },
 
