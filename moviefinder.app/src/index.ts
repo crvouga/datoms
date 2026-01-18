@@ -230,6 +230,7 @@ async function main() {
             const compliedPsql = psql.params.reduce<string>((acc, param) => {
               return acc.replace(`?`, String(param));
             }, psql.sql);
+            const start = performance.now();
             const populateMovies = await db.query(q);
             logger.info("Movies datoms populated", {
               event: "populated_movies",
@@ -239,7 +240,16 @@ async function main() {
               event: "populated_movies_data",
               data: populateMovies,
             });
-            return Response.json([q, compliedPsql, ...populateMovies]);
+            const end = performance.now();
+            const duration = end - start;
+
+            return Response.json([
+              duration,
+              q,
+              compliedPsql,
+              ...populateMovies,
+              duration,
+            ]);
           },
         },
 

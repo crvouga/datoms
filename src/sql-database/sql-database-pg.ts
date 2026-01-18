@@ -16,9 +16,9 @@ import type { DatabaseRow, SQLParams } from "./types.js";
 type SSLConfig =
   | false
   | {
-    rejectUnauthorized?: boolean;
-    ca?: string;
-  };
+      rejectUnauthorized?: boolean;
+      ca?: string;
+    };
 
 /**
  * Result of parsing connection string for SSL config
@@ -42,7 +42,11 @@ function parseSSLConfig(connectionString: string): ParsedConnectionConfig {
   const cleanConnectionString = url.toString();
 
   // Configure SSL based on parameters
-  if (sslMode === "require" || sslMode === "verify-full" || sslMode === "verify-ca") {
+  if (
+    sslMode === "require" ||
+    sslMode === "verify-full" ||
+    sslMode === "verify-ca"
+  ) {
     const sslConfig: SSLConfig = {
       rejectUnauthorized: sslMode === "verify-full" || sslMode === "verify-ca",
     };
