@@ -1,11 +1,6 @@
 /**
- * SQL aggregation types
+ * PostgreSQL aggregation types
  */
-
-/**
- * Database type
- */
-export type DatabaseType = "postgresql" | "sqlite";
 
 /**
  * Result of converting an aggregation to SQL

@@ -3,13 +3,13 @@
  */
 
 import { POSTGRES_AGGREGATIONS } from "./registry.js";
-import { escapeColumnName, getValueExtraction } from "../shared/helpers.js";
+import { escapeColumnName, getValueExtraction } from "./helpers.js";
 
 POSTGRES_AGGREGATIONS.set("median", {
   convert: (variableColumn, outputKey, _defaultValue, isValueColumn) => {
     const sql = isValueColumn
-      ? `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${getValueExtraction(variableColumn, isValueColumn, "postgresql")}) AS ${escapeColumnName(outputKey, "postgresql")}`
-      : `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY CAST(${variableColumn} AS NUMERIC)) AS ${escapeColumnName(outputKey, "postgresql")}`;
+      ? `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${getValueExtraction(variableColumn, isValueColumn)}) AS ${escapeColumnName(outputKey)}`
+      : `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY CAST(${variableColumn} AS NUMERIC)) AS ${escapeColumnName(outputKey)}`;
     return {
       sql,
       requiresGroupBy: false,

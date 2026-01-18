@@ -2,7 +2,7 @@
  * PostgreSQL aggregation registry - registration system for PostgreSQL SQL aggregations
  */
 
-import type { SQLAggregationResult } from "../shared/types.js";
+import type { SQLAggregationResult } from "./types.js";
 
 /**
  * SQL aggregation converter function

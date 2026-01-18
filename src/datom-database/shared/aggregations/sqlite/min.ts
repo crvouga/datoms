@@ -7,20 +7,20 @@ import {
   escapeColumnName,
   escapeValue,
   getValueExtraction,
-} from "../shared/helpers.js";
+} from "./helpers.js";
 
 SQLITE_AGGREGATIONS.set("min", {
   convert: (variableColumn, outputKey, defaultValue, isValueColumn) => {
     // For min/max on value columns, extract as numeric for proper numeric comparison
     const minColumn = isValueColumn
-      ? getValueExtraction(variableColumn, isValueColumn, "sqlite")
+      ? getValueExtraction(variableColumn, isValueColumn)
       : variableColumn;
     const minDefault =
       defaultValue !== undefined
-        ? `COALESCE(MIN(${minColumn}), ${escapeValue(defaultValue, "sqlite")})`
+        ? `COALESCE(MIN(${minColumn}), ${escapeValue(defaultValue)})`
         : `MIN(${minColumn})`;
     return {
-      sql: `${minDefault} AS ${escapeColumnName(outputKey, "sqlite")}`,
+      sql: `${minDefault} AS ${escapeColumnName(outputKey)}`,
       requiresGroupBy: false,
     };
   },

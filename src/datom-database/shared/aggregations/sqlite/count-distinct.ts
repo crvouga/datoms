@@ -3,10 +3,7 @@
  */
 
 import { SQLITE_AGGREGATIONS } from "./registry.js";
-import {
-  escapeColumnName,
-  getSQLiteJSONTextExtraction,
-} from "../shared/helpers.js";
+import { escapeColumnName, getSQLiteJSONTextExtraction } from "./helpers.js";
 
 SQLITE_AGGREGATIONS.set("count-distinct", {
   convert: (variableColumn, outputKey, _defaultValue, isValueColumn) => {
@@ -15,7 +12,7 @@ SQLITE_AGGREGATIONS.set("count-distinct", {
       ? getSQLiteJSONTextExtraction(variableColumn, isValueColumn)
       : variableColumn;
     return {
-      sql: `COUNT(DISTINCT ${distinctColumn}) AS ${escapeColumnName(outputKey, "sqlite")}`,
+      sql: `COUNT(DISTINCT ${distinctColumn}) AS ${escapeColumnName(outputKey)}`,
       requiresGroupBy: false,
     };
   },

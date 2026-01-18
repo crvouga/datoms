@@ -3,10 +3,7 @@
  */
 
 import { POSTGRES_AGGREGATIONS } from "./registry.js";
-import {
-  escapeColumnName,
-  getPostgresJSONBTextExtraction,
-} from "../shared/helpers.js";
+import { escapeColumnName, getPostgresJSONBTextExtraction } from "./helpers.js";
 
 POSTGRES_AGGREGATIONS.set("count-distinct", {
   convert: (variableColumn, outputKey, _defaultValue, isValueColumn) => {
@@ -15,7 +12,7 @@ POSTGRES_AGGREGATIONS.set("count-distinct", {
       ? getPostgresJSONBTextExtraction(variableColumn, isValueColumn)
       : variableColumn;
     return {
-      sql: `COUNT(DISTINCT ${distinctColumn}) AS ${escapeColumnName(outputKey, "postgresql")}`,
+      sql: `COUNT(DISTINCT ${distinctColumn}) AS ${escapeColumnName(outputKey)}`,
       requiresGroupBy: false,
     };
   },

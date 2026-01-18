@@ -15,5 +15,12 @@ export type {
   AggregationFunction,
 } from "./in-memory/types.js";
 export { POSTGRES_AGGREGATIONS } from "./postgres/registry.js";
-export { aggregationToSQL, checkSQLAggregations } from "./shared/helpers.js";
+export {
+  aggregationToSQL as aggregationToSQLPostgres,
+  checkSQLAggregations as checkSQLAggregationsPostgres,
+} from "./postgres/helpers.js";
 export { SQLITE_AGGREGATIONS } from "./sqlite/registry.js";
+export {
+  aggregationToSQL as aggregationToSQLSqlite,
+  checkSQLAggregations as checkSQLAggregationsSqlite,
+} from "./sqlite/helpers.js";

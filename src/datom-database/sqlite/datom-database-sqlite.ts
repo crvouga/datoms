@@ -23,7 +23,7 @@ import { joinResults, project } from "../shared/query-helpers.js";
 import {
   aggregationToSQL,
   checkSQLAggregations,
-} from "../shared/aggregations/shared/helpers.js";
+} from "../shared/aggregations/sqlite/helpers.js";
 import { parseAggregation } from "../shared/aggregations/index.js";
 import { applyAggregations } from "../shared/aggregations/index.js";
 
@@ -935,7 +935,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
     const joinConditions: string[] = [];
 
     // Check if we have aggregations and if they're all SQL-supported
-    const aggCheck = checkSQLAggregations(query.find, "sqlite");
+    const aggCheck = checkSQLAggregations(query.find);
     const hasAggs = aggCheck.hasAggregations;
     const allAggsSupported = aggCheck.allSupported;
 
@@ -1202,12 +1202,7 @@ export class SQLiteDatomDatabase extends DatomDatabase {
           const varName = agg.variable;
           const columnRef = variableToColumn.get(varName);
           if (columnRef) {
-            const sqlAgg = aggregationToSQL(
-              expr,
-              columnRef,
-              "sqlite",
-              outputKey
-            );
+            const sqlAgg = aggregationToSQL(expr, columnRef, outputKey);
             if (sqlAgg && sqlAgg.sql) {
               selectColumns.push(sqlAgg.sql);
             } else {

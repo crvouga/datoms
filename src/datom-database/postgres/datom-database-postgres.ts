@@ -31,7 +31,7 @@ import { joinResults, project } from "../shared/query-helpers.js";
 import {
   aggregationToSQL,
   checkSQLAggregations,
-} from "../shared/aggregations/shared/helpers.js";
+} from "../shared/aggregations/postgres/helpers.js";
 import { parseAggregation } from "../shared/aggregations/index.js";
 import { applyAggregations } from "../shared/aggregations/index.js";
 
@@ -778,7 +778,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
     }
 
     // Check if we have aggregations - if so, use SQL query building
-    const aggCheck = checkSQLAggregations(modifiedQuery.find, "postgresql");
+    const aggCheck = checkSQLAggregations(modifiedQuery.find);
     const hasAggs = aggCheck.hasAggregations;
     const allAggsSupported = aggCheck.allSupported;
 
@@ -1107,12 +1107,7 @@ export class PostgreSQLDatomDatabase extends DatomDatabase {
         const varName = agg.variable;
         const columnRef = variableToColumn.get(varName);
         if (columnRef) {
-          const sqlAgg = aggregationToSQL(
-            expr,
-            columnRef,
-            "postgresql",
-            outputKey
-          );
+          const sqlAgg = aggregationToSQL(expr, columnRef, outputKey);
           if (sqlAgg && sqlAgg.sql) {
             selectColumns.push(sqlAgg.sql);
           } else {

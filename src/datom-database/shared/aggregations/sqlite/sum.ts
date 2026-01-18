@@ -3,13 +3,13 @@
  */
 
 import { SQLITE_AGGREGATIONS } from "./registry.js";
-import { escapeColumnName, getValueExtraction } from "../shared/helpers.js";
+import { escapeColumnName, getValueExtraction } from "./helpers.js";
 
 SQLITE_AGGREGATIONS.set("sum", {
   convert: (variableColumn, outputKey, _defaultValue, isValueColumn) => {
     const sql = isValueColumn
-      ? `SUM(${getValueExtraction(variableColumn, isValueColumn, "sqlite")}) AS ${escapeColumnName(outputKey, "sqlite")}`
-      : `SUM(CAST(${variableColumn} AS NUMERIC)) AS ${escapeColumnName(outputKey, "sqlite")}`;
+      ? `SUM(${getValueExtraction(variableColumn, isValueColumn)}) AS ${escapeColumnName(outputKey)}`
+      : `SUM(CAST(${variableColumn} AS NUMERIC)) AS ${escapeColumnName(outputKey)}`;
     return {
       sql,
       requiresGroupBy: false,
