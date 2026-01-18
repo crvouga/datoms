@@ -8,9 +8,8 @@ import type {
   ViewConfig,
 } from "../../views/internal-database-view.js";
 import { ConfiguredDatabaseView } from "../../views/internal-database-view.js";
-import type { ITransport } from "./transport.js";
-import { TransportError } from "./transport.js";
 import type {
+  ITransport,
   DatomsRequest,
   DatomsResponse,
   GetLatestTransactionResponse,
@@ -27,7 +26,8 @@ import type {
   RegisterHookResponse,
   TransactRequest,
   TransactResponse,
-} from "./types.js";
+} from "./transport.js";
+import { TransportError } from "./transport.js";
 
 /**
  * Mock transport that uses an in-memory database as backend

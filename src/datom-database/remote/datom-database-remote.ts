@@ -36,16 +36,16 @@ import {
 } from "../views/internal-database-view.js";
 import type { WithResult } from "../datom-database.js";
 import type { Hook } from "../hook/hook.js";
-import type { ITransport } from "./transport/transport.js";
-import { TransportError } from "./transport/transport.js";
 import type {
+  ITransport,
   DatomsRequest,
   QueryRequest,
   TransactRequest,
   GetTransactionMetadataRequest,
   GetObsoleteDatomsRequest,
   DeleteDatomsRequest,
-} from "./transport/types.js";
+} from "./transport/transport.js";
+import { TransportError } from "./transport/transport.js";
 
 /**
  * Remote database implementation
