@@ -710,6 +710,63 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     return this._mapRowsToDatoms(rows);
   }
 
+  private async _executeSpeculativeQuery(
+    options: DatomsParams,
+    speculativeDatoms: Datom[]
+  ): Promise<Datom[]> {
+    await this._ensureInitialized();
+
+    // For speculative queries, we need to merge base datoms with speculative changes
+    // Get all base datoms (current state)
+    const baseDatoms = await this._executeCurrentQuery({});
+
+    // Create a map of base datoms by (entity, attribute, value) for efficient lookup
+    const baseMap = new Map<string, Datom>();
+    for (const datom of baseDatoms) {
+      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
+      baseMap.set(key, datom);
+    }
+
+    // Apply speculative datoms (retracts remove, asserts add/update)
+    for (const speculativeDatom of speculativeDatoms) {
+      const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
+      if (speculativeDatom.op === "retract") {
+        baseMap.delete(key);
+      } else {
+        baseMap.set(key, speculativeDatom);
+      }
+    }
+
+    // Create merged datoms array
+    const mergedDatoms = Array.from(baseMap.values());
+
+    // Apply filters from options
+    let results = mergedDatoms;
+    if (options.e !== undefined) {
+      results = results.filter((d) => d.e === options.e);
+    }
+    if (options.a !== undefined) {
+      results = results.filter((d) => d.a === options.a);
+    }
+    if (options.v !== undefined) {
+      results = results.filter((d) => d.v === options.v);
+    }
+    if (options.tx !== undefined) {
+      results = results.filter((d) => d.tx === options.tx);
+    }
+    if (options.op !== undefined) {
+      results = results.filter((d) => d.op === options.op);
+    } else {
+      // Default: only assert
+      results = results.filter((d) => d.op === "assert");
+    }
+
+    // Apply pagination
+    const offset = options.offset ?? 0;
+    const limit = options.limit;
+    return results.slice(offset, limit ? offset + limit : undefined);
+  }
+
   /**
    * Helper method to map database rows to Datom objects
    * Reused across query methods
@@ -1461,55 +1518,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
       return this._executeHistoryQuery(options);
     }
     if (viewConfig.type === "speculative") {
-      // For speculative queries, we need to merge base datoms with speculative changes
-      // Get all base datoms (current state)
-      const baseDatoms = await this._executeCurrentQuery({});
-
-      // Create a map of base datoms by (entity, attribute, value) for efficient lookup
-      const baseMap = new Map<string, Datom>();
-      for (const datom of baseDatoms) {
-        const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
-        baseMap.set(key, datom);
-      }
-
-      // Apply speculative datoms (retracts remove, asserts add/update)
-      for (const speculativeDatom of viewConfig.datoms) {
-        const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-        if (speculativeDatom.op === "retract") {
-          baseMap.delete(key);
-        } else {
-          baseMap.set(key, speculativeDatom);
-        }
-      }
-
-      // Create merged datoms array
-      const mergedDatoms = Array.from(baseMap.values());
-
-      // Apply filters from options
-      let results = mergedDatoms;
-      if (options.e !== undefined) {
-        results = results.filter((d) => d.e === options.e);
-      }
-      if (options.a !== undefined) {
-        results = results.filter((d) => d.a === options.a);
-      }
-      if (options.v !== undefined) {
-        results = results.filter((d) => d.v === options.v);
-      }
-      if (options.tx !== undefined) {
-        results = results.filter((d) => d.tx === options.tx);
-      }
-      if (options.op !== undefined) {
-        results = results.filter((d) => d.op === options.op);
-      } else {
-        // Default: only assert
-        results = results.filter((d) => d.op === "assert");
-      }
-
-      // Apply pagination
-      const offset = options.offset ?? 0;
-      const limit = options.limit;
-      return results.slice(offset, limit ? offset + limit : undefined);
+      return this._executeSpeculativeQuery(options, viewConfig.datoms);
     }
 
     // TypeScript exhaustiveness check

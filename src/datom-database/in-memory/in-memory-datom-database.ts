@@ -464,6 +464,56 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
     return results.slice(offset, limit ? offset + limit : undefined);
   }
 
+  private async _executeSpeculativeQuery(
+    options: DatomsParams,
+    speculativeDatoms: Datom[]
+  ): Promise<Datom[]> {
+    await this._ensureInitialized();
+
+    // Get all base datoms using _executeHistoryQuery to bypass validation
+    // This returns all datoms including retracted ones, so we need to deduplicate
+    const allBaseDatoms = await this._executeHistoryQuery({});
+
+    // Create a map of base datoms by (entity, attribute, value) for efficient lookup
+    // Deduplicate by keeping the latest transaction for each (entity, attribute, value)
+    const baseMap = new Map<string, Datom>();
+    for (const datom of allBaseDatoms) {
+      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
+      const existing = baseMap.get(key);
+      if (!existing || datom.tx > existing.tx) {
+        baseMap.set(key, datom);
+      }
+    }
+
+    // Filter to only asserted datoms (current state)
+    const currentStateDatoms = Array.from(baseMap.values()).filter(
+      (d) => d.op === "assert"
+    );
+
+    // Create a map for merging with speculative changes
+    const mergedMap = new Map<string, Datom>();
+    for (const datom of currentStateDatoms) {
+      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
+      mergedMap.set(key, datom);
+    }
+
+    // Apply speculative datoms (retracts remove, asserts add/update)
+    for (const speculativeDatom of speculativeDatoms) {
+      const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
+      if (speculativeDatom.op === "retract") {
+        mergedMap.delete(key);
+      } else {
+        mergedMap.set(key, speculativeDatom);
+      }
+    }
+
+    // Create merged datoms array
+    const mergedDatoms = Array.from(mergedMap.values());
+
+    // Use the shared query execution logic
+    return executeQueryOnDatoms(mergedDatoms, options);
+  }
+
   async query(
     query: DatalogQuery,
     context?: Record<string, unknown>
@@ -684,48 +734,7 @@ export class InMemoryDatomDatabase implements InternalDatabaseView {
       return this._executeHistoryQuery(options);
     }
     if (viewConfig.type === "speculative") {
-      // Get all base datoms using _executeHistoryQuery to bypass validation
-      // This returns all datoms including retracted ones, so we need to deduplicate
-      const allBaseDatoms = await this._executeHistoryQuery({});
-
-      // Create a map of base datoms by (entity, attribute, value) for efficient lookup
-      // Deduplicate by keeping the latest transaction for each (entity, attribute, value)
-      const baseMap = new Map<string, Datom>();
-      for (const datom of allBaseDatoms) {
-        const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
-        const existing = baseMap.get(key);
-        if (!existing || datom.tx > existing.tx) {
-          baseMap.set(key, datom);
-        }
-      }
-
-      // Filter to only asserted datoms (current state)
-      const currentStateDatoms = Array.from(baseMap.values()).filter(
-        (d) => d.op === "assert"
-      );
-
-      // Create a map for merging with speculative changes
-      const mergedMap = new Map<string, Datom>();
-      for (const datom of currentStateDatoms) {
-        const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
-        mergedMap.set(key, datom);
-      }
-
-      // Apply speculative datoms (retracts remove, asserts add/update)
-      for (const speculativeDatom of viewConfig.datoms) {
-        const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-        if (speculativeDatom.op === "retract") {
-          mergedMap.delete(key);
-        } else {
-          mergedMap.set(key, speculativeDatom);
-        }
-      }
-
-      // Create merged datoms array
-      const mergedDatoms = Array.from(mergedMap.values());
-
-      // Use the shared query execution logic
-      return executeQueryOnDatoms(mergedDatoms, options);
+      return this._executeSpeculativeQuery(options, viewConfig.datoms);
     }
 
     // TypeScript exhaustiveness check
