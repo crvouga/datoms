@@ -148,11 +148,11 @@ async function main() {
                   e: "?movie/id",
                   a: "tmdb.movie/popularity",
                   v: "?popularity",
-                }
+                },
               ],
               orderBy: [["?popularity", "desc"]],
               limit: 25,
-            }
+            };
             const populateMovies = await db.query(q);
             logger.info("Movies datoms populated", {
               event: "populated_movies",
@@ -162,9 +162,7 @@ async function main() {
               event: "populated_movies_data",
               data: populateMovies,
             });
-            return Response.json([
-              q,
-              ...populateMovies]);
+            return Response.json([q, ...populateMovies]);
           },
         },
 
