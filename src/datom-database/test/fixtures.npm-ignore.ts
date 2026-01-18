@@ -2,10 +2,12 @@ import { unlinkSync } from "fs";
 import { PgSQLDatabase } from "../../sql-database/sql-database-pg.npm-ignore.js";
 import { PGLiteSQLDatabase } from "../../sql-database/sql-database-pglite.npm-ignore.js";
 import { SQLiteSQLDatabase } from "../../sql-database/sql-database-sqlite.npm-ignore.js";
-import { PostgreSQLDatomDatabase } from "../postgres/postgres-datom-database.js";
-import { InMemoryDatomDatabase } from "../in-memory/in-memory-datom-database.js";
-import { SQLiteDatomDatabase } from "../sqlite/sqlite-datom-database.js";
 import { DatomDatabase } from "../datom-database.js";
+import { InMemoryDatomDatabase } from "../in-memory/in-memory-datom-database.js";
+import { PostgreSQLDatomDatabase } from "../postgres/postgres-datom-database.js";
+import { RemoteDatomDatabase } from "../remote/datom-database-remote.js";
+import { MockTransport } from "../remote/transport/mock-transport.js";
+import { SQLiteDatomDatabase } from "../sqlite/sqlite-datom-database.js";
 
 export type Fixture = {
   db: DatomDatabase;
@@ -71,6 +73,19 @@ const createPGLiteFixture = async (): Promise<Fixture> => {
   };
 };
 
+const createRemoteFixture = async (): Promise<Fixture> => {
+  const transport = new MockTransport(new InMemoryDatomDatabase());
+  const db = new RemoteDatomDatabase(transport);
+  await db.initialize();
+  return {
+    db,
+    beforeEach: async () => {},
+    afterEach: async () => {
+      await db.close();
+    },
+  };
+};
+
 const TEST_ALL = false;
 
 export const FIXTURES: [string, () => Promise<Fixture>][] = [];
@@ -83,3 +98,4 @@ FIXTURES.push(["PostgreSQL", () => createPostgresFixture()]);
 if (TEST_ALL) {
   FIXTURES.push(["PostgreSQL (PGLite)", () => createPGLiteFixture()]);
 }
+FIXTURES.push(["Remote", () => createRemoteFixture()]);
