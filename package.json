@@ -31,7 +31,8 @@
     "docker:logs": "docker-compose logs -f",
     "docker:ps": "docker-compose ps",
     "docker:destroy": "docker-compose down -v",
-    "psql": "docker-compose exec postgres psql -U datoms -d datoms_test"
+    "psql": "docker-compose exec postgres psql -U datoms -d datoms_test",
+    "cloc": "bun x cloc src"
   },
   "keywords": [],
   "author": "",
@@ -44,13 +45,14 @@
     "@semantic-release/npm": "^11.0.2",
     "@types/bun": "latest",
     "@types/pg": "^8.10.9",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^8.57.0",
     "madge": "^8.0.0",
     "pg": "^8.11.3",
     "prettier": "^3.0.0",
     "semantic-release": "^23.0.0",
     "typescript": "^5.3.0"
-  }
+  },
+  "packageManager": "pnpm@10.28.0+sha512.05df71d1421f21399e053fde567cea34d446fa02c76571441bfc1c7956e98e363088982d940465fd34480d4d90a0668bc12362f8aa88000a64e83d0b0e47be48"
 }
