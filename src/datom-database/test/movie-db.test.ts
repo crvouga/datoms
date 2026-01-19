@@ -1,10 +1,8 @@
 import {
-  afterEach,
   beforeAll,
-  beforeEach,
   describe,
   expect,
-  it,
+  it
 } from "bun:test";
 
 import { FileSystemDatomDatabase } from "../filesystem/filesystem-datom-database.js";
