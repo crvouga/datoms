@@ -15,7 +15,7 @@ export class TmdbLoader {
     private readonly tmdbClient: TmdbClient,
     private readonly db: DatomDatabase,
     private readonly logger: Logger
-  ) { }
+  ) {}
 
   async start(): Promise<void> {
     this.shouldStop = false;
