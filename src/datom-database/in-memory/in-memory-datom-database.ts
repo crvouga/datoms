@@ -896,19 +896,74 @@ export class InMemoryDatomDatabase implements DatomDatabase {
 
     // Apply ordering if specified
     if (modifiedQuery.orderBy) {
+      // Map orderBy variables to output keys from find clause
+      const variableToOutputKey = new Map<string, string>();
+      for (const [outputKey, expr] of Object.entries(modifiedQuery.find)) {
+        let varName: string | undefined;
+        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === "string") {
+          varName = expr[0];
+        } else if (typeof expr === "string") {
+          varName = expr;
+        }
+        if (varName) {
+          variableToOutputKey.set(varName, outputKey);
+        }
+      }
+
       projected.sort((a, b) => {
         for (const [variable, direction] of modifiedQuery.orderBy!) {
-          const key = stripQuestionMark(variable);
-          const aVal = a[key];
-          const bVal = b[key];
+          // Map variable to output key, or fall back to stripped variable name
+          const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
+          const aVal = a[outputKey];
+          const bVal = b[outputKey];
 
           // Handle null/undefined
           if (aVal == null && bVal == null) continue;
           if (aVal == null) return direction === "asc" ? -1 : 1;
           if (bVal == null) return direction === "asc" ? 1 : -1;
 
-          if (aVal < bVal) return direction === "asc" ? -1 : 1;
-          if (aVal > bVal) return direction === "asc" ? 1 : -1;
+          // Ensure proper numeric comparison when both values are numeric
+          // This handles cases where numeric values might be stored as strings
+          let comparison: number;
+          
+          // Check if both values can be treated as numbers
+          const aIsNumber = typeof aVal === "number";
+          const bIsNumber = typeof bVal === "number";
+          
+          let aNum: number | null = null;
+          let bNum: number | null = null;
+          
+          if (aIsNumber) {
+            aNum = aVal;
+          } else if (typeof aVal === "string" && aVal !== "") {
+            const parsed = Number(aVal);
+            if (!isNaN(parsed) && isFinite(parsed)) {
+              aNum = parsed;
+            }
+          }
+          
+          if (bIsNumber) {
+            bNum = bVal;
+          } else if (typeof bVal === "string" && bVal !== "") {
+            const parsed = Number(bVal);
+            if (!isNaN(parsed) && isFinite(parsed)) {
+              bNum = parsed;
+            }
+          }
+          
+          // If both are numeric, compare as numbers
+          if (aNum !== null && bNum !== null) {
+            comparison = aNum - bNum;
+          } else {
+            // At least one is not numeric, use standard comparison
+            if (aVal < bVal) comparison = -1;
+            else if (aVal > bVal) comparison = 1;
+            else comparison = 0;
+          }
+
+          if (comparison !== 0) {
+            return direction === "asc" ? comparison : -comparison;
+          }
         }
         return 0;
       });

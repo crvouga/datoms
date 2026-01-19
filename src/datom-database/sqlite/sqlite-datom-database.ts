@@ -966,22 +966,75 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     // Apply ordering if specified
     if (query.orderBy) {
+      // Map orderBy variables to output keys from find clause
+      const variableToOutputKey = new Map<string, string>();
+      for (const [outputKey, expr] of Object.entries(query.find)) {
+        let varName: string | undefined;
+        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === "string") {
+          varName = expr[0];
+        } else if (typeof expr === "string") {
+          varName = expr;
+        }
+        if (varName) {
+          variableToOutputKey.set(varName, outputKey);
+        }
+      }
+
       projected.sort(
         (
           a: Record<string, Value | Attribute>,
           b: Record<string, Value | Attribute>
         ) => {
           for (const [variable, direction] of query.orderBy!) {
-            const key = stripQuestionMark(variable);
-            const aVal = a[key];
-            const bVal = b[key];
+            // Map variable to output key, or fall back to stripped variable name
+            const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
+            const aVal = a[outputKey];
+            const bVal = b[outputKey];
             if (aVal === undefined && bVal === undefined) return 0;
             if (aVal === undefined || aVal === null)
               return direction === "asc" ? 1 : -1;
             if (bVal === undefined || bVal === null)
               return direction === "asc" ? -1 : 1;
-            if (aVal < bVal) return direction === "asc" ? -1 : 1;
-            if (aVal > bVal) return direction === "asc" ? 1 : -1;
+            
+            // Ensure proper numeric comparison when both values are numeric
+            let comparison: number;
+            const aIsNumber = typeof aVal === "number";
+            const bIsNumber = typeof bVal === "number";
+            
+            let aNum: number | null = null;
+            let bNum: number | null = null;
+            
+            if (aIsNumber) {
+              aNum = aVal;
+            } else if (typeof aVal === "string" && aVal !== "") {
+              const parsed = Number(aVal);
+              if (!isNaN(parsed) && isFinite(parsed)) {
+                aNum = parsed;
+              }
+            }
+            
+            if (bIsNumber) {
+              bNum = bVal;
+            } else if (typeof bVal === "string" && bVal !== "") {
+              const parsed = Number(bVal);
+              if (!isNaN(parsed) && isFinite(parsed)) {
+                bNum = parsed;
+              }
+            }
+            
+            // If both are numeric, compare as numbers
+            if (aNum !== null && bNum !== null) {
+              comparison = aNum - bNum;
+            } else {
+              // At least one is not numeric, use standard comparison
+              if (aVal < bVal) comparison = -1;
+              else if (aVal > bVal) comparison = 1;
+              else comparison = 0;
+            }
+            
+            if (comparison !== 0) {
+              return direction === "asc" ? comparison : -comparison;
+            }
           }
           return 0;
         }
@@ -1091,22 +1144,29 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   ): Promise<void> {
     if (datoms.length === 0) return;
 
-    const placeholders = datoms.map(() => "(?, ?, ?, ?, ?)").join(", ");
-    const sql = `
-      INSERT INTO ${this.tableName} (e, a, v, tx, op)
-      VALUES ${placeholders}
-      ON CONFLICT DO NOTHING
-    `;
+    // Batch inserts to avoid SQLite's SQL variable limit (typically 999)
+    // Using batches of 199 datoms (199 * 5 params = 995 variables, safely under limit)
+    const BATCH_SIZE = 199;
+    
+    for (let i = 0; i < datoms.length; i += BATCH_SIZE) {
+      const batch = datoms.slice(i, i + BATCH_SIZE);
+      const placeholders = batch.map(() => "(?, ?, ?, ?, ?)").join(", ");
+      const sql = `
+        INSERT INTO ${this.tableName} (e, a, v, tx, op)
+        VALUES ${placeholders}
+        ON CONFLICT DO NOTHING
+      `;
 
-    const params = datoms.flatMap((d) => {
-      let value = d.v;
-      if (value === undefined) {
-        value = "__UNDEFINED__";
-      }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, d.op];
-    });
+      const params = batch.flatMap((d) => {
+        let value = d.v;
+        if (value === undefined) {
+          value = "__UNDEFINED__";
+        }
+        return [String(d.e), String(d.a), JSON.stringify(value), tx, d.op];
+      });
 
-    await this.connection.execute(sql, params);
+      await this.connection.execute(sql, params);
+    }
   }
 
   async _getLatestTransaction(): Promise<Transaction> {

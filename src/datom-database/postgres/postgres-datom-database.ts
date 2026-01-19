@@ -1932,38 +1932,48 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   ): Promise<{ sql: string }> {
     if (datoms.length === 0) return { sql: "" };
 
-    const placeholders = datoms.map(() => "(?, ?, ?, ?, ?)").join(", ");
-    const sql = `
-      INSERT INTO ${this.tableName} (e, a, v, tx, op)
-      VALUES ${placeholders}
-      ON CONFLICT DO NOTHING
-    `.trim();
+    // Batch inserts to avoid PostgreSQL's parameter limit
+    // Using batches of 199 datoms (199 * 5 params = 995 variables, safely under limit)
+    const BATCH_SIZE = 199;
+    const sqlStatements: string[] = [];
+    
+    for (let i = 0; i < datoms.length; i += BATCH_SIZE) {
+      const batch = datoms.slice(i, i + BATCH_SIZE);
+      const placeholders = batch.map(() => "(?, ?, ?, ?, ?)").join(", ");
+      const sql = `
+        INSERT INTO ${this.tableName} (e, a, v, tx, op)
+        VALUES ${placeholders}
+        ON CONFLICT DO NOTHING
+      `.trim();
 
-    const params = datoms.flatMap((d) => {
-      let value = d.v;
-      if (value === undefined) {
-        value = "__UNDEFINED__";
-      }
-      return [String(d.e), String(d.a), JSON.stringify(value), tx, d.op];
-    });
-
-    const queryStartTime = performance.now();
-    await this.sqlDb.execute(sql, params);
-    const queryDuration = performance.now() - queryStartTime;
-
-    if (sqlQueries) {
-      // For INSERT operations, rowCount represents the number of datoms attempted to insert
-      // Note: Actual inserted count may be less due to ON CONFLICT DO NOTHING
-      const queryPlan = await this._getQueryPlan(sql, params);
-      sqlQueries.push({
-        sql: formatSQLWithParams(sql, params),
-        rowCount: datoms.length,
-        durationMs: queryDuration,
-        queryPlan,
+      const params = batch.flatMap((d) => {
+        let value = d.v;
+        if (value === undefined) {
+          value = "__UNDEFINED__";
+        }
+        return [String(d.e), String(d.a), JSON.stringify(value), tx, d.op];
       });
+
+      const queryStartTime = performance.now();
+      await this.sqlDb.execute(sql, params);
+      const queryDuration = performance.now() - queryStartTime;
+
+      sqlStatements.push(sql);
+
+      if (sqlQueries) {
+        // For INSERT operations, rowCount represents the number of datoms attempted to insert
+        // Note: Actual inserted count may be less due to ON CONFLICT DO NOTHING
+        const queryPlan = await this._getQueryPlan(sql, params);
+        sqlQueries.push({
+          sql: formatSQLWithParams(sql, params),
+          rowCount: batch.length,
+          durationMs: queryDuration,
+          queryPlan,
+        });
+      }
     }
 
-    return { sql };
+    return { sql: sqlStatements.join("; ") };
   }
 
   async _getLatestTransaction(): Promise<Transaction> {
@@ -2726,18 +2736,70 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const projected = project(results, modifiedQuery.find, modifiedQuery.where);
 
     if (modifiedQuery.orderBy) {
+      // Map orderBy variables to output keys from find clause
+      const variableToOutputKey = new Map<string, string>();
+      for (const [outputKey, expr] of Object.entries(modifiedQuery.find)) {
+        let varName: string | undefined;
+        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === "string") {
+          varName = expr[0];
+        } else if (typeof expr === "string") {
+          varName = expr;
+        }
+        if (varName) {
+          variableToOutputKey.set(varName, outputKey);
+        }
+      }
+
       projected.sort((a, b) => {
         for (const [variable, direction] of modifiedQuery.orderBy!) {
-          const key = stripQuestionMark(variable);
-          const aVal = a[key];
-          const bVal = b[key];
+          // Map variable to output key, or fall back to stripped variable name
+          const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
+          const aVal = a[outputKey];
+          const bVal = b[outputKey];
 
           if (aVal == null && bVal == null) continue;
           if (aVal == null) return direction === "asc" ? -1 : 1;
           if (bVal == null) return direction === "asc" ? 1 : -1;
 
-          if (aVal < bVal) return direction === "asc" ? -1 : 1;
-          if (aVal > bVal) return direction === "asc" ? 1 : -1;
+          // Ensure proper numeric comparison when both values are numeric
+          let comparison: number;
+          const aIsNumber = typeof aVal === "number";
+          const bIsNumber = typeof bVal === "number";
+          
+          let aNum: number | null = null;
+          let bNum: number | null = null;
+          
+          if (aIsNumber) {
+            aNum = aVal;
+          } else if (typeof aVal === "string" && aVal !== "") {
+            const parsed = Number(aVal);
+            if (!isNaN(parsed) && isFinite(parsed)) {
+              aNum = parsed;
+            }
+          }
+          
+          if (bIsNumber) {
+            bNum = bVal;
+          } else if (typeof bVal === "string" && bVal !== "") {
+            const parsed = Number(bVal);
+            if (!isNaN(parsed) && isFinite(parsed)) {
+              bNum = parsed;
+            }
+          }
+          
+          // If both are numeric, compare as numbers
+          if (aNum !== null && bNum !== null) {
+            comparison = aNum - bNum;
+          } else {
+            // At least one is not numeric, use standard comparison
+            if (aVal < bVal) comparison = -1;
+            else if (aVal > bVal) comparison = 1;
+            else comparison = 0;
+          }
+
+          if (comparison !== 0) {
+            return direction === "asc" ? comparison : -comparison;
+          }
         }
         return 0;
       });

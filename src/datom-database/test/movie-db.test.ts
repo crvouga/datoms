@@ -56,7 +56,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
           v: "?popularity",
         },
       ],
-      orderBy: [["?popularity", "asc"]],
+      orderBy: [["?popularity", "desc"]],
       limit: limit,
     });
 
