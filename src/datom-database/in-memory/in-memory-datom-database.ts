@@ -960,10 +960,11 @@ export class InMemoryDatomDatabase implements DatomDatabase {
           if (aNum !== null && bNum !== null) {
             comparison = aNum - bNum;
           } else {
-            // At least one is not numeric, use standard comparison
-            if (aVal < bVal) comparison = -1;
-            else if (aVal > bVal) comparison = 1;
-            else comparison = 0;
+            // At least one is not numeric, use locale-aware string comparison
+            // Convert to strings to ensure consistent comparison (matching test expectations)
+            const aStr = String(aVal);
+            const bStr = String(bVal);
+            comparison = aStr.localeCompare(bStr);
           }
 
           if (comparison !== 0) {

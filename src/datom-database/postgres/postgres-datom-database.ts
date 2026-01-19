@@ -382,6 +382,7 @@ export function datalogToPostgresSQL(
         : "";
 
     // Build ORDER BY clause
+    // For JSONB value columns, extract text before sorting for proper alphabetical ordering
     let orderByClause = "";
     if (query.orderBy && query.orderBy.length > 0) {
       const orderParts = query.orderBy
@@ -389,7 +390,13 @@ export function datalogToPostgresSQL(
           const colName = varToColumn.get(variable);
           if (colName) {
             const columnRef = `"${colName}"`;
-            return `${columnRef} ${direction.toUpperCase()}`;
+            // Value columns from pivot are JSONB, extract text for proper sorting
+            const orderExpr = `CASE 
+              WHEN jsonb_typeof(${columnRef}::jsonb) = 'string' 
+              THEN ${columnRef}::jsonb#>>'{}'
+              ELSE ${columnRef}::jsonb::text
+            END`;
+            return `${orderExpr} ${direction.toUpperCase()}`;
           }
           return "";
         })
@@ -721,12 +728,23 @@ export function datalogToPostgresSQL(
 
   // Build ORDER BY clause
   // Use variableToColumn map to ensure we reference columns from tables that are definitely joined
+  // For JSONB value columns (.v), extract text before sorting for proper alphabetical ordering
   let orderByClause = "";
   if (query.orderBy && query.orderBy.length > 0) {
     const orderParts = query.orderBy
       .map(([variable, direction]) => {
         const columnRef = variableToColumn.get(variable);
         if (columnRef) {
+          // Check if this is a value column (JSONB) by checking if it contains .v
+          const isValueColumn = columnRef.includes(".v");
+          if (isValueColumn) {
+            const orderExpr = `CASE 
+              WHEN jsonb_typeof(${columnRef}::jsonb) = 'string' 
+              THEN ${columnRef}::jsonb#>>'{}'
+              ELSE ${columnRef}::jsonb::text
+            END`;
+            return `${orderExpr} ${direction.toUpperCase()}`;
+          }
           return `${columnRef} ${direction.toUpperCase()}`;
         }
         return "";
@@ -2796,10 +2814,11 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           if (aNum !== null && bNum !== null) {
             comparison = aNum - bNum;
           } else {
-            // At least one is not numeric, use standard comparison
-            if (aVal < bVal) comparison = -1;
-            else if (aVal > bVal) comparison = 1;
-            else comparison = 0;
+            // At least one is not numeric, use locale-aware string comparison
+            // Convert to strings to ensure consistent comparison (matching test expectations)
+            const aStr = String(aVal);
+            const bStr = String(bVal);
+            comparison = aStr.localeCompare(bStr);
           }
 
           if (comparison !== 0) {

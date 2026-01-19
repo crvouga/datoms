@@ -63,4 +63,38 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
       );
     }
   });
+
+  it("should return movies sorted by title A to Z", async () => {
+    const limit = 10;
+    const results = await f.db.query({
+      find: {
+        "movie/id": ["?id"],
+        "movie/title": ["?title"],
+      },
+      where: [
+        {
+          e: "?id",
+          a: "tmdb.movie/title",
+          v: "?title",
+        },
+      ],
+      orderBy: [["?title", "asc"]],
+      limit: limit,
+    });
+
+    expect(results).toBeDefined();
+    expect(Array.isArray(results)).toBe(true);
+    expect(results.length).toBe(limit);
+
+    // Should be sorted ascending by title (A to Z)
+    for (let i = 1; i < limit; i++) {
+      const prevTitle = results[i - 1]?.["movie/title"];
+      const currTitle = results[i]?.["movie/title"];
+      expect(prevTitle).toBeDefined();
+      expect(currTitle).toBeDefined();
+      expect(
+        String(prevTitle).localeCompare(String(currTitle))
+      ).toBeLessThanOrEqual(0);
+    }
+  });
 });
