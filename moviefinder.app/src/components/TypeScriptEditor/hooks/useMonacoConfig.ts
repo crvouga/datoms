@@ -1,4 +1,5 @@
-import { useEffect, RefObject } from "react";
+import { useEffect } from "react";
+import type { RefObject } from "react";
 import type { TypeDefinition } from "../types";
 
 /**
@@ -24,6 +25,7 @@ export function useMonacoConfig(
         allowNonTsExtensions: true,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
         moduleResolution:
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
           monaco.languages.typescript.ModuleResolutionKind.NodeJs,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
         module: monaco.languages.typescript.ModuleKind.ESNext,
