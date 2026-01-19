@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import { Panel, PanelResizeHandle } from "react-resizable-panels";
-import {
-  createLoggedDatabase,
-  type DbCallLog,
-} from "../../../datom-database/wrapper/logged-datom-database";
 import { db } from "../lib/db";
 import { DbCallLogList } from "./DbCallLogList";
 import { TypeScriptEditor, type TypeDefinition } from "./TypeScriptEditor";
 import { ResizablePanels } from "./ui/ResizablePanels";
+import { createLoggedDatabaseWithHooks } from "./hooks/useDatabaseLogging";
+import type { QueryEditorLog } from "./types";
 // Type definitions from db-types.d.ts are automatically included via TypeScript
 
 // Monaco Editor theme configuration with type safety
@@ -119,7 +117,7 @@ await db.query({
 export function QueryPlayground() {
   const [error, setError] = useState<string | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
-  const [dbCallLogs, setDbCallLogs] = useState<DbCallLog[]>([]);
+  const [dbCallLogs, setDbCallLogs] = useState<QueryEditorLog[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
   // Load logs from localStorage on mount
@@ -127,7 +125,7 @@ export function QueryPlayground() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_DB_CALL_LOGS);
       if (saved) {
-        const parsedLogs = JSON.parse(saved) as DbCallLog[];
+        const parsedLogs = JSON.parse(saved) as QueryEditorLog[];
         setDbCallLogs(parsedLogs);
       }
     } catch {
@@ -180,25 +178,19 @@ export function QueryPlayground() {
               <TypeScriptEditor
                 typeDefinitions={DB_TYPE_DEFINITIONS}
                 executionContext={() => {
-                  // Create a logged database wrapper for each execution
-                  const loggedDb = createLoggedDatabase(db, {
-                    onCallStart: (method, args) => {
-                      console.log(`[DB Call] Calling ${method}`, args);
-                    },
-                    onCallComplete: (log) => {
+                  // Create a logged database using hooks API
+                  const loggedDb = createLoggedDatabaseWithHooks(db, {
+                    onLog: (log) => {
                       console.log(
                         `[DB Call] Completed ${log.method} in ${log.duration}ms`
                       );
                       // Use functional update to ensure we get the latest state
                       setDbCallLogs((prev) => {
                         const newLogs = [...prev, log];
-                        console.log(
-                          `[DB Call] State update: prev length=${prev.length}, new length=${newLogs.length}`
-                        );
                         return newLogs;
                       });
                     },
-                    onCallError: (log) => {
+                    onError: (log) => {
                       console.error(
                         `[DB Call] Error in ${log.method}: ${log.error}`
                       );

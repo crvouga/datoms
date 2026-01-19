@@ -4,12 +4,12 @@ import {
   datalogToPostgresSQL,
   type DatalogQuery,
 } from "../../../datom-database/index";
-import type { DbCallLog } from "../../../datom-database/wrapper/logged-datom-database";
+import type { QueryEditorLog } from "./types";
 
 const MONACO_THEME: "vs" | "vs-dark" | "hc-black" | "hc-light" = "hc-black";
 
 interface DbCallLogItemProps {
-  log: DbCallLog;
+  log: QueryEditorLog;
   isExpanded: boolean;
   onToggle: () => void;
 }

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import type { DbCallLog } from "../../../datom-database/wrapper/logged-datom-database";
+import type { QueryEditorLog } from "./types";
 import { DbCallLogItem } from "./DbCallLogItem";
 
 // LocalStorage key for persistence
 const STORAGE_KEY_EXPANDED_IDS = "db-call-log-expanded-ids";
 
 interface DbCallLogListProps {
-  logs: DbCallLog[];
+  logs: QueryEditorLog[];
   onClear: () => void;
 }
 
