@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { DbCallLog } from "../../../src/datom-database/index";
+import type { DbCallLog } from "../../../datom-database/index";
 import { DbCallLogItem } from "./DbCallLogItem";
 
 // LocalStorage key for persistence

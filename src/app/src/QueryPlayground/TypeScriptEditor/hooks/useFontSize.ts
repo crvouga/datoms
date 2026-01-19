@@ -18,6 +18,7 @@ export interface UseFontSizeOptions {
   /**
    * Reference to the Monaco editor instance
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   editorRef: React.RefObject<any>;
 }
 

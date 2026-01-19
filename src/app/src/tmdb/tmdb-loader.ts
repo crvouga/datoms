@@ -1,5 +1,5 @@
-import type { DatomDatabase, DatomInput, Logger } from "../../../src";
-import { datoms, value } from "../../../src/datoms";
+import type { DatomDatabase, DatomInput, Logger } from "../../..";
+import { datoms, value } from "../../../datoms";
 import { mapKeys } from "../lib/map-keys";
 import { tmdbPrefixKey } from "./tmdb";
 import type { TmdbClient } from "./tmdb-client";

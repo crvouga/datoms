@@ -25,8 +25,12 @@ export function compileTypeScript(code: string): string {
   if (!result.code) {
     throw new Error("Failed to compile TypeScript code");
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-  return result.code;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+  const compiledCode = result.code as string;
+  if (typeof compiledCode !== "string") {
+    throw new Error("Compiled code is not a string");
+  }
+  return compiledCode;
 }
 
 /**

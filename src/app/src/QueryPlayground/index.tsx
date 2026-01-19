@@ -3,7 +3,7 @@ import { Panel, PanelResizeHandle } from "react-resizable-panels";
 import {
   createLoggedDatabase,
   type DbCallLog,
-} from "../../../src/datom-database/index";
+} from "../../../datom-database/index";
 import { db } from "../lib/db";
 import { TypeScriptEditor, type TypeDefinition } from "./TypeScriptEditor";
 import { ResizablePanels } from "./ui/ResizablePanels";

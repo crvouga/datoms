@@ -10,7 +10,6 @@
  * - Only prunes history, never deletes all transactions
  */
 
-import { createLogger } from "../../../app/src/lib/logger.js";
 import type { Datom } from "../../datoms.js";
 import type { Logger } from "../../types.js";
 import type { InternalDatabaseView } from "../views/internal-database-view.js";
@@ -28,7 +27,7 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
   constructor(
     private readonly sourceDb: InternalDatabaseView,
     private readonly config: RetentionPolicyConfig,
-    private readonly logger: Logger = createLogger()
+    private readonly logger: Logger
   ) {
     // Ensure we always keep at least 1 transaction worth of history
     // This prevents accidentally deleting all history

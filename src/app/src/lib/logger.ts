@@ -1,5 +1,5 @@
 import pino from "pino";
-import type { Logger } from "../../../src/types";
+import type { Logger } from "../../../types";
 
 /**
  * Creates a Pino-based logger that implements the Logger interface.

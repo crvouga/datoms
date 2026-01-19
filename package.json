@@ -40,7 +40,7 @@
     "prepublishOnly": "npm run build",
     "preview": "docker build --no-cache -t datoms-preview -f Dockerfile . && docker run --name datoms-preview --rm --env-file .env -p 8080:8080 datoms-preview",
     "psql": "cd app && docker-compose exec postgres psql -U postgres -d postgres",
-    "server": "bun --watch app/src/index.ts",
+    "server": "bun --watch src/app/src/index.ts",
     "tc": "bun typecheck -- --watch",
     "test": "bun test",
     "test:e2e": "playwright test",

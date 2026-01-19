@@ -1,10 +1,10 @@
 import Editor from "@monaco-editor/react";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import type { DbCallLog } from "../../../src/datom-database/index";
+import type { DbCallLog } from "../../../datom-database/index";
 import {
   datalogToPostgresSQL,
   type DatalogQuery,
-} from "../../../src/datom-database/index";
+} from "../../../datom-database/index";
 
 const MONACO_THEME: "vs" | "vs-dark" | "hc-black" | "hc-light" = "hc-black";
 

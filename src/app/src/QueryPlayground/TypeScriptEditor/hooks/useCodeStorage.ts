@@ -64,21 +64,33 @@ export function useCodeStorage(
           // Calculate character offset for better position preservation
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
           const currentValue = editor.getValue();
+          const currentValueStr =
+            typeof currentValue === "string"
+              ? currentValue
+              : String(currentValue);
           let cursorOffset = 0;
           if (position) {
             // Calculate offset: sum of characters in previous lines + column
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            const lines = currentValue.split("\n");
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            for (
-              let i = 0;
-              i < position.lineNumber - 1 && i < lines.length;
-              i++
-            ) {
-              cursorOffset += lines[i].length + 1; // +1 for newline
+            const lines = currentValueStr.split("\n");
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+            const lineNumberRaw = position.lineNumber;
+            const lineNumber =
+              typeof lineNumberRaw === "number"
+                ? lineNumberRaw
+                : Number(lineNumberRaw) || 1;
+            for (let i = 0; i < lineNumber - 1 && i < lines.length; i++) {
+              const line = lines[i];
+              if (line) {
+                cursorOffset += line.length + 1; // +1 for newline
+              }
             }
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            cursorOffset += position.column - 1;
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+            const columnRaw = position.column;
+            const column =
+              typeof columnRaw === "number"
+                ? columnRaw
+                : Number(columnRaw) || 1;
+            cursorOffset += column - 1;
           }
 
           // Format using Monaco's formatter with aggressive options
@@ -145,10 +157,19 @@ export function useCodeStorage(
               });
 
               // Restore selection if there was one
-              if (selection && !selection.isEmpty()) {
-                // Try to preserve selection bounds
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-                editor.setSelection(selection);
+              if (
+                selection &&
+                typeof selection === "object" &&
+                "isEmpty" in selection
+              ) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
+                const isEmptyFn = selection.isEmpty;
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                if (typeof isEmptyFn === "function" && !isEmptyFn()) {
+                  // Try to preserve selection bounds
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+                  editor.setSelection(selection);
+                }
               }
 
               // Focus the editor to ensure cursor is visible

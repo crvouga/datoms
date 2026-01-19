@@ -2,8 +2,8 @@
  * HTTP client database instance for frontend
  */
 
-import type { DatalogQuery, QueryResult } from "../../../src/datalog/datalog";
-import { HttpClientDatomDatabase } from "../../../src/datom-database/http-client/http-client-datom-database";
+import type { DatalogQuery, QueryResult } from "../../../datalog/datalog";
+import { HttpClientDatomDatabase } from "../../../datom-database/http-client/http-client-datom-database";
 import { DATOMS_API_ENDPOINT } from "../shared/api";
 import { FetchHttpClient } from "./http-client";
 
