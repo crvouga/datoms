@@ -1,16 +1,15 @@
 import Editor from "@monaco-editor/react";
 import { useState } from "react";
 import { Panel, PanelResizeHandle } from "react-resizable-panels";
-import { db } from "../lib/db";
 import {
   createLoggedDatabase,
   type DbCallLog,
 } from "../../../src/datom-database/index";
+import { db } from "../lib/db";
 import { TypeScriptEditor, type TypeDefinition } from "./TypeScriptEditor";
 import { ResizablePanels } from "./ui/ResizablePanels";
 // Type definitions from db-types.d.ts are automatically included via TypeScript
 
-type OutputTab = "results" | "sql";
 
 // Monaco Editor theme configuration with type safety
 // Available themes: "vs", "vs-dark", "hc-black", "hc-light"
@@ -120,8 +119,6 @@ await db.query({
 export function QueryEditor() {
   const [error, setError] = useState<string | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<OutputTab>("results");
-  const [sqlQuery, setSqlQuery] = useState<string | null>(null);
   const [dbCallLogs, setDbCallLogs] = useState<DbCallLog[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -283,9 +280,7 @@ export function QueryEditor() {
                   setLoading(true);
                   setError(null);
                   setLatency(null);
-                  setSqlQuery(null);
                   setDbCallLogs([]);
-                  setActiveTab("results");
                 }}
                 onExecuteComplete={(duration) => {
                   setLatency(duration);
@@ -309,28 +304,9 @@ export function QueryEditor() {
             >
               <div className="border-b border-gray-700 bg-gray-900">
                 <div className="flex items-center justify-between p-2 border-b border-gray-700">
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => setActiveTab("results")}
-                      className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
-                        activeTab === "results"
-                          ? "bg-gray-700 text-white"
-                          : "text-gray-400 hover:text-gray-300"
-                      }`}
-                    >
-                      DB Calls{" "}
-                      {dbCallLogs.length > 0 ? `(${dbCallLogs.length})` : ""}
-                    </button>
-                    <button
-                      onClick={() => setActiveTab("sql")}
-                      className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
-                        activeTab === "sql"
-                          ? "bg-gray-700 text-white"
-                          : "text-gray-400 hover:text-gray-300"
-                      }`}
-                    >
-                      PostgreSQL
-                    </button>
+                  <div className="text-sm font-medium text-gray-300">
+                    DB Calls{" "}
+                    {dbCallLogs.length > 0 ? `(${dbCallLogs.length})` : ""}
                   </div>
                   {latency !== null && (
                     <div className="text-sm text-gray-400 font-mono">
@@ -344,66 +320,28 @@ export function QueryEditor() {
                 </div>
               </div>
               <div className="flex-1 overflow-auto">
-                {activeTab === "results" && (
-                  <>
-                    {error && (
-                      <div className="p-4 bg-red-900/20 border-l-4 border-red-500">
-                        <div className="font-semibold text-red-400 mb-1">
-                          Error
-                        </div>
-                        <div className="text-red-300 font-mono text-sm whitespace-pre-wrap">
-                          {error}
-                        </div>
-                      </div>
-                    )}
-                    {dbCallLogs.length > 0 && (
-                      <div className="h-full flex flex-col">
-                        <div className="p-2 text-xs text-gray-400 border-b border-gray-700">
-                          {dbCallLogs.length} DB call
-                          {dbCallLogs.length !== 1 ? "s" : ""} logged
-                        </div>
-                        <div className="flex-1 min-h-0">
-                          <Editor
-                            key={`db-calls-${dbCallLogs.length}`}
-                            height="100%"
-                            defaultLanguage="plaintext"
-                            value={dbCallLogs.map(formatCallLog).join("\n")}
-                            theme={MONACO_THEME}
-                            options={{
-                              minimap: { enabled: false },
-                              fontSize: 14,
-                              wordWrap: "on",
-                              automaticLayout: true,
-                              lineHeight: 20,
-                              padding: { top: 16, bottom: 16 },
-                              scrollBeyondLastLine: false,
-                              readOnly: true,
-                              formatOnPaste: true,
-                              formatOnType: true,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                    {dbCallLogs.length === 0 && !error && !loading && (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        Click "Run Code" to see DB call logs
-                      </div>
-                    )}
-                    {loading && dbCallLogs.length === 0 && (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        Running code...
-                      </div>
-                    )}
-                  </>
+                {error && (
+                  <div className="p-4 bg-red-900/20 border-l-4 border-red-500">
+                    <div className="font-semibold text-red-400 mb-1">
+                      Error
+                    </div>
+                    <div className="text-red-300 font-mono text-sm whitespace-pre-wrap">
+                      {error}
+                    </div>
+                  </div>
                 )}
-                {activeTab === "sql" && (
-                  <div className="h-full">
-                    {sqlQuery ? (
+                {dbCallLogs.length > 0 && (
+                  <div className="h-full flex flex-col">
+                    <div className="p-2 text-xs text-gray-400 border-b border-gray-700">
+                      {dbCallLogs.length} DB call
+                      {dbCallLogs.length !== 1 ? "s" : ""} logged
+                    </div>
+                    <div className="flex-1 min-h-0">
                       <Editor
+                        key={`db-calls-${dbCallLogs.length}`}
                         height="100%"
-                        defaultLanguage="sql"
-                        value={sqlQuery}
+                        defaultLanguage="plaintext"
+                        value={dbCallLogs.map(formatCallLog).join("\n")}
                         theme={MONACO_THEME}
                         options={{
                           minimap: { enabled: false },
@@ -418,13 +356,17 @@ export function QueryEditor() {
                           formatOnType: true,
                         }}
                       />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        {loading
-                          ? "Generating SQL..."
-                          : "Run a query to see the generated PostgreSQL SQL"}
-                      </div>
-                    )}
+                    </div>
+                  </div>
+                )}
+                {dbCallLogs.length === 0 && !error && !loading && (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    Click "Run Code" to see DB call logs
+                  </div>
+                )}
+                {loading && dbCallLogs.length === 0 && (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    Running code...
                   </div>
                 )}
               </div>
