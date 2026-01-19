@@ -2,7 +2,7 @@ import { serve } from "bun";
 import { HttpClientDatomDatabaseServerComponent } from "../../datom-database/http-client/http-client-datom-database-server-component";
 import {
   PostgreSQLDatomDatabase,
-  SQLiteDatomDatabase
+  SQLiteDatomDatabase,
 } from "../../datom-database/index";
 import { DestroyRetentionPolicy } from "../../datom-database/retention-policy";
 import { PgSQLDatabase } from "../../sql-database/sql-database-pg";
@@ -154,43 +154,6 @@ async function main() {
           async GET(_req) {
             return Response.json(await notepad(db));
           },
-        },
-
-        "/api/hello": {
-          async GET(_req) {
-            logger.info("Route hit", {
-              event: "route_hit",
-              route: "/api/hello",
-              method: "GET",
-            });
-            return Response.json({
-              message: "Hello, world!",
-              method: "GET",
-            });
-          },
-          async PUT(_req) {
-            logger.info("Route hit", {
-              event: "route_hit",
-              route: "/api/hello",
-              method: "PUT",
-            });
-            return Response.json({
-              message: "Hello, world!",
-              method: "PUT",
-            });
-          },
-        },
-
-        "/api/hello/:name": async (req) => {
-          logger.info("Route hit", {
-            event: "route_hit",
-            route: "/api/hello/:name",
-            params: req.params,
-          });
-          const name = req.params.name;
-          return Response.json({
-            message: `Hello, ${name}!`,
-          });
         },
 
         [DATOMS_API_ENDPOINT]: {
