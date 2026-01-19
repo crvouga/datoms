@@ -314,7 +314,7 @@ export interface DatomDatabase extends DatabaseView {
    * @param datoms Array of datoms to delete (must match exactly by e, a, v, tx, op)
    * @internal
    */
-  deleteDatoms(datoms: Datom[]): Promise<void>;
+  _destroy(datoms: Datom[]): Promise<void>;
 }
 
 /**

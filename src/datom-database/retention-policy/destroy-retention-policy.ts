@@ -345,7 +345,7 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
 
         // Delete batch from source database
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        await this.sourceDb.deleteDatoms(batch);
+        await this.sourceDb._destroy(batch);
         deleted += batch.length;
 
         this.logger?.debug("Batch deleted", {

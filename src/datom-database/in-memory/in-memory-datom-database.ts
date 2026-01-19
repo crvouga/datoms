@@ -633,7 +633,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     return this.nextTx > 1 ? this.nextTx - 1 : 0;
   }
 
-  async deleteDatoms(datoms: Datom[]): Promise<void> {
+  async _destroy(datoms: Datom[]): Promise<void> {
     await this._ensureInitialized();
 
     // Create a set of keys for fast lookup

@@ -1731,7 +1731,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     return Number(row.last_tx);
   }
 
-  async deleteDatoms(datoms: Datom[]): Promise<void> {
+  async _destroy(datoms: Datom[]): Promise<void> {
     await this._ensureInitialized();
 
     if (datoms.length === 0) {
