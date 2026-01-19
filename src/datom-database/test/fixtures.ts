@@ -9,6 +9,10 @@ import { PostgreSQLDatomDatabase } from "../postgres/postgres-datom-database.js"
 import { RemoteDatomDatabase } from "../remote/datom-database-remote.js";
 import { LocalTransport } from "../remote/transport/local-transport.js";
 import { SQLiteDatomDatabase } from "../sqlite/sqlite-datom-database.js";
+import { HttpClientTransport } from "../remote/transport/http-client-transport.js";
+import { FetchHttpClient } from "../../http-client/http-client.js";
+import { serve } from "bun";
+import { HttpClientTransportServerComponent } from "../remote/transport/http-client-transport-server-component.js";
 
 export type Fixture = {
   db: DatomDatabase;
@@ -21,8 +25,8 @@ const createInMemoryFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
@@ -39,8 +43,8 @@ const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
@@ -67,20 +71,54 @@ const createPGLiteFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
-const createRemoteFixture = async (): Promise<Fixture> => {
+const createLocalTransportRemoteFixture = async (): Promise<Fixture> => {
   const transport = new LocalTransport(new InMemoryDatomDatabase());
   const db = new RemoteDatomDatabase(transport);
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
+    beforeEach: async () => { },
     afterEach: async () => {
       await db.close();
+    },
+  };
+};
+
+const createHttpClientTransportRemoteFixture = async (): Promise<Fixture> => {
+  const serverDb = new InMemoryDatomDatabase();
+  const transportServerComponent = new HttpClientTransportServerComponent(
+    serverDb
+  );
+  const endpoint = `/api/datom-database`;
+  const server = serve({
+    port: 0, // Let OS assign an available port
+    routes: {
+      [endpoint]: (request) => transportServerComponent.handleRequest(request),
+    },
+  });
+  // Extract the actual port from the server URL
+  const port = parseInt(server.url.port, 10);
+  const httpClient = new FetchHttpClient(`http://localhost:${port}`);
+  const transport = new HttpClientTransport(httpClient, endpoint);
+  const db = new RemoteDatomDatabase(transport);
+  await db.initialize();
+  return {
+    db,
+    beforeEach: async () => {
+      // Reset the server database state between tests
+      await serverDb.close();
+      await serverDb.initialize();
+      // Also reset the remote database's initialization state
+      await db.close();
+      await db.initialize();
+    },
+    afterEach: async () => {
+      await server.stop();
     },
   };
 };
@@ -97,4 +135,11 @@ FIXTURES.push(["PostgreSQL", () => createPostgresFixture()]);
 if (TEST_ALL) {
   FIXTURES.push(["PostgreSQL (PGLite)", () => createPGLiteFixture()]);
 }
-FIXTURES.push(["Remote", () => createRemoteFixture()]);
+FIXTURES.push([
+  "Remote (local transport)",
+  () => createLocalTransportRemoteFixture(),
+]);
+FIXTURES.push([
+  "Remote (http client transport)",
+  () => createHttpClientTransportRemoteFixture(),
+]);
