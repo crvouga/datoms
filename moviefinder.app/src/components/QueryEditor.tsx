@@ -280,7 +280,6 @@ export function QueryEditor() {
 
             <PanelResizeHandle className="w-2 bg-gray-800 hover:bg-gray-700 transition-colors cursor-col-resize" />
 
-            {/* Output Section */}
             <Panel defaultSize={panelSizes[1]} minSize={20} className="flex flex-col">
               <div className="border-b border-gray-700 bg-gray-900">
                 <div className="flex items-center justify-between p-2 border-b border-gray-700">
