@@ -3,8 +3,8 @@
  * Communicates with remote database server via HTTP
  */
 
-import type { DatalogQuery } from "../../datalog/datalog.js";
-import type { Datom, DatomInput, TransactionId } from "../../datoms.js";
+import type { DatalogQuery, QueryClause } from "../../datalog/datalog.js";
+import type { Attribute, Datom, DatomInput, TransactionId, Value } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
 import type { HttpClient } from "../../http-client/http-client.js";
 import type { Transaction } from "../../types.js";
@@ -21,7 +21,9 @@ import {
   type WriteContext,
   type WriteResult,
 } from "../hook/hook.js";
+import { isQueryPattern, isVariable } from "../shared/datalog-helpers.js";
 import { executeQueryOnDatoms } from "../shared/in-memory-query-executor.js";
+import { joinResults, project } from "../shared/query-results.js";
 import { validateQueryOptions } from "../shared/query-validation.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type {
@@ -39,10 +41,6 @@ interface DatomsResponse {
 
 interface TransactResponse {
   txId: TransactionId;
-}
-
-interface QueryResponse {
-  results: QueryResult;
 }
 
 interface GetLatestTransactionResponse {
@@ -393,59 +391,238 @@ export class HttpClientDatomDatabase implements DatomDatabase {
 
     const modifiedQuery = beforeResult.query;
 
-    // Send query to server - server handles all filtering, sorting, and limiting
-    try {
-      const response = await this.httpClient.post<QueryResponse>(
-        this.endpoint,
+    // Always fetch datoms and run after-read hooks
+    // This ensures hooks can filter/transform results
+    // If no hooks are registered, runAfterRead will quickly return datoms unchanged
+    // Extract all datoms from all clauses for afterRead hooks
+    const allDatomsSet = new Set<string>();
+    const allDatoms: Datom[] = [];
+
+    for (const clause of modifiedQuery.where) {
+      if (!isQueryPattern(clause)) {
+        continue;
+      }
+      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+      const entity = isVariable(entityVal)
+        ? undefined
+        : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal)
+        ? undefined
+        : (attributeVal as string);
+      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+      // Fetch datoms matching this clause from server
+      const clauseDatoms = await this._datomsWithMetadataInternal(
         {
-          method: "query",
-          query: modifiedQuery,
-          context: restContext,
+          e: entity,
+          a: attribute,
+          v: value,
           viewConfig,
-        }
+        },
+        viewConfig
       );
 
-      const executionTime = performance.now() - startTime;
-      metadata.executionTimeMs = executionTime;
-      metadata.resultCount = response.results.length;
-      metadata.executionStrategy = "http-remote";
-
-      return {
-        data: response.results,
-        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-      };
-    } catch (error) {
-      const mappedError = this._mapHttpError(error);
-      if (mappedError.code === "QUERY_TIMEOUT") {
-        const timeoutMs = (query as { timeoutMs?: number }).timeoutMs || 0;
-        throw new QueryTimeoutError(timeoutMs, query);
+      for (const datom of clauseDatoms.data) {
+        const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
+        if (!allDatomsSet.has(key)) {
+          allDatomsSet.add(key);
+          allDatoms.push(datom);
+        }
       }
-      if (mappedError.code === "QUERY_SAFETY_VIOLATION") {
-        throw new QuerySafetyError(mappedError.message);
-      }
-      if (mappedError.code === "QUERY_RESULT_SIZE_EXCEEDED") {
-        const errorData = mappedError.originalError as {
-          resultSize?: number;
-          maxResultSize?: number;
-          queryOptions?: unknown;
-        };
-        throw new QueryResultSizeError(
-          errorData.resultSize ?? 0,
-          errorData.maxResultSize ?? 0,
-          errorData.queryOptions ?? query
-        );
-      }
-      if (
-        mappedError.code === "QUERY_HOOK_ERROR" ||
-        mappedError.code === "QUERY_ERROR"
-      ) {
-        const errorData = mappedError.originalError as {
-          errors?: Array<{ hook: string; message: string; code?: string }>;
-        };
-        throw new QueryError(mappedError.message, errorData?.errors || []);
-      }
-      throw new Error(`Query failed: ${mappedError.message}`);
     }
+
+    // Run after-read hooks
+    const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
+
+    if (afterResult.errors && afterResult.errors.length > 0) {
+      throw new QueryError(
+        "Query blocked by after-read hooks",
+        afterResult.errors
+      );
+    }
+
+    // Execute query locally on filtered datoms
+    if (modifiedQuery.where.length === 0) {
+      const executionTime = performance.now() - startTime;
+      return {
+        data: [],
+        metadata: {
+          executionTimeMs: executionTime,
+          resultCount: 0,
+          executionStrategy: "http-remote-with-hooks",
+        },
+      };
+    }
+
+    const firstClause = modifiedQuery.where[0];
+    if (!firstClause) {
+      const executionTime = performance.now() - startTime;
+      return {
+        data: [],
+        metadata: {
+          executionTimeMs: executionTime,
+          resultCount: 0,
+          executionStrategy: "http-remote-with-hooks",
+        },
+      };
+    }
+
+    const firstResults = await this._executeClauseWithFilteredDatoms(
+      firstClause,
+      afterResult.datoms
+    );
+
+    // Join with remaining clauses
+    let results = firstResults;
+    for (let i = 1; i < modifiedQuery.where.length; i++) {
+      const clause = modifiedQuery.where[i];
+      if (!clause) continue;
+      const clauseResults = await this._executeClauseWithFilteredDatoms(
+        clause,
+        afterResult.datoms
+      );
+      results = joinResults(
+        results,
+        clauseResults,
+        modifiedQuery.where.slice(0, i + 1)
+      );
+    }
+
+    // Project to find variables
+    const projected = project(results, modifiedQuery.find, modifiedQuery.where);
+
+    // Apply ordering if specified
+    if (modifiedQuery.orderBy) {
+      // Map orderBy variables to output keys from find clause
+      const variableToOutputKey = new Map<string, string>();
+      for (const [outputKey, expr] of Object.entries(modifiedQuery.find)) {
+        let varName: string | undefined;
+        if (
+          Array.isArray(expr) &&
+          expr.length === 1 &&
+          typeof expr[0] === "string"
+        ) {
+          varName = expr[0];
+        } else if (typeof expr === "string") {
+          varName = expr;
+        }
+        if (varName) {
+          variableToOutputKey.set(varName, outputKey);
+        }
+      }
+
+      projected.sort((a, b) => {
+        for (const [variable, direction] of modifiedQuery.orderBy!) {
+          // Map variable to output key, or fall back to stripped variable name
+          const outputKey =
+            variableToOutputKey.get(variable) ?? variable.replace(/^\?/, "");
+          const aVal = a[outputKey];
+          const bVal = b[outputKey];
+
+          // Handle null/undefined
+          if (aVal == null && bVal == null) continue;
+          if (aVal == null) return direction === "asc" ? -1 : 1;
+          if (bVal == null) return direction === "asc" ? 1 : -1;
+
+          // Ensure proper numeric comparison when both values are numeric
+          const aIsNumber = typeof aVal === "number";
+          const bIsNumber = typeof bVal === "number";
+
+          let aNum: number | null = null;
+          let bNum: number | null = null;
+
+          if (aIsNumber) {
+            aNum = aVal as number;
+          } else if (typeof aVal === "string" && !isNaN(Number(aVal))) {
+            aNum = Number(aVal);
+          }
+
+          if (bIsNumber) {
+            bNum = bVal as number;
+          } else if (typeof bVal === "string" && !isNaN(Number(bVal))) {
+            bNum = Number(bVal);
+          }
+
+          let comparison: number;
+          if (aNum !== null && bNum !== null) {
+            comparison = aNum - bNum;
+          } else {
+            // String comparison
+            const aStr = String(aVal);
+            const bStr = String(bVal);
+            comparison = aStr.localeCompare(bStr);
+          }
+
+          if (comparison !== 0) {
+            return direction === "asc" ? comparison : -comparison;
+          }
+        }
+        return 0;
+      });
+    }
+
+    // Apply limit if specified
+    let finalResults = projected;
+    if (modifiedQuery.limit !== undefined) {
+      finalResults = projected.slice(0, modifiedQuery.limit);
+    }
+
+    const executionTime = performance.now() - startTime;
+    metadata.executionTimeMs = executionTime;
+    metadata.resultCount = finalResults.length;
+    metadata.executionStrategy = "http-remote-with-hooks";
+
+    return {
+      data: finalResults,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+    };
+  }
+
+  /**
+   * Execute a clause using filtered datoms from hooks
+   */
+  private async _executeClauseWithFilteredDatoms(
+    clause: QueryClause,
+    filteredDatoms: Datom[]
+  ): Promise<Record<string, Value | Attribute>[]> {
+    if (!isQueryPattern(clause)) {
+      throw new Error("Only QueryPattern clauses are supported");
+    }
+    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+    const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+    const attribute = isVariable(attributeVal)
+      ? undefined
+      : (attributeVal as string);
+    const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+    // Filter datoms based on clause
+    let matchingDatoms = filteredDatoms;
+    if (entity !== undefined) {
+      matchingDatoms = matchingDatoms.filter((d) => d.e === entity);
+    }
+    if (attribute !== undefined) {
+      matchingDatoms = matchingDatoms.filter((d) => d.a === attribute);
+    }
+    if (value !== undefined) {
+      matchingDatoms = matchingDatoms.filter(
+        (d) => JSON.stringify(d.v) === JSON.stringify(value)
+      );
+    }
+
+    // Map datom fields to variable names from the clause
+    return matchingDatoms.map((datom) => {
+      const result: Record<string, Value | Attribute> = {};
+      if (isVariable(entityVal)) {
+        result[entityVal as string] = datom.e;
+      }
+      if (isVariable(attributeVal)) {
+        result[attributeVal as string] = datom.a;
+      }
+      if (isVariable(valueVal)) {
+        result[valueVal as string] = datom.v;
+      }
+      return result;
+    });
   }
 
   private async _datomsWithMetadataInternal(

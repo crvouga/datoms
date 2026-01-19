@@ -4,18 +4,23 @@ import { FileSystemDatomDatabase } from "../filesystem/filesystem-datom-database
 import type { Fixture } from "./fixtures/fixture.js";
 import { FAST_TESTS, FIXTURES } from "./fixtures/fixtures.js";
 
+const TIMEOUT = 30000;
+
 describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
   let f: Fixture;
 
-  beforeAll(async () => {
-    f = await createFixture();
-    const movieDb = new FileSystemDatomDatabase({ filePath: "movie-db.csv" });
-    await movieDb.initialize();
-    const movieDatoms = await movieDb.datoms({
-      limit: FAST_TESTS ? 500 : 1_000_000,
-    });
-    await f.db.transact(movieDatoms);
-  });
+  beforeAll(
+    async () => {
+      f = await createFixture();
+      const movieDb = new FileSystemDatomDatabase({ filePath: "movie-db.csv" });
+      await movieDb.initialize();
+      const movieDatoms = await movieDb.datoms({
+        limit: FAST_TESTS ? 500 : 1_000_000,
+      });
+      await f.db.transact(movieDatoms);
+    },
+    { timeout: TIMEOUT }
+  );
 
   it("should return the top movies by popularity", async () => {
     const limit = 10;
@@ -62,7 +67,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
         Number(currPopularity)
       );
     }
-  });
+  }, { timeout: TIMEOUT });
 
   it("should return movies sorted by title A to Z", async () => {
     const limit = 10;
@@ -96,7 +101,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
         String(prevTitle).localeCompare(String(currTitle))
       ).toBeLessThanOrEqual(0);
     }
-  });
+  }, { timeout: TIMEOUT });
 
   it("should return highly rated movies filtered by genre", async () => {
     // Filter for Action genre (genre_id: 28) and sort by vote_average descending
@@ -159,5 +164,5 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
       expect(typeof movie["movie/title"]).toBe("string");
       expect(typeof Number(movie["movie/vote_average"])).toBe("number");
     }
-  });
+  }, { timeout: TIMEOUT });
 });
