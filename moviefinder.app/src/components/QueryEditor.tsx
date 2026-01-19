@@ -1,4 +1,3 @@
-import Editor from "@monaco-editor/react";
 import { useState } from "react";
 import { Panel, PanelResizeHandle } from "react-resizable-panels";
 import {
@@ -8,6 +7,7 @@ import {
 import { db } from "../lib/db";
 import { TypeScriptEditor, type TypeDefinition } from "./TypeScriptEditor";
 import { ResizablePanels } from "./ui/ResizablePanels";
+import { DbCallLogList } from "./DbCallLogList";
 // Type definitions from db-types.d.ts are automatically included via TypeScript
 
 
@@ -128,103 +128,6 @@ export function QueryEditor() {
     console.error("Code execution error:", err);
   };
 
-  const formatCallLog = (log: DbCallLog): string => {
-    const timeStr = new Date(log.timestamp).toLocaleTimeString("en-US", {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      fractionalSecondDigits: 3,
-    });
-
-    const durationStr =
-      log.duration < 1
-        ? `${(log.duration * 1000).toFixed(2)}μs`
-        : log.duration < 1000
-          ? `${log.duration.toFixed(2)}ms`
-          : `${(log.duration / 1000).toFixed(2)}s`;
-
-    // Format arguments nicely
-    const formatArgs = (args: unknown[]): string => {
-      if (args.length === 0) return "";
-      if (args.length === 1) {
-        const argStr = JSON.stringify(args[0], null, 2);
-        // If it's a single object argument, format it nicely
-        if (typeof args[0] === "object" && args[0] !== null) {
-          return argStr
-            .split("\n")
-            .map((line, i) => (i === 0 ? line : `  ${line}`))
-            .join("\n");
-        }
-        return argStr;
-      }
-      return args
-        .map((arg, i) => {
-          const argStr = JSON.stringify(arg, null, 2);
-          if (typeof arg === "object" && arg !== null) {
-            return `  ${i + 1}. ${argStr.split("\n").join("\n    ")}`;
-          }
-          return `  ${i + 1}. ${argStr}`;
-        })
-        .join("\n");
-    };
-
-    // Format result nicely
-    const formatResult = (result: unknown): string => {
-      if (result === null || result === undefined) {
-        return String(result);
-      }
-
-      const resultStr = JSON.stringify(result, null, 2);
-      const maxResultLength = 2000;
-
-      if (resultStr.length > maxResultLength) {
-        const truncated = resultStr.substring(0, maxResultLength);
-        return `${truncated}...\n  (truncated, ${resultStr.length} chars total)`;
-      }
-
-      // Indent the result
-      return resultStr
-        .split("\n")
-        .map((line, i) => (i === 0 ? line : `  ${line}`))
-        .join("\n");
-    };
-
-    let output = "";
-
-    // Header with timestamp and method name
-    output += `┌─ ${timeStr} ──────────────────────────────────────────────┐\n`;
-    output += `│ Method: ${log.method.padEnd(50)} │\n`;
-    output += `│ Duration: ${durationStr.padEnd(47)} │\n`;
-    output += `└──────────────────────────────────────────────────────────┘\n\n`;
-
-    // Arguments section
-    if (log.args.length > 0) {
-      output += `Arguments:\n`;
-      const formattedArgs = formatArgs(log.args);
-      output += formattedArgs
-        .split("\n")
-        .map((line) => `  ${line}`)
-        .join("\n");
-      output += `\n\n`;
-    }
-
-    // Result or error section
-    if (log.error) {
-      output += `❌ Error:\n`;
-      output += `  ${log.error.split("\n").join("\n  ")}\n`;
-    } else {
-      output += `✓ Result:\n`;
-      const formattedResult = formatResult(log.result);
-      output += `  ${formattedResult.split("\n").join("\n  ")}\n`;
-    }
-
-    // Add separator between calls
-    output += `\n${"─".repeat(60)}\n\n`;
-
-    return output;
-  };
-
   return (
     <div className="h-screen w-screen overflow-hidden">
       <ResizablePanels
@@ -330,44 +233,16 @@ export function QueryEditor() {
                     </div>
                   </div>
                 )}
-                {dbCallLogs.length > 0 && (
-                  <div className="h-full flex flex-col">
-                    <div className="p-2 text-xs text-gray-400 border-b border-gray-700">
-                      {dbCallLogs.length} DB call
-                      {dbCallLogs.length !== 1 ? "s" : ""} logged
-                    </div>
-                    <div className="flex-1 min-h-0">
-                      <Editor
-                        key={`db-calls-${dbCallLogs.length}`}
-                        height="100%"
-                        defaultLanguage="plaintext"
-                        value={dbCallLogs.map(formatCallLog).join("\n")}
-                        theme={MONACO_THEME}
-                        options={{
-                          minimap: { enabled: false },
-                          fontSize: 14,
-                          wordWrap: "on",
-                          automaticLayout: true,
-                          lineHeight: 20,
-                          padding: { top: 16, bottom: 16 },
-                          scrollBeyondLastLine: false,
-                          readOnly: true,
-                          formatOnPaste: true,
-                          formatOnType: true,
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-                {dbCallLogs.length === 0 && !error && !loading && (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    Click "Run Code" to see DB call logs
-                  </div>
-                )}
                 {loading && dbCallLogs.length === 0 && (
                   <div className="flex items-center justify-center h-full text-gray-500">
                     Running code...
                   </div>
+                )}
+                {!loading && (
+                  <DbCallLogList
+                    logs={dbCallLogs}
+                    onClear={() => setDbCallLogs([])}
+                  />
                 )}
               </div>
             </Panel>
