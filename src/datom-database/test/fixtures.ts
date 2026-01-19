@@ -23,8 +23,8 @@ const createInMemoryFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => { },
-    afterEach: async () => { },
+    beforeEach: async () => {},
+    afterEach: async () => {},
   };
 };
 
@@ -41,8 +41,8 @@ const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => { },
-    afterEach: async () => { },
+    beforeEach: async () => {},
+    afterEach: async () => {},
   };
 };
 
@@ -69,8 +69,8 @@ const createPGLiteFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => { },
-    afterEach: async () => { },
+    beforeEach: async () => {},
+    afterEach: async () => {},
   };
 };
 
@@ -97,7 +97,7 @@ const createHttpClientTransportRemoteFixture = async (): Promise<Fixture> => {
       // Reset the server database state between tests
       await serverDb.close();
       await serverDb.initialize();
-      // Also reset t  
+      // Also reset t
       // he remote database's initialization state
       await db.close();
       await db.initialize();

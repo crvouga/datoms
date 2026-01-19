@@ -34,6 +34,7 @@ export { InMemoryDatomDatabase } from "./in-memory/in-memory-datom-database.js";
 export {
   datalogToPostgresSQL,
   PostgreSQLDatomDatabase,
+  type PostgreSQLMaintenanceConfig,
 } from "./postgres/postgres-datom-database.js";
 export { SQLiteDatomDatabase } from "./sqlite/sqlite-datom-database.js";
 

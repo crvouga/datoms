@@ -34,53 +34,31 @@ async function main() {
     const sqliteSqlDb = new SQLiteSQLDatabase(":memory:");
     const sqliteDb = new SQLiteDatomDatabase(sqliteSqlDb);
     const postgresSqlDb = new PgSQLDatabase(databaseUrl);
-    const postgresDb = new PostgreSQLDatomDatabase(postgresSqlDb);
+    const tableName = process.env.POSTGRES_TABLE_NAME || "datoms"; // Default: "datoms"
+    const postgresDb = new PostgreSQLDatomDatabase(
+      postgresSqlDb,
+      tableName,
+      {
+        enabled: true,
+        intervalMs: 1000 * 60, // 1 minute
+        runImmediately: true,
+      },
+      logger
+    );
     const db = false ? sqliteDb : postgresDb;
+
+    // Initialize database and start maintenance if using PostgreSQL
+    await db.initialize();
+    if (db === postgresDb) {
+      postgresDb.startMaintenance();
+    }
+
     const destroyRetentionPolicy = new DestroyRetentionPolicy(db, {
       retentionTxCount: 10,
       intervalMs: 3000,
       batchSize: 5_000,
     });
     destroyRetentionPolicy.start();
-
-    // PostgreSQL maintenance: VACUUM ANALYZE on interval
-    const maintenanceIntervalMs = 1000 * 60;
-    const tableName = process.env.POSTGRES_TABLE_NAME || "datoms"; // Default: "datoms"
-    // Validate table name to prevent SQL injection (alphanumeric and underscores only)
-    if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
-      throw new Error(
-        `Invalid table name: ${tableName}. Only alphanumeric characters and underscores are allowed.`
-      );
-    }
-    const runPostgresMaintenance = async () => {
-      try {
-        logger.info("Running PostgreSQL maintenance...", {
-          event: "postgres_maintenance_start",
-          tableName,
-        });
-        // VACUUM ANALYZE on both tables to reclaim storage and update statistics
-        // VACUUM ANALYZE reclaims storage occupied by dead tuples and updates statistics
-        await postgresSqlDb.execute(`VACUUM ANALYZE ${tableName}`);
-        await postgresSqlDb.execute(`VACUUM ANALYZE ${tableName}_tx`);
-        logger.info("PostgreSQL maintenance completed", {
-          event: "postgres_maintenance_complete",
-          tableName,
-        });
-      } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        logger.error("PostgreSQL maintenance error", {
-          event: "postgres_maintenance_error",
-          error: errorMessage,
-          tableName,
-        });
-      }
-    };
-    // Run maintenance immediately, then on interval
-    runPostgresMaintenance();
-    const maintenanceInterval = setInterval(
-      runPostgresMaintenance,
-      maintenanceIntervalMs
-    );
 
     const httpClient = new FetchHttpClient();
     logger.info("Creating TMDB client...", { event: "tmdb_client_creating" });
@@ -125,9 +103,6 @@ async function main() {
           error: errorMessage,
         });
       }
-
-      // Clear maintenance interval
-      clearInterval(maintenanceInterval);
 
       // Close database connections
       try {

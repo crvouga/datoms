@@ -18,7 +18,7 @@ import type {
 import type { EntityId } from "../../entity-id.js";
 import type { SQLDatabase } from "../../sql-database/sql-database.js";
 import type { DatabaseRow } from "../../sql-database/types.js";
-import type { Transaction } from "../../types.js";
+import type { Logger, Transaction } from "../../types.js";
 
 import type { WithResult } from "../datom-database.js";
 import {
@@ -51,6 +51,18 @@ import {
   aggregationToSQL,
   checkSQLAggregations,
 } from "./aggregations/helpers.js";
+
+/**
+ * Configuration for PostgreSQL maintenance operations
+ */
+export interface PostgreSQLMaintenanceConfig {
+  /** Enable maintenance (default: false) */
+  enabled?: boolean;
+  /** Interval in milliseconds for periodic execution (required if enabled) */
+  intervalMs?: number;
+  /** Run maintenance immediately on start (default: true) */
+  runImmediately?: boolean;
+}
 
 /**
  * Check if query can use pivot optimization (multiple attributes on same entity)
@@ -546,11 +558,22 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   protected initialized = false;
   private connection: SQLDatabase;
   private tableName: string;
+  private maintenanceIntervalId: ReturnType<typeof setInterval> | null = null;
+  private maintenanceRunning: boolean = false;
+  private maintenanceConfig?: PostgreSQLMaintenanceConfig;
+  private logger?: Logger;
 
-  constructor(connection: SQLDatabase, tableName: string = "datoms") {
+  constructor(
+    connection: SQLDatabase,
+    tableName: string = "datoms",
+    maintenanceConfig?: PostgreSQLMaintenanceConfig,
+    logger?: Logger
+  ) {
     this.hooks = new HookEngine();
     this.connection = connection;
     this.tableName = tableName;
+    this.maintenanceConfig = maintenanceConfig;
+    this.logger = logger;
   }
 
   async initialize(): Promise<void> {
@@ -620,6 +643,7 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
   }
 
   async close(): Promise<void> {
+    this.stopMaintenance();
     if (this.connection.close) {
       await this.connection.close();
     }
@@ -2219,5 +2243,125 @@ export class PostgreSQLDatomDatabase implements InternalDatabaseView {
     }
 
     return projected;
+  }
+
+  /**
+   * Start periodic PostgreSQL maintenance (VACUUM ANALYZE)
+   * Maintenance must be configured in constructor to use this method
+   */
+  startMaintenance(): void {
+    if (!this.maintenanceConfig || !this.maintenanceConfig.enabled) {
+      return;
+    }
+
+    if (this.maintenanceRunning) {
+      this.logger?.warn("Maintenance already running", {
+        event: "postgres_maintenance_already_running",
+      });
+      return;
+    }
+
+    if (!this.maintenanceConfig.intervalMs) {
+      this.logger?.warn("Maintenance enabled but intervalMs not provided", {
+        event: "postgres_maintenance_config_error",
+      });
+      return;
+    }
+
+    this.maintenanceRunning = true;
+
+    this.logger?.info("Starting PostgreSQL maintenance", {
+      event: "postgres_maintenance_starting",
+      intervalMs: this.maintenanceConfig.intervalMs,
+      runImmediately: this.maintenanceConfig.runImmediately ?? true,
+    });
+
+    // Run immediately if configured
+    if (this.maintenanceConfig.runImmediately !== false) {
+      this.runMaintenance().catch((err) => {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        this.logger?.error("Initial maintenance run failed", {
+          event: "postgres_maintenance_error",
+          error: errorMessage,
+        });
+      });
+    }
+
+    // Set up interval
+    this.maintenanceIntervalId = setInterval(() => {
+      this.runMaintenance().catch((err) => {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        this.logger?.error("Periodic maintenance execution failed", {
+          event: "postgres_maintenance_error",
+          error: errorMessage,
+        });
+      });
+    }, this.maintenanceConfig.intervalMs);
+  }
+
+  /**
+   * Stop periodic PostgreSQL maintenance
+   */
+  stopMaintenance(): void {
+    if (!this.maintenanceRunning) {
+      return;
+    }
+
+    this.maintenanceRunning = false;
+
+    if (this.maintenanceIntervalId !== null) {
+      clearInterval(this.maintenanceIntervalId);
+      this.maintenanceIntervalId = null;
+    }
+
+    this.logger?.info("Stopped PostgreSQL maintenance", {
+      event: "postgres_maintenance_stopped",
+    });
+  }
+
+  /**
+   * Check if maintenance is currently running
+   */
+  isMaintenanceRunning(): boolean {
+    return this.maintenanceRunning;
+  }
+
+  /**
+   * Execute PostgreSQL maintenance (VACUUM ANALYZE) once
+   * This can be called manually or is called automatically by the interval
+   */
+  async runMaintenance(): Promise<void> {
+    await this._executeVacuumAnalyze();
+  }
+
+  /**
+   * Execute VACUUM ANALYZE on both tables
+   * @private
+   */
+  private async _executeVacuumAnalyze(): Promise<void> {
+    try {
+      this.logger?.info("Running PostgreSQL maintenance...", {
+        event: "postgres_maintenance_start",
+        tableName: this.tableName,
+      });
+
+      // VACUUM ANALYZE on both tables to reclaim storage and update statistics
+      // VACUUM ANALYZE reclaims storage occupied by dead tuples and updates statistics
+      await this.connection.execute(`VACUUM ANALYZE ${this.tableName}`);
+      await this.connection.execute(`VACUUM ANALYZE ${this.tableName}_tx`);
+
+      this.logger?.info("PostgreSQL maintenance completed", {
+        event: "postgres_maintenance_complete",
+        tableName: this.tableName,
+      });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this.logger?.error("PostgreSQL maintenance error", {
+        event: "postgres_maintenance_error",
+        error: errorMessage,
+        tableName: this.tableName,
+      });
+      // Don't throw - allow interval to continue
+    }
   }
 }
