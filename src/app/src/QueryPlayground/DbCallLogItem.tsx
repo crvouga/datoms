@@ -115,6 +115,15 @@ export function DbCallLogItem({
     }
   }, [datalogQuery]);
 
+  // Calculate result count
+  const resultCount = useMemo(() => {
+    if (log.result === undefined) return null;
+    if (Array.isArray(log.result)) {
+      return log.result.length;
+    }
+    return null;
+  }, [log.result]);
+
   // Determine available tabs
   const availableTabs = useMemo(() => {
     const tabs: TabType[] = [];
@@ -277,7 +286,7 @@ export function DbCallLogItem({
                   : tab === "sql"
                     ? "SQL Query"
                     : tab === "result"
-                      ? "Result"
+                      ? `Result${resultCount !== null ? ` (${resultCount})` : ""}`
                       : tab === "error"
                         ? "Error"
                         : "Arguments"}
