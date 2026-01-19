@@ -6,7 +6,7 @@ import { createPGLiteFixture } from "./fixture/pglite.js";
 import { createPostgresFixture } from "./fixture/postgres.js";
 import { createSQLiteFixture } from "./fixture/sqlite.js";
 
-const FAST_TESTS = process.env["FAST_TESTS"] === "true";
+export const FAST_TESTS = process.env["FAST_TESTS"] === "true";
 
 export const FIXTURES: [string, () => Promise<Fixture>][] = [];
 FIXTURES.push(["InMemory", () => createInMemoryFixture()]);

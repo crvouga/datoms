@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 
 import { FileSystemDatomDatabase } from "../filesystem/filesystem-datom-database.js";
 import type { Fixture } from "./fixtures/fixture.js";
-import { FIXTURES } from "./fixtures/fixtures.js";
+import { FAST_TESTS, FIXTURES } from "./fixtures/fixtures.js";
 
 describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
   let f: Fixture;
@@ -11,7 +11,9 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
     f = await createFixture();
     const movieDb = new FileSystemDatomDatabase({ filePath: "movie-db.csv" });
     await movieDb.initialize();
-    const movieDatoms = await movieDb.datoms({ limit: 1_000_000 });
+    const movieDatoms = await movieDb.datoms({
+      limit: FAST_TESTS ? 500 : 1_000_000,
+    });
     await f.db.transact(movieDatoms);
   });
 
