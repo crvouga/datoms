@@ -1,7 +1,9 @@
 import type { Fixture } from "../fixture.js";
 import { FileSystemDatomDatabase } from "../../../filesystem/filesystem-datom-database.js";
 
-export const createFileSystemFixture = async (filePath: string): Promise<Fixture> => {
+export const createFileSystemFixture = async (
+  filePath: string
+): Promise<Fixture> => {
   // Ensure a clean state before database initialization
   try {
     await Bun.file(filePath).delete();

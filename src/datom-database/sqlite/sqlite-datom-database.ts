@@ -970,7 +970,11 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       const variableToOutputKey = new Map<string, string>();
       for (const [outputKey, expr] of Object.entries(query.find)) {
         let varName: string | undefined;
-        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === "string") {
+        if (
+          Array.isArray(expr) &&
+          expr.length === 1 &&
+          typeof expr[0] === "string"
+        ) {
           varName = expr[0];
         } else if (typeof expr === "string") {
           varName = expr;
@@ -987,7 +991,8 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         ) => {
           for (const [variable, direction] of query.orderBy!) {
             // Map variable to output key, or fall back to stripped variable name
-            const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
+            const outputKey =
+              variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
             const aVal = a[outputKey];
             const bVal = b[outputKey];
             if (aVal === undefined && bVal === undefined) return 0;
@@ -995,15 +1000,15 @@ export class SQLiteDatomDatabase implements DatomDatabase {
               return direction === "asc" ? 1 : -1;
             if (bVal === undefined || bVal === null)
               return direction === "asc" ? -1 : 1;
-            
+
             // Ensure proper numeric comparison when both values are numeric
             let comparison: number;
             const aIsNumber = typeof aVal === "number";
             const bIsNumber = typeof bVal === "number";
-            
+
             let aNum: number | null = null;
             let bNum: number | null = null;
-            
+
             if (aIsNumber) {
               aNum = aVal;
             } else if (typeof aVal === "string" && aVal !== "") {
@@ -1012,7 +1017,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
                 aNum = parsed;
               }
             }
-            
+
             if (bIsNumber) {
               bNum = bVal;
             } else if (typeof bVal === "string" && bVal !== "") {
@@ -1021,7 +1026,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
                 bNum = parsed;
               }
             }
-            
+
             // If both are numeric, compare as numbers
             if (aNum !== null && bNum !== null) {
               comparison = aNum - bNum;
@@ -1031,7 +1036,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
               else if (aVal > bVal) comparison = 1;
               else comparison = 0;
             }
-            
+
             if (comparison !== 0) {
               return direction === "asc" ? comparison : -comparison;
             }
@@ -1147,7 +1152,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     // Batch inserts to avoid SQLite's SQL variable limit (typically 999)
     // Using batches of 199 datoms (199 * 5 params = 995 variables, safely under limit)
     const BATCH_SIZE = 199;
-    
+
     for (let i = 0; i < datoms.length; i += BATCH_SIZE) {
       const batch = datoms.slice(i, i + BATCH_SIZE);
       const placeholders = batch.map(() => "(?, ?, ?, ?, ?)").join(", ");

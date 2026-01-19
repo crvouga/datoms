@@ -1936,7 +1936,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Using batches of 199 datoms (199 * 5 params = 995 variables, safely under limit)
     const BATCH_SIZE = 199;
     const sqlStatements: string[] = [];
-    
+
     for (let i = 0; i < datoms.length; i += BATCH_SIZE) {
       const batch = datoms.slice(i, i + BATCH_SIZE);
       const placeholders = batch.map(() => "(?, ?, ?, ?, ?)").join(", ");
@@ -2740,7 +2740,11 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       const variableToOutputKey = new Map<string, string>();
       for (const [outputKey, expr] of Object.entries(modifiedQuery.find)) {
         let varName: string | undefined;
-        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === "string") {
+        if (
+          Array.isArray(expr) &&
+          expr.length === 1 &&
+          typeof expr[0] === "string"
+        ) {
           varName = expr[0];
         } else if (typeof expr === "string") {
           varName = expr;
@@ -2753,7 +2757,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       projected.sort((a, b) => {
         for (const [variable, direction] of modifiedQuery.orderBy!) {
           // Map variable to output key, or fall back to stripped variable name
-          const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
+          const outputKey =
+            variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
           const aVal = a[outputKey];
           const bVal = b[outputKey];
 
@@ -2765,10 +2770,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           let comparison: number;
           const aIsNumber = typeof aVal === "number";
           const bIsNumber = typeof bVal === "number";
-          
+
           let aNum: number | null = null;
           let bNum: number | null = null;
-          
+
           if (aIsNumber) {
             aNum = aVal;
           } else if (typeof aVal === "string" && aVal !== "") {
@@ -2777,7 +2782,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
               aNum = parsed;
             }
           }
-          
+
           if (bIsNumber) {
             bNum = bVal;
           } else if (typeof bVal === "string" && bVal !== "") {
@@ -2786,7 +2791,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
               bNum = parsed;
             }
           }
-          
+
           // If both are numeric, compare as numbers
           if (aNum !== null && bNum !== null) {
             comparison = aNum - bNum;

@@ -1,9 +1,4 @@
-import {
-  beforeAll,
-  describe,
-  expect,
-  it
-} from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import { FileSystemDatomDatabase } from "../filesystem/filesystem-datom-database.js";
 import type { Fixture } from "./fixtures/fixture.js";

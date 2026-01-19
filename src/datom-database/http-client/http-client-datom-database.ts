@@ -4,11 +4,7 @@
  */
 
 import type { DatalogQuery } from "../../datalog/datalog.js";
-import type {
-  Datom,
-  DatomInput,
-  TransactionId,
-} from "../../datoms.js";
+import type { Datom, DatomInput, TransactionId } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
 import type { HttpClient } from "../../http-client/http-client.js";
 import type { Transaction } from "../../types.js";
@@ -439,7 +435,10 @@ export class HttpClientDatomDatabase implements DatomDatabase {
           errorData.queryOptions ?? query
         );
       }
-      if (mappedError.code === "QUERY_HOOK_ERROR" || mappedError.code === "QUERY_ERROR") {
+      if (
+        mappedError.code === "QUERY_HOOK_ERROR" ||
+        mappedError.code === "QUERY_ERROR"
+      ) {
         const errorData = mappedError.originalError as {
           errors?: Array<{ hook: string; message: string; code?: string }>;
         };
@@ -621,7 +620,6 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     // Use the shared query execution logic
     return executeQueryOnDatoms(mergedDatoms, options);
   }
-
 
   private async _ensureInitialized(): Promise<void> {
     if (!this.initialized) {

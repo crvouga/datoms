@@ -900,7 +900,11 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       const variableToOutputKey = new Map<string, string>();
       for (const [outputKey, expr] of Object.entries(modifiedQuery.find)) {
         let varName: string | undefined;
-        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === "string") {
+        if (
+          Array.isArray(expr) &&
+          expr.length === 1 &&
+          typeof expr[0] === "string"
+        ) {
           varName = expr[0];
         } else if (typeof expr === "string") {
           varName = expr;
@@ -913,7 +917,8 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       projected.sort((a, b) => {
         for (const [variable, direction] of modifiedQuery.orderBy!) {
           // Map variable to output key, or fall back to stripped variable name
-          const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
+          const outputKey =
+            variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
           const aVal = a[outputKey];
           const bVal = b[outputKey];
 
@@ -925,14 +930,14 @@ export class InMemoryDatomDatabase implements DatomDatabase {
           // Ensure proper numeric comparison when both values are numeric
           // This handles cases where numeric values might be stored as strings
           let comparison: number;
-          
+
           // Check if both values can be treated as numbers
           const aIsNumber = typeof aVal === "number";
           const bIsNumber = typeof bVal === "number";
-          
+
           let aNum: number | null = null;
           let bNum: number | null = null;
-          
+
           if (aIsNumber) {
             aNum = aVal;
           } else if (typeof aVal === "string" && aVal !== "") {
@@ -941,7 +946,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
               aNum = parsed;
             }
           }
-          
+
           if (bIsNumber) {
             bNum = bVal;
           } else if (typeof bVal === "string" && bVal !== "") {
@@ -950,7 +955,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
               bNum = parsed;
             }
           }
-          
+
           // If both are numeric, compare as numbers
           if (aNum !== null && bNum !== null) {
             comparison = aNum - bNum;
