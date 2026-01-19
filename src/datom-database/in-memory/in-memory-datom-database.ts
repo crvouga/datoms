@@ -298,12 +298,13 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       options.e !== undefined ||
       options.a !== undefined ||
       options.v !== undefined ||
-      options.tx !== undefined;
+      options.tx !== undefined ||
+      options.txMax !== undefined;
     const hasLimit = options.limit !== undefined;
 
     if (!hasFilter && !hasLimit) {
       throw new QuerySafetyError(
-        "Query must include at least one filter (entity, attribute, value, tx) or a limit to prevent full table scans"
+        "Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans"
       );
     }
 
@@ -351,10 +352,17 @@ export class InMemoryDatomDatabase implements DatomDatabase {
   ): Promise<Datom[]> {
     await this._ensureInitialized();
 
+    // Validate that tx and txMax are mutually exclusive
+    if (options.tx !== undefined && options.txMax !== undefined) {
+      throw new Error(
+        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
+      );
+    }
+
     // Get all matching datoms without tx filter
     let results = this._datomsArray;
 
-    // Apply filters (except tx, which we'll handle separately)
+    // Apply filters (except tx/txMax, which we'll handle separately)
     if (options.e !== undefined) {
       results = results.filter((d) => d.e === options.e);
     }
@@ -367,7 +375,13 @@ export class InMemoryDatomDatabase implements DatomDatabase {
 
     // Filter to only datoms with tx <= txId
     // If options.tx is specified, use the minimum of both
-    const maxTx = options.tx !== undefined ? Math.min(options.tx, txId) : txId;
+    // If options.txMax is specified, use the minimum of txMax and txId
+    let maxTx = txId;
+    if (options.tx !== undefined) {
+      maxTx = Math.min(options.tx, txId);
+    } else if (options.txMax !== undefined) {
+      maxTx = Math.min(options.txMax, txId);
+    }
     results = results.filter((d) => d.tx <= maxTx);
 
     // Deduplicate by (entity, attribute) keeping the latest tx
@@ -394,6 +408,13 @@ export class InMemoryDatomDatabase implements DatomDatabase {
   private async _executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
     await this._ensureInitialized();
 
+    // Validate that tx and txMax are mutually exclusive
+    if (options.tx !== undefined && options.txMax !== undefined) {
+      throw new Error(
+        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
+      );
+    }
+
     // Get all datoms matching filters without deduplication
     let results = this._datomsArray;
 
@@ -409,6 +430,10 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     }
     if (options.tx !== undefined) {
       results = results.filter((d) => d.tx === options.tx);
+    }
+    if (options.txMax !== undefined) {
+      const txMax = options.txMax;
+      results = results.filter((d) => d.tx <= txMax);
     }
 
     // Sort by tx ASC for history
@@ -606,64 +631,6 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
     // nextTx is the next transaction ID to be used, so latest is one less
     return this.nextTx > 1 ? this.nextTx - 1 : 0;
-  }
-
-  async getObsoleteDatoms(cutoffTx: TransactionId): Promise<Datom[]> {
-    await this._ensureInitialized();
-
-    if (cutoffTx <= 0) {
-      return [];
-    }
-
-    // Get all datoms up to cutoff transaction using internal method to bypass validation
-    const allDatoms = await this._executeHistoryQuery({
-      tx: cutoffTx,
-    });
-
-    // Group datoms by (entity, attribute, value)
-    const datomsByKey = new Map<string, Datom[]>();
-    for (const datom of allDatoms) {
-      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
-      if (!datomsByKey.has(key)) {
-        datomsByKey.set(key, []);
-      }
-      datomsByKey.get(key)!.push(datom);
-    }
-
-    // For each (e, a, v) group, find the latest transaction
-    // All datoms with tx < latestTx are obsolete
-    const obsoleteDatoms: Datom[] = [];
-    for (const [_key, datoms] of datomsByKey.entries()) {
-      if (datoms.length === 0) {
-        continue;
-      }
-
-      // Sort by transaction ID descending
-      datoms.sort((a, b) => b.tx - a.tx);
-
-      // Get the latest transaction ID for this (e, a, v)
-      const latestDatom = datoms[0];
-      if (!latestDatom) {
-        continue;
-      }
-
-      // All datoms with tx < latestTx are obsolete (they've been superseded)
-      for (let i = 1; i < datoms.length; i++) {
-        const datom = datoms[i];
-        if (datom) {
-          obsoleteDatoms.push(datom);
-        }
-      }
-    }
-
-    // Remove duplicates using a unique key
-    const uniqueObsolete = new Map<string, Datom>();
-    for (const datom of obsoleteDatoms) {
-      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
-      uniqueObsolete.set(key, datom);
-    }
-
-    return Array.from(uniqueObsolete.values());
   }
 
   async deleteDatoms(datoms: Datom[]): Promise<void> {

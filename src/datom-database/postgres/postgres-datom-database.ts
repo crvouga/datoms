@@ -823,17 +823,25 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   async datomsWithMetadata(
     options: DatomsParams
   ): Promise<DatomsResultEnvelope> {
+    // Validate that tx and txMax are mutually exclusive
+    if (options.tx !== undefined && options.txMax !== undefined) {
+      throw new Error(
+        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
+      );
+    }
+
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
       options.e !== undefined ||
       options.a !== undefined ||
       options.v !== undefined ||
-      options.tx !== undefined;
+      options.tx !== undefined ||
+      options.txMax !== undefined;
     const hasLimit = options.limit !== undefined;
 
     if (!hasFilter && !hasLimit) {
       throw new QuerySafetyError(
-        "Query must include at least one filter (entity, attribute, value, tx) or a limit to prevent full table scans"
+        "Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans"
       );
     }
 
@@ -953,6 +961,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       conditions.push("tx = ?");
       params.push(options.tx);
     }
+    if (options.txMax !== undefined) {
+      conditions.push("tx <= ?");
+      params.push(options.txMax);
+    }
 
     // Use DISTINCT ON to get latest datom per (e, a, v) in SQL
     // This supports multi-valued attributes (multiple values per attribute)
@@ -1021,6 +1033,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   ): Promise<Datom[]> {
     await this._ensureInitialized();
 
+    // Validate that tx and txMax are mutually exclusive
+    if (options.tx !== undefined && options.txMax !== undefined) {
+      throw new Error(
+        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
+      );
+    }
+
     const conditions: string[] = [];
     const params: unknown[] = [];
 
@@ -1042,8 +1061,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       params.push(JSON.stringify(value));
     }
 
-    // Merge options.tx with txId: use minimum of both if options.tx is specified
-    const maxTx = options.tx !== undefined ? Math.min(options.tx, txId) : txId;
+    // Merge options.tx or options.txMax with txId: use minimum of both
+    let maxTx = txId;
+    if (options.tx !== undefined) {
+      maxTx = Math.min(options.tx, txId);
+    } else if (options.txMax !== undefined) {
+      maxTx = Math.min(options.txMax, txId);
+    }
     conditions.push("tx <= ?");
     params.push(maxTx);
 
@@ -1098,6 +1122,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   private async _executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
     await this._ensureInitialized();
 
+    // Validate that tx and txMax are mutually exclusive
+    if (options.tx !== undefined && options.txMax !== undefined) {
+      throw new Error(
+        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
+      );
+    }
+
     const conditions: string[] = [];
     const params: unknown[] = [];
 
@@ -1121,6 +1152,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     if (options.tx !== undefined) {
       conditions.push("tx = ?");
       params.push(options.tx);
+    }
+    if (options.txMax !== undefined) {
+      conditions.push("tx <= ?");
+      params.push(options.txMax);
     }
 
     const whereClause =
@@ -1694,33 +1729,6 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     }
     const row = result[0] as Record<string, unknown>;
     return Number(row.last_tx);
-  }
-
-  async getObsoleteDatoms(cutoffTx: TransactionId): Promise<Datom[]> {
-    await this._ensureInitialized();
-
-    if (cutoffTx <= 0) {
-      return [];
-    }
-
-    // Use a window function to find the latest transaction for each (e, a, v)
-    // Then select all datoms that are not the latest for their (e, a, v) group
-    const sql = `
-      WITH LatestDatoms AS (
-        SELECT e, a, v, MAX(tx) as max_tx
-        FROM ${this.tableName}
-        WHERE tx <= $1
-        GROUP BY e, a, v
-      )
-      SELECT d.e, d.a, d.v, d.tx, d.op
-      FROM ${this.tableName} d
-      LEFT JOIN LatestDatoms ld ON d.e = ld.e AND d.a = ld.a AND d.v = ld.v
-      WHERE d.tx <= $2 AND (ld.max_tx IS NULL OR d.tx < ld.max_tx)
-      ORDER BY d.tx ASC
-    `;
-
-    const result = await this.connection.query(sql, [cutoffTx, cutoffTx]);
-    return this._mapRowsToDatoms(result);
   }
 
   async deleteDatoms(datoms: Datom[]): Promise<void> {

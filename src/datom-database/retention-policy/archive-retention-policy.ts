@@ -11,6 +11,59 @@ import type { RetentionPolicy } from "./retention-policy.js";
 import type { RetentionPolicyConfig, RetentionResult } from "./types.js";
 
 /**
+ * Compute obsolete datoms from a list of datoms.
+ * A datom is obsolete if it has been superseded by a later transaction for the same (entity, attribute, value).
+ * @param datoms Array of datoms to analyze
+ * @returns Array of obsolete datoms (all datoms that are not the latest for their (e, a, v) group)
+ */
+function computeObsoleteDatoms(datoms: Datom[]): Datom[] {
+  // Group datoms by (entity, attribute, value)
+  const datomsByKey = new Map<string, Datom[]>();
+  for (const datom of datoms) {
+    const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
+    if (!datomsByKey.has(key)) {
+      datomsByKey.set(key, []);
+    }
+    datomsByKey.get(key)!.push(datom);
+  }
+
+  // For each (e, a, v) group, find the latest transaction
+  // All datoms with tx < latestTx are obsolete
+  const obsoleteDatoms: Datom[] = [];
+  for (const [_key, groupDatoms] of datomsByKey.entries()) {
+    if (groupDatoms.length === 0) {
+      continue;
+    }
+
+    // Sort by transaction ID descending
+    groupDatoms.sort((a, b) => b.tx - a.tx);
+
+    // Get the latest transaction ID for this (e, a, v)
+    const latestDatom = groupDatoms[0];
+    if (!latestDatom) {
+      continue;
+    }
+
+    // All datoms with tx < latestTx are obsolete (they've been superseded)
+    for (let i = 1; i < groupDatoms.length; i++) {
+      const datom = groupDatoms[i];
+      if (datom) {
+        obsoleteDatoms.push(datom);
+      }
+    }
+  }
+
+  // Remove duplicates using a unique key
+  const uniqueObsolete = new Map<string, Datom>();
+  for (const datom of obsoleteDatoms) {
+    const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
+    uniqueObsolete.set(key, datom);
+  }
+
+  return Array.from(uniqueObsolete.values());
+}
+
+/**
  * Archive retention policy
  * Moves obsolete historic datoms to an archive database before deleting them from the source
  */
@@ -177,10 +230,13 @@ export class ArchiveRetentionPolicy implements RetentionPolicy {
         };
       }
 
-      // Get obsolete datoms
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-      const obsoleteDatoms: Datom[] =
-        await this.sourceDb.getObsoleteDatoms(cutoffTx);
+      // Get all datoms up to cutoff transaction using history view
+      const allDatoms = await this.sourceDb
+        .history()
+        .datoms({ txMax: cutoffTx });
+
+      // Compute obsolete datoms: group by (e, a, v), find latest tx per group, return non-latest
+      const obsoleteDatoms = computeObsoleteDatoms(allDatoms);
       const batchSize = this.config.batchSize ?? 1000;
 
       this.logger?.info("Retrieved obsolete datoms", {

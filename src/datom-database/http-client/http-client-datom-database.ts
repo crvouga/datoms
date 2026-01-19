@@ -64,10 +64,6 @@ interface GetTransactionMetadataResponse {
   metadata?: Record<string, unknown>;
 }
 
-interface GetObsoleteDatomsResponse {
-  datoms: Datom[];
-}
-
 interface DeleteDatomsResponse {
   success: boolean;
 }
@@ -262,25 +258,6 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     } catch (error) {
       throw new Error(
         `Failed to get latest transaction: ${this._extractErrorMessage(error)}`
-      );
-    }
-  }
-
-  async getObsoleteDatoms(cutoffTx: TransactionId): Promise<Datom[]> {
-    await this._ensureInitialized();
-
-    try {
-      const response = await this.httpClient.post<GetObsoleteDatomsResponse>(
-        this.endpoint,
-        {
-          method: "getObsoleteDatoms",
-          cutoffTx,
-        }
-      );
-      return response.datoms;
-    } catch (error) {
-      throw new Error(
-        `Failed to get obsolete datoms: ${this._extractErrorMessage(error)}`
       );
     }
   }

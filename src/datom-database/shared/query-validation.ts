@@ -13,12 +13,13 @@ export function validateQueryOptions(options: DatomsParams): void {
     options.e !== undefined ||
     options.a !== undefined ||
     options.v !== undefined ||
-    options.tx !== undefined;
+    options.tx !== undefined ||
+    options.txMax !== undefined;
   const hasLimit = options.limit !== undefined;
 
   if (!hasFilter && !hasLimit) {
     throw new QuerySafetyError(
-      "Query must include at least one filter (entity, attribute, value, tx) or a limit to prevent full table scans"
+      "Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans"
     );
   }
 }

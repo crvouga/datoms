@@ -17,6 +17,59 @@ import type { RetentionPolicy } from "./retention-policy.js";
 import type { RetentionPolicyConfig, RetentionResult } from "./types.js";
 
 /**
+ * Compute obsolete datoms from a list of datoms.
+ * A datom is obsolete if it has been superseded by a later transaction for the same (entity, attribute, value).
+ * @param datoms Array of datoms to analyze
+ * @returns Array of obsolete datoms (all datoms that are not the latest for their (e, a, v) group)
+ */
+function computeObsoleteDatoms(datoms: Datom[]): Datom[] {
+  // Group datoms by (entity, attribute, value)
+  const datomsByKey = new Map<string, Datom[]>();
+  for (const datom of datoms) {
+    const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
+    if (!datomsByKey.has(key)) {
+      datomsByKey.set(key, []);
+    }
+    datomsByKey.get(key)!.push(datom);
+  }
+
+  // For each (e, a, v) group, find the latest transaction
+  // All datoms with tx < latestTx are obsolete
+  const obsoleteDatoms: Datom[] = [];
+  for (const [_key, groupDatoms] of datomsByKey.entries()) {
+    if (groupDatoms.length === 0) {
+      continue;
+    }
+
+    // Sort by transaction ID descending
+    groupDatoms.sort((a, b) => b.tx - a.tx);
+
+    // Get the latest transaction ID for this (e, a, v)
+    const latestDatom = groupDatoms[0];
+    if (!latestDatom) {
+      continue;
+    }
+
+    // All datoms with tx < latestTx are obsolete (they've been superseded)
+    for (let i = 1; i < groupDatoms.length; i++) {
+      const datom = groupDatoms[i];
+      if (datom) {
+        obsoleteDatoms.push(datom);
+      }
+    }
+  }
+
+  // Remove duplicates using a unique key
+  const uniqueObsolete = new Map<string, Datom>();
+  for (const datom of obsoleteDatoms) {
+    const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
+    uniqueObsolete.set(key, datom);
+  }
+
+  return Array.from(uniqueObsolete.values());
+}
+
+/**
  * Destroy retention policy
  * Permanently deletes obsolete historic datoms from the database
  */
@@ -211,13 +264,13 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
         };
       }
 
-      // Get obsolete datoms
-      // getObsoleteDatoms only returns datoms with tx <= cutoffTx, so it will never
-      // return current datoms (which have tx = latestTx)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-      const obsoleteDatoms: Datom[] =
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        await this.sourceDb.getObsoleteDatoms(cutoffTx);
+      // Get all datoms up to cutoff transaction using history view
+      const allDatoms = await this.sourceDb
+        .history()
+        .datoms({ txMax: cutoffTx });
+
+      // Compute obsolete datoms: group by (e, a, v), find latest tx per group, return non-latest
+      const obsoleteDatoms = computeObsoleteDatoms(allDatoms);
 
       // Safety check: Verify no current datoms are included
       // This is a defensive check - getObsoleteDatoms should never return these

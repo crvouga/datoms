@@ -105,8 +105,10 @@ export interface DatomsParams {
   a?: Attribute;
   /** Filter by value */
   v?: Value;
-  /** Filter by transaction ID */
+  /** Filter by transaction ID (exact match). Mutually exclusive with txMax */
   tx?: TransactionId;
+  /** Filter by maximum transaction ID (tx <= txMax). Mutually exclusive with tx */
+  txMax?: TransactionId;
   /** Filter by operation type */
   op?: DatomOperation;
   /** Limit the number of results */

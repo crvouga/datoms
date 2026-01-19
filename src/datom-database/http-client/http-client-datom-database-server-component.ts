@@ -83,15 +83,6 @@ interface RegisterHookResponse {
   success: boolean;
 }
 
-interface GetObsoleteDatomsRequest {
-  method: "getObsoleteDatoms";
-  cutoffTx: TransactionId;
-}
-
-interface GetObsoleteDatomsResponse {
-  datoms: Datom[];
-}
-
 interface DeleteDatomsRequest {
   method: "deleteDatoms";
   datoms: Datom[];
@@ -109,7 +100,6 @@ type TransportRequest =
   | GetLatestTransactionRequest
   | GetTransactionMetadataRequest
   | RegisterHookRequest
-  | GetObsoleteDatomsRequest
   | DeleteDatomsRequest;
 
 type TransportResponse =
@@ -120,7 +110,6 @@ type TransportResponse =
   | GetLatestTransactionResponse
   | GetTransactionMetadataResponse
   | RegisterHookResponse
-  | GetObsoleteDatomsResponse
   | DeleteDatomsResponse;
 
 /**
@@ -210,11 +199,6 @@ export class HttpClientDatomDatabaseServerComponent {
             transportRequest as RegisterHookRequest
           );
           break;
-        case "getObsoleteDatoms":
-          response = await this._handleGetObsoleteDatoms(
-            transportRequest as GetObsoleteDatomsRequest
-          );
-          break;
         case "deleteDatoms":
           response = await this._handleDeleteDatoms(
             transportRequest as DeleteDatomsRequest
@@ -293,6 +277,10 @@ export class HttpClientDatomDatabaseServerComponent {
       if (request.options.tx !== undefined) {
         filtered = filtered.filter((d) => d.tx === request.options.tx);
       }
+      if (request.options.txMax !== undefined) {
+        const txMax = request.options.txMax;
+        filtered = filtered.filter((d) => d.tx <= txMax);
+      }
       if (request.options.op !== undefined) {
         filtered = filtered.filter((d) => d.op === request.options.op);
       }
@@ -351,15 +339,6 @@ export class HttpClientDatomDatabaseServerComponent {
 
     this.db.hook(request.hook);
     return { success: true };
-  }
-
-  private async _handleGetObsoleteDatoms(
-    request: GetObsoleteDatomsRequest
-  ): Promise<GetObsoleteDatomsResponse> {
-    await this._ensureInitialized();
-
-    const datoms = await this.db.getObsoleteDatoms(request.cutoffTx);
-    return { datoms };
   }
 
   private async _handleDeleteDatoms(

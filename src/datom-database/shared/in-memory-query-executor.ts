@@ -14,6 +14,13 @@ export function executeQueryOnDatoms(
   datoms: Datom[],
   options: DatomsParams
 ): Datom[] {
+  // Validate that tx and txMax are mutually exclusive
+  if (options.tx !== undefined && options.txMax !== undefined) {
+    throw new Error(
+      "Cannot specify both tx and txMax parameters - they are mutually exclusive"
+    );
+  }
+
   let results = datoms;
 
   // Apply filters
@@ -28,6 +35,10 @@ export function executeQueryOnDatoms(
   }
   if (options.tx !== undefined) {
     results = results.filter((d) => d.tx === options.tx);
+  }
+  if (options.txMax !== undefined) {
+    const txMax = options.txMax;
+    results = results.filter((d) => d.tx <= txMax);
   }
 
   // Handle subions: for each unique (entity, attribute, value) combination,
