@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  testDir: "./moviefinder.app",
+  testDir: "./app",
   testMatch: /.*\.(e2e)\.(ts|js)/,
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -34,7 +34,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "PORT=3000 bun moviefinder.app/src/index.ts",
+    command: "PORT=3000 bun app/src/index.ts",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,

@@ -10,7 +10,7 @@
  * - Only prunes history, never deletes all transactions
  */
 
-import { createLogger } from "../../../moviefinder.app/src/lib/logger.js";
+import { createLogger } from "../../../app/src/lib/logger.js";
 import type { Datom } from "../../datoms.js";
 import type { Logger } from "../../types.js";
 import type { InternalDatabaseView } from "../views/internal-database-view.js";

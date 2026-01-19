@@ -18,5 +18,5 @@ ENV PORT=${PORT}
 
 EXPOSE ${PORT}
 
-CMD ["bun", "run", "moviefinder.app/src/index.ts"]
+CMD ["bun", "run", "app/src/index.ts"]
 
