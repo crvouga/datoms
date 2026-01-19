@@ -1,12 +1,22 @@
 import Editor from "@monaco-editor/react";
-import { useState } from "react";
+// @ts-expect-error - @babel/standalone doesn't have complete TypeScript definitions
+import * as Babel from "@babel/standalone";
+import { useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { format } from "sql-formatter";
-import { datalogToPostgresSQL } from "../../../src/datom-database/postgres/postgres-datom-database";
-import type { DatalogQuery, QueryResult } from "../lib/db";
 import { db } from "../lib/db";
+// Type definitions from db-types.d.ts are automatically included via TypeScript
 
 type OutputTab = "results" | "sql";
+
+interface DbCallLog {
+  id: number;
+  timestamp: number;
+  method: string;
+  args: unknown[];
+  result?: unknown;
+  error?: string;
+  duration: number;
+}
 
 // Monaco Editor theme configuration with type safety
 // Available themes: "vs", "vs-dark", "hc-black", "hc-light"
@@ -15,22 +25,44 @@ const MONACO_THEME: "vs" | "vs-dark" | "hc-black" | "hc-light" = "hc-black";
 // LocalStorage keys for persistence
 const STORAGE_KEY_PANEL_SIZES = "query-editor-panel-sizes";
 
-const DEFAULT_QUERY = `{
-  "find": {
+const DEFAULT_QUERY = `
+const results = await db.query({
+  find: {
     "movie/id": ["?movie/id"],
     "movie/title": ["?title"],
     "movie/popularity": ["?popularity"]
   },
-  "where": [
-    { "e": "?movie/id", "a": "tmdb.movie/id", "v": "?id" },
-    { "e": "?movie/id", "a": "tmdb.movie/title", "v": "?title" },
-    { "e": "?movie/id", "a": "tmdb.movie/popularity", "v": "?popularity" }
+  where: [
+    { e: "?movie/id", a: "tmdb.movie/id", v: "?movie/id" },
+    { e: "?movie/id", a: "tmdb.movie/title", v: "?title" },
+    { e: "?movie/id", a: "tmdb.movie/popularity", v: "?popularity" }
   ],
-  "orderBy": [["?popularity", "desc"]],
-  "limit": 10
-}`;
+  orderBy: [["?popularity", "desc"]],
+  limit: 10
+});
+
+const results2 = await db.query({
+  find: {
+    "movie/id": ["?movie/id"],
+    "movie/title": ["?title"],
+    "movie/popularity": ["?popularity"]
+  },
+  where: [
+    { e: "?movie/id", a: "tmdb.movie/id", v: "?movie/id" },
+    { e: "?movie/id", a: "tmdb.movie/title", v: "?title" },
+    { e: "?movie/id", a: "tmdb.movie/popularity", v: "?popularity" }
+  ],
+  orderBy: [["?popularity", "desc"]],
+  limit: 10
+});
+`;
 
 export function QueryEditor() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const monacoRef = useRef<any>(null);
+
   // Load saved panel sizes from localStorage
   const loadPanelSizes = (): [number, number] => {
     try {
@@ -53,12 +85,111 @@ export function QueryEditor() {
 
   const [panelSizes, setPanelSizes] = useState<[number, number]>(loadPanelSizes);
   const [queryText, setQueryText] = useState<string>(DEFAULT_QUERY);
-  const [results, setResults] = useState<QueryResult | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<OutputTab>("results");
   const [sqlQuery, setSqlQuery] = useState<string | null>(null);
+  const [dbCallLogs, setDbCallLogs] = useState<DbCallLog[]>([]);
+
+  // Configure Monaco Editor with TypeScript types
+  useEffect(() => {
+    if (monacoRef.current) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const monaco = monacoRef.current;
+
+      // Add type definitions for the db instance
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
+      monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        target: monaco.languages.typescript.ScriptTarget.ES2020,
+        allowNonTsExtensions: true,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        module: monaco.languages.typescript.ModuleKind.ESNext,
+        noEmit: true,
+        esModuleInterop: true,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        jsx: monaco.languages.typescript.JsxEmit.React,
+        reactNamespace: "React",
+        allowJs: true,
+        typeRoots: ["node_modules/@types"],
+      });
+
+      // Add extra libs for better IntelliSense
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
+      monaco.languages.typescript.typescriptDefaults.setExtraLibs([
+        {
+          content: `
+declare const db: {
+  query(query: {
+    find: Record<string, string[]>;
+    where: Array<{
+      e: string | number;
+      a: string;
+      v?: string | number | boolean | null;
+      tx?: number;
+    }>;
+    orderBy?: Array<[string, "asc" | "desc"]>;
+    limit?: number;
+  }): Promise<Array<Record<string, unknown>>>;
+  
+  datoms(options: {
+    e?: string | number;
+    a?: string;
+    v?: unknown;
+    tx?: number;
+    op?: "assert" | "retract";
+    limit?: number;
+    offset?: number;
+  }): Promise<Array<{
+    e: string | number;
+    a: string;
+    v: unknown;
+    tx: number;
+    op: "assert" | "retract";
+  }>>;
+  
+  transact(
+    ops: Array<{
+      op: "assert" | "retract";
+      e: string | number;
+      a: string;
+      v: unknown;
+    }>,
+    metadata?: Record<string, unknown>,
+    context?: Record<string, unknown>
+  ): Promise<number>;
+  
+  initialize(): Promise<void>;
+  close(): Promise<void>;
+  getLatestTransaction(): Promise<number>;
+  asOf(txId: number): typeof db;
+  history(): typeof db;
+  since(txId: number): typeof db;
+  with(ops: Array<{
+    op: "assert" | "retract";
+    e: string | number;
+    a: string;
+    v: unknown;
+  }>): Promise<{
+    dbBefore: typeof db;
+    dbAfter: typeof db;
+    txData: Array<unknown>;
+  }>;
+};
+          `,
+          filePath: "file:///db.d.ts",
+        },
+      ]);
+    }
+  }, [monacoRef.current]);
+
+  // Debug: Log when dbCallLogs changes
+  useEffect(() => {
+    console.log("[DB Call] State changed, logs count:", dbCallLogs.length);
+  }, [dbCallLogs]);
 
   // Save panel sizes to localStorage when they change
   const handlePanelLayout = (sizes: number[]) => {
@@ -73,82 +204,222 @@ export function QueryEditor() {
     }
   };
 
+
   const handleRunQuery = async () => {
     setLoading(true);
     setError(null);
-    setResults(null);
     setLatency(null);
     setSqlQuery(null);
+    setDbCallLogs([]);
     setActiveTab("results");
 
     const startTime = performance.now();
+    let callIdCounter = 0;
+
+    // Create a proxy wrapper around db to intercept all method calls
+    const createLoggedDb = (originalDb: typeof db): typeof db => {
+      return new Proxy(originalDb, {
+        get(target, prop) {
+          const methodName = String(prop);
+          console.log(`[DB Call] Proxy get trap for: ${methodName}`);
+
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          const originalMethod = Reflect.get(target, prop);
+
+          // Skip Symbol properties
+          if (typeof prop === "symbol") {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+            return originalMethod;
+          }
+
+          // If it's not a function, return as-is (for properties like asOf, history, since)
+          if (typeof originalMethod !== "function") {
+            console.log(`[DB Call] Property ${methodName} is not a function, returning as-is`);
+            // Handle special methods that return db instances (asOf, history, since)
+            if (prop === "asOf" || prop === "history" || prop === "since") {
+              return (...args: unknown[]) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+                const method = originalMethod as any;
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument
+                const dbInstance = method.apply(target, args);
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+                return createLoggedDb(dbInstance);
+              };
+            }
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+            return originalMethod;
+          }
+
+          // Wrap function calls with logging
+          console.log(`[DB Call] Wrapping function ${methodName}, original type:`, typeof originalMethod);
+          const wrappedFunction = async (...args: unknown[]) => {
+            const callId = callIdCounter++;
+            const callStartTime = performance.now();
+            const timestamp = Date.now();
+
+            console.log(`[DB Call] Wrapped function CALLED for ${methodName}`, args);
+
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+              const result = await (originalMethod as (...args: unknown[]) => Promise<unknown>).apply(target, args);
+              const callEndTime = performance.now();
+              const duration = callEndTime - callStartTime;
+
+              const logEntry: DbCallLog = {
+                id: callId,
+                timestamp,
+                method: methodName,
+                args,
+                result,
+                duration,
+              };
+
+              console.log(`[DB Call] Created log entry:`, logEntry);
+
+              // Use functional update to ensure we get the latest state
+              setDbCallLogs((prev) => {
+                const newLogs = [...prev, logEntry];
+                console.log(`[DB Call] State update: prev length=${prev.length}, new length=${newLogs.length}`);
+                return newLogs;
+              });
+
+              // If the result is a db instance (like asOf, history, since return), wrap it too
+              if (result && typeof result === "object" && "query" in result) {
+                return createLoggedDb(result as typeof db);
+              }
+
+              return result;
+            } catch (err) {
+              const callEndTime = performance.now();
+              const duration = callEndTime - callStartTime;
+              const errorMessage = err instanceof Error ? err.message : String(err);
+
+              const logEntry: DbCallLog = {
+                id: callId,
+                timestamp,
+                method: methodName,
+                args,
+                error: errorMessage,
+                duration,
+              };
+
+              // Use functional update to ensure we get the latest state
+              setDbCallLogs((prev) => {
+                const newLogs = [...prev, logEntry];
+                return newLogs;
+              });
+
+              throw err;
+            }
+          };
+
+          // Add a property to help identify the wrapped function
+          Object.defineProperty(wrappedFunction, 'name', { value: `${methodName}_logged`, writable: false });
+          console.log(`[DB Call] Returning wrapped function for ${methodName}`);
+
+          return wrappedFunction;
+        },
+      }) as typeof db;
+    };
 
     try {
-      // Parse the query text as JSON
-      const parsed: unknown = JSON.parse(queryText);
-      if (
-        typeof parsed !== "object" ||
-        parsed === null ||
-        !("find" in parsed) ||
-        !("where" in parsed)
-      ) {
-        throw new Error("Invalid query format: must have 'find' and 'where' properties");
-      }
-      const query = parsed as DatalogQuery;
-
-      // Generate PostgreSQL SQL query
+      // Transpile TypeScript to JavaScript using Babel
+      let compiledCode: string;
       try {
-        const tableName = "datoms"; // Default table name
-        const { sql, params } = datalogToPostgresSQL(query, tableName);
-        // Replace placeholders with parameter values
-        let sqlWithParams = sql;
-        params.forEach((param) => {
-          const value =
-            typeof param === "string"
-              ? `'${param.replace(/'/g, "''")}'`
-              : param === null
-                ? "NULL"
-                : String(param);
-          sqlWithParams = sqlWithParams.replace("?", value);
+        // Wrap user code in an async function to handle top-level await
+        const wrappedCode = `(async () => {\n${queryText}\n})()`;
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+        const result = Babel.transform(wrappedCode, {
+          presets: [
+            ["typescript", { isTSX: false, allExtensions: false }],
+            ["env", { targets: { browsers: ["last 2 versions"] } }],
+          ],
+          filename: "query.ts",
         });
-        // Format the SQL with proper indentation and line breaks
-        try {
-          const formattedSql: string = format(sqlWithParams, {
-            language: "postgresql",
-            tabWidth: 2,
-            useTabs: false,
-            keywordCase: "upper",
-            functionCase: "upper",
-            dataTypeCase: "upper",
-            identifierCase: "lower",
-            indentStyle: "standard",
-            linesBetweenQueries: 2,
-          });
-          setSqlQuery(formattedSql);
-        } catch (formatError: unknown) {
-          // If formatting fails, use unformatted SQL
-          const errorMessage =
-            formatError instanceof Error
-              ? formatError.message
-              : String(formatError);
-          console.warn("Failed to format SQL, using unformatted version:", errorMessage);
-          setSqlQuery(sqlWithParams);
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        if (!result.code) {
+          throw new Error("Failed to compile TypeScript code");
         }
-      } catch (sqlError) {
-        // If SQL generation fails, still try to execute the query
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+        compiledCode = result.code;
+      } catch (compileError: unknown) {
         const errorMessage =
-          sqlError instanceof Error ? sqlError.message : String(sqlError);
-        console.warn("Failed to generate SQL:", errorMessage);
-        setSqlQuery(null);
+          compileError instanceof Error
+            ? compileError.message
+            : String(compileError);
+        throw new Error(`TypeScript compilation error: ${errorMessage}`);
       }
 
-      // Execute the query
-      const queryResults = await db.query(query);
+      // Create execution context with logged db instance
+      const loggedDb = createLoggedDb(db);
+      console.log(`[DB Call] Created loggedDb, testing access to query:`, typeof loggedDb.query);
+      const executionContext = {
+        db: loggedDb,
+        console: {
+          log: (...args: unknown[]) => {
+            console.log(...args);
+          },
+          error: (...args: unknown[]) => {
+            console.error(...args);
+          },
+          warn: (...args: unknown[]) => {
+            console.warn(...args);
+          },
+        },
+        setTimeout,
+        clearTimeout,
+        setInterval,
+        clearInterval,
+        Promise,
+        JSON,
+        Array,
+        Object,
+        String,
+        Number,
+        Boolean,
+        Date,
+        Math,
+        Error,
+      };
+
+      // Execute the compiled code (wrapped in async IIFE, so it returns a Promise)
+      console.log(`[DB Call] About to execute compiled code`);
+      console.log(`[DB Call] Compiled code preview:`, compiledCode.substring(0, 200));
+
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-assignment
+      const executeCode = new Function(
+        ...Object.keys(executionContext),
+        `
+        console.log('[DB Call] Inside execution context, db type:', typeof db);
+        console.log('[DB Call] Inside execution context, db.query type:', typeof db?.query);
+        console.log('[DB Call] About to execute:', ${JSON.stringify(compiledCode.substring(0, 100))});
+        try {
+          const result = ${compiledCode};
+          console.log('[DB Call] Execution completed, result type:', typeof result);
+          return result;
+        } catch (e) {
+          console.error('[DB Call] Execution error:', e);
+          throw e;
+        }
+        `
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+      const executionResult = executeCode(...Object.values(executionContext));
+      console.log(`[DB Call] Execution started, result type:`, typeof executionResult);
+
+      // The wrapped code always returns a Promise, so await it
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+      await executionResult;
+
+      // SQL generation is skipped for TypeScript code execution
+      // Users can manually generate SQL if needed
 
       const endTime = performance.now();
       const duration = endTime - startTime;
 
-      setResults(queryResults);
       setLatency(duration);
     } catch (err) {
       const endTime = performance.now();
@@ -157,14 +428,95 @@ export function QueryEditor() {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(errorMessage);
       setLatency(duration);
-      console.error("Query execution error:", err);
+      console.error("Code execution error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const formatResults = (results: QueryResult): string => {
-    return JSON.stringify(results, null, 2);
+  const formatCallLog = (log: DbCallLog): string => {
+    const timeStr = new Date(log.timestamp).toLocaleTimeString("en-US", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      fractionalSecondDigits: 3,
+    });
+
+    const durationStr = log.duration < 1
+      ? `${(log.duration * 1000).toFixed(2)}μs`
+      : log.duration < 1000
+        ? `${log.duration.toFixed(2)}ms`
+        : `${(log.duration / 1000).toFixed(2)}s`;
+
+    // Format arguments nicely
+    const formatArgs = (args: unknown[]): string => {
+      if (args.length === 0) return "";
+      if (args.length === 1) {
+        const argStr = JSON.stringify(args[0], null, 2);
+        // If it's a single object argument, format it nicely
+        if (typeof args[0] === "object" && args[0] !== null) {
+          return argStr.split("\n").map((line, i) => i === 0 ? line : `  ${line}`).join("\n");
+        }
+        return argStr;
+      }
+      return args.map((arg, i) => {
+        const argStr = JSON.stringify(arg, null, 2);
+        if (typeof arg === "object" && arg !== null) {
+          return `  ${i + 1}. ${argStr.split("\n").join("\n    ")}`;
+        }
+        return `  ${i + 1}. ${argStr}`;
+      }).join("\n");
+    };
+
+    // Format result nicely
+    const formatResult = (result: unknown): string => {
+      if (result === null || result === undefined) {
+        return String(result);
+      }
+
+      const resultStr = JSON.stringify(result, null, 2);
+      const maxResultLength = 2000;
+
+      if (resultStr.length > maxResultLength) {
+        const truncated = resultStr.substring(0, maxResultLength);
+        return `${truncated}...\n  (truncated, ${resultStr.length} chars total)`;
+      }
+
+      // Indent the result
+      return resultStr.split("\n").map((line, i) => i === 0 ? line : `  ${line}`).join("\n");
+    };
+
+    let output = "";
+
+    // Header with timestamp and method name
+    output += `┌─ ${timeStr} ──────────────────────────────────────────────┐\n`;
+    output += `│ Method: ${log.method.padEnd(50)} │\n`;
+    output += `│ Duration: ${durationStr.padEnd(47)} │\n`;
+    output += `└──────────────────────────────────────────────────────────┘\n\n`;
+
+    // Arguments section
+    if (log.args.length > 0) {
+      output += `Arguments:\n`;
+      const formattedArgs = formatArgs(log.args);
+      output += formattedArgs.split("\n").map(line => `  ${line}`).join("\n");
+      output += `\n\n`;
+    }
+
+    // Result or error section
+    if (log.error) {
+      output += `❌ Error:\n`;
+      output += `  ${log.error.split("\n").join("\n  ")}\n`;
+    } else {
+      output += `✓ Result:\n`;
+      const formattedResult = formatResult(log.result);
+      output += `  ${formattedResult.split("\n").join("\n  ")}\n`;
+    }
+
+    // Add separator between calls
+    output += `\n${"─".repeat(60)}\n\n`;
+
+    return output;
   };
 
   return (
@@ -176,22 +528,28 @@ export function QueryEditor() {
         {/* Editor Section */}
         <Panel defaultSize={panelSizes[0]} minSize={30} className="flex flex-col">
           <div className="flex items-center justify-between p-2 border-b border-gray-700 bg-gray-900">
-            <h2 className="text-lg font-semibold">Datalog Query</h2>
+            <h2 className="text-lg font-semibold">TypeScript Query</h2>
             <button
               onClick={handleRunQuery}
               disabled={loading}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors"
             >
-              {loading ? "Running..." : "Run Query"}
+              {loading ? "Running..." : "Run Code"}
             </button>
           </div>
           <div className="flex-1 min-h-0">
             <Editor
               height="100%"
-              defaultLanguage="json"
+              defaultLanguage="typescript"
               value={queryText}
               onChange={(value) => setQueryText(value || "")}
               theme={MONACO_THEME}
+              onMount={(editor, monaco) => {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                editorRef.current = editor;
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                monacoRef.current = monaco;
+              }}
               options={{
                 minimap: { enabled: false },
                 fontSize: 18,
@@ -202,6 +560,12 @@ export function QueryEditor() {
                 scrollBeyondLastLine: false,
                 renderWhitespace: "selection",
                 tabSize: 2,
+                suggestOnTriggerCharacters: true,
+                quickSuggestions: true,
+                parameterHints: { enabled: true },
+                hover: { enabled: true },
+                formatOnPaste: true,
+                formatOnType: true,
               }}
             />
           </div>
@@ -221,7 +585,7 @@ export function QueryEditor() {
                     : "text-gray-400 hover:text-gray-300"
                     }`}
                 >
-                  Results {results && `(${results.length})`}
+                  DB Calls {dbCallLogs.length > 0 ? `(${dbCallLogs.length})` : ""}
                 </button>
                 <button
                   onClick={() => setActiveTab("sql")}
@@ -255,36 +619,42 @@ export function QueryEditor() {
                     </div>
                   </div>
                 )}
-                {results !== null && !error && (
-                  <div className="h-full">
-                    <Editor
-                      height="100%"
-                      defaultLanguage="json"
-                      value={formatResults(results)}
-                      theme={MONACO_THEME}
-                      options={{
-                        minimap: { enabled: false },
-                        fontSize: 14,
-                        wordWrap: "on",
-                        automaticLayout: true,
-                        lineHeight: 20,
-                        padding: { top: 16, bottom: 16 },
-                        scrollBeyondLastLine: false,
-                        readOnly: true,
-                        formatOnPaste: true,
-                        formatOnType: true,
-                      }}
-                    />
+                {dbCallLogs.length > 0 && (
+                  <div className="h-full flex flex-col">
+                    <div className="p-2 text-xs text-gray-400 border-b border-gray-700">
+                      {dbCallLogs.length} DB call{dbCallLogs.length !== 1 ? "s" : ""} logged
+                    </div>
+                    <div className="flex-1 min-h-0">
+                      <Editor
+                        key={`db-calls-${dbCallLogs.length}`}
+                        height="100%"
+                        defaultLanguage="plaintext"
+                        value={dbCallLogs.map(formatCallLog).join("\n")}
+                        theme={MONACO_THEME}
+                        options={{
+                          minimap: { enabled: false },
+                          fontSize: 14,
+                          wordWrap: "on",
+                          automaticLayout: true,
+                          lineHeight: 20,
+                          padding: { top: 16, bottom: 16 },
+                          scrollBeyondLastLine: false,
+                          readOnly: true,
+                          formatOnPaste: true,
+                          formatOnType: true,
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
-                {results === null && !error && !loading && (
+                {dbCallLogs.length === 0 && !error && !loading && (
                   <div className="flex items-center justify-center h-full text-gray-500">
-                    Click "Run Query" to execute your Datalog query
+                    Click "Run Code" to see DB call logs
                   </div>
                 )}
-                {loading && (
+                {loading && dbCallLogs.length === 0 && (
                   <div className="flex items-center justify-center h-full text-gray-500">
-                    Running query...
+                    Running code...
                   </div>
                 )}
               </>
