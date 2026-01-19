@@ -3,10 +3,23 @@
  * Provides a high-level interface for working with datoms and datalog queries
  */
 
+import type { DatalogQuery, QueryResult } from "../datalog/datalog.js";
 import type { Datom, DatomInput, TransactionId } from "../datoms.js";
 import type { EntityId } from "../entity-id.js";
 import type { Hook } from "./hook/hook.js";
-import type { DatabaseView } from "./views/database-view.js";
+import type { DatabaseView, DatomsParams } from "./views/database-view.js";
+
+/**
+ * Configuration for database views
+ * Views use this to pass their configuration to implementations
+ * @internal
+ */
+export type ViewConfig =
+  | { type: "current" }
+  | { type: "asOf"; txId: TransactionId }
+  | { type: "since"; txId: TransactionId }
+  | { type: "history" }
+  | { type: "speculative"; datoms: Datom[] };
 
 /**
  * Datom database interface (Datomic-like minimal API)
@@ -262,6 +275,50 @@ export interface DatomDatabase extends DatabaseView {
    * await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
    */
   with(ops: DatomInput[]): Promise<WithResult>;
+
+  /**
+   * Execute a query with view configuration.
+   * This method routes queries to the appropriate implementation method based on view config.
+   * @param options Query options
+   * @param viewConfig View configuration (asOf, since, history, current, or speculative)
+   * @returns Array of matching datoms
+   * @internal
+   */
+  _executeQuery(
+    options: DatomsParams,
+    viewConfig: ViewConfig
+  ): Promise<Datom[]>;
+
+  /**
+   * Execute a datalog query with view configuration.
+   * This method routes datalog queries to the appropriate implementation method based on view config.
+   * @param query Datalog query to execute
+   * @param context Optional context object for hooks
+   * @param viewConfig View configuration (asOf, since, history, current, or speculative)
+   * @returns Query results as an array of records
+   * @internal
+   */
+  _executeDatalogQuery(
+    query: DatalogQuery,
+    context: Record<string, unknown> | undefined,
+    viewConfig: ViewConfig
+  ): Promise<QueryResult>;
+
+  /**
+   * Get obsolete datoms that don't affect the current state up to a cutoff transaction ID.
+   * A datom is obsolete if it has been superseded by a later transaction for the same (entity, attribute, value).
+   * @param cutoffTx Transaction ID cutoff - only datoms with tx <= cutoffTx are considered
+   * @returns Array of obsolete datoms that can be safely deleted
+   * @internal
+   */
+  getObsoleteDatoms(cutoffTx: TransactionId): Promise<Datom[]>;
+
+  /**
+   * Delete specific datoms from the database.
+   * @param datoms Array of datoms to delete (must match exactly by e, a, v, tx, op)
+   * @internal
+   */
+  deleteDatoms(datoms: Datom[]): Promise<void>;
 }
 
 /**

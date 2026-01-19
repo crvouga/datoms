@@ -3,9 +3,27 @@
  * Communicates with remote database server via HTTP
  */
 
-import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
-import type { Datom, DatomInput, TransactionId, Value } from "../../datoms.js";
+import type {
+  DatalogQuery,
+  QueryClause,
+  QueryResult,
+} from "../../datalog/datalog.js";
+import type {
+  Attribute,
+  Datom,
+  DatomInput,
+  TransactionId,
+  Value,
+} from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
+import type { HttpClient } from "../../http-client/http-client.js";
+import type { Transaction } from "../../types.js";
+import type {
+  DatomDatabase,
+  ViewConfig,
+  WithResult,
+} from "../datom-database.js";
+import type { Hook } from "../hook/hook.js";
 import {
   HookEngine,
   QueryError,
@@ -17,26 +35,16 @@ import {
   type WriteContext,
   type WriteResult,
 } from "../hook/hook.js";
-import type { Transaction } from "../../types.js";
-import { validateQueryOptions } from "../shared/query-validation.js";
-import { executeQueryOnDatoms } from "../shared/in-memory-query-executor.js";
 import {
   isQueryPattern,
   isVariable,
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
+import { executeQueryOnDatoms } from "../shared/in-memory-query-executor.js";
 import { joinResults, project } from "../shared/query-results.js";
-import type { QueryClause } from "../../datalog/datalog.js";
-import type { Attribute } from "../../datoms.js";
+import { validateQueryOptions } from "../shared/query-validation.js";
+import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type { DatabaseView, DatomsParams } from "../views/database-view.js";
-import {
-  ConfiguredDatabaseView,
-  type InternalDatabaseView,
-  type ViewConfig,
-} from "../views/internal-database-view.js";
-import type { WithResult } from "../datom-database.js";
-import type { Hook } from "../hook/hook.js";
-import type { HttpClient } from "../../http-client/http-client.js";
 
 interface DatomsResponse {
   datoms: Datom[];
@@ -74,7 +82,7 @@ interface InitializeResponse {
  * HTTP client database implementation
  * All operations are delegated to a remote server via HTTP
  */
-export class HttpClientDatomDatabase implements InternalDatabaseView {
+export class HttpClientDatomDatabase implements DatomDatabase {
   public readonly hooks: HookEngine;
   private initialized = false;
   private currentViewConfig: ViewConfig = { type: "current" };

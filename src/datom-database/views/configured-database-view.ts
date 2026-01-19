@@ -1,0 +1,38 @@
+/**
+ * Internal database view interface for implementation details
+ * Used internally by database views and implementations
+ * Not part of the public API
+ */
+
+import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
+import type { Datom } from "../../datoms.js";
+import type { DatomDatabase, ViewConfig } from "../datom-database.js";
+import { validateQueryOptions } from "../shared/query-validation.js";
+import type { DatabaseView, DatomsParams } from "./database-view.js";
+
+/**
+ * Database view that is configured with a view config
+ * Used to create database views with specific configurations
+ * @internal
+ */
+export class ConfiguredDatabaseView implements DatabaseView {
+  constructor(
+    private db: DatomDatabase,
+    private viewConfig: ViewConfig
+  ) {}
+
+  async datoms(options: DatomsParams): Promise<Datom[]> {
+    // Validate that query has at least one filter or limit to prevent accidental full scans
+    validateQueryOptions(options);
+
+    // Route to implementation with view config
+    return this.db._executeQuery(options, this.viewConfig);
+  }
+
+  async query(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResult> {
+    return this.db._executeDatalogQuery(query, context, this.viewConfig);
+  }
+}

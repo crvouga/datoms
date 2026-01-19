@@ -20,7 +20,11 @@ import type { SQLDatabase } from "../../sql-database/sql-database.js";
 import type { DatabaseRow } from "../../sql-database/types.js";
 import type { Logger, Transaction } from "../../types.js";
 
-import type { WithResult } from "../datom-database.js";
+import type {
+  DatomDatabase,
+  ViewConfig,
+  WithResult,
+} from "../datom-database.js";
 import {
   HookEngine,
   QueryError,
@@ -41,12 +45,8 @@ import {
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
 import { joinResults, project } from "../shared/query-results.js";
+import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type { DatabaseView, DatomsParams } from "../views/database-view.js";
-import {
-  ConfiguredDatabaseView,
-  type InternalDatabaseView,
-  type ViewConfig,
-} from "../views/internal-database-view.js";
 import {
   aggregationToSQL,
   checkSQLAggregations,
@@ -553,7 +553,7 @@ export function datalogToPostgresSQL(
  * PostgreSQL database implementation
  * Accepts a SqlDatabase that implements PostgreSQL-compatible SQL
  */
-export class PostgreSQLDatomDatabase implements InternalDatabaseView {
+export class PostgreSQLDatomDatabase implements DatomDatabase {
   public readonly hooks: HookEngine;
   protected initialized = false;
   private connection: SQLDatabase;

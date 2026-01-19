@@ -5,6 +5,7 @@
 
 import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
 import type { Datom, DatomInput, TransactionId } from "../../datoms.js";
+import type { DatomDatabase, ViewConfig } from "../datom-database.js";
 import type { Hook } from "../hook/hook.js";
 import {
   QueryError,
@@ -12,12 +13,8 @@ import {
   QueryTimeoutError,
   TransactionError,
 } from "../hook/hook.js";
+import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type { DatomsParams } from "../views/database-view.js";
-import type {
-  InternalDatabaseView,
-  ViewConfig,
-} from "../views/internal-database-view.js";
-import { ConfiguredDatabaseView } from "../views/internal-database-view.js";
 
 // Request/Response types for HTTP API contract
 interface InitializeRequest {
@@ -133,7 +130,7 @@ type TransportResponse =
 export class HttpClientDatomDatabaseServerComponent {
   private initialized = false;
 
-  constructor(private db: InternalDatabaseView) {}
+  constructor(private db: DatomDatabase) {}
 
   /**
    * Handle an incoming HTTP request

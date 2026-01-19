@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { Logger } from "../../types.js";
-import type { InternalDatabaseView } from "../views/internal-database-view.js";
-import { FIXTURES, type Fixture } from "./fixtures.js";
+import type { DatomDatabase } from "../datom-database.js";
 import { DestroyRetentionPolicy } from "../retention-policy/destroy-retention-policy.js";
 import type { RetentionPolicyConfig } from "../retention-policy/types.js";
+import { FIXTURES, type Fixture } from "./fixtures.js";
 
 /**
  * Simple logger that captures logs for testing
@@ -66,11 +66,7 @@ describe.each(FIXTURES)(
         };
 
         expect(() => {
-          new DestroyRetentionPolicy(
-            f.db as InternalDatabaseView,
-            config,
-            logger
-          );
+          new DestroyRetentionPolicy(f.db, config, logger);
         }).toThrow("retentionTxCount must be at least 1");
       });
 
@@ -80,11 +76,7 @@ describe.each(FIXTURES)(
         };
 
         expect(() => {
-          new DestroyRetentionPolicy(
-            f.db as InternalDatabaseView,
-            config,
-            logger
-          );
+          new DestroyRetentionPolicy(f.db, config, logger);
         }).toThrow("Either intervalMs or cronExpression must be provided");
       });
 
@@ -96,11 +88,7 @@ describe.each(FIXTURES)(
         };
 
         expect(() => {
-          new DestroyRetentionPolicy(
-            f.db as InternalDatabaseView,
-            config,
-            logger
-          );
+          new DestroyRetentionPolicy(f.db, config, logger);
         }).toThrow("Cannot specify both intervalMs and cronExpression");
       });
 
@@ -111,11 +99,7 @@ describe.each(FIXTURES)(
         };
 
         expect(() => {
-          new DestroyRetentionPolicy(
-            f.db as InternalDatabaseView,
-            config,
-            logger
-          );
+          new DestroyRetentionPolicy(f.db, config, logger);
         }).not.toThrow();
       });
 
@@ -126,11 +110,7 @@ describe.each(FIXTURES)(
         };
 
         expect(() => {
-          new DestroyRetentionPolicy(
-            f.db as InternalDatabaseView,
-            config,
-            logger
-          );
+          new DestroyRetentionPolicy(f.db, config, logger);
         }).not.toThrow();
       });
     });
@@ -141,11 +121,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 10,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         expect(policy.isRunning()).toBe(false);
         policy.start();
@@ -159,11 +135,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 10,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         policy.start();
         expect(policy.isRunning()).toBe(true);
@@ -182,11 +154,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 10,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         expect(policy.isRunning()).toBe(false);
         policy.stop(); // Stop when not running
@@ -206,11 +174,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 5,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         // Create transactions 1-10
         // With retentionTxCount = 5, cutoffTx = 5, so we keep transactions 6-10
@@ -255,11 +219,7 @@ describe.each(FIXTURES)(
           intervalMs: 1000,
           batchSize: 2, // Small batch size for testing
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         // Create many transactions with updates to generate obsolete datoms
         for (let i = 1; i <= 10; i++) {
@@ -285,11 +245,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 5,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         // Create transactions 1-10
         for (let tx = 1; tx <= 10; tx++) {
@@ -324,11 +280,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 5,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         // Create 20 transactions
         for (let tx = 1; tx <= 20; tx++) {
@@ -364,11 +316,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 3,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         // Test with various latestTx values
         for (const targetTx of [5, 10, 20]) {
@@ -398,11 +346,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 5,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         const latestTx = await f.db.getLatestTransaction();
         expect(latestTx).toBe(0); // No transactions yet
@@ -425,11 +369,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 10,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         // Create only 5 transactions (less than retentionTxCount of 10)
         for (let tx = 1; tx <= 5; tx++) {
@@ -461,11 +401,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 5,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         // Create exactly 5 transactions
         for (let tx = 1; tx <= 5; tx++) {
@@ -498,11 +434,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 5,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         // Create transactions but no updates (no obsolete datoms)
         for (let tx = 1; tx <= 10; tx++) {
@@ -532,12 +464,12 @@ describe.each(FIXTURES)(
         };
 
         // Create a database that will fail on getLatestTransaction
-        const errorDb = {
+        const errorDb: DatomDatabase = {
           ...f.db,
           async getLatestTransaction() {
             throw new Error("Database connection failed");
           },
-        } as unknown as InternalDatabaseView;
+        };
 
         const policy = new DestroyRetentionPolicy(errorDb, config, logger);
 
@@ -560,11 +492,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 3,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         // Simulate entity updates: entity 1's name changes over time
         await f.db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
@@ -599,11 +527,7 @@ describe.each(FIXTURES)(
           retentionTxCount: 5,
           intervalMs: 1000,
         };
-        const policy = new DestroyRetentionPolicy(
-          f.db as InternalDatabaseView,
-          config,
-          logger
-        );
+        const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         // Create 20 transactions
         for (let tx = 1; tx <= 20; tx++) {

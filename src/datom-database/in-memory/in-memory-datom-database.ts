@@ -18,7 +18,11 @@ import type {
 } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
 import type { Transaction } from "../../types.js";
-import type { WithResult } from "../datom-database.js";
+import type {
+  DatomDatabase,
+  ViewConfig,
+  WithResult,
+} from "../datom-database.js";
 import {
   HookEngine,
   QueryError,
@@ -38,18 +42,14 @@ import {
 } from "../shared/datalog-helpers.js";
 import { executeQueryOnDatoms } from "../shared/in-memory-query-executor.js";
 import { joinResults, project } from "../shared/query-results.js";
+import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type { DatabaseView, DatomsParams } from "../views/database-view.js";
-import {
-  ConfiguredDatabaseView,
-  type InternalDatabaseView,
-  type ViewConfig,
-} from "../views/internal-database-view.js";
 
 /**
  * In-memory database implementation
  * Stores datoms in memory using an array-based structure
  */
-export class InMemoryDatomDatabase implements InternalDatabaseView {
+export class InMemoryDatomDatabase implements DatomDatabase {
   public readonly hooks: HookEngine;
   protected initialized = false;
   private _datomsArray: Datom[] = [];

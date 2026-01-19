@@ -14,7 +14,11 @@ import type {
 import type { EntityId } from "../../entity-id.js";
 import type { SQLDatabase } from "../../sql-database/sql-database.js";
 import type { Transaction } from "../../types.js";
-import type { DatomDatabase, WithResult } from "../datom-database.js";
+import type {
+  DatomDatabase,
+  ViewConfig,
+  WithResult,
+} from "../datom-database.js";
 import {
   HookEngine,
   QueryError,
@@ -33,20 +37,14 @@ import {
   stripQuestionMark,
 } from "../shared/datalog-helpers.js";
 import { joinResults, project } from "../shared/query-results.js";
+import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type { DatabaseView, DatomsParams } from "../views/database-view.js";
-import {
-  ConfiguredDatabaseView,
-  type InternalDatabaseView,
-  type ViewConfig,
-} from "../views/internal-database-view.js";
 
 /**
  * SQLite database implementation
  * Accepts a SqlDatabase that implements SQLite-compatible SQL
  */
-export class SQLiteDatomDatabase
-  implements DatomDatabase, InternalDatabaseView
-{
+export class SQLiteDatomDatabase implements DatomDatabase {
   public readonly hooks: HookEngine;
   protected initialized = false;
   private connection: SQLDatabase;

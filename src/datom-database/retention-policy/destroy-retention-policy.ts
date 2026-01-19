@@ -12,7 +12,7 @@
 
 import type { Datom } from "../../datoms.js";
 import type { Logger } from "../../types.js";
-import type { InternalDatabaseView } from "../views/internal-database-view.js";
+import type { DatomDatabase } from "../datom-database.js";
 import type { RetentionPolicy } from "./retention-policy.js";
 import type { RetentionPolicyConfig, RetentionResult } from "./types.js";
 
@@ -25,7 +25,7 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
   private running = false;
 
   constructor(
-    private readonly sourceDb: InternalDatabaseView,
+    private readonly sourceDb: DatomDatabase,
     private readonly config: RetentionPolicyConfig,
     private readonly logger: Logger
   ) {
