@@ -2,10 +2,11 @@ import Editor from "@monaco-editor/react";
 // @ts-expect-error - @babel/standalone doesn't have complete TypeScript definitions
 import * as Babel from "@babel/standalone";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { Panel, PanelResizeHandle } from "react-resizable-panels";
 import { db } from "../lib/db";
 import { PlayIcon, SaveIcon, HelpIcon } from "./ui/icons";
 import { KeyboardShortcut } from "./ui/KeyboardShortcut";
+import { ResizablePanels } from "./ui/ResizablePanels";
 import {
   createLoggedDatabase,
   type DbCallLog,
@@ -19,7 +20,6 @@ type OutputTab = "results" | "sql";
 const MONACO_THEME: "vs" | "vs-dark" | "hc-black" | "hc-light" = "hc-black";
 
 // LocalStorage keys for persistence
-const STORAGE_KEY_PANEL_SIZES = "query-editor-panel-sizes";
 const STORAGE_KEY_SAVED_QUERY = "query-editor-saved-query";
 
 const DEFAULT_QUERY = `
@@ -60,28 +60,6 @@ export function QueryEditor() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const monacoRef = useRef<any>(null);
   const handleRunQueryRef = useRef<(() => Promise<void>) | undefined>(undefined);
-
-  // Load saved panel sizes from localStorage
-  const loadPanelSizes = (): [number, number] => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_PANEL_SIZES);
-      if (saved) {
-        const sizes = JSON.parse(saved) as number[];
-        if (
-          Array.isArray(sizes) &&
-          sizes.length === 2 &&
-          sizes.every((s) => typeof s === "number" && s > 0 && s < 100)
-        ) {
-          return [sizes[0]!, sizes[1]!];
-        }
-      }
-    } catch {
-      // Ignore errors, use defaults
-    }
-    return [75, 25]; // Default sizes
-  };
-
-  const [panelSizes, setPanelSizes] = useState<[number, number]>(loadPanelSizes);
   const [queryText, setQueryText] = useState<string>(DEFAULT_QUERY);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -190,19 +168,6 @@ declare const db: {
   useEffect(() => {
     console.log("[DB Call] State changed, logs count:", dbCallLogs.length);
   }, [dbCallLogs]);
-
-  // Save panel sizes to localStorage when they change
-  const handlePanelLayout = (sizes: number[]) => {
-    if (sizes.length === 2) {
-      const newSizes: [number, number] = [sizes[0]!, sizes[1]!];
-      setPanelSizes(newSizes);
-      try {
-        localStorage.setItem(STORAGE_KEY_PANEL_SIZES, JSON.stringify(newSizes));
-      } catch {
-        // Ignore localStorage errors
-      }
-    }
-  };
 
   // Save query to localStorage
   const handleSaveQuery = useCallback(() => {
@@ -502,158 +467,197 @@ declare const db: {
 
   return (
     <div className="h-screen w-screen overflow-hidden">
-      <PanelGroup
+      <ResizablePanels
+        storageKey="query-editor-panel-sizes"
+        defaultSizes={[75, 25]}
         direction="horizontal"
-        onLayout={handlePanelLayout}
       >
-        {/* Editor Section */}
-        <Panel defaultSize={panelSizes[0]} minSize={30} className="flex flex-col">
-          <div className="flex items-center justify-between p-2 border-b border-gray-700 bg-gray-900">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold">TypeScript Query</h2>
-              <button
-                onClick={() => setShowShortcuts(!showShortcuts)}
-                className="p-1.5 text-gray-400 hover:text-gray-300 hover:bg-gray-800 rounded transition-colors"
-                title="Show keyboard shortcuts"
-              >
-                <HelpIcon className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              {saveNotification && (
-                <span className="text-sm text-green-400 font-medium animate-pulse">
-                  {saveNotification}
-                </span>
-              )}
-              <button
-                onClick={handleSaveQuery}
-                className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition-colors text-sm"
-                title="Save query"
-              >
-                <SaveIcon className="w-4 h-4" />
-                <span>Save</span>
-                <KeyboardShortcut keys={["mod", "S"]} />
-              </button>
-              <button
-                onClick={handleRunQuery}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors"
-                title="Run code"
-              >
-                <PlayIcon className="w-4 h-4" />
-                <span>{loading ? "Running..." : "Run Code"}</span>
-                <KeyboardShortcut keys={["mod", "Enter"]} />
-              </button>
-            </div>
-          </div>
-          {showShortcuts && (
-            <div className="p-3 bg-gray-800 border-b border-gray-700">
-              <div className="text-sm text-gray-300 space-y-2">
-                <div className="font-semibold text-gray-200 mb-2">Keyboard Shortcuts:</div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Run Code</span>
-                  <KeyboardShortcut keys={["mod", "Enter"]} />
+        {({ panelSizes }) => (
+          <>
+            {/* Editor Section */}
+            <Panel defaultSize={panelSizes[0]} minSize={30} className="flex flex-col">
+              <div className="flex items-center justify-between p-2 border-b border-gray-700 bg-gray-900">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold">TypeScript Query</h2>
+                  <button
+                    onClick={() => setShowShortcuts(!showShortcuts)}
+                    className="p-1.5 text-gray-400 hover:text-gray-300 hover:bg-gray-800 rounded transition-colors"
+                    title="Show keyboard shortcuts"
+                  >
+                    <HelpIcon className="w-4 h-4" />
+                  </button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Save Query</span>
-                  <KeyboardShortcut keys={["mod", "S"]} />
+                <div className="flex items-center gap-3">
+                  {saveNotification && (
+                    <span className="text-sm text-green-400 font-medium animate-pulse">
+                      {saveNotification}
+                    </span>
+                  )}
+                  <button
+                    onClick={handleSaveQuery}
+                    className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition-colors text-sm"
+                    title="Save query"
+                  >
+                    <SaveIcon className="w-4 h-4" />
+                    <span>Save</span>
+                    <KeyboardShortcut keys={["mod", "S"]} />
+                  </button>
+                  <button
+                    onClick={handleRunQuery}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors"
+                    title="Run code"
+                  >
+                    <PlayIcon className="w-4 h-4" />
+                    <span>{loading ? "Running..." : "Run Code"}</span>
+                    <KeyboardShortcut keys={["mod", "Enter"]} />
+                  </button>
                 </div>
               </div>
-            </div>
-          )}
-          <div className="flex-1 min-h-0">
-            <Editor
-              height="100%"
-              defaultLanguage="typescript"
-              value={queryText}
-              onChange={(value) => setQueryText(value || "")}
-              theme={MONACO_THEME}
-              onMount={(editor, monaco) => {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                editorRef.current = editor;
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                monacoRef.current = monaco;
-              }}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 18,
-                wordWrap: "off",
-                automaticLayout: true,
-                lineHeight: 26,
-                padding: { top: 20, bottom: 20 },
-                scrollBeyondLastLine: false,
-                renderWhitespace: "selection",
-                tabSize: 2,
-                suggestOnTriggerCharacters: true,
-                quickSuggestions: true,
-                parameterHints: { enabled: true },
-                hover: { enabled: true },
-                formatOnPaste: true,
-                formatOnType: true,
-              }}
-            />
-          </div>
-        </Panel>
-
-        <PanelResizeHandle className="w-2 bg-gray-800 hover:bg-gray-700 transition-colors cursor-col-resize" />
-
-        {/* Output Section */}
-        <Panel defaultSize={panelSizes[1]} minSize={20} className="flex flex-col">
-          <div className="border-b border-gray-700 bg-gray-900">
-            <div className="flex items-center justify-between p-2 border-b border-gray-700">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setActiveTab("results")}
-                  className={`px-3 py-1 text-sm font-medium rounded transition-colors ${activeTab === "results"
-                    ? "bg-gray-700 text-white"
-                    : "text-gray-400 hover:text-gray-300"
-                    }`}
-                >
-                  DB Calls {dbCallLogs.length > 0 ? `(${dbCallLogs.length})` : ""}
-                </button>
-                <button
-                  onClick={() => setActiveTab("sql")}
-                  className={`px-3 py-1 text-sm font-medium rounded transition-colors ${activeTab === "sql"
-                    ? "bg-gray-700 text-white"
-                    : "text-gray-400 hover:text-gray-300"
-                    }`}
-                >
-                  PostgreSQL
-                </button>
-              </div>
-              {latency !== null && (
-                <div className="text-sm text-gray-400 font-mono">
-                  {latency < 1
-                    ? `${(latency * 1000).toFixed(2)}μs`
-                    : latency < 1000
-                      ? `${latency.toFixed(2)}ms`
-                      : `${(latency / 1000).toFixed(2)}s`}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex-1 overflow-auto">
-            {activeTab === "results" && (
-              <>
-                {error && (
-                  <div className="p-4 bg-red-900/20 border-l-4 border-red-500">
-                    <div className="font-semibold text-red-400 mb-1">Error</div>
-                    <div className="text-red-300 font-mono text-sm whitespace-pre-wrap">
-                      {error}
+              {showShortcuts && (
+                <div className="p-3 bg-gray-800 border-b border-gray-700">
+                  <div className="text-sm text-gray-300 space-y-2">
+                    <div className="font-semibold text-gray-200 mb-2">Keyboard Shortcuts:</div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Run Code</span>
+                      <KeyboardShortcut keys={["mod", "Enter"]} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Save Query</span>
+                      <KeyboardShortcut keys={["mod", "S"]} />
                     </div>
                   </div>
-                )}
-                {dbCallLogs.length > 0 && (
-                  <div className="h-full flex flex-col">
-                    <div className="p-2 text-xs text-gray-400 border-b border-gray-700">
-                      {dbCallLogs.length} DB call{dbCallLogs.length !== 1 ? "s" : ""} logged
+                </div>
+              )}
+              <div className="flex-1 min-h-0">
+                <Editor
+                  height="100%"
+                  defaultLanguage="typescript"
+                  value={queryText}
+                  onChange={(value) => setQueryText(value || "")}
+                  theme={MONACO_THEME}
+                  onMount={(editor, monaco) => {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                    editorRef.current = editor;
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                    monacoRef.current = monaco;
+                  }}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 18,
+                    wordWrap: "off",
+                    automaticLayout: true,
+                    lineHeight: 26,
+                    padding: { top: 20, bottom: 20 },
+                    scrollBeyondLastLine: false,
+                    renderWhitespace: "selection",
+                    tabSize: 2,
+                    suggestOnTriggerCharacters: true,
+                    quickSuggestions: true,
+                    parameterHints: { enabled: true },
+                    hover: { enabled: true },
+                    formatOnPaste: true,
+                    formatOnType: true,
+                  }}
+                />
+              </div>
+            </Panel>
+
+            <PanelResizeHandle className="w-2 bg-gray-800 hover:bg-gray-700 transition-colors cursor-col-resize" />
+
+            {/* Output Section */}
+            <Panel defaultSize={panelSizes[1]} minSize={20} className="flex flex-col">
+              <div className="border-b border-gray-700 bg-gray-900">
+                <div className="flex items-center justify-between p-2 border-b border-gray-700">
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setActiveTab("results")}
+                      className={`px-3 py-1 text-sm font-medium rounded transition-colors ${activeTab === "results"
+                        ? "bg-gray-700 text-white"
+                        : "text-gray-400 hover:text-gray-300"
+                        }`}
+                    >
+                      DB Calls {dbCallLogs.length > 0 ? `(${dbCallLogs.length})` : ""}
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("sql")}
+                      className={`px-3 py-1 text-sm font-medium rounded transition-colors ${activeTab === "sql"
+                        ? "bg-gray-700 text-white"
+                        : "text-gray-400 hover:text-gray-300"
+                        }`}
+                    >
+                      PostgreSQL
+                    </button>
+                  </div>
+                  {latency !== null && (
+                    <div className="text-sm text-gray-400 font-mono">
+                      {latency < 1
+                        ? `${(latency * 1000).toFixed(2)}μs`
+                        : latency < 1000
+                          ? `${latency.toFixed(2)}ms`
+                          : `${(latency / 1000).toFixed(2)}s`}
                     </div>
-                    <div className="flex-1 min-h-0">
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto">
+                {activeTab === "results" && (
+                  <>
+                    {error && (
+                      <div className="p-4 bg-red-900/20 border-l-4 border-red-500">
+                        <div className="font-semibold text-red-400 mb-1">Error</div>
+                        <div className="text-red-300 font-mono text-sm whitespace-pre-wrap">
+                          {error}
+                        </div>
+                      </div>
+                    )}
+                    {dbCallLogs.length > 0 && (
+                      <div className="h-full flex flex-col">
+                        <div className="p-2 text-xs text-gray-400 border-b border-gray-700">
+                          {dbCallLogs.length} DB call{dbCallLogs.length !== 1 ? "s" : ""} logged
+                        </div>
+                        <div className="flex-1 min-h-0">
+                          <Editor
+                            key={`db-calls-${dbCallLogs.length}`}
+                            height="100%"
+                            defaultLanguage="plaintext"
+                            value={dbCallLogs.map(formatCallLog).join("\n")}
+                            theme={MONACO_THEME}
+                            options={{
+                              minimap: { enabled: false },
+                              fontSize: 14,
+                              wordWrap: "on",
+                              automaticLayout: true,
+                              lineHeight: 20,
+                              padding: { top: 16, bottom: 16 },
+                              scrollBeyondLastLine: false,
+                              readOnly: true,
+                              formatOnPaste: true,
+                              formatOnType: true,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {dbCallLogs.length === 0 && !error && !loading && (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        Click "Run Code" to see DB call logs
+                      </div>
+                    )}
+                    {loading && dbCallLogs.length === 0 && (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        Running code...
+                      </div>
+                    )}
+                  </>
+                )}
+                {activeTab === "sql" && (
+                  <div className="h-full">
+                    {sqlQuery ? (
                       <Editor
-                        key={`db-calls-${dbCallLogs.length}`}
                         height="100%"
-                        defaultLanguage="plaintext"
-                        value={dbCallLogs.map(formatCallLog).join("\n")}
+                        defaultLanguage="sql"
+                        value={sqlQuery}
                         theme={MONACO_THEME}
                         options={{
                           minimap: { enabled: false },
@@ -668,54 +672,20 @@ declare const db: {
                           formatOnType: true,
                         }}
                       />
-                    </div>
-                  </div>
-                )}
-                {dbCallLogs.length === 0 && !error && !loading && (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    Click "Run Code" to see DB call logs
-                  </div>
-                )}
-                {loading && dbCallLogs.length === 0 && (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    Running code...
-                  </div>
-                )}
-              </>
-            )}
-            {activeTab === "sql" && (
-              <div className="h-full">
-                {sqlQuery ? (
-                  <Editor
-                    height="100%"
-                    defaultLanguage="sql"
-                    value={sqlQuery}
-                    theme={MONACO_THEME}
-                    options={{
-                      minimap: { enabled: false },
-                      fontSize: 14,
-                      wordWrap: "on",
-                      automaticLayout: true,
-                      lineHeight: 20,
-                      padding: { top: 16, bottom: 16 },
-                      scrollBeyondLastLine: false,
-                      readOnly: true,
-                      formatOnPaste: true,
-                      formatOnType: true,
-                    }}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    {loading
-                      ? "Generating SQL..."
-                      : "Run a query to see the generated PostgreSQL SQL"}
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        {loading
+                          ? "Generating SQL..."
+                          : "Run a query to see the generated PostgreSQL SQL"}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        </Panel>
-      </PanelGroup>
+            </Panel>
+          </>
+        )}
+      </ResizablePanels>
     </div>
   );
 }
