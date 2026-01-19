@@ -64,6 +64,66 @@ export interface PostgreSQLMaintenanceConfig {
 }
 
 /**
+ * Format SQL query with parameters substituted for display purposes
+ * Converts ? placeholders to actual values, properly escaped
+ */
+function formatSQLWithParams(sql: string, params: unknown[]): string {
+  if (!params || params.length === 0) {
+    return sql;
+  }
+
+  let paramIndex = 0;
+  return sql.replace(/\?/g, () => {
+    if (paramIndex >= params.length) {
+      return "?";
+    }
+    const param = params[paramIndex++];
+
+    // Handle null/undefined
+    if (param === null || param === undefined) {
+      return "NULL";
+    }
+
+    // Handle numbers
+    if (typeof param === "number") {
+      return String(param);
+    }
+
+    // Handle booleans
+    if (typeof param === "boolean") {
+      return param ? "TRUE" : "FALSE";
+    }
+
+    // Handle strings
+    if (typeof param === "string") {
+      // Check if it's a JSONB value (used for v column)
+      // JSONB values are stringified JSON that need ::jsonb cast
+      if (param.startsWith("{") || param.startsWith("[")) {
+        try {
+          // Validate it's valid JSON
+          JSON.parse(param);
+          // Escape single quotes and add jsonb cast
+          const escaped = param.replace(/'/g, "''");
+          return `'${escaped}'::jsonb`;
+        } catch {
+          // Not valid JSON, treat as regular string
+          const escaped = param.replace(/'/g, "''");
+          return `'${escaped}'`;
+        }
+      }
+      // Regular string - escape single quotes and wrap in quotes
+      const escaped = param.replace(/'/g, "''");
+      return `'${escaped}'`;
+    }
+
+    // For other types, stringify and escape
+    const stringified = String(param);
+    const escaped = stringified.replace(/'/g, "''");
+    return `'${escaped}'`;
+  });
+}
+
+/**
  * Check if query can use pivot optimization (multiple attributes on same entity)
  */
 function canUsePivotOptimization(clauses: QueryClause[]): boolean {
@@ -659,7 +719,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   }
 
   private async _writeDatoms(datoms: DatomInput[]): Promise<TransactionId> {
-    const tx = await this._getNextTransactionId();
+    const txResult = await this._getNextTransactionId();
+    const tx = txResult.txId;
 
     if (
       this.sqlDb.beginTransaction &&
@@ -887,7 +948,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
-    const speculativeTxId = (await this._getLatestTransaction()).txId! + 1;
+    const latestTx = await this._getLatestTransaction();
+    const speculativeTxId = latestTx.txId! + 1;
 
     // Process operations in sequence, creating speculative datoms directly
     const speculativeDatoms: Datom[] = [];
@@ -924,7 +986,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     };
   }
 
-  private async _executeCurrentQuery(options: DatomsQuery): Promise<Datom[]> {
+  private async _executeCurrentQuery(
+    options: DatomsQuery,
+    sqlQueries?: string[]
+  ): Promise<{ datoms: Datom[]; sql: string }> {
     await this._ensureInitialized();
 
     // Note: Validation is handled by the base class query() method
@@ -1006,7 +1071,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         a
       ${limitClause}
       ${offsetClause}
-    `;
+    `.trim();
 
     if (options.limit) {
       params.push(options.limit);
@@ -1015,14 +1080,19 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       params.push(options.offset);
     }
 
+    if (sqlQueries) {
+      sqlQueries.push(formatSQLWithParams(sql, params));
+    }
+
     const rows = await this.sqlDb.query(sql, params);
-    return this._mapRowsToDatoms(rows);
+    return { datoms: this._mapRowsToDatoms(rows), sql };
   }
 
   private async _executeAsOfQuery(
     options: DatomsQuery,
-    txId: TransactionId
-  ): Promise<Datom[]> {
+    txId: TransactionId,
+    sqlQueries?: string[]
+  ): Promise<{ datoms: Datom[]; sql: string }> {
     await this._ensureInitialized();
 
     // Validate that tx and txMax are mutually exclusive
@@ -1098,7 +1168,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         a
       ${limitClause}
       ${offsetClause}
-    `;
+    `.trim();
 
     if (options.limit) {
       params.push(options.limit);
@@ -1107,11 +1177,18 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       params.push(options.offset);
     }
 
+    if (sqlQueries) {
+      sqlQueries.push(formatSQLWithParams(finalSql, params));
+    }
+
     const rows = await this.sqlDb.query(finalSql, params);
-    return this._mapRowsToDatoms(rows);
+    return { datoms: this._mapRowsToDatoms(rows), sql: finalSql };
   }
 
-  private async _executeHistoryQuery(options: DatomsQuery): Promise<Datom[]> {
+  private async _executeHistoryQuery(
+    options: DatomsQuery,
+    sqlQueries?: string[]
+  ): Promise<{ datoms: Datom[]; sql: string }> {
     await this._ensureInitialized();
 
     // Validate that tx and txMax are mutually exclusive
@@ -1169,7 +1246,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       ORDER BY tx ASC, e ASC, a ASC
       ${limitClause}
       ${offsetClause}
-    `;
+    `.trim();
 
     if (options.limit) {
       params.push(options.limit);
@@ -1178,14 +1255,19 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       params.push(options.offset);
     }
 
+    if (sqlQueries) {
+      sqlQueries.push(formatSQLWithParams(sql, params));
+    }
+
     const rows = await this.sqlDb.query(sql, params);
-    return this._mapRowsToDatoms(rows);
+    return { datoms: this._mapRowsToDatoms(rows), sql };
   }
 
   private async _executeSinceQuery(
     options: DatomsQuery,
-    txId: TransactionId
-  ): Promise<Datom[]> {
+    txId: TransactionId,
+    sqlQueries?: string[]
+  ): Promise<{ datoms: Datom[]; sql: string }> {
     await this._ensureInitialized();
 
     const conditions: string[] = [];
@@ -1247,7 +1329,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         a
       ${limitClause}
       ${offsetClause}
-    `;
+    `.trim();
 
     if (options.limit) {
       params.push(options.limit);
@@ -1256,19 +1338,27 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       params.push(options.offset);
     }
 
+    if (sqlQueries) {
+      sqlQueries.push(formatSQLWithParams(finalSql, params));
+    }
+
     const rows = await this.sqlDb.query(finalSql, params);
-    return this._mapRowsToDatoms(rows);
+    return { datoms: this._mapRowsToDatoms(rows), sql: finalSql };
   }
 
   private async _executeSpeculativeQuery(
     options: DatomsQuery,
-    speculativeDatoms: Datom[]
-  ): Promise<Datom[]> {
+    speculativeDatoms: Datom[],
+    sqlQueries?: string[]
+  ): Promise<{ datoms: Datom[]; sqlQueries: string[] }> {
     await this._ensureInitialized();
+
+    const accumulatedSql: string[] = [];
 
     // For speculative queries, we need to merge base datoms with speculative changes
     // Get all base datoms (current state)
-    const baseDatoms = await this._executeCurrentQuery({});
+    const baseResult = await this._executeCurrentQuery({}, accumulatedSql);
+    const baseDatoms = baseResult.datoms;
 
     // Create a map of base datoms by (entity, attribute, value) for efficient lookup
     const baseMap = new Map<string, Datom>();
@@ -1314,7 +1404,17 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Apply pagination
     const offset = options.offset ?? 0;
     const limit = options.limit;
-    return results.slice(offset, limit ? offset + limit : undefined);
+    const finalResults = results.slice(
+      offset,
+      limit ? offset + limit : undefined
+    );
+
+    // Accumulate SQL queries if provided
+    if (sqlQueries) {
+      sqlQueries.push(...accumulatedSql);
+    }
+
+    return { datoms: finalResults, sqlQueries: accumulatedSql };
   }
 
   /**
@@ -1410,12 +1510,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       : (attributeVal as string);
     const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-    return this._executeCurrentQuery({
+    const result = await this._executeCurrentQuery({
       e: entity,
       a: attribute,
       v: value,
       op: "assert",
     });
+    return result.datoms;
   }
 
   /**
@@ -1476,10 +1577,15 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
    * Execute datalog query using pivot optimization (single scan, conditional aggregation)
    */
   private async _executeDatalogWithPivot(
-    query: DatalogQuery
-  ): Promise<QueryResult> {
+    query: DatalogQuery,
+    sqlQueries?: string[]
+  ): Promise<{ results: QueryResult; sql: string }> {
     // Use the extracted SQL building function
     const { sql, params } = datalogToPostgresSQL(query, this.tableName);
+
+    if (sqlQueries) {
+      sqlQueries.push(formatSQLWithParams(sql, params));
+    }
 
     const rows = await this.sqlDb.query(sql, params);
 
@@ -1530,11 +1636,11 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     );
 
     if (Object.keys(query.find).length === 0) {
-      return results;
+      return { results, sql };
     }
 
     // Map results to output keys
-    return results.map((row) => {
+    const finalResults = results.map((row) => {
       const projected: Record<string, Value | Attribute> = {};
       for (const outputKey of Object.keys(query.find)) {
         if (outputKey in row) {
@@ -1543,16 +1649,22 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       }
       return projected;
     });
+    return { results: finalResults, sql };
   }
 
   /**
    * Execute datalog query using SQL with aggregations
    */
   private async _executeDatalogWithSQL(
-    query: DatalogQuery
-  ): Promise<QueryResult> {
+    query: DatalogQuery,
+    sqlQueries?: string[]
+  ): Promise<{ results: QueryResult; sql: string }> {
     // Use the extracted SQL building function
     const { sql, params } = datalogToPostgresSQL(query, this.tableName);
+
+    if (sqlQueries) {
+      sqlQueries.push(formatSQLWithParams(sql, params));
+    }
 
     const rows = await this.sqlDb.query(sql, params);
 
@@ -1615,11 +1727,11 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // We just need to map them directly without calling applyAggregations again
     // (The project function would try to re-aggregate, but we've already done it in SQL)
     if (Object.keys(query.find).length === 0) {
-      return results;
+      return { results, sql };
     }
 
     // Map results - they already have output keys as keys (from SQL aliases)
-    return results.map((row) => {
+    const finalResults = results.map((row) => {
       const projected: Record<string, Value | Attribute> = {};
       for (const outputKey of Object.keys(query.find)) {
         if (outputKey in row) {
@@ -1628,6 +1740,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       }
       return projected;
     });
+    return { results: finalResults, sql };
   }
 
   /**
@@ -1650,7 +1763,9 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     await this.sqlDb.execute(initTxSql);
   }
 
-  private async _getNextTransactionId(): Promise<TransactionId> {
+  private async _getNextTransactionId(
+    sqlQueries?: string[]
+  ): Promise<{ txId: TransactionId; sql: string }> {
     // PostgreSQL-optimized: Use INSERT ... ON CONFLICT ... UPDATE ... RETURNING
     // This combines initialization, update, and retrieval into a single atomic operation
     // The ON CONFLICT ensures thread-safety, and RETURNING gets the new value in one query
@@ -1660,28 +1775,33 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       ON CONFLICT (id) 
       DO UPDATE SET last_tx = ${this.tableName}_tx.last_tx + 1
       RETURNING last_tx
-    `;
+    `.trim();
+
+    if (sqlQueries) {
+      sqlQueries.push(formatSQLWithParams(sql, []));
+    }
 
     const result = await this.sqlDb.query(sql);
     if (!result || result.length === 0) {
       throw new Error("Transaction counter row not found after update");
     }
     const row = result[0] as Record<string, unknown>;
-    return Number(row.last_tx);
+    return { txId: Number(row.last_tx), sql };
   }
 
   private async _writeDatomsInternal(
     datoms: DatomInput[],
-    tx: TransactionId
-  ): Promise<void> {
-    if (datoms.length === 0) return;
+    tx: TransactionId,
+    sqlQueries?: string[]
+  ): Promise<{ sql: string }> {
+    if (datoms.length === 0) return { sql: "" };
 
     const placeholders = datoms.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const sql = `
       INSERT INTO ${this.tableName} (e, a, v, tx, op)
       VALUES ${placeholders}
       ON CONFLICT DO NOTHING
-    `;
+    `.trim();
 
     const params = datoms.flatMap((d) => {
       let value = d.v;
@@ -1691,7 +1811,12 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       return [String(d.e), String(d.a), JSON.stringify(value), tx, d.op];
     });
 
+    if (sqlQueries) {
+      sqlQueries.push(formatSQLWithParams(sql, params));
+    }
+
     await this.sqlDb.execute(sql, params);
+    return { sql };
   }
 
   async _getLatestTransaction(): Promise<Transaction> {
@@ -1706,11 +1831,11 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const txId = Number(row.last_tx);
 
     // Get all datoms for this transaction using history view
-    const datoms = await this._executeHistoryQuery({ tx: txId });
+    const historyResult = await this._executeHistoryQuery({ tx: txId });
 
     return {
       txId,
-      datoms,
+      datoms: historyResult.datoms,
       meta: undefined, // Metadata is not persisted in PostgreSQL implementation
     };
   }
@@ -1775,7 +1900,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
   private async _datomsWithMetadataInternal(
     options: DatomsQuery,
-    viewConfig: ViewConfig
+    viewConfig: ViewConfig,
+    sqlQueries?: string[]
   ): Promise<DatomsResultEnvelope> {
     await this._ensureInitialized();
 
@@ -1783,35 +1909,42 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const metadata: Record<string, unknown> = {};
 
     let result: Datom[];
-    const sqlQueries: string[] = [];
+    const accumulatedSql: string[] = sqlQueries || [];
 
     if (viewConfig.type === "current") {
-      const sqlInfo = this._buildCurrentQuerySQL(options);
-      if (sqlInfo.sql) {
-        sqlQueries.push(sqlInfo.sql);
-      }
-      result = await this._executeCurrentQuery(options);
+      const execResult = await this._executeCurrentQuery(
+        options,
+        accumulatedSql
+      );
+      result = execResult.datoms;
     } else if (viewConfig.type === "asOf") {
-      const sqlInfo = this._buildAsOfQuerySQL(options, viewConfig.txId);
-      if (sqlInfo.sql) {
-        sqlQueries.push(sqlInfo.sql);
-      }
-      result = await this._executeAsOfQuery(options, viewConfig.txId);
+      const execResult = await this._executeAsOfQuery(
+        options,
+        viewConfig.txId,
+        accumulatedSql
+      );
+      result = execResult.datoms;
     } else if (viewConfig.type === "since") {
-      const sqlInfo = this._buildSinceQuerySQL(options, viewConfig.txId);
-      if (sqlInfo.sql) {
-        sqlQueries.push(sqlInfo.sql);
-      }
-      result = await this._executeSinceQuery(options, viewConfig.txId);
+      const execResult = await this._executeSinceQuery(
+        options,
+        viewConfig.txId,
+        accumulatedSql
+      );
+      result = execResult.datoms;
     } else if (viewConfig.type === "history") {
-      const sqlInfo = this._buildHistoryQuerySQL(options);
-      if (sqlInfo.sql) {
-        sqlQueries.push(sqlInfo.sql);
-      }
-      result = await this._executeHistoryQuery(options);
+      const execResult = await this._executeHistoryQuery(
+        options,
+        accumulatedSql
+      );
+      result = execResult.datoms;
     } else if (viewConfig.type === "speculative") {
-      result = await this._executeSpeculativeQuery(options, viewConfig.datoms);
-      // Speculative queries don't generate SQL directly
+      const execResult = await this._executeSpeculativeQuery(
+        options,
+        viewConfig.datoms,
+        accumulatedSql
+      );
+      result = execResult.datoms;
+      accumulatedSql.push(...execResult.sqlQueries);
     } else {
       // TypeScript exhaustiveness check
       const _exhaustive: never = viewConfig;
@@ -1822,8 +1955,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     const executionTime = performance.now() - startTime;
 
-    if (sqlQueries.length > 0) {
-      metadata.sqlQueries = sqlQueries;
+    if (accumulatedSql.length > 0) {
+      metadata.sqlQueries = accumulatedSql;
     }
     metadata.executionTimeMs = executionTime;
     metadata.resultCount = result.length;
@@ -2133,7 +2266,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           v: value,
           viewConfig,
         },
-        viewConfig
+        viewConfig,
+        sqlQueries
       );
 
       for (const datom of clauseDatoms.data) {
@@ -2183,7 +2317,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           v: value,
           viewConfig,
         },
-        viewConfig
+        viewConfig,
+        sqlQueries
       );
 
       const firstResults = firstDatoms.data.map((datom) => {
@@ -2221,7 +2356,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
             a: attribute,
             v: value,
           },
-          viewConfig
+          viewConfig,
+          sqlQueries
         );
 
         const clauseResults = clauseDatoms.data.map((datom) => {
@@ -2287,6 +2423,9 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       metadata.executionTimeMs = executionTime;
       metadata.resultCount = finalResult.length;
       metadata.executionStrategy = "in-memory-speculative";
+      if (sqlQueries.length > 0) {
+        metadata.sqlQueries = sqlQueries;
+      }
 
       return {
         data: finalResult,
@@ -2364,7 +2503,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       const executionTime = performance.now() - startTime;
       metadata.executionTimeMs = executionTime;
       metadata.resultCount = finalResult.length;
-      metadata.executionStrategy = "in-memory-speculative";
+      metadata.executionStrategy = "in-memory-unsupported-aggregations";
+      if (sqlQueries.length > 0) {
+        metadata.sqlQueries = sqlQueries;
+      }
 
       return {
         data: finalResult,
@@ -2374,20 +2516,21 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // For multi-clause queries with all aggregations supported, use SQL query building
     if (modifiedQuery.where.length > 1 && hasAggs && allAggsSupported) {
-      const sqlResult = await this._executeDatalogWithSQL(modifiedQuery);
-      const { sql } = datalogToPostgresSQL(modifiedQuery, this.tableName);
-      sqlQueries.push(sql);
+      const sqlResult = await this._executeDatalogWithSQL(
+        modifiedQuery,
+        sqlQueries
+      );
 
       const executionTime = performance.now() - startTime;
       metadata.executionTimeMs = executionTime;
-      metadata.resultCount = sqlResult.length;
+      metadata.resultCount = sqlResult.results.length;
       metadata.executionStrategy = "sql-aggregations";
       if (sqlQueries.length > 0) {
         metadata.sqlQueries = sqlQueries;
       }
 
       return {
-        data: sqlResult,
+        data: sqlResult.results,
         metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       };
     }
@@ -2454,6 +2597,9 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     metadata.executionTimeMs = executionTime;
     metadata.resultCount = finalResult.length;
     metadata.executionStrategy = "in-memory-filtered-datoms";
+    if (sqlQueries.length > 0) {
+      metadata.sqlQueries = sqlQueries;
+    }
 
     return {
       data: finalResult,
