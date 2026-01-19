@@ -7,6 +7,7 @@ import { db } from "../lib/db";
 import { PlayIcon, SaveIcon, HelpIcon } from "./ui/icons";
 import { KeyboardShortcut } from "./ui/KeyboardShortcut";
 import { ResizablePanels } from "./ui/ResizablePanels";
+import { useKeyboardShortcut } from "./hooks/useKeyboardShortcut";
 import {
   createLoggedDatabase,
   type DbCallLog,
@@ -59,7 +60,6 @@ export function QueryEditor() {
   const editorRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const monacoRef = useRef<any>(null);
-  const handleRunQueryRef = useRef<(() => Promise<void>) | undefined>(undefined);
   const [queryText, setQueryText] = useState<string>(DEFAULT_QUERY);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -345,40 +345,17 @@ declare const db: {
     }
   };
 
-  // Update ref with latest handleRunQuery function
-  useEffect(() => {
-    handleRunQueryRef.current = handleRunQuery;
-  }, [handleRunQuery]);
+  // Keyboard shortcuts
+  useKeyboardShortcut({
+    keys: ["mod", "Enter"],
+    callback: handleRunQuery,
+    enabled: !loading,
+  });
 
-  // Keyboard shortcuts handler
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for Command (Mac) or Ctrl (Windows/Linux)
-      const isModifierPressed = event.metaKey || event.ctrlKey;
-
-      if (!isModifierPressed) return;
-
-      // Command+Enter or Ctrl+Enter: Run query
-      if (event.key === "Enter") {
-        event.preventDefault();
-        if (!loading && handleRunQueryRef.current) {
-          handleRunQueryRef.current();
-        }
-      }
-
-      // Command+S or Ctrl+S: Save query
-      if (event.key === "s" || event.key === "S") {
-        event.preventDefault();
-        handleSaveQuery();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [loading, handleSaveQuery]);
+  useKeyboardShortcut({
+    keys: ["mod", "S"],
+    callback: handleSaveQuery,
+  });
 
   const formatCallLog = (log: DbCallLog): string => {
     const timeStr = new Date(log.timestamp).toLocaleTimeString("en-US", {
