@@ -1,21 +1,20 @@
 import { serve } from "bun";
+import { HttpClientDatomDatabaseServerComponent } from "../../datom-database/http-client/http-client-datom-database-server-component";
 import {
   PostgreSQLDatomDatabase,
-  SQLiteDatomDatabase,
-  datalogToPostgresSQL,
-  type DatalogQuery,
+  SQLiteDatomDatabase
 } from "../../datom-database/index";
 import { DestroyRetentionPolicy } from "../../datom-database/retention-policy";
-import { HttpClientDatomDatabaseServerComponent } from "../../datom-database/http-client/http-client-datom-database-server-component";
 import { PgSQLDatabase } from "../../sql-database/sql-database-pg";
 import { SQLiteSQLDatabase } from "../../sql-database/sql-database-sqlite";
-import { FetchHttpClient } from "./lib/http-client";
+import type { Logger } from "../../types";
 import index from "./index.html";
+import { FetchHttpClient } from "./lib/http-client";
 import { createLogger } from "./lib/logger";
+import { notepad } from "./notepad";
+import { DATOMS_API_ENDPOINT } from "./shared/api";
 import { createTmdbClient } from "./tmdb/tmdb-client";
 import { TmdbLoader } from "./tmdb/tmdb-loader";
-import { DATOMS_API_ENDPOINT } from "./shared/api";
-import type { Logger } from "../../types";
 
 async function main() {
   const logger = createLogger();
@@ -151,91 +150,9 @@ async function main() {
         // Serve index.html for all unmatched routes.
         "/*": index,
 
-        "/popular-movies": {
+        "/notepad": {
           async GET(_req) {
-            logger.info("Querying for movies datoms...", {
-              event: "populating_movies_query",
-            });
-            const q: DatalogQuery = {
-              find: {
-                "movie/id": ["?movie/id"],
-                "movie/title": ["?title"],
-                "movie/overview": ["?overview"],
-                "movie/releaseDate": ["?release_date"],
-                "movie/posterPath": ["?poster_path"],
-                "movie/backdropPath": ["?backdrop_path"],
-                "movie/voteAverage": ["?vote_average"],
-                "movie/voteCount": ["?vote_count"],
-                "movie/popularity": ["?popularity"],
-                "movie/genreId": ["?genre_id"],
-              },
-              where: [
-                { e: "?movie/id", a: "tmdb.movie/id", v: "?id" },
-                { e: "?movie/id", a: "tmdb.movie/title", v: "?title" },
-                { e: "?movie/id", a: "tmdb.movie/overview", v: "?overview" },
-                {
-                  e: "?movie/id",
-                  a: "tmdb.movie/release_date",
-                  v: "?release_date",
-                },
-                {
-                  e: "?movie/id",
-                  a: "tmdb.movie/poster_path",
-                  v: "?poster_path",
-                },
-                {
-                  e: "?movie/id",
-                  a: "tmdb.movie/backdrop_path",
-                  v: "?backdrop_path",
-                },
-                {
-                  e: "?movie/id",
-                  a: "tmdb.movie/vote_average",
-                  v: "?vote_average",
-                },
-                {
-                  e: "?movie/id",
-                  a: "tmdb.movie/vote_count",
-                  v: "?vote_count",
-                },
-                {
-                  e: "?movie/id",
-                  a: "tmdb.movie/popularity",
-                  v: "?popularity",
-                },
-                {
-                  e: "?movie/id",
-                  a: "tmdb.movie/genre_id",
-                  v: "?genre_ids",
-                },
-              ],
-              orderBy: [["?popularity", "desc"]],
-              limit: 25,
-            };
-            const psql = datalogToPostgresSQL(q);
-            const compliedPsql = psql.params.reduce<string>((acc, param) => {
-              return acc.replace(`?`, String(param));
-            }, psql.sql);
-            const start = performance.now();
-            const populateMovies = await db.query(q);
-            logger.info("Movies datoms populated", {
-              event: "populated_movies",
-              count: populateMovies?.length,
-            });
-            logger.debug("Movies datoms data", {
-              event: "populated_movies_data",
-              data: populateMovies,
-            });
-            const end = performance.now();
-            const duration = end - start;
-
-            return Response.json([
-              duration,
-              q,
-              compliedPsql,
-              ...populateMovies,
-              duration,
-            ]);
+            return Response.json(await notepad(db));
           },
         },
 
