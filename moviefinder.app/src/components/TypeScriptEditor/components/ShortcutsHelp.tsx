@@ -21,6 +21,14 @@ export function ShortcutsHelp({ storageKey }: ShortcutsHelpProps) {
             <KeyboardShortcut keys={["mod", "S"]} />
           </div>
         )}
+        <div className="flex items-center justify-between">
+          <span className="text-gray-400">Increase Font Size</span>
+          <KeyboardShortcut keys={["mod", "+"]} />
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-gray-400">Decrease Font Size</span>
+          <KeyboardShortcut keys={["mod", "-"]} />
+        </div>
       </div>
     </div>
   );
