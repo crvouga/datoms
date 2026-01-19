@@ -37,10 +37,9 @@ async function main() {
     const sqliteSqlDb = new SQLiteSQLDatabase(":memory:");
     const sqliteDb = new SQLiteDatomDatabase(sqliteSqlDb);
     const postgresSqlDb = new PgSQLDatabase(databaseUrl);
-    const tableName = process.env.POSTGRES_TABLE_NAME || "datoms"; // Default: "datoms"
     const postgresDb = new PostgreSQLDatomDatabase(
       postgresSqlDb,
-      tableName,
+      "datoms",
       {
         enabled: true,
         intervalMs: 1000 * 60, // 1 minute
