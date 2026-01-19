@@ -1,12 +1,95 @@
 import Editor from "@monaco-editor/react";
 // @ts-expect-error - @babel/standalone doesn't have complete TypeScript definitions
 import * as Babel from "@babel/standalone";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { db } from "../lib/db";
 // Type definitions from db-types.d.ts are automatically included via TypeScript
 
 type OutputTab = "results" | "sql";
+
+// Simple keyboard shortcut display component
+const KeyboardShortcut = ({ keys }: { keys: string[] }) => {
+  const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+  const modifierKey = isMac ? "⌘" : "Ctrl";
+
+  return (
+    <span className="flex items-center gap-1 text-xs text-gray-400">
+      {keys.map((key, index) => (
+        <span key={index} className="flex items-center gap-1">
+          {index > 0 && <span className="text-gray-500">+</span>}
+          {key === "mod" ? (
+            <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-xs font-mono">
+              {modifierKey}
+            </kbd>
+          ) : (
+            <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-xs font-mono">
+              {key}
+            </kbd>
+          )}
+        </span>
+      ))}
+    </span>
+  );
+};
+
+// Simple icon components using SVG
+const PlayIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
+  </svg>
+);
+
+const SaveIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+    />
+  </svg>
+);
+
+const HelpIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
+  </svg>
+);
 
 interface DbCallLog {
   id: number;
@@ -24,6 +107,7 @@ const MONACO_THEME: "vs" | "vs-dark" | "hc-black" | "hc-light" = "hc-black";
 
 // LocalStorage keys for persistence
 const STORAGE_KEY_PANEL_SIZES = "query-editor-panel-sizes";
+const STORAGE_KEY_SAVED_QUERY = "query-editor-saved-query";
 
 const DEFAULT_QUERY = `
 const results = await db.query({
@@ -62,6 +146,7 @@ export function QueryEditor() {
   const editorRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const monacoRef = useRef<any>(null);
+  const handleRunQueryRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   // Load saved panel sizes from localStorage
   const loadPanelSizes = (): [number, number] => {
@@ -91,6 +176,8 @@ export function QueryEditor() {
   const [activeTab, setActiveTab] = useState<OutputTab>("results");
   const [sqlQuery, setSqlQuery] = useState<string | null>(null);
   const [dbCallLogs, setDbCallLogs] = useState<DbCallLog[]>([]);
+  const [saveNotification, setSaveNotification] = useState<string | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState<boolean>(false);
 
   // Configure Monaco Editor with TypeScript types
   useEffect(() => {
@@ -203,6 +290,36 @@ declare const db: {
       }
     }
   };
+
+  // Save query to localStorage
+  const handleSaveQuery = useCallback(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_SAVED_QUERY, queryText);
+      setSaveNotification("Saved");
+      // Clear notification after 2 seconds
+      setTimeout(() => {
+        setSaveNotification(null);
+      }, 2000);
+    } catch {
+      setSaveNotification("Failed to save");
+      setTimeout(() => {
+        setSaveNotification(null);
+      }, 2000);
+    }
+  }, [queryText]);
+
+  // Load saved query on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SAVED_QUERY);
+      if (saved && saved.trim() !== "") {
+        setQueryText(saved);
+      }
+    } catch {
+      // Ignore errors, use default
+    }
+  }, []);
+
 
 
   const handleRunQuery = async () => {
@@ -434,6 +551,41 @@ declare const db: {
     }
   };
 
+  // Update ref with latest handleRunQuery function
+  useEffect(() => {
+    handleRunQueryRef.current = handleRunQuery;
+  }, [handleRunQuery]);
+
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Command (Mac) or Ctrl (Windows/Linux)
+      const isModifierPressed = event.metaKey || event.ctrlKey;
+
+      if (!isModifierPressed) return;
+
+      // Command+Enter or Ctrl+Enter: Run query
+      if (event.key === "Enter") {
+        event.preventDefault();
+        if (!loading && handleRunQueryRef.current) {
+          handleRunQueryRef.current();
+        }
+      }
+
+      // Command+S or Ctrl+S: Save query
+      if (event.key === "s" || event.key === "S") {
+        event.preventDefault();
+        handleSaveQuery();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [loading, handleSaveQuery]);
+
   const formatCallLog = (log: DbCallLog): string => {
     const timeStr = new Date(log.timestamp).toLocaleTimeString("en-US", {
       hour12: false,
@@ -528,15 +680,58 @@ declare const db: {
         {/* Editor Section */}
         <Panel defaultSize={panelSizes[0]} minSize={30} className="flex flex-col">
           <div className="flex items-center justify-between p-2 border-b border-gray-700 bg-gray-900">
-            <h2 className="text-lg font-semibold">TypeScript Query</h2>
-            <button
-              onClick={handleRunQuery}
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors"
-            >
-              {loading ? "Running..." : "Run Code"}
-            </button>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold">TypeScript Query</h2>
+              <button
+                onClick={() => setShowShortcuts(!showShortcuts)}
+                className="p-1.5 text-gray-400 hover:text-gray-300 hover:bg-gray-800 rounded transition-colors"
+                title="Show keyboard shortcuts"
+              >
+                <HelpIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              {saveNotification && (
+                <span className="text-sm text-green-400 font-medium animate-pulse">
+                  {saveNotification}
+                </span>
+              )}
+              <button
+                onClick={handleSaveQuery}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition-colors text-sm"
+                title="Save query"
+              >
+                <SaveIcon className="w-4 h-4" />
+                <span>Save</span>
+                <KeyboardShortcut keys={["mod", "S"]} />
+              </button>
+              <button
+                onClick={handleRunQuery}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors"
+                title="Run code"
+              >
+                <PlayIcon className="w-4 h-4" />
+                <span>{loading ? "Running..." : "Run Code"}</span>
+                <KeyboardShortcut keys={["mod", "Enter"]} />
+              </button>
+            </div>
           </div>
+          {showShortcuts && (
+            <div className="p-3 bg-gray-800 border-b border-gray-700">
+              <div className="text-sm text-gray-300 space-y-2">
+                <div className="font-semibold text-gray-200 mb-2">Keyboard Shortcuts:</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Run Code</span>
+                  <KeyboardShortcut keys={["mod", "Enter"]} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Save Query</span>
+                  <KeyboardShortcut keys={["mod", "S"]} />
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex-1 min-h-0">
             <Editor
               height="100%"
