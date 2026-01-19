@@ -137,7 +137,7 @@ export interface DatomDatabase extends DatabaseView {
    * );
    */
   transact(
-    ops: (DatomInput | DatomInput[])[],
+    ops: (DatomInput | DatomInput[] | Datom | Datom[])[],
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>
   ): Promise<TransactionId>;

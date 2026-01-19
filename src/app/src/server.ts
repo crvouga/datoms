@@ -51,42 +51,6 @@ async function main() {
 
   tmdbLoader.start();
 
-  const allDatoms = await db.datoms({ limit: 1_000_000 });
-
-  try {
-    allDatoms.sort((a, b) => (a["e"] > b["e"] ? 1 : -1));
-
-    // CSV header
-    const header = "e,a,v,tx,op";
-    // Convert datoms to CSV rows, escaping quotes and commas properly where necessary
-    const rows = allDatoms.map((datom) => {
-      // Stringify and escape CSV fields
-      function csvEscape(val: unknown): string {
-        if (val === null || val === undefined) return "";
-        let str = String(val);
-        // Escape double quotes by doubling them
-        if (/["\n,]/.test(str)) {
-          str = '"' + str.replace(/"/g, '""') + '"';
-        }
-        return str;
-      }
-      return [
-        csvEscape(datom.e),
-        csvEscape(datom.a),
-        csvEscape(datom.v),
-        csvEscape(datom.tx),
-        csvEscape(datom.op),
-      ].join(",");
-    });
-
-    const csvContent = [header, ...rows].join("\n") + "\n";
-    await Bun.write("datoms.csv", csvContent);
-
-    logger.info("allDatoms written to datoms.csv");
-  } catch (err) {
-    logger.error("Failed to write allDatoms", { error: getErrorMsg(err) });
-  }
-
   const server = serve({
     port,
     routes: {

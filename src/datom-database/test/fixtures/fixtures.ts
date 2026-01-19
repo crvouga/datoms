@@ -12,11 +12,9 @@ export const FIXTURES: [string, () => Promise<Fixture>][] = [];
 FIXTURES.push(["InMemory", () => createInMemoryFixture()]);
 FIXTURES.push(["SQLite (memory)", () => createSQLiteFixture(":memory:")]);
 FIXTURES.push(["PostgreSQL", () => createPostgresFixture()]);
-if (FAST_TESTS) {
-  console.log("FAST_TESTS is true. Skipping slow tests...");
-} else {
+if (!FAST_TESTS) {
   FIXTURES.push(["HTTP Client", () => createHttpClientFixture()]);
   FIXTURES.push(["SQLite (file)", () => createSQLiteFixture("test.db")]);
-  FIXTURES.push(["PostgreSQL (PGLite)", () => createPGLiteFixture()]);
+  FIXTURES.push(["PGLite", () => createPGLiteFixture()]);
   FIXTURES.push(["FileSystem", () => createFileSystemFixture()]);
 }

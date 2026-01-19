@@ -88,7 +88,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
    * Execute a transaction and persist to file system
    */
   async transact(
-    ops: (DatomInput | DatomInput[])[],
+    ops: (DatomInput | DatomInput[] | Datom | Datom[])[],
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>
   ): Promise<TransactionId> {

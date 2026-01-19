@@ -52,17 +52,19 @@ export class InMemoryDatomDatabase implements DatomDatabase {
   public readonly hooks: HookEngine;
   protected initialized = false;
   protected _datomsArray: Datom[] = [];
+  private _initialDatoms: Datom[] = [];
   protected nextTx: TransactionId = 1;
 
   constructor(initialDatoms: Datom[] = []) {
     this.hooks = new HookEngine();
     this._datomsArray = initialDatoms;
+    this._initialDatoms = initialDatoms;
     this.nextTx = Math.max(...initialDatoms.map((d) => d.tx)) + 1;
   }
 
   async initialize(): Promise<void> {
     if (!this.initialized) {
-      this._datomsArray = [];
+      this._datomsArray = this._initialDatoms;
       this.nextTx = 1;
       this.initialized = true;
     }
