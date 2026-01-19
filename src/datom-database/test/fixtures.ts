@@ -10,6 +10,7 @@ import { HttpClientDatomDatabase } from "../http-client/http-client-datom-databa
 import { InMemoryDatomDatabase } from "../in-memory/in-memory-datom-database.js";
 import { PostgreSQLDatomDatabase } from "../postgres/postgres-datom-database.js";
 import { SQLiteDatomDatabase } from "../sqlite/sqlite-datom-database.js";
+import { FileSystemDatomDatabase } from "../filesystem/filesystem-datom-database.js";
 
 export type Fixture = {
   db: DatomDatabase;
@@ -114,6 +115,42 @@ const createHttpClientFixture = async (): Promise<Fixture> => {
   };
 };
 
+const createFileSystemFixture = async (): Promise<Fixture> => {
+  const FILE_PATH = "test.csv";
+
+  // Ensure a clean state before database initialization
+  try {
+    await Bun.file(FILE_PATH).delete();
+  } catch {
+    // File might not exist; ignore
+  }
+
+  const db = new FileSystemDatomDatabase({ filePath: FILE_PATH });
+  await db.initialize();
+
+  return {
+    db,
+    beforeEach: async () => {
+      // Before each test, delete the file and re-initialize DB
+      try {
+        await Bun.file(FILE_PATH).delete();
+      } catch {
+        // File might not exist; ignore
+      }
+      await db.initialize();
+    },
+    afterEach: async () => {
+      // After each test, close DB and remove the test file
+      await db.close();
+      try {
+        await Bun.file(FILE_PATH).delete();
+      } catch {
+        // File might not exist; ignore
+      }
+    },
+  };
+};
+
 const TEST_ALL = false;
 
 export const FIXTURES: [string, () => Promise<Fixture>][] = [];
@@ -127,3 +164,4 @@ if (TEST_ALL) {
   FIXTURES.push(["PostgreSQL (PGLite)", () => createPGLiteFixture()]);
 }
 FIXTURES.push(["HTTP Client", () => createHttpClientFixture()]);
+FIXTURES.push(["FileSystem", () => createFileSystemFixture()]);

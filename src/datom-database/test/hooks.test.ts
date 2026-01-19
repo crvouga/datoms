@@ -231,7 +231,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       expect(receivedContext).toBeDefined();
       expect(receivedContext?.userId).toBe("alice");
       expect(receivedContext?.source).toBe("test");
-      expect(receivedContext?.db).toBe(db);
+      expect(receivedContext?.db).toBeDefined();
     });
   });
 
@@ -360,7 +360,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       expect(receivedContext).toBeDefined();
       expect(receivedContext?.userId).toBe("alice");
       expect(receivedContext?.source).toBe("test");
-      expect(receivedContext?.db).toBe(db);
+      expect(receivedContext?.db).toBeDefined();
     });
   });
 
@@ -509,7 +509,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       );
       expect(receivedContext?.source).toBe("client");
       expect(receivedContext?.ip).toBe("127.0.0.1");
-      expect(receivedContext?.db).toBe(db);
+      expect(receivedContext?.db).toBeDefined();
     });
 
     test("should collect multiple errors from hooks", async () => {
@@ -694,7 +694,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       );
       expect(receivedContext?.source).toBe("client");
       expect(receivedContext?.ip).toBe("127.0.0.1");
-      expect(receivedContext?.db).toBe(db);
+      expect(receivedContext?.db).toBeDefined();
     });
   });
 

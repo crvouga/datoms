@@ -51,8 +51,8 @@ import type { ViewConfig } from "../views/view-config.js";
 export class InMemoryDatomDatabase implements DatomDatabase {
   public readonly hooks: HookEngine;
   protected initialized = false;
-  private _datomsArray: Datom[] = [];
-  private nextTx: TransactionId = 1;
+  protected _datomsArray: Datom[] = [];
+  protected nextTx: TransactionId = 1;
 
   constructor(initialDatoms: Datom[] = []) {
     this.hooks = new HookEngine();

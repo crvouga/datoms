@@ -172,8 +172,8 @@ export type DatomInput = {
  * await db.transact(
  *   datoms({
  *     entityId: 1,
- *     [USER_TYPE]: USER_TYPE_ADMIN,
- *     [USER_NAME]: "Admin User",
+ *     "blogging.user/type": USER_TYPE_ADMIN,
+ *     "blogging.user/name": "Admin User",
  *     "user/email": "admin@example.com"
  *   })
  * );
