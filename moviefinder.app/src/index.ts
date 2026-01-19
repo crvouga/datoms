@@ -6,6 +6,7 @@ import {
   type DatalogQuery,
 } from "../../src";
 import { DestroyRetentionPolicy } from "../../src/datom-database/retention-policy";
+import { HttpClientDatomDatabaseServerComponent } from "../../src/datom-database/http-client/http-client-datom-database-server-component";
 import { PgSQLDatabase } from "../../src/sql-database/sql-database-pg";
 import { SQLiteSQLDatabase } from "../../src/sql-database/sql-database-sqlite";
 import { FetchHttpClient } from "./lib/http-client";
@@ -13,6 +14,7 @@ import index from "./index.html";
 import { createLogger } from "./lib/logger";
 import { createTmdbClient } from "./tmdb/tmdb-client";
 import { TmdbLoader } from "./tmdb/tmdb-loader";
+import { DATOMS_API_ENDPOINT } from "./shared/api";
 
 async function main() {
   const logger = createLogger();
@@ -68,6 +70,10 @@ async function main() {
       throw new Error("TMDB_API_READ_ACCESS_TOKEN is not set");
     }
     const tmdbLoader = new TmdbLoader(tmdbClient, db, logger);
+
+    // Create HTTP client database server component
+    const httpClientServerComponent =
+      new HttpClientDatomDatabaseServerComponent(db);
 
     // Graceful shutdown handler (defined after all resources are created)
     const shutdown = async (signal: string) => {
@@ -263,6 +269,16 @@ async function main() {
           return Response.json({
             message: `Hello, ${name}!`,
           });
+        },
+
+        [DATOMS_API_ENDPOINT]: {
+          async POST(req) {
+            logger.info("Datoms API request", {
+              event: "datoms_api_request",
+              route: DATOMS_API_ENDPOINT,
+            });
+            return httpClientServerComponent.handleRequest(req);
+          },
         },
       },
 
