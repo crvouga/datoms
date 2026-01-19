@@ -1,17 +1,15 @@
 import type { Fixture } from "../fixture.js";
 import { FileSystemDatomDatabase } from "../../../filesystem/filesystem-datom-database.js";
 
-export const createFileSystemFixture = async (): Promise<Fixture> => {
-  const FILE_PATH = "test.csv";
-
+export const createFileSystemFixture = async (filePath: string): Promise<Fixture> => {
   // Ensure a clean state before database initialization
   try {
-    await Bun.file(FILE_PATH).delete();
+    await Bun.file(filePath).delete();
   } catch {
     // File might not exist; ignore
   }
 
-  const db = new FileSystemDatomDatabase({ filePath: FILE_PATH });
+  const db = new FileSystemDatomDatabase({ filePath });
   await db.initialize();
 
   return {
@@ -19,7 +17,7 @@ export const createFileSystemFixture = async (): Promise<Fixture> => {
     beforeEach: async () => {
       // Before each test, delete the file and re-initialize DB
       try {
-        await Bun.file(FILE_PATH).delete();
+        await Bun.file(filePath).delete();
       } catch {
         // File might not exist; ignore
       }
@@ -29,7 +27,7 @@ export const createFileSystemFixture = async (): Promise<Fixture> => {
       // After each test, close DB and remove the test file
       await db.close();
       try {
-        await Bun.file(FILE_PATH).delete();
+        await Bun.file(filePath).delete();
       } catch {
         // File might not exist; ignore
       }

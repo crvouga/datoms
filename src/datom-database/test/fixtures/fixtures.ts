@@ -16,5 +16,5 @@ if (!FAST_TESTS) {
   FIXTURES.push(["HTTP Client", () => createHttpClientFixture()]);
   FIXTURES.push(["SQLite (file)", () => createSQLiteFixture("test.db")]);
   FIXTURES.push(["PGLite", () => createPGLiteFixture()]);
-  FIXTURES.push(["FileSystem", () => createFileSystemFixture()]);
+  FIXTURES.push(["FileSystem", () => createFileSystemFixture("test.csv")]);
 }

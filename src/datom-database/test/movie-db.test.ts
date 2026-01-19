@@ -22,14 +22,6 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
     await f.db.transact(movieDatoms);
   });
 
-  beforeEach(async () => {
-    await f.beforeEach();
-  });
-
-  afterEach(async () => {
-    await f.afterEach();
-  });
-
   it("should return the top movies by popularity", async () => {
     const limit = 10;
     const results = await f.db.query({

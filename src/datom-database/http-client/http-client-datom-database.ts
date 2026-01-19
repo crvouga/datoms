@@ -3,13 +3,11 @@
  * Communicates with remote database server via HTTP
  */
 
-import type { DatalogQuery, QueryClause } from "../../datalog/datalog.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
 import type {
-  Attribute,
   Datom,
   DatomInput,
   TransactionId,
-  Value,
 } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
 import type { HttpClient } from "../../http-client/http-client.js";
@@ -27,13 +25,7 @@ import {
   type WriteContext,
   type WriteResult,
 } from "../hook/hook.js";
-import {
-  isQueryPattern,
-  isVariable,
-  stripQuestionMark,
-} from "../shared/datalog-helpers.js";
 import { executeQueryOnDatoms } from "../shared/in-memory-query-executor.js";
-import { joinResults, project } from "../shared/query-results.js";
 import { validateQueryOptions } from "../shared/query-validation.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type {
@@ -51,6 +43,10 @@ interface DatomsResponse {
 
 interface TransactResponse {
   txId: TransactionId;
+}
+
+interface QueryResponse {
+  results: QueryResult;
 }
 
 interface GetLatestTransactionResponse {
@@ -375,7 +371,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     const startTime = performance.now();
     const metadata: Record<string, unknown> = {};
 
-    // Create read context
+    // Create read context for hooks
     // Extract context, but ensure db and query fields are not overwritten
     const { db: _, query: __, ...restContext } = context || {};
     // Merge db into query.context so hooks can access it via query.context.db
@@ -392,8 +388,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
       query: enhancedQuery,
     };
 
-    // Run before-read hooks locally (though query executes remotely)
-    // Pass enhanced query with db in context
+    // Run before-read hooks locally (query will execute remotely)
     const beforeResult = await this.hooks.runBeforeRead(enhancedQuery, ctx);
 
     if (beforeResult.errors.length > 0) {
@@ -402,153 +397,56 @@ export class HttpClientDatomDatabase implements DatomDatabase {
 
     const modifiedQuery = beforeResult.query;
 
-    if (modifiedQuery.where.length === 0) {
+    // Send query to server - server handles all filtering, sorting, and limiting
+    try {
+      const response = await this.httpClient.post<QueryResponse>(
+        this.endpoint,
+        {
+          method: "query",
+          query: modifiedQuery,
+          context: restContext,
+          viewConfig,
+        }
+      );
+
       const executionTime = performance.now() - startTime;
+      metadata.executionTimeMs = executionTime;
+      metadata.resultCount = response.results.length;
+      metadata.executionStrategy = "http-remote";
+
       return {
-        data: [],
-        metadata: {
-          executionTimeMs: executionTime,
-          resultCount: 0,
-        },
+        data: response.results,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       };
-    }
-
-    // Extract all datoms from all clauses for afterRead hooks
-    const allDatomsSet = new Set<string>();
-    const allDatoms: Datom[] = [];
-
-    for (const clause of modifiedQuery.where) {
-      if (!isQueryPattern(clause)) {
-        continue;
+    } catch (error) {
+      const mappedError = this._mapHttpError(error);
+      if (mappedError.code === "QUERY_TIMEOUT") {
+        const timeoutMs = (query as { timeoutMs?: number }).timeoutMs || 0;
+        throw new QueryTimeoutError(timeoutMs, query);
       }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-      const entity = isVariable(entityVal)
-        ? undefined
-        : (entityVal as EntityId);
-      const attribute = isVariable(attributeVal)
-        ? undefined
-        : (attributeVal as string);
-      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
-
-      // When all positions are variables, use _executeQuery directly with limit
-      // to bypass validation, then apply deduplication and filtering
-      const hasAnyFilter =
-        entity !== undefined || attribute !== undefined || value !== undefined;
-
-      let clauseDatoms: Datom[];
-      if (!hasAnyFilter) {
-        // All variables - get all datoms using _executeQuery with limit to satisfy validation
-        // For speculative views, this will fetch all datoms and merge with speculative ones
-        const rawDatoms = await this._datomsWithMetadataInternal(
-          { limit: Number.MAX_SAFE_INTEGER, viewConfig },
-          viewConfig
+      if (mappedError.code === "QUERY_SAFETY_VIOLATION") {
+        throw new QuerySafetyError(mappedError.message);
+      }
+      if (mappedError.code === "QUERY_RESULT_SIZE_EXCEEDED") {
+        const errorData = mappedError.originalError as {
+          resultSize?: number;
+          maxResultSize?: number;
+          queryOptions?: unknown;
+        };
+        throw new QueryResultSizeError(
+          errorData.resultSize ?? 0,
+          errorData.maxResultSize ?? 0,
+          errorData.queryOptions ?? query
         );
-        // Use shared query executor to deduplicate and filter
-        clauseDatoms = executeQueryOnDatoms(rawDatoms.data, {});
-      } else {
-        // Has filters - use _executeQuery with viewConfig to respect time-travel views
-        // Include attribute filter if specified to optimize speculative queries
-        const queryOptions: DatomsQuery = {};
-        if (entity !== undefined) queryOptions.e = entity;
-        if (attribute !== undefined) queryOptions.a = attribute;
-        if (value !== undefined) queryOptions.v = value;
-        clauseDatoms = (
-          await this._datomsWithMetadataInternal(queryOptions, viewConfig)
-        ).data;
       }
-
-      for (const datom of clauseDatoms) {
-        const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
-        if (!allDatomsSet.has(key)) {
-          allDatomsSet.add(key);
-          allDatoms.push(datom);
-        }
+      if (mappedError.code === "QUERY_HOOK_ERROR" || mappedError.code === "QUERY_ERROR") {
+        const errorData = mappedError.originalError as {
+          errors?: Array<{ hook: string; message: string; code?: string }>;
+        };
+        throw new QueryError(mappedError.message, errorData?.errors || []);
       }
+      throw new Error(`Query failed: ${mappedError.message}`);
     }
-
-    // Run after-read hooks locally
-    const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
-
-    if (afterResult.errors && afterResult.errors.length > 0) {
-      throw new QueryError(
-        "Query blocked by after-read hooks",
-        afterResult.errors
-      );
-    }
-
-    // Re-execute query with filtered datoms from hooks
-    // Start with the first clause
-    const firstClause = modifiedQuery.where[0];
-    if (!firstClause) {
-      const executionTime = performance.now() - startTime;
-      return {
-        data: [],
-        metadata: {
-          executionTimeMs: executionTime,
-          resultCount: 0,
-          executionStrategy: "http-remote-with-hooks",
-        },
-      };
-    }
-    const firstResults = await this._executeClauseWithFilteredDatoms(
-      firstClause,
-      afterResult.datoms
-    );
-
-    // Join with remaining clauses
-    let results = firstResults;
-    for (let i = 1; i < modifiedQuery.where.length; i++) {
-      const clause = modifiedQuery.where[i];
-      if (!clause) continue;
-      const clauseResults = await this._executeClauseWithFilteredDatoms(
-        clause,
-        afterResult.datoms
-      );
-      results = joinResults(
-        results,
-        clauseResults,
-        modifiedQuery.where.slice(0, i + 1)
-      );
-    }
-
-    // Project to find variables
-    const projected = project(results, modifiedQuery.find, modifiedQuery.where);
-
-    // Apply ordering if specified
-    if (modifiedQuery.orderBy) {
-      projected.sort((a, b) => {
-        for (const [variable, direction] of modifiedQuery.orderBy!) {
-          const key = stripQuestionMark(variable);
-          const aVal = a[key];
-          const bVal = b[key];
-
-          // Handle null/undefined
-          if (aVal == null && bVal == null) continue;
-          if (aVal == null) return direction === "asc" ? -1 : 1;
-          if (bVal == null) return direction === "asc" ? 1 : -1;
-
-          if (aVal < bVal) return direction === "asc" ? -1 : 1;
-          if (aVal > bVal) return direction === "asc" ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-
-    // Apply limit
-    let finalResult: QueryResult = projected;
-    if (modifiedQuery.limit) {
-      finalResult = finalResult.slice(0, modifiedQuery.limit);
-    }
-
-    const executionTime = performance.now() - startTime;
-    metadata.executionTimeMs = executionTime;
-    metadata.resultCount = finalResult.length;
-    metadata.executionStrategy = "http-remote-with-hooks";
-
-    return {
-      data: finalResult,
-      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-    };
   }
 
   private async _datomsWithMetadataInternal(
@@ -724,52 +622,6 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     return executeQueryOnDatoms(mergedDatoms, options);
   }
 
-  /**
-   * Execute a clause using filtered datoms from hooks
-   */
-  private async _executeClauseWithFilteredDatoms(
-    clause: QueryClause,
-    filteredDatoms: Datom[]
-  ): Promise<Record<string, Value | Attribute>[]> {
-    if (!isQueryPattern(clause)) {
-      throw new Error("Only QueryPattern clauses are supported");
-    }
-    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-    const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
-    const attribute = isVariable(attributeVal)
-      ? undefined
-      : (attributeVal as string);
-    const value = isVariable(valueVal) ? undefined : (valueVal as Value);
-
-    // Filter datoms based on clause
-    let matchingDatoms = filteredDatoms;
-    if (entity !== undefined) {
-      matchingDatoms = matchingDatoms.filter((d) => d.e === entity);
-    }
-    if (attribute !== undefined) {
-      matchingDatoms = matchingDatoms.filter((d) => d.a === attribute);
-    }
-    if (value !== undefined) {
-      matchingDatoms = matchingDatoms.filter(
-        (d) => JSON.stringify(d.v) === JSON.stringify(value)
-      );
-    }
-
-    // Map datom fields to variable names from the clause
-    return matchingDatoms.map((datom) => {
-      const result: Record<string, Value | Attribute> = {};
-      if (isVariable(entityVal)) {
-        result[entityVal as string] = datom.e;
-      }
-      if (isVariable(attributeVal)) {
-        result[attributeVal as string] = datom.a;
-      }
-      if (isVariable(valueVal)) {
-        result[valueVal as string] = datom.v;
-      }
-      return result;
-    });
-  }
 
   private async _ensureInitialized(): Promise<void> {
     if (!this.initialized) {
