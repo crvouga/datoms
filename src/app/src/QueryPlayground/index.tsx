@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Panel, PanelResizeHandle } from "react-resizable-panels";
 import {
   createLoggedDatabase,
   type DbCallLog,
-} from "../../../datom-database/index";
+} from "../../../datom-database/wrapper/logged-datom-database";
 import { db } from "../lib/db";
+import { DbCallLogList } from "./DbCallLogList";
 import { TypeScriptEditor, type TypeDefinition } from "./TypeScriptEditor";
 import { ResizablePanels } from "./ui/ResizablePanels";
-import { DbCallLogList } from "./DbCallLogList";
 // Type definitions from db-types.d.ts are automatically included via TypeScript
 
 // Monaco Editor theme configuration with type safety

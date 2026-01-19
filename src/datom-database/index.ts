@@ -53,10 +53,3 @@ export type { WithResult } from "./datom-database.js";
 
 export { HookEngine } from "./hook/hook.js";
 export { HookValidator } from "./hook/validator.js";
-
-// Database wrapper utility
-export {
-  createLoggedDatabase,
-  type DbCallLog,
-  type LoggedDatabaseOptions,
-} from "./wrapper/logged-datom-database.js";
