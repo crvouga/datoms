@@ -24,7 +24,7 @@ const MONACO_THEME: "vs" | "vs-dark" | "hc-black" | "hc-light" = "hc-black";
 const STORAGE_KEY_SAVED_QUERY = "query-editor-saved-query";
 
 const DEFAULT_QUERY = `
-const results = await db.query({
+await db.query({
   find: {
     "movie/id": ["?movie/id"],
     "movie/title": ["?title"],
@@ -39,7 +39,7 @@ const results = await db.query({
   limit: 10
 });
 
-const results2 = await db.query({
+await db.query({
   find: {
     "movie/id": ["?movie/id"],
     "movie/title": ["?title"],
