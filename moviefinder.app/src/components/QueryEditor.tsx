@@ -6,19 +6,13 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { db } from "../lib/db";
 import { PlayIcon, SaveIcon, HelpIcon } from "./ui/icons";
 import { KeyboardShortcut } from "./ui/KeyboardShortcut";
+import {
+  createLoggedDatabase,
+  type DbCallLog,
+} from "../../../src/datom-database/index";
 // Type definitions from db-types.d.ts are automatically included via TypeScript
 
 type OutputTab = "results" | "sql";
-
-interface DbCallLog {
-  id: number;
-  timestamp: number;
-  method: string;
-  args: unknown[];
-  result?: unknown;
-  error?: string;
-  duration: number;
-}
 
 // Monaco Editor theme configuration with type safety
 // Available themes: "vs", "vs-dark", "hc-black", "hc-light"
@@ -250,113 +244,30 @@ declare const db: {
     setActiveTab("results");
 
     const startTime = performance.now();
-    let callIdCounter = 0;
 
-    // Create a proxy wrapper around db to intercept all method calls
-    const createLoggedDb = (originalDb: typeof db): typeof db => {
-      return new Proxy(originalDb, {
-        get(target, prop) {
-          const methodName = String(prop);
-          console.log(`[DB Call] Proxy get trap for: ${methodName}`);
-
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const originalMethod = Reflect.get(target, prop);
-
-          // Skip Symbol properties
-          if (typeof prop === "symbol") {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-            return originalMethod;
-          }
-
-          // If it's not a function, return as-is (for properties like asOf, history, since)
-          if (typeof originalMethod !== "function") {
-            console.log(`[DB Call] Property ${methodName} is not a function, returning as-is`);
-            // Handle special methods that return db instances (asOf, history, since)
-            if (prop === "asOf" || prop === "history" || prop === "since") {
-              return (...args: unknown[]) => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-                const method = originalMethod as any;
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument
-                const dbInstance = method.apply(target, args);
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-                return createLoggedDb(dbInstance);
-              };
-            }
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-            return originalMethod;
-          }
-
-          // Wrap function calls with logging
-          console.log(`[DB Call] Wrapping function ${methodName}, original type:`, typeof originalMethod);
-          const wrappedFunction = async (...args: unknown[]) => {
-            const callId = callIdCounter++;
-            const callStartTime = performance.now();
-            const timestamp = Date.now();
-
-            console.log(`[DB Call] Wrapped function CALLED for ${methodName}`, args);
-
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-              const result = await (originalMethod as (...args: unknown[]) => Promise<unknown>).apply(target, args);
-              const callEndTime = performance.now();
-              const duration = callEndTime - callStartTime;
-
-              const logEntry: DbCallLog = {
-                id: callId,
-                timestamp,
-                method: methodName,
-                args,
-                result,
-                duration,
-              };
-
-              console.log(`[DB Call] Created log entry:`, logEntry);
-
-              // Use functional update to ensure we get the latest state
-              setDbCallLogs((prev) => {
-                const newLogs = [...prev, logEntry];
-                console.log(`[DB Call] State update: prev length=${prev.length}, new length=${newLogs.length}`);
-                return newLogs;
-              });
-
-              // If the result is a db instance (like asOf, history, since return), wrap it too
-              if (result && typeof result === "object" && "query" in result) {
-                return createLoggedDb(result as typeof db);
-              }
-
-              return result;
-            } catch (err) {
-              const callEndTime = performance.now();
-              const duration = callEndTime - callStartTime;
-              const errorMessage = err instanceof Error ? err.message : String(err);
-
-              const logEntry: DbCallLog = {
-                id: callId,
-                timestamp,
-                method: methodName,
-                args,
-                error: errorMessage,
-                duration,
-              };
-
-              // Use functional update to ensure we get the latest state
-              setDbCallLogs((prev) => {
-                const newLogs = [...prev, logEntry];
-                return newLogs;
-              });
-
-              throw err;
-            }
-          };
-
-          // Add a property to help identify the wrapped function
-          Object.defineProperty(wrappedFunction, 'name', { value: `${methodName}_logged`, writable: false });
-          console.log(`[DB Call] Returning wrapped function for ${methodName}`);
-
-          return wrappedFunction;
-        },
-      }) as typeof db;
-    };
+    // Create a logged database wrapper using the library utility
+    const loggedDb = createLoggedDatabase(db, {
+      onCallStart: (method, args) => {
+        console.log(`[DB Call] Calling ${method}`, args);
+      },
+      onCallComplete: (log) => {
+        console.log(`[DB Call] Completed ${log.method} in ${log.duration}ms`);
+        // Use functional update to ensure we get the latest state
+        setDbCallLogs((prev) => {
+          const newLogs = [...prev, log];
+          console.log(`[DB Call] State update: prev length=${prev.length}, new length=${newLogs.length}`);
+          return newLogs;
+        });
+      },
+      onCallError: (log) => {
+        console.error(`[DB Call] Error in ${log.method}: ${log.error}`);
+        // Use functional update to ensure we get the latest state
+        setDbCallLogs((prev) => {
+          const newLogs = [...prev, log];
+          return newLogs;
+        });
+      },
+    });
 
     try {
       // Transpile TypeScript to JavaScript using Babel
@@ -388,8 +299,7 @@ declare const db: {
         throw new Error(`TypeScript compilation error: ${errorMessage}`);
       }
 
-      // Create execution context with logged db instance
-      const loggedDb = createLoggedDb(db);
+      // Use the logged db instance created above
       console.log(`[DB Call] Created loggedDb, testing access to query:`, typeof loggedDb.query);
       const executionContext = {
         db: loggedDb,
