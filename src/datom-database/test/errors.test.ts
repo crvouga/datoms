@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { FIXTURES, type Fixture } from "./fixtures.js";
+import { FIXTURES } from "./fixtures/fixtures.js";
+import type { Fixture } from "./fixtures/fixture.js";
 import {
   ConnectionPoolExhaustedError,
   QueryResultSizeError,

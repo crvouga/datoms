@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { QueryResultSizeError } from "../hook/hook";
-import { FIXTURES, type Fixture } from "./fixtures.js";
+import { FIXTURES } from "./fixtures/fixtures.js";
+import type { Fixture } from "./fixtures/fixture.js";
 
 describe.each(FIXTURES)(
   "Query Result Size Limits (%s)",

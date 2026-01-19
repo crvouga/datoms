@@ -5,7 +5,8 @@ import {
   DestroyRetentionPolicy,
   type DestroyRetentionPolicyConfig,
 } from "../retention-policy/destroy-retention-policy.js";
-import { FIXTURES, type Fixture } from "./fixtures.js";
+import { FIXTURES } from "./fixtures/fixtures.js";
+import type { Fixture } from "./fixtures/fixture.js";
 
 describe.each(FIXTURES)(
   "DestroyRetentionPolicy (%s)",

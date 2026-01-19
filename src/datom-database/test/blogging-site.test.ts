@@ -22,7 +22,8 @@ import {
   USER_TYPE_AUTHOR,
   USER_TYPE_READER,
 } from "./blogging-site.js";
-import { FIXTURES, type Fixture } from "./fixtures.js";
+import { FIXTURES } from "./fixtures/fixtures.js";
+import type { Fixture } from "./fixtures/fixture.js";
 
 describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
   let f: Fixture;
