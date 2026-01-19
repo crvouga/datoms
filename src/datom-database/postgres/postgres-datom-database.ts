@@ -555,22 +555,27 @@ export function datalogToPostgresSQL(
 export class PostgreSQLDatomDatabase implements DatomDatabase {
   public readonly hooks: HookEngine;
   protected initialized = false;
-  private connection: SQLDatabase;
+  private sqlDb: SQLDatabase;
   private tableName: string;
   private maintenanceIntervalId: ReturnType<typeof setInterval> | null = null;
   private maintenanceRunning: boolean = false;
   private maintenanceConfig?: PostgreSQLMaintenanceConfig;
   private logger?: Logger;
 
-  constructor(
-    connection: SQLDatabase,
-    tableName: string = "datoms",
-    maintenanceConfig?: PostgreSQLMaintenanceConfig,
-    logger?: Logger
-  ) {
+  constructor({
+    sqlDb,
+    tableName = "datoms",
+    maintenanceConfig,
+    logger,
+  }: {
+    sqlDb: SQLDatabase;
+    tableName?: string;
+    maintenanceConfig?: PostgreSQLMaintenanceConfig;
+    logger?: Logger;
+  }) {
     this.hooks = new HookEngine();
-    this.connection = connection;
-    this.tableName = tableName;
+    this.sqlDb = sqlDb;
+    this.tableName = tableName || "datoms";
     this.maintenanceConfig = maintenanceConfig;
     this.logger = logger;
   }
@@ -579,7 +584,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     if (!this.initialized) {
       // Create enum type for op column (handle error if already exists)
       try {
-        await this.connection.execute(`
+        await this.sqlDb.execute(`
           CREATE TYPE datom_op AS ENUM ('assert', 'retract')
         `);
       } catch (_error) {
@@ -615,9 +620,9 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx DESC)`,
       ];
 
-      await this.connection.execute(createTableSql);
+      await this.sqlDb.execute(createTableSql);
       for (const indexSql of indexes) {
-        await this.connection.execute(indexSql);
+        await this.sqlDb.execute(indexSql);
       }
 
       // Create transaction counter table
@@ -627,7 +632,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           last_tx BIGINT NOT NULL DEFAULT 0
         )
       `;
-      await this.connection.execute(txTableSql);
+      await this.sqlDb.execute(txTableSql);
 
       // Initialize transaction counter if needed
       const initTxSql = `
@@ -635,7 +640,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         SELECT 1, 0
         WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
       `;
-      await this.connection.execute(initTxSql);
+      await this.sqlDb.execute(initTxSql);
 
       this.initialized = true;
     }
@@ -643,8 +648,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
   async close(): Promise<void> {
     this.stopMaintenance();
-    if (this.connection.close) {
-      await this.connection.close();
+    if (this.sqlDb.close) {
+      await this.sqlDb.close();
     }
     this.initialized = false;
   }
@@ -657,16 +662,16 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const tx = await this._getNextTransactionId();
 
     if (
-      this.connection.beginTransaction &&
-      this.connection.commitTransaction &&
-      this.connection.rollbackTransaction
+      this.sqlDb.beginTransaction &&
+      this.sqlDb.commitTransaction &&
+      this.sqlDb.rollbackTransaction
     ) {
-      await this.connection.beginTransaction();
+      await this.sqlDb.beginTransaction();
       try {
         await this._writeDatomsInternal(datoms, tx);
-        await this.connection.commitTransaction();
+        await this.sqlDb.commitTransaction();
       } catch (error) {
-        await this.connection.rollbackTransaction();
+        await this.sqlDb.rollbackTransaction();
         throw error;
       }
     } else {
@@ -1010,7 +1015,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       params.push(options.offset);
     }
 
-    const rows = await this.connection.query(sql, params);
+    const rows = await this.sqlDb.query(sql, params);
     return this._mapRowsToDatoms(rows);
   }
 
@@ -1102,7 +1107,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       params.push(options.offset);
     }
 
-    const rows = await this.connection.query(finalSql, params);
+    const rows = await this.sqlDb.query(finalSql, params);
     return this._mapRowsToDatoms(rows);
   }
 
@@ -1173,7 +1178,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       params.push(options.offset);
     }
 
-    const rows = await this.connection.query(sql, params);
+    const rows = await this.sqlDb.query(sql, params);
     return this._mapRowsToDatoms(rows);
   }
 
@@ -1251,7 +1256,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       params.push(options.offset);
     }
 
-    const rows = await this.connection.query(finalSql, params);
+    const rows = await this.sqlDb.query(finalSql, params);
     return this._mapRowsToDatoms(rows);
   }
 
@@ -1476,7 +1481,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Use the extracted SQL building function
     const { sql, params } = datalogToPostgresSQL(query, this.tableName);
 
-    const rows = await this.connection.query(sql, params);
+    const rows = await this.sqlDb.query(sql, params);
 
     // Convert SQL results back to QueryResult format
     const results: Record<string, Value | Attribute>[] = rows.map(
@@ -1549,7 +1554,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Use the extracted SQL building function
     const { sql, params } = datalogToPostgresSQL(query, this.tableName);
 
-    const rows = await this.connection.query(sql, params);
+    const rows = await this.sqlDb.query(sql, params);
 
     // Convert SQL results back to QueryResult format
     // Note: Special handling for aggregation results (numeric strings)
@@ -1632,7 +1637,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
    */
   protected async cleanUp(): Promise<void> {
     await this._ensureInitialized();
-    await this.connection.execute(
+    await this.sqlDb.execute(
       `TRUNCATE TABLE ${this.tableName}, ${this.tableName}_tx RESTART IDENTITY CASCADE`
     );
     // Re-initialize transaction counter after truncate
@@ -1642,7 +1647,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       VALUES (1, 0)
       ON CONFLICT (id) DO UPDATE SET last_tx = 0
     `;
-    await this.connection.execute(initTxSql);
+    await this.sqlDb.execute(initTxSql);
   }
 
   private async _getNextTransactionId(): Promise<TransactionId> {
@@ -1657,7 +1662,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       RETURNING last_tx
     `;
 
-    const result = await this.connection.query(sql);
+    const result = await this.sqlDb.query(sql);
     if (!result || result.length === 0) {
       throw new Error("Transaction counter row not found after update");
     }
@@ -1686,13 +1691,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       return [String(d.e), String(d.a), JSON.stringify(value), tx, d.op];
     });
 
-    await this.connection.execute(sql, params);
+    await this.sqlDb.execute(sql, params);
   }
 
   async _getLatestTransaction(): Promise<Transaction> {
     await this._ensureInitialized();
     const sql = `SELECT last_tx FROM ${this.tableName}_tx WHERE id = 1`;
-    const result = await this.connection.query(sql);
+    const result = await this.sqlDb.query(sql);
     if (!result || result.length === 0) {
       // No transactions yet
       return { txId: 0, datoms: [], meta: undefined };
@@ -1765,7 +1770,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     }
 
     const sql = `DELETE FROM ${this.tableName} ${whereClause} ${limitClause} ${offsetClause}`;
-    await this.connection.execute(sql, params);
+    await this.sqlDb.execute(sql, params);
   }
 
   private async _datomsWithMetadataInternal(
@@ -2558,8 +2563,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
       // VACUUM ANALYZE on both tables to reclaim storage and update statistics
       // VACUUM ANALYZE reclaims storage occupied by dead tuples and updates statistics
-      await this.connection.execute(`VACUUM ANALYZE ${this.tableName}`);
-      await this.connection.execute(`VACUUM ANALYZE ${this.tableName}_tx`);
+      await this.sqlDb.execute(`VACUUM ANALYZE ${this.tableName}`);
+      await this.sqlDb.execute(`VACUUM ANALYZE ${this.tableName}_tx`);
 
       this.logger?.info("PostgreSQL maintenance completed", {
         event: "postgres_maintenance_complete",

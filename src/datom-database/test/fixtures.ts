@@ -48,7 +48,7 @@ const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
 
 const createPostgresFixture = async (): Promise<Fixture> => {
   const connection = new PgSQLDatabase(DATABASE_URL);
-  const db = new PostgreSQLDatomDatabase(connection);
+  const db = new PostgreSQLDatomDatabase({ sqlDb: connection });
   await db.initialize();
   return {
     db,
@@ -65,7 +65,7 @@ const createPostgresFixture = async (): Promise<Fixture> => {
 
 const createPGLiteFixture = async (): Promise<Fixture> => {
   const connection = new PGLiteSQLDatabase("memory://");
-  const db = new PostgreSQLDatomDatabase(connection);
+  const db = new PostgreSQLDatomDatabase({ sqlDb: connection });
   await db.initialize();
   return {
     db,

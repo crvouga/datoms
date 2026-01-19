@@ -20,16 +20,16 @@ async function main() {
   if (!databaseUrl) throw new Error("DATABASE_URL is not set");
 
   const sqlDb = new PgSQLDatabase(databaseUrl);
-  const db = new PostgreSQLDatomDatabase(
-    sqlDb,
-    "datoms",
-    {
+  const db = new PostgreSQLDatomDatabase({
+    sqlDb: sqlDb,
+    tableName: "datoms",
+    maintenanceConfig: {
       enabled: true,
       intervalMs: 60_000,
       runImmediately: true,
     },
-    logger
-  );
+    logger,
+  });
 
   await db.initialize();
   db.startMaintenance();
