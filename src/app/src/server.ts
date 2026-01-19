@@ -77,7 +77,7 @@ async function main() {
     const tmdbLoader = new TmdbLoader(tmdbClient, db, logger);
 
     // Create HTTP client database server component
-    const httpClientServerComponent =
+    const httpClientDatomDatabaseServerComponent =
       new HttpClientDatomDatabaseServerComponent(db);
 
     // Graceful shutdown handler (defined after all resources are created)
@@ -282,7 +282,7 @@ async function main() {
               event: "datoms_api_request",
               route: DATOMS_API_ENDPOINT,
             });
-            return httpClientServerComponent.handleRequest(req);
+            return httpClientDatomDatabaseServerComponent.handleRequest(req);
           },
         },
       },
