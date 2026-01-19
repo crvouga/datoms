@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { DbCallLog } from "../../../src/datom-database/index";
 import { DbCallLogItem } from "./DbCallLogItem";
+
+// LocalStorage key for persistence
+const STORAGE_KEY_EXPANDED_IDS = "db-call-log-expanded-ids";
 
 interface DbCallLogListProps {
   logs: DbCallLog[];
@@ -9,6 +12,29 @@ interface DbCallLogListProps {
 
 export function DbCallLogList({ logs, onClear }: DbCallLogListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+
+  // Load expanded IDs from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_EXPANDED_IDS);
+      if (saved) {
+        const parsedIds = JSON.parse(saved) as number[];
+        setExpandedIds(new Set(parsedIds));
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
+
+  // Save expanded IDs to localStorage whenever expandedIds changes
+  useEffect(() => {
+    try {
+      const idsArray = Array.from(expandedIds);
+      localStorage.setItem(STORAGE_KEY_EXPANDED_IDS, JSON.stringify(idsArray));
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [expandedIds]);
 
   const toggleExpanded = (id: number) => {
     setExpandedIds((prev) => {

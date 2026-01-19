@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Panel, PanelResizeHandle } from "react-resizable-panels";
 import {
   createLoggedDatabase,
@@ -10,13 +10,13 @@ import { ResizablePanels } from "./ui/ResizablePanels";
 import { DbCallLogList } from "./DbCallLogList";
 // Type definitions from db-types.d.ts are automatically included via TypeScript
 
-
 // Monaco Editor theme configuration with type safety
 // Available themes: "vs", "vs-dark", "hc-black", "hc-light"
 const MONACO_THEME: "vs" | "vs-dark" | "hc-black" | "hc-light" = "hc-black";
 
 // LocalStorage keys for persistence
 const STORAGE_KEY_SAVED_QUERY = "query-editor-saved-query";
+const STORAGE_KEY_DB_CALL_LOGS = "query-editor-db-call-logs";
 
 // Type definitions for the db instance (used by Monaco IntelliSense)
 const DB_TYPE_DEFINITIONS: TypeDefinition[] = [
@@ -122,10 +122,44 @@ export function QueryEditor() {
   const [dbCallLogs, setDbCallLogs] = useState<DbCallLog[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
+  // Load logs from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_DB_CALL_LOGS);
+      if (saved) {
+        const parsedLogs = JSON.parse(saved) as DbCallLog[];
+        setDbCallLogs(parsedLogs);
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
+
+  // Save logs to localStorage whenever dbCallLogs changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY_DB_CALL_LOGS,
+        JSON.stringify(dbCallLogs)
+      );
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [dbCallLogs]);
+
   const handleExecuteError = (err: Error) => {
     const errorMessage = err.message;
     setError(errorMessage);
     console.error("Code execution error:", err);
+  };
+
+  const handleClearLogs = () => {
+    setDbCallLogs([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY_DB_CALL_LOGS);
+    } catch {
+      // Ignore localStorage errors
+    }
   };
 
   return (
@@ -184,6 +218,11 @@ export function QueryEditor() {
                   setError(null);
                   setLatency(null);
                   setDbCallLogs([]);
+                  try {
+                    localStorage.removeItem(STORAGE_KEY_DB_CALL_LOGS);
+                  } catch {
+                    // Ignore localStorage errors
+                  }
                 }}
                 onExecuteComplete={(duration) => {
                   setLatency(duration);
@@ -225,9 +264,7 @@ export function QueryEditor() {
               <div className="flex-1 overflow-auto">
                 {error && (
                   <div className="p-4 bg-red-900/20 border-l-4 border-red-500">
-                    <div className="font-semibold text-red-400 mb-1">
-                      Error
-                    </div>
+                    <div className="font-semibold text-red-400 mb-1">Error</div>
                     <div className="text-red-300 font-mono text-sm whitespace-pre-wrap">
                       {error}
                     </div>
@@ -239,10 +276,7 @@ export function QueryEditor() {
                   </div>
                 )}
                 {!loading && (
-                  <DbCallLogList
-                    logs={dbCallLogs}
-                    onClear={() => setDbCallLogs([])}
-                  />
+                  <DbCallLogList logs={dbCallLogs} onClear={handleClearLogs} />
                 )}
               </div>
             </Panel>
