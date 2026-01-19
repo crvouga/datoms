@@ -116,7 +116,7 @@ await db.query({
 });
 `;
 
-export function QueryEditor() {
+export function QueryPlayground() {
   const [error, setError] = useState<string | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
   const [dbCallLogs, setDbCallLogs] = useState<DbCallLog[]>([]);

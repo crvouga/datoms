@@ -142,7 +142,13 @@ export function DbCallLogItem({
       if (saved) {
         const savedTab = saved as TabType;
         // Validate that the saved tab is a valid tab type
-        const validTabs: TabType[] = ["datalog", "sql", "result", "error", "args"];
+        const validTabs: TabType[] = [
+          "datalog",
+          "sql",
+          "result",
+          "error",
+          "args",
+        ];
         if (validTabs.includes(savedTab)) {
           return savedTab;
         }
@@ -260,10 +266,11 @@ export function DbCallLogItem({
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as TabType)}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === tab
-                  ? "border-blue-500 text-blue-400 bg-gray-800/50"
-                  : "border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/30"
-                  }`}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  activeTab === tab
+                    ? "border-blue-500 text-blue-400 bg-gray-800/50"
+                    : "border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/30"
+                }`}
               >
                 {tab === "datalog"
                   ? "Datalog Query"
