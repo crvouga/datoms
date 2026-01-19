@@ -1,6 +1,6 @@
 /**
- * Remote database implementation
- * Delegates all operations to a remote server via ITransport abstraction
+ * HTTP client database implementation
+ * Communicates with remote database server via HTTP
  */
 
 import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
@@ -36,27 +36,53 @@ import {
 } from "../views/internal-database-view.js";
 import type { WithResult } from "../datom-database.js";
 import type { Hook } from "../hook/hook.js";
-import type {
-  ITransport,
-  DatomsRequest,
-  QueryRequest,
-  TransactRequest,
-  GetTransactionMetadataRequest,
-  GetObsoleteDatomsRequest,
-  DeleteDatomsRequest,
-} from "./transport/transport.js";
-import { TransportError } from "./transport/transport.js";
+import type { HttpClient } from "../../http-client/http-client.js";
+
+interface DatomsResponse {
+  datoms: Datom[];
+}
+
+interface QueryResponse {
+  results: QueryResult;
+}
+
+interface TransactResponse {
+  txId: TransactionId;
+}
+
+interface GetLatestTransactionResponse {
+  txId: TransactionId;
+}
+
+interface GetTransactionMetadataResponse {
+  metadata?: Record<string, unknown>;
+}
+
+interface GetObsoleteDatomsResponse {
+  datoms: Datom[];
+}
+
+interface DeleteDatomsResponse {
+  success: boolean;
+}
+
+interface InitializeResponse {
+  success: boolean;
+}
 
 /**
- * Remote database implementation
- * All operations are delegated to a remote server via ITransport
+ * HTTP client database implementation
+ * All operations are delegated to a remote server via HTTP
  */
-export class RemoteDatomDatabase implements InternalDatabaseView {
+export class HttpClientDatomDatabase implements InternalDatabaseView {
   public readonly hooks: HookEngine;
   private initialized = false;
   private currentViewConfig: ViewConfig = { type: "current" };
 
-  constructor(private transport: ITransport) {
+  constructor(
+    private readonly httpClient: HttpClient,
+    private readonly endpoint: string
+  ) {
     this.hooks = new HookEngine();
   }
 
@@ -66,30 +92,29 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     }
 
     try {
-      const response = await this.transport.initialize();
+      const response = await this.httpClient.post<InitializeResponse>(
+        this.endpoint,
+        { method: "initialize" }
+      );
       if (!response.success) {
         throw new Error("Failed to initialize remote database");
       }
       this.initialized = true;
     } catch (error) {
-      if (error instanceof TransportError) {
-        throw new Error(
-          `Failed to initialize remote database: ${error.message}`
-        );
-      }
-      throw error;
+      throw new Error(
+        `Failed to initialize remote database: ${this._extractErrorMessage(error)}`
+      );
     }
   }
 
   async close(): Promise<void> {
-    await this.transport.close();
     this.initialized = false;
   }
 
   hook(hook: Hook): void {
     // Register hook locally only
-    // Hooks run locally on RemoteDatomDatabase, not on the remote server
-    // This ensures hooks receive the RemoteDatomDatabase instance in context, not the backend
+    // Hooks run locally on HttpClientDatomDatabase, not on the remote server
+    // This ensures hooks receive the HttpClientDatomDatabase instance in context, not the backend
     this.hooks.register(hook);
   }
 
@@ -147,13 +172,15 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     }));
 
     try {
-      const request: TransactRequest = {
-        method: "transact",
-        ops: finalOps,
-        metadata,
-        context,
-      };
-      const response = await this.transport.transact(request);
+      const response = await this.httpClient.post<TransactResponse>(
+        this.endpoint,
+        {
+          method: "transact",
+          ops: finalOps,
+          metadata,
+          context,
+        }
+      );
 
       // Create write result for after-write hooks
       const writeResult: WriteResult = {
@@ -169,24 +196,20 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
 
       return response.txId;
     } catch (error) {
-      if (error instanceof TransportError) {
-        // Try to map transport error to transaction error
-        if (
-          error.code === "TRANSACTION_HOOK_ERROR" ||
-          error.code === "TRANSACTION_ERROR"
-        ) {
-          // Parse error details if available
-          const errorData = error.originalError as {
-            errors?: Array<{ hook: string; message: string; code?: string }>;
-          };
-          if (errorData?.errors) {
-            throw new TransactionError(error.message, errorData.errors);
-          }
-          throw new TransactionError(error.message, []);
+      const mappedError = this._mapHttpError(error);
+      if (
+        mappedError.code === "TRANSACTION_HOOK_ERROR" ||
+        mappedError.code === "TRANSACTION_ERROR"
+      ) {
+        const errorData = mappedError.originalError as {
+          errors?: Array<{ hook: string; message: string; code?: string }>;
+        };
+        if (errorData?.errors) {
+          throw new TransactionError(mappedError.message, errorData.errors);
         }
-        throw new Error(`Transaction failed: ${error.message}`);
+        throw new TransactionError(mappedError.message, []);
       }
-      throw error;
+      throw new Error(`Transaction failed: ${mappedError.message}`);
     }
   }
 
@@ -203,17 +226,19 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     await this._ensureInitialized();
 
     try {
-      const request: GetTransactionMetadataRequest = {
-        method: "getTransactionMetadata",
-        txId,
-      };
-      const response = await this.transport.getTransactionMetadata(request);
+      const response =
+        await this.httpClient.post<GetTransactionMetadataResponse>(
+          this.endpoint,
+          {
+            method: "getTransactionMetadata",
+            txId,
+          }
+        );
       return response.metadata;
     } catch (error) {
-      if (error instanceof TransportError) {
-        throw new Error(`Failed to get transaction metadata: ${error.message}`);
-      }
-      throw error;
+      throw new Error(
+        `Failed to get transaction metadata: ${this._extractErrorMessage(error)}`
+      );
     }
   }
 
@@ -221,13 +246,17 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     await this._ensureInitialized();
 
     try {
-      const response = await this.transport.getLatestTransaction();
+      const response = await this.httpClient.post<GetLatestTransactionResponse>(
+        this.endpoint,
+        {
+          method: "getLatestTransaction",
+        }
+      );
       return response.txId;
     } catch (error) {
-      if (error instanceof TransportError) {
-        throw new Error(`Failed to get latest transaction: ${error.message}`);
-      }
-      throw error;
+      throw new Error(
+        `Failed to get latest transaction: ${this._extractErrorMessage(error)}`
+      );
     }
   }
 
@@ -235,17 +264,18 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     await this._ensureInitialized();
 
     try {
-      const request: GetObsoleteDatomsRequest = {
-        method: "getObsoleteDatoms",
-        cutoffTx,
-      };
-      const response = await this.transport.getObsoleteDatoms(request);
+      const response = await this.httpClient.post<GetObsoleteDatomsResponse>(
+        this.endpoint,
+        {
+          method: "getObsoleteDatoms",
+          cutoffTx,
+        }
+      );
       return response.datoms;
     } catch (error) {
-      if (error instanceof TransportError) {
-        throw new Error(`Failed to get obsolete datoms: ${error.message}`);
-      }
-      throw error;
+      throw new Error(
+        `Failed to get obsolete datoms: ${this._extractErrorMessage(error)}`
+      );
     }
   }
 
@@ -253,16 +283,14 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     await this._ensureInitialized();
 
     try {
-      const request: DeleteDatomsRequest = {
+      await this.httpClient.post<DeleteDatomsResponse>(this.endpoint, {
         method: "deleteDatoms",
         datoms,
-      };
-      await this.transport.deleteDatoms(request);
+      });
     } catch (error) {
-      if (error instanceof TransportError) {
-        throw new Error(`Failed to delete datoms: ${error.message}`);
-      }
-      throw error;
+      throw new Error(
+        `Failed to delete datoms: ${this._extractErrorMessage(error)}`
+      );
     }
   }
 
@@ -381,15 +409,14 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     }
 
     try {
-      const request: QueryRequest = {
+      // Note: We don't use the remote response directly because we need to
+      // re-execute the query with filtered datoms from after-read hooks
+      await this.httpClient.post<QueryResponse>(this.endpoint, {
         method: "query",
         query: modifiedQuery,
         context,
         viewConfig: this.currentViewConfig,
-      };
-      // Note: We don't use the remote response directly because we need to
-      // re-execute the query with filtered datoms from after-read hooks
-      await this.transport.query(request);
+      });
 
       // Fetch datoms for after-read hooks
       // Extract datoms from all query clauses
@@ -514,10 +541,62 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
 
       return projected;
     } catch (error) {
-      if (error instanceof TransportError) {
-        error.toQueryError(query);
+      const mappedError = this._mapHttpError(error);
+      if (
+        mappedError.code === "QUERY_HOOK_ERROR" ||
+        mappedError.code === "QUERY_ERROR"
+      ) {
+        const errorData = mappedError.originalError as {
+          errors?: Array<{ hook: string; message: string; code?: string }>;
+        };
+        if (errorData?.errors) {
+          throw new QueryError(mappedError.message, errorData.errors);
+        }
+        throw new QueryError(mappedError.message, []);
       }
-      throw error;
+      if (mappedError.code === "QUERY_TIMEOUT") {
+        throw new QueryTimeoutError(0, query);
+      }
+      throw new QueryError(`Query failed: ${mappedError.message}`, []);
+    }
+  }
+
+  async _executeDatalogQuery(
+    query: DatalogQuery,
+    context: Record<string, unknown> | undefined,
+    viewConfig: ViewConfig
+  ): Promise<QueryResult> {
+    await this._ensureInitialized();
+
+    try {
+      const response = await this.httpClient.post<QueryResponse>(
+        this.endpoint,
+        {
+          method: "query",
+          query,
+          context,
+          viewConfig,
+        }
+      );
+      return response.results;
+    } catch (error) {
+      const mappedError = this._mapHttpError(error);
+      if (
+        mappedError.code === "QUERY_HOOK_ERROR" ||
+        mappedError.code === "QUERY_ERROR"
+      ) {
+        const errorData = mappedError.originalError as {
+          errors?: Array<{ hook: string; message: string; code?: string }>;
+        };
+        if (errorData?.errors) {
+          throw new QueryError(mappedError.message, errorData.errors);
+        }
+        throw new QueryError(mappedError.message, []);
+      }
+      if (mappedError.code === "QUERY_TIMEOUT") {
+        throw new QueryTimeoutError(0, query);
+      }
+      throw new QueryError(`Query failed: ${mappedError.message}`, []);
     }
   }
 
@@ -533,24 +612,24 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     }
 
     try {
-      const request: DatomsRequest = {
-        method: "datoms",
-        options,
-        viewConfig,
-      };
-      const response = await this.transport.datoms(request);
+      const response = await this.httpClient.post<DatomsResponse>(
+        this.endpoint,
+        {
+          method: "datoms",
+          options,
+          viewConfig,
+        }
+      );
       return response.datoms;
     } catch (error) {
-      if (error instanceof TransportError) {
-        if (error.code === "QUERY_TIMEOUT") {
-          throw new QueryTimeoutError(options.timeoutMs || 0, options);
-        }
-        if (error.code === "QUERY_SAFETY_VIOLATION") {
-          throw new QuerySafetyError(error.message);
-        }
-        throw new Error(`Query failed: ${error.message}`);
+      const mappedError = this._mapHttpError(error);
+      if (mappedError.code === "QUERY_TIMEOUT") {
+        throw new QueryTimeoutError(options.timeoutMs || 0, options);
       }
-      throw error;
+      if (mappedError.code === "QUERY_SAFETY_VIOLATION") {
+        throw new QuerySafetyError(mappedError.message);
+      }
+      throw new Error(`Query failed: ${mappedError.message}`);
     }
   }
 
@@ -571,12 +650,14 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     const currentStateDatoms: Datom[] = [];
     for (const entityId of affectedEntities) {
       try {
-        const request: DatomsRequest = {
-          method: "datoms",
-          options: { e: entityId },
-          viewConfig: { type: "current" },
-        };
-        const response = await this.transport.datoms(request);
+        const response = await this.httpClient.post<DatomsResponse>(
+          this.endpoint,
+          {
+            method: "datoms",
+            options: { e: entityId },
+            viewConfig: { type: "current" },
+          }
+        );
         currentStateDatoms.push(...response.datoms);
       } catch (error) {
         // If fetching fails, continue with speculative datoms only
@@ -659,68 +740,107 @@ export class RemoteDatomDatabase implements InternalDatabaseView {
     });
   }
 
-  async _executeDatalogQuery(
-    query: DatalogQuery,
-    context: Record<string, unknown> | undefined,
-    viewConfig: ViewConfig
-  ): Promise<QueryResult> {
-    await this._ensureInitialized();
-
-    // Handle speculative queries client-side
-    if (viewConfig.type === "speculative") {
-      // For speculative datalog queries, we need to fetch current state
-      // and merge with speculative datoms, then execute query locally
-      // This is complex, so for now we'll delegate to remote with speculative datoms
-      // The remote server should handle this, but if not supported, we can implement client-side
-    }
-
-    // Create read context
-    const ctx: ReadContext = {
-      db: this,
-      ...(context || {}),
-    };
-
-    // Run before-read hooks locally
-    const beforeResult = await this.hooks.runBeforeRead(query, ctx);
-
-    if (beforeResult.errors && beforeResult.errors.length > 0) {
-      throw new QueryError("Query blocked by hooks", beforeResult.errors);
-    }
-
-    const modifiedQuery = beforeResult.query || query;
-
-    try {
-      const request: QueryRequest = {
-        method: "query",
-        query: modifiedQuery,
-        context,
-        viewConfig,
-      };
-      const response = await this.transport.query(request);
-      return response.results;
-    } catch (error) {
-      if (error instanceof TransportError) {
-        if (error.code === "QUERY_HOOK_ERROR" || error.code === "QUERY_ERROR") {
-          const errorData = error.originalError as {
-            errors?: Array<{ hook: string; message: string; code?: string }>;
-          };
-          if (errorData?.errors) {
-            throw new QueryError(error.message, errorData.errors);
-          }
-          throw new QueryError(error.message, []);
-        }
-        if (error.code === "QUERY_TIMEOUT") {
-          throw new QueryTimeoutError(0, query);
-        }
-        throw new QueryError(`Query failed: ${error.message}`, []);
-      }
-      throw error;
-    }
-  }
-
   private async _ensureInitialized(): Promise<void> {
     if (!this.initialized) {
       await this.initialize();
     }
+  }
+
+  private _mapHttpError(error: unknown): {
+    message: string;
+    code?: string;
+    originalError?: unknown;
+  } {
+    if (error instanceof Error) {
+      // Try to extract error details from HTTP error message
+      // HttpClient throws errors with "HTTP error! status: {status}" format
+      const statusMatch = error.message.match(/status: (\d+)/);
+      const status =
+        statusMatch && statusMatch[1]
+          ? parseInt(statusMatch[1], 10)
+          : undefined;
+
+      // Try to extract error response body if available
+      let errorData: unknown = error;
+      const errorWithResponse = error as unknown as { response?: unknown };
+      if (errorWithResponse.response) {
+        errorData = errorWithResponse.response;
+      }
+
+      // Map HTTP status codes to error codes
+      if (status === 408) {
+        return {
+          message: error.message,
+          code: "QUERY_TIMEOUT",
+          originalError: errorData,
+        };
+      }
+      if (status === 400) {
+        // Try to determine specific error type from error data
+        const errorObj = errorData as {
+          code?: string;
+          errors?: Array<{ hook: string; message: string; code?: string }>;
+        };
+        if (errorObj?.code === "QUERY_SAFETY_VIOLATION") {
+          return {
+            message: error.message,
+            code: "QUERY_SAFETY_VIOLATION",
+            originalError: errorData,
+          };
+        }
+        if (
+          errorObj?.code === "TRANSACTION_HOOK_ERROR" ||
+          errorObj?.code === "TRANSACTION_ERROR"
+        ) {
+          return {
+            message: error.message,
+            code: "TRANSACTION_HOOK_ERROR",
+            originalError: errorData,
+          };
+        }
+        if (
+          errorObj?.code === "QUERY_HOOK_ERROR" ||
+          errorObj?.code === "QUERY_ERROR"
+        ) {
+          return {
+            message: error.message,
+            code: "QUERY_HOOK_ERROR",
+            originalError: errorData,
+          };
+        }
+        return {
+          message: error.message,
+          code: "DATABASE_ERROR",
+          originalError: errorData,
+        };
+      }
+      if (status === 500) {
+        return {
+          message: error.message,
+          code: "DATABASE_ERROR",
+          originalError: errorData,
+        };
+      }
+
+      // Default: map to DATABASE_ERROR
+      return {
+        message: error.message,
+        code: "DATABASE_ERROR",
+        originalError: errorData,
+      };
+    }
+
+    return {
+      message: String(error),
+      code: "DATABASE_ERROR",
+      originalError: error,
+    };
+  }
+
+  private _extractErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return String(error);
   }
 }

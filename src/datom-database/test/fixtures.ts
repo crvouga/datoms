@@ -1,18 +1,16 @@
+import { serve } from "bun";
 import { unlinkSync } from "fs";
 import { DATABASE_URL } from "../../env.js";
+import { FetchHttpClient } from "../../http-client/http-client.js";
 import { PgSQLDatabase } from "../../sql-database/sql-database-pg.js";
 import { PGLiteSQLDatabase } from "../../sql-database/sql-database-pglite.js";
 import { SQLiteSQLDatabase } from "../../sql-database/sql-database-sqlite.js";
 import type { DatomDatabase } from "../datom-database.js";
+import { HttpClientDatomDatabaseServerComponent } from "../http-client/http-client-datom-database-server-component.js";
+import { HttpClientDatomDatabase } from "../http-client/http-client-datom-database.js";
 import { InMemoryDatomDatabase } from "../in-memory/in-memory-datom-database.js";
 import { PostgreSQLDatomDatabase } from "../postgres/postgres-datom-database.js";
-import { RemoteDatomDatabase } from "../remote/datom-database-remote.js";
-import { LocalTransport } from "../remote/transport/local-transport.js";
 import { SQLiteDatomDatabase } from "../sqlite/sqlite-datom-database.js";
-import { HttpClientTransport } from "../remote/transport/http-client-transport.js";
-import { FetchHttpClient } from "../../http-client/http-client.js";
-import { serve } from "bun";
-import { HttpClientTransportServerComponent } from "../remote/transport/http-client-transport-server-component.js";
 
 export type Fixture = {
   db: DatomDatabase;
@@ -25,8 +23,8 @@ const createInMemoryFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
@@ -43,8 +41,8 @@ const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
@@ -71,27 +69,14 @@ const createPGLiteFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => {},
-    afterEach: async () => {},
-  };
-};
-
-const createLocalTransportRemoteFixture = async (): Promise<Fixture> => {
-  const transport = new LocalTransport(new InMemoryDatomDatabase());
-  const db = new RemoteDatomDatabase(transport);
-  await db.initialize();
-  return {
-    db,
-    beforeEach: async () => {},
-    afterEach: async () => {
-      await db.close();
-    },
+    beforeEach: async () => { },
+    afterEach: async () => { },
   };
 };
 
 const createHttpClientTransportRemoteFixture = async (): Promise<Fixture> => {
   const serverDb = new InMemoryDatomDatabase();
-  const transportServerComponent = new HttpClientTransportServerComponent(
+  const transportServerComponent = new HttpClientDatomDatabaseServerComponent(
     serverDb
   );
   const endpoint = `/api/datom-database`;
@@ -104,8 +89,7 @@ const createHttpClientTransportRemoteFixture = async (): Promise<Fixture> => {
   // Extract the actual port from the server URL
   const port = parseInt(server.url.port, 10);
   const httpClient = new FetchHttpClient(`http://localhost:${port}`);
-  const transport = new HttpClientTransport(httpClient, endpoint);
-  const db = new RemoteDatomDatabase(transport);
+  const db = new HttpClientDatomDatabase(httpClient, endpoint);
   await db.initialize();
   return {
     db,
@@ -113,7 +97,8 @@ const createHttpClientTransportRemoteFixture = async (): Promise<Fixture> => {
       // Reset the server database state between tests
       await serverDb.close();
       await serverDb.initialize();
-      // Also reset the remote database's initialization state
+      // Also reset t  
+      // he remote database's initialization state
       await db.close();
       await db.initialize();
     },
@@ -135,10 +120,6 @@ FIXTURES.push(["PostgreSQL", () => createPostgresFixture()]);
 if (TEST_ALL) {
   FIXTURES.push(["PostgreSQL (PGLite)", () => createPGLiteFixture()]);
 }
-FIXTURES.push([
-  "Remote (local transport)",
-  () => createLocalTransportRemoteFixture(),
-]);
 FIXTURES.push([
   "Remote (http client transport)",
   () => createHttpClientTransportRemoteFixture(),

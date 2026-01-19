@@ -3,37 +3,106 @@
  * Handles web standard Request/Response objects
  */
 
+import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
+import type { Datom, DatomInput, TransactionId } from "../../datoms.js";
+import type { Hook } from "../hook/hook.js";
+import {
+  QueryError,
+  QuerySafetyError,
+  QueryTimeoutError,
+  TransactionError,
+} from "../hook/hook.js";
+import type { DatomsParams } from "../views/database-view.js";
 import type {
   InternalDatabaseView,
   ViewConfig,
-} from "../../views/internal-database-view.js";
-import { ConfiguredDatabaseView } from "../../views/internal-database-view.js";
-import type {
-  InitializeRequest,
-  InitializeResponse,
-  DatomsRequest,
-  DatomsResponse,
-  QueryRequest,
-  QueryResponse,
-  TransactRequest,
-  TransactResponse,
-  GetLatestTransactionRequest,
-  GetLatestTransactionResponse,
-  GetTransactionMetadataRequest,
-  GetTransactionMetadataResponse,
-  RegisterHookRequest,
-  RegisterHookResponse,
-  GetObsoleteDatomsRequest,
-  GetObsoleteDatomsResponse,
-  DeleteDatomsRequest,
-  DeleteDatomsResponse,
-} from "./transport.js";
-import {
-  QueryError,
-  QueryTimeoutError,
-  QuerySafetyError,
-  TransactionError,
-} from "../../hook/hook.js";
+} from "../views/internal-database-view.js";
+import { ConfiguredDatabaseView } from "../views/internal-database-view.js";
+
+// Request/Response types for HTTP API contract
+interface InitializeRequest {
+  method: "initialize";
+}
+
+interface InitializeResponse {
+  success: boolean;
+}
+
+interface DatomsRequest {
+  method: "datoms";
+  options: DatomsParams;
+  viewConfig: ViewConfig;
+}
+
+interface DatomsResponse {
+  datoms: Datom[];
+}
+
+interface QueryRequest {
+  method: "query";
+  query: DatalogQuery;
+  context?: Record<string, unknown>;
+  viewConfig: ViewConfig;
+}
+
+interface QueryResponse {
+  results: QueryResult;
+}
+
+interface TransactRequest {
+  method: "transact";
+  ops: (DatomInput | DatomInput[])[];
+  metadata?: Record<string, unknown>;
+  context?: Record<string, unknown>;
+}
+
+interface TransactResponse {
+  txId: TransactionId;
+}
+
+interface GetLatestTransactionRequest {
+  method: "getLatestTransaction";
+}
+
+interface GetLatestTransactionResponse {
+  txId: TransactionId;
+}
+
+interface GetTransactionMetadataRequest {
+  method: "getTransactionMetadata";
+  txId: TransactionId;
+}
+
+interface GetTransactionMetadataResponse {
+  metadata?: Record<string, unknown>;
+}
+
+interface RegisterHookRequest {
+  method: "registerHook";
+  hook: Hook;
+}
+
+interface RegisterHookResponse {
+  success: boolean;
+}
+
+interface GetObsoleteDatomsRequest {
+  method: "getObsoleteDatoms";
+  cutoffTx: TransactionId;
+}
+
+interface GetObsoleteDatomsResponse {
+  datoms: Datom[];
+}
+
+interface DeleteDatomsRequest {
+  method: "deleteDatoms";
+  datoms: Datom[];
+}
+
+interface DeleteDatomsResponse {
+  success: boolean;
+}
 
 type TransportRequest =
   | InitializeRequest
@@ -61,7 +130,7 @@ type TransportResponse =
  * Server component that handles HTTP requests for the HTTP client transport
  * Uses web standard Request/Response objects
  */
-export class HttpClientTransportServerComponent {
+export class HttpClientDatomDatabaseServerComponent {
   private initialized = false;
 
   constructor(private db: InternalDatabaseView) {}
