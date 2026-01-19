@@ -1,45 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-
-import type { Logger } from "../../types.js";
+import { TestLogger } from "../../types.js";
 import type { DatomDatabase } from "../datom-database.js";
 import { DestroyRetentionPolicy } from "../retention-policy/destroy-retention-policy.js";
 import type { RetentionPolicyConfig } from "../retention-policy/types.js";
 import { FIXTURES, type Fixture } from "./fixtures.js";
-
-/**
- * Simple logger that captures logs for testing
- */
-class TestLogger implements Logger {
-  public logs: Array<{
-    level: "debug" | "info" | "warn" | "error";
-    message: string;
-    meta?: Record<string, unknown>;
-  }> = [];
-
-  debug(message: string, meta?: Record<string, unknown>): void {
-    this.logs.push({ level: "debug", message, meta });
-  }
-
-  info(message: string, meta?: Record<string, unknown>): void {
-    this.logs.push({ level: "info", message, meta });
-  }
-
-  warn(message: string, meta?: Record<string, unknown>): void {
-    this.logs.push({ level: "warn", message, meta });
-  }
-
-  error(message: string, meta?: Record<string, unknown>): void {
-    this.logs.push({ level: "error", message, meta });
-  }
-
-  reset(): void {
-    this.logs = [];
-  }
-
-  getLogsByLevel(level: "debug" | "info" | "warn" | "error") {
-    return this.logs.filter((log) => log.level === level);
-  }
-}
 
 describe.each(FIXTURES)(
   "DestroyRetentionPolicy (%s)",

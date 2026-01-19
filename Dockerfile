@@ -18,5 +18,5 @@ ENV PORT=${PORT}
 
 EXPOSE ${PORT}
 
-CMD ["bun", "run", "src/app/src/index.ts"]
+CMD ["bun", "run", "src/app/src/server.ts"]
 

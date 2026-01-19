@@ -237,6 +237,41 @@ export interface Logger {
 }
 
 /**
+ * Simple logger that captures logs for testing
+ */
+export class TestLogger implements Logger {
+  public logs: Array<{
+    level: "debug" | "info" | "warn" | "error";
+    message: string;
+    meta?: Record<string, unknown>;
+  }> = [];
+
+  debug(message: string, meta?: Record<string, unknown>): void {
+    this.logs.push({ level: "debug", message, meta });
+  }
+
+  info(message: string, meta?: Record<string, unknown>): void {
+    this.logs.push({ level: "info", message, meta });
+  }
+
+  warn(message: string, meta?: Record<string, unknown>): void {
+    this.logs.push({ level: "warn", message, meta });
+  }
+
+  error(message: string, meta?: Record<string, unknown>): void {
+    this.logs.push({ level: "error", message, meta });
+  }
+
+  reset(): void {
+    this.logs = [];
+  }
+
+  getLogsByLevel(level: "debug" | "info" | "warn" | "error") {
+    return this.logs.filter((log) => log.level === level);
+  }
+}
+
+/**
  * Batch query key for type-safe entity-attribute pair access
  * Used internally for batch query result mapping
  */
