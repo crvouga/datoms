@@ -7,6 +7,8 @@
  * minimally to capture actual results while using hooks for the logging infrastructure.
  */
 
+import type { DatalogQuery, QueryResult } from "../../../../datalog/datalog.js";
+import type { DatomDatabase } from "../../../../datom-database/datom-database.js";
 import type {
     AfterRead,
     AfterWrite,
@@ -15,10 +17,8 @@ import type {
     ReadContext,
     WriteContext,
 } from "../../../../datom-database/hook/hook.js";
-import type { DatomDatabase } from "../../../../datom-database/datom-database.js";
-import type { QueryEditorLog } from "../types.js";
-import type { DatalogQuery, QueryResult } from "../../../../datalog/datalog.js";
 import type { TransactionId } from "../../../../datoms.js";
+import type { QueryEditorLog } from "../types.js";
 
 /**
  * Options for database logging hooks
