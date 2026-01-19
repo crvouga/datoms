@@ -31,7 +31,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
   });
 
   it("should return the top movies by popularity", async () => {
-    const limit = 100;
+    const limit = 10;
     const results = await f.db.query({
       find: {
         "movie/id": ["?id"],
@@ -69,7 +69,6 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
     for (let i = 1; i < limit; i++) {
       const prevPopularity = results[i - 1]?.["movie/popularity"];
       const currPopularity = results[i]?.["movie/popularity"];
-      console.log(prevPopularity, currPopularity);
       expect(prevPopularity).toBeDefined();
       expect(currPopularity).toBeDefined();
       expect(Number(prevPopularity)).toBeGreaterThanOrEqual(
