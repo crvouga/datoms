@@ -94,16 +94,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "assert", e: "user-2", a: "name", v: "Bob" },
         { op: "assert", e: "user-1", a: "age", v: 30 },
       ]);
-      const results = await db.query({
+      const results = await db.queryWithMetadata({
         find: { e: ["?e"], n: ["?n"] },
         where: [
           { e: "?e", a: "name", v: "?n" },
           { e: "?e", a: "age", v: "?a" },
         ],
       });
-      expect(results).toHaveLength(1);
-      expect(results[0]!["e"]).toBe("user-1");
-      expect(results[0]!["n"]).toBe("Alice");
+      expect(results.data).toEqual([{ e: "user-1", n: "Alice" }]);
     });
   });
 });

@@ -53,21 +53,15 @@ const createPostgresFixture = async (): Promise<Fixture> => {
   const db = new PostgreSQLDatomDatabase({ sqlDb: sqlDb, tableName });
   await db.initialize();
   const cleanUp = async () => {
-    await sqlDb.execute(
-      `TRUNCATE TABLE ${tableName}, ${tableName}_tx RESTART IDENTITY CASCADE`
-    );
-    const initTxSql = `
-      INSERT INTO ${tableName}_tx (id, last_tx)
-      VALUES (1, 0)
-      ON CONFLICT (id) DO UPDATE SET last_tx = 0
-    `;
-    await sqlDb.execute(initTxSql);
+    try {
+      await sqlDb.execute(`DROP TABLE IF EXISTS ${tableName}, ${tableName}_tx`);
+    } catch (error) {
+      console.error("Error cleaning up Postgres tables", error);
+    }
   };
   return {
     db,
-    beforeEach: async () => {
-      await cleanUp();
-    },
+    beforeEach: async () => {},
     afterEach: async () => {
       await cleanUp();
       await db.close();
@@ -86,7 +80,7 @@ const createPGLiteFixture = async (): Promise<Fixture> => {
   };
 };
 
-const createHttpClientTransportRemoteFixture = async (): Promise<Fixture> => {
+const createHttpClientFixture = async (): Promise<Fixture> => {
   const serverDb = new InMemoryDatomDatabase();
   const transportServerComponent = new HttpClientDatomDatabaseServerComponent(
     serverDb
@@ -132,7 +126,4 @@ FIXTURES.push(["PostgreSQL", () => createPostgresFixture()]);
 if (TEST_ALL) {
   FIXTURES.push(["PostgreSQL (PGLite)", () => createPGLiteFixture()]);
 }
-FIXTURES.push([
-  "Remote (http client transport)",
-  () => createHttpClientTransportRemoteFixture(),
-]);
+FIXTURES.push(["HTTP Client", () => createHttpClientFixture()]);

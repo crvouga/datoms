@@ -97,20 +97,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "assert", e: 3, a: "age", v: 30 },
         { op: "assert", e: 3, a: "city", v: "LA" },
       ]);
-
-      // Find people in NYC who are 30 years old
-      const query: DatalogQuery = {
+      const results = await db.queryWithMetadata({
         find: { name: ["?name"] },
         where: [
-          { e: "?person", a: "name", v: "?name" },
-          { e: "?person", a: "age", v: 30 },
-          { e: "?person", a: "city", v: "NYC" },
+          { e: "?e", a: "age", v: 30 },
+          { e: "?e", a: "city", v: "NYC" },
+          { e: "?e", a: "name", v: "?name" },
         ],
-      };
-
-      const results = await db.query(query);
-      expect(results).toHaveLength(1);
-      expect(results[0]!.name).toBe("Alice");
+      });
+      expect(results.data).toHaveLength(1);
+      expect(results.data[0]!.name).toBe("Alice");
     });
 
     test("should handle complex variable bindings across multiple clauses", async () => {

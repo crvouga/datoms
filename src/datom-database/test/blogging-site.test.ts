@@ -185,16 +185,15 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         }),
       ]);
 
-      const results = await db.query({
+      const results = await db.queryWithMetadata({
         find: { e: ["?e"], status: ["?status"] },
         where: [
           { e: "?e", a: POST_TITLE, v: "My Post" },
           { e: "?e", a: POST_STATUS, v: "?status" },
         ],
       });
-
-      expect(results).toHaveLength(1);
-      expect(results[0]!.status).toBe(POST_STATUS_PUBLISHED);
+      expect(results.data).toHaveLength(1);
+      expect(results.data[0]!.status).toBe(POST_STATUS_PUBLISHED);
     });
 
     test("should edit a post", async () => {
@@ -777,7 +776,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       ]);
 
       // Verify final state
-      const results = await db.query({
+      const results = await db.queryWithMetadata({
         find: {
           e: ["?e"],
           title: ["?title"],
@@ -793,9 +792,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
           { e: "?tag", a: TAG_NAME, v: "?tagName" },
         ],
       });
-
-      expect(results.length).toBeGreaterThanOrEqual(2); // At least 2 results (one per tag)
-      const firstResult = results[0]!;
+      expect(results.data.length).toBeGreaterThanOrEqual(2); // At least 2 results (one per tag)
+      const firstResult = results.data[0]!;
       expect(firstResult.title).toBe("My Blog Post");
       expect(firstResult.content).toBe("Updated content");
       expect(firstResult.status).toBe(POST_STATUS_PUBLISHED);

@@ -188,9 +188,10 @@ export function datalogToPostgresSQL(
 
   if (usePivot) {
     // Build SQL using pivot optimization
-    // Collect all attributes and map them to their value variables
+    // Collect all attributes and map them to their value variables or bound values
     const attributes: string[] = [];
     const attrToVar: Map<string, string> = new Map();
+    const attrToBoundValue: Map<string, Value> = new Map();
     let entityVarName: string | null = null;
 
     for (const clause of clauses) {
@@ -208,30 +209,59 @@ export function datalogToPostgresSQL(
         }
       }
 
-      // Collect bound attributes and their value variables
+      // Collect bound attributes and their value variables or bound values
       if (!isVariable(attributeVal)) {
         const attr = String(attributeVal);
-        attributes.push(attr);
+        if (!attributes.includes(attr)) {
+          attributes.push(attr);
+        }
         if (isVariable(valueVal)) {
           attrToVar.set(attr, valueVal as string);
+        } else {
+          // Bound value - track it for filtering
+          let boundValue = valueVal as Value;
+          if (boundValue === undefined) {
+            boundValue = "__UNDEFINED__";
+          }
+          attrToBoundValue.set(attr, boundValue);
         }
       }
     }
 
-    // Build single CTE with all attributes
-    const attributesList = attributes.map(() => "?").join(", ");
+    // Build single CTE with all attributes, filtering by bound values
+    // For each attribute:
+    // - If it has a bound value: (a = ? AND v = ?::jsonb)
+    // - If it doesn't: a = ?
+    // Combine with OR to include all matching datoms
+    const attributeConditions: string[] = [];
     for (const attr of attributes) {
-      params.push(attr);
+      if (attrToBoundValue.has(attr)) {
+        // Bound value - filter by both attribute and value
+        params.push(attr);
+        const boundValue = attrToBoundValue.get(attr)!;
+        params.push(JSON.stringify(boundValue));
+        attributeConditions.push(`(a = ? AND v = ?::jsonb)`);
+      } else {
+        // Variable value - just filter by attribute
+        params.push(attr);
+        attributeConditions.push(`a = ?`);
+      }
     }
 
+    // We need to include retractions in DISTINCT ON to correctly determine the latest state.
+    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was asserted then retracted, the retraction wins.
     const cte = `
       all_datoms AS (
         SELECT DISTINCT ON (e, a, v)
-          e, a, v, tx
+          e, a, v, tx, op
         FROM ${tableName}
-        WHERE op = 'assert'
-          AND a IN (${attributesList})
+        WHERE (${attributeConditions.join(" OR ")})
         ORDER BY e, a, v, tx DESC
+      ),
+      active_datoms AS (
+        SELECT e, a, v, tx
+        FROM all_datoms
+        WHERE op = 'assert'
       )`;
 
     // Build pivot SELECT with conditional aggregation
@@ -317,15 +347,39 @@ export function datalogToPostgresSQL(
       groupByClause = `GROUP BY e`;
     }
 
-    // Build HAVING clause to ensure we have at least one required attribute
-    // Use array_agg with FILTER instead of MAX because PostgreSQL's MAX() doesn't work on JSONB
-    const havingClause =
-      attributes.length > 0
-        ? `HAVING (array_agg(v) FILTER (WHERE a = ?))[1] IS NOT NULL`
-        : "";
-    if (havingClause) {
-      params.push(attributes[0]);
+    // Build HAVING clause to ensure we have ALL required attributes
+    // We need to check that:
+    // 1. Each attribute that maps to a variable is present (not NULL)
+    // 2. Each attribute with a bound value matches the expected value
+    // This ensures entities without all required attributes are filtered out
+    // Note: We must repeat the expression in HAVING, not reference the alias
+    // The connection adapter will convert ? placeholders to $1, $2, etc.
+    const havingConditions: string[] = [];
+
+    // Check that attributes with variables are present
+    for (const [attr] of attrToVar.entries()) {
+      // Repeat the same array_agg expression used in SELECT to check for NULL
+      // Add the attribute to params again (will be converted to positional params by adapter)
+      params.push(attr);
+      havingConditions.push(
+        `(array_agg(v) FILTER (WHERE a = ?))[1] IS NOT NULL`
+      );
     }
+
+    // Check that attributes with bound values match the expected values
+    for (const [attr, boundValue] of attrToBoundValue.entries()) {
+      // Verify the pivoted value matches the bound value
+      params.push(attr);
+      params.push(JSON.stringify(boundValue));
+      havingConditions.push(
+        `(array_agg(v) FILTER (WHERE a = ?))[1] = ?::jsonb`
+      );
+    }
+
+    const havingClause =
+      havingConditions.length > 0
+        ? `HAVING ${havingConditions.join(" AND ")}`
+        : "";
 
     // Build ORDER BY clause
     let orderByClause = "";
@@ -356,7 +410,7 @@ export function datalogToPostgresSQL(
       SELECT ${selectColumns.join(", ")}
       FROM (
         SELECT ${pivotSelects.join(", ")}
-        FROM all_datoms
+        FROM active_datoms
         ${groupByClause}
         ${havingClause}
       ) AS pivoted
@@ -401,9 +455,8 @@ export function datalogToPostgresSQL(
       params.push(JSON.stringify(value));
     }
 
-    // Always filter for active datoms to use partial index
-    conditions.push(`op = 'assert'`);
-
+    // We need to include retractions in DISTINCT ON to correctly determine the latest state.
+    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was asserted then retracted, the retraction wins.
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
@@ -411,10 +464,15 @@ export function datalogToPostgresSQL(
     const cte = `
       ${alias} AS (
         SELECT DISTINCT ON (e, a, v)
-          e, a, v, tx
+          e, a, v, tx, op
         FROM ${tableName}
         ${whereClause}
         ORDER BY e, a, v, tx DESC
+      ),
+      ${alias}_active AS (
+        SELECT e, a, v, tx
+        FROM ${alias}
+        WHERE op = 'assert'
       )`;
 
     ctes.push(cte);
@@ -422,6 +480,7 @@ export function datalogToPostgresSQL(
 
   // Map variables to their column references for aggregations
   // Use first occurrence (lowest index) to ensure the table is definitely in FROM/JOIN
+  // Use _active CTEs which filter to only assertions after DISTINCT ON
   const variableToColumn: Map<string, string> = new Map();
   for (let i = 0; i < clauses.length; i++) {
     const clause = clauses[i];
@@ -429,7 +488,7 @@ export function datalogToPostgresSQL(
       continue;
     }
     const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-    const alias = `d${i}`;
+    const alias = `d${i}_active`;
     if (isVariable(entityVal)) {
       // Only set if not already mapped (prefer first occurrence)
       if (!variableToColumn.has(entityVal as string)) {
@@ -489,14 +548,15 @@ export function datalogToPostgresSQL(
   }
 
   // Build JOIN conditions for shared variables
+  // Use _active CTEs which filter to only assertions after DISTINCT ON
   for (const occurrences of variableToClause.values()) {
     if (occurrences.length > 1) {
       for (let i = 1; i < occurrences.length; i++) {
         const prev = occurrences[i - 1];
         const curr = occurrences[i];
         if (!prev || !curr) continue;
-        const prevAlias = `d${prev.clauseIndex}`;
-        const currAlias = `d${curr.clauseIndex}`;
+        const prevAlias = `d${prev.clauseIndex}_active`;
+        const currAlias = `d${curr.clauseIndex}_active`;
 
         // Handle type casting: v is jsonb, e and a are text
         // When comparing v with e or a, cast v to text
@@ -577,13 +637,14 @@ export function datalogToPostgresSQL(
   }
 
   // Build the final SQL query
+  // Use _active CTEs which filter to only assertions after DISTINCT ON
   const cteClause = ctes.length > 0 ? `WITH ${ctes.join(", ")}` : "";
-  const fromClause = `FROM d0`;
+  const fromClause = `FROM d0_active`;
 
   // Build JOIN clauses
   const joinClauses: string[] = [];
   for (let i = 1; i < clauses.length; i++) {
-    const alias = `d${i}`;
+    const alias = `d${i}_active`;
     const conditions: string[] = [];
 
     for (const joinCond of joinConditions) {
@@ -591,14 +652,15 @@ export function datalogToPostgresSQL(
       if (parts.length === 2 && parts[0] && parts[1]) {
         // Extract table aliases from both sides (handle type casting like ::text)
         // Match alias at the start, which may be followed by field access and type casts
-        const leftMatch = parts[0].trim().match(/^(d\d+)\./);
-        const rightMatch = parts[1].trim().match(/^(d\d+)\./);
+        // Join conditions already use _active aliases
+        const leftMatch = parts[0].trim().match(/^(d\d+)_active\./);
+        const rightMatch = parts[1].trim().match(/^(d\d+)_active\./);
 
         if (!leftMatch || !rightMatch || !leftMatch[1] || !rightMatch[1])
           continue;
 
-        const leftAlias = leftMatch[1];
-        const rightAlias = rightMatch[1];
+        const leftAlias = `${leftMatch[1]}_active`;
+        const rightAlias = `${rightMatch[1]}_active`;
 
         // Check if this condition involves the current alias
         if (leftAlias !== alias && rightAlias !== alias) {
@@ -611,10 +673,12 @@ export function datalogToPostgresSQL(
 
         // Only include condition if the other table has already been joined
         // (i.e., has a lower index than the current table)
-        const otherIndex = parseInt(otherAlias.substring(1));
+        // Extract index from alias like "d0_active" -> 0
+        const otherIndexMatch = otherAlias.match(/^d(\d+)_active$/);
+        const otherIndex = otherIndexMatch ? parseInt(otherIndexMatch[1]!) : -1;
         if (otherIndex < i) {
           // Other table is already joined, include this condition
-          // Keep original order if current alias is on right, otherwise use as-is
+          // Join conditions already use _active aliases, so use as-is
           if (rightAlias === alias) {
             conditions.push(`${parts[1].trim()} = ${parts[0].trim()}`);
           } else {
@@ -629,7 +693,7 @@ export function datalogToPostgresSQL(
     } else {
       // If no explicit JOIN conditions found, try to join to the previous table
       // This handles cases where variables might not be properly tracked
-      const prevAlias = `d${i - 1}`;
+      const prevAlias = `d${i - 1}_active`;
       // Try to find any shared variables between current and previous clause
       const currentClause = clauses[i];
       const prevClause = clauses[i - 1];
