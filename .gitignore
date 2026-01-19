@@ -26,3 +26,4 @@ playwright/.cache/
 test.db
 
 .env
+test.csv
