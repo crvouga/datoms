@@ -140,11 +140,12 @@ export function QueryEditor() {
       fractionalSecondDigits: 3,
     });
 
-    const durationStr = log.duration < 1
-      ? `${(log.duration * 1000).toFixed(2)}μs`
-      : log.duration < 1000
-        ? `${log.duration.toFixed(2)}ms`
-        : `${(log.duration / 1000).toFixed(2)}s`;
+    const durationStr =
+      log.duration < 1
+        ? `${(log.duration * 1000).toFixed(2)}μs`
+        : log.duration < 1000
+          ? `${log.duration.toFixed(2)}ms`
+          : `${(log.duration / 1000).toFixed(2)}s`;
 
     // Format arguments nicely
     const formatArgs = (args: unknown[]): string => {
@@ -153,17 +154,22 @@ export function QueryEditor() {
         const argStr = JSON.stringify(args[0], null, 2);
         // If it's a single object argument, format it nicely
         if (typeof args[0] === "object" && args[0] !== null) {
-          return argStr.split("\n").map((line, i) => i === 0 ? line : `  ${line}`).join("\n");
+          return argStr
+            .split("\n")
+            .map((line, i) => (i === 0 ? line : `  ${line}`))
+            .join("\n");
         }
         return argStr;
       }
-      return args.map((arg, i) => {
-        const argStr = JSON.stringify(arg, null, 2);
-        if (typeof arg === "object" && arg !== null) {
-          return `  ${i + 1}. ${argStr.split("\n").join("\n    ")}`;
-        }
-        return `  ${i + 1}. ${argStr}`;
-      }).join("\n");
+      return args
+        .map((arg, i) => {
+          const argStr = JSON.stringify(arg, null, 2);
+          if (typeof arg === "object" && arg !== null) {
+            return `  ${i + 1}. ${argStr.split("\n").join("\n    ")}`;
+          }
+          return `  ${i + 1}. ${argStr}`;
+        })
+        .join("\n");
     };
 
     // Format result nicely
@@ -181,7 +187,10 @@ export function QueryEditor() {
       }
 
       // Indent the result
-      return resultStr.split("\n").map((line, i) => i === 0 ? line : `  ${line}`).join("\n");
+      return resultStr
+        .split("\n")
+        .map((line, i) => (i === 0 ? line : `  ${line}`))
+        .join("\n");
     };
 
     let output = "";
@@ -196,7 +205,10 @@ export function QueryEditor() {
     if (log.args.length > 0) {
       output += `Arguments:\n`;
       const formattedArgs = formatArgs(log.args);
-      output += formattedArgs.split("\n").map(line => `  ${line}`).join("\n");
+      output += formattedArgs
+        .split("\n")
+        .map((line) => `  ${line}`)
+        .join("\n");
       output += `\n\n`;
     }
 
@@ -226,7 +238,11 @@ export function QueryEditor() {
         {({ panelSizes }) => (
           <>
             {/* Editor Section */}
-            <Panel defaultSize={panelSizes[0]} minSize={30} className="flex flex-col">
+            <Panel
+              defaultSize={panelSizes[0]}
+              minSize={30}
+              className="flex flex-col"
+            >
               <TypeScriptEditor
                 typeDefinitions={DB_TYPE_DEFINITIONS}
                 executionContext={() => {
@@ -236,16 +252,22 @@ export function QueryEditor() {
                       console.log(`[DB Call] Calling ${method}`, args);
                     },
                     onCallComplete: (log) => {
-                      console.log(`[DB Call] Completed ${log.method} in ${log.duration}ms`);
+                      console.log(
+                        `[DB Call] Completed ${log.method} in ${log.duration}ms`
+                      );
                       // Use functional update to ensure we get the latest state
                       setDbCallLogs((prev) => {
                         const newLogs = [...prev, log];
-                        console.log(`[DB Call] State update: prev length=${prev.length}, new length=${newLogs.length}`);
+                        console.log(
+                          `[DB Call] State update: prev length=${prev.length}, new length=${newLogs.length}`
+                        );
                         return newLogs;
                       });
                     },
                     onCallError: (log) => {
-                      console.error(`[DB Call] Error in ${log.method}: ${log.error}`);
+                      console.error(
+                        `[DB Call] Error in ${log.method}: ${log.error}`
+                      );
                       // Use functional update to ensure we get the latest state
                       setDbCallLogs((prev) => {
                         const newLogs = [...prev, log];
@@ -280,25 +302,32 @@ export function QueryEditor() {
 
             <PanelResizeHandle className="w-2 bg-gray-800 hover:bg-gray-700 transition-colors cursor-col-resize" />
 
-            <Panel defaultSize={panelSizes[1]} minSize={20} className="flex flex-col">
+            <Panel
+              defaultSize={panelSizes[1]}
+              minSize={20}
+              className="flex flex-col"
+            >
               <div className="border-b border-gray-700 bg-gray-900">
                 <div className="flex items-center justify-between p-2 border-b border-gray-700">
                   <div className="flex items-center gap-4">
                     <button
                       onClick={() => setActiveTab("results")}
-                      className={`px-3 py-1 text-sm font-medium rounded transition-colors ${activeTab === "results"
-                        ? "bg-gray-700 text-white"
-                        : "text-gray-400 hover:text-gray-300"
-                        }`}
+                      className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
+                        activeTab === "results"
+                          ? "bg-gray-700 text-white"
+                          : "text-gray-400 hover:text-gray-300"
+                      }`}
                     >
-                      DB Calls {dbCallLogs.length > 0 ? `(${dbCallLogs.length})` : ""}
+                      DB Calls{" "}
+                      {dbCallLogs.length > 0 ? `(${dbCallLogs.length})` : ""}
                     </button>
                     <button
                       onClick={() => setActiveTab("sql")}
-                      className={`px-3 py-1 text-sm font-medium rounded transition-colors ${activeTab === "sql"
-                        ? "bg-gray-700 text-white"
-                        : "text-gray-400 hover:text-gray-300"
-                        }`}
+                      className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
+                        activeTab === "sql"
+                          ? "bg-gray-700 text-white"
+                          : "text-gray-400 hover:text-gray-300"
+                      }`}
                     >
                       PostgreSQL
                     </button>
@@ -319,7 +348,9 @@ export function QueryEditor() {
                   <>
                     {error && (
                       <div className="p-4 bg-red-900/20 border-l-4 border-red-500">
-                        <div className="font-semibold text-red-400 mb-1">Error</div>
+                        <div className="font-semibold text-red-400 mb-1">
+                          Error
+                        </div>
                         <div className="text-red-300 font-mono text-sm whitespace-pre-wrap">
                           {error}
                         </div>
@@ -328,7 +359,8 @@ export function QueryEditor() {
                     {dbCallLogs.length > 0 && (
                       <div className="h-full flex flex-col">
                         <div className="p-2 text-xs text-gray-400 border-b border-gray-700">
-                          {dbCallLogs.length} DB call{dbCallLogs.length !== 1 ? "s" : ""} logged
+                          {dbCallLogs.length} DB call
+                          {dbCallLogs.length !== 1 ? "s" : ""} logged
                         </div>
                         <div className="flex-1 min-h-0">
                           <Editor
