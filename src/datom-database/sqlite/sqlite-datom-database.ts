@@ -3,7 +3,7 @@
  * Accepts a SqlConnection interface for SQLite-compatible databases
  */
 
-import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
 import type {
   Attribute,
   Datom,
@@ -38,7 +38,11 @@ import {
 } from "../shared/datalog-helpers.js";
 import { joinResults, project } from "../shared/query-results.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
-import type { DatabaseView, DatomsParams } from "../views/database-view.js";
+import type {
+  DatabaseView,
+  DatomsParams,
+  QueryResult,
+} from "../views/database-view.js";
 
 /**
  * SQLite database implementation

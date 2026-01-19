@@ -4,11 +4,15 @@
  * Not part of the public API
  */
 
-import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
 import type { Datom } from "../../datoms.js";
 import type { DatomDatabase, ViewConfig } from "../datom-database.js";
 import { validateQueryOptions } from "../shared/query-validation.js";
-import type { DatabaseView, DatomsParams } from "./database-view.js";
+import type {
+  DatabaseView,
+  DatomsParams,
+  QueryResult,
+} from "./database-view.js";
 
 /**
  * Database view that is configured with a view config

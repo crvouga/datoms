@@ -3,11 +3,7 @@
  * Communicates with remote database server via HTTP
  */
 
-import type {
-  DatalogQuery,
-  QueryClause,
-  QueryResult,
-} from "../../datalog/datalog.js";
+import type { DatalogQuery, QueryClause } from "../../datalog/datalog.js";
 import type {
   Attribute,
   Datom,
@@ -44,7 +40,11 @@ import { executeQueryOnDatoms } from "../shared/in-memory-query-executor.js";
 import { joinResults, project } from "../shared/query-results.js";
 import { validateQueryOptions } from "../shared/query-validation.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
-import type { DatabaseView, DatomsParams } from "../views/database-view.js";
+import type {
+  DatabaseView,
+  DatomsParams,
+  QueryResult,
+} from "../views/database-view.js";
 
 interface DatomsResponse {
   datoms: Datom[];

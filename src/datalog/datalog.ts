@@ -84,11 +84,6 @@ export interface DatalogQuery {
   limit?: number;
 }
 
-/**
- * Result of a datalog query execution
- */
-export type QueryResult = Array<Record<string, Value | Attribute | EntityId>>;
-
 export const d: DatalogQuery = {
   find: {
     id: ["?e"],

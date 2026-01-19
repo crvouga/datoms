@@ -3,7 +3,7 @@
  * Handles web standard Request/Response objects
  */
 
-import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
 import type { Datom, DatomInput, TransactionId } from "../../datoms.js";
 import type { DatomDatabase, ViewConfig } from "../datom-database.js";
 import type { Hook } from "../hook/hook.js";
@@ -14,7 +14,7 @@ import {
   TransactionError,
 } from "../hook/hook.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
-import type { DatomsParams } from "../views/database-view.js";
+import type { DatomsParams, QueryResult } from "../views/database-view.js";
 
 // Request/Response types for HTTP API contract
 interface InitializeRequest {

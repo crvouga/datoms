@@ -2,10 +2,10 @@
  * Aggregation computation functions
  */
 
-import type { QueryResult } from "../../../datalog/datalog.js";
 import type { Attribute, Value } from "../../../datoms.js";
 import { IN_MEMORY_AGGREGATIONS } from "./registry.js";
 import { parseAggregation } from "./parser.js";
+import type { QueryResult } from "../../views/database-view.js";
 
 /**
  * Check if a query has any aggregations in the find clause

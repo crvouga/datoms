@@ -3,7 +3,7 @@
  * Provides a high-level interface for working with datoms and datalog queries
  */
 
-import type { DatalogQuery, QueryResult } from "../../datalog/datalog.js";
+import type { DatalogQuery } from "../../datalog/datalog.js";
 import type {
   Attribute,
   Datom,
@@ -12,6 +12,13 @@ import type {
   Value,
 } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
+
+export type DatomsResult = Array<Datom>;
+
+/**
+ * Result of a datalog query execution
+ */
+export type QueryResult = Array<Record<string, Value | Attribute | EntityId>>;
 
 /**
  * Read-only database view for time-travel queries (Datomic-like)
@@ -27,7 +34,7 @@ export type DatabaseView = {
    * const dbPast = db.asOf(100);
    * const datoms = await dbPast.datoms({ entity: 123 });
    */
-  datoms(options: DatomsParams): Promise<Datom[]>;
+  datoms(options: DatomsParams): Promise<DatomsResult>;
 
   /**
    * Execute a datalog query against this database view

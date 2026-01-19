@@ -3,11 +3,15 @@
  * Provides a high-level interface for working with datoms and datalog queries
  */
 
-import type { DatalogQuery, QueryResult } from "../datalog/datalog.js";
+import type { DatalogQuery } from "../datalog/datalog.js";
 import type { Datom, DatomInput, TransactionId } from "../datoms.js";
 import type { EntityId } from "../entity-id.js";
 import type { Hook } from "./hook/hook.js";
-import type { DatabaseView, DatomsParams } from "./views/database-view.js";
+import type {
+  DatabaseView,
+  DatomsParams,
+  QueryResult,
+} from "./views/database-view.js";
 
 /**
  * Configuration for database views
