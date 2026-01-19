@@ -136,7 +136,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
 
     // Flatten ops and convert to datoms for transaction object
     const flatOps = ops.flat();
-    const latestTx = await this.getLatestTransaction();
+    const latestTx = await this._getLatestTransaction();
     const txId = latestTx + 1;
 
     // Convert ops to datoms for transaction object
@@ -244,7 +244,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     }
   }
 
-  async getLatestTransaction(): Promise<TransactionId> {
+  async _getLatestTransaction(): Promise<TransactionId> {
     await this._ensureInitialized();
 
     try {
@@ -293,7 +293,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
-    const speculativeTxId = (await this.getLatestTransaction()) + 1;
+    const speculativeTxId = (await this._getLatestTransaction()) + 1;
 
     // Process operations in sequence, creating speculative datoms directly
     const speculativeDatoms: Datom[] = [];

@@ -824,7 +824,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Get the latest transaction ID
-      const latestTx = await db.getLatestTransaction();
+      const latestTx = await db._getLatestTransaction();
       expect(latestTx).toBeGreaterThanOrEqual(tx3);
 
       // Query at current state (should match asOf with latestTx)

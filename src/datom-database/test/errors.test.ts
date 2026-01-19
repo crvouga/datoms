@@ -57,7 +57,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
     test("should throw TransactionConflictError when optimistic lock fails", async () => {
       const { db } = f;
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
-      void (await db.getLatestTransaction());
+      void (await db._getLatestTransaction());
 
       // First transaction updates the database
       await db.transact([{ op: "assert", e: 2, a: "name", v: "Bob" }]);

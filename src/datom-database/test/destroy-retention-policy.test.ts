@@ -159,7 +159,7 @@ describe.each(FIXTURES)(
           { op: "assert", e: 1, a: "name", v: "Entity-1-v4" },
         ]);
 
-        const latestTx = await f.db.getLatestTransaction();
+        const latestTx = await f.db._getLatestTransaction();
         expect(latestTx).toBeGreaterThanOrEqual(13);
 
         const result = await policy.execute();
@@ -192,7 +192,7 @@ describe.each(FIXTURES)(
           ]);
         }
 
-        const latestTx = await f.db.getLatestTransaction();
+        const latestTx = await f.db._getLatestTransaction();
         expect(latestTx).toBeGreaterThanOrEqual(10);
 
         const result = await policy.execute();
@@ -218,7 +218,7 @@ describe.each(FIXTURES)(
           ]);
         }
 
-        const latestTxBefore = await f.db.getLatestTransaction();
+        const latestTxBefore = await f.db._getLatestTransaction();
         expect(latestTxBefore).toBe(10);
 
         // Get current datoms before execution
@@ -227,7 +227,7 @@ describe.each(FIXTURES)(
         const result = await policy.execute();
 
         // Verify cutoffTx < latestTx
-        const latestTxAfter = await f.db.getLatestTransaction();
+        const latestTxAfter = await f.db._getLatestTransaction();
         expect(result.cutoffTx).toBeLessThan(latestTxAfter);
 
         // Verify current datoms are still present
@@ -253,7 +253,7 @@ describe.each(FIXTURES)(
           ]);
         }
 
-        const latestTx = await f.db.getLatestTransaction();
+        const latestTx = await f.db._getLatestTransaction();
         expect(latestTx).toBe(20);
 
         const result = await policy.execute();
@@ -291,7 +291,7 @@ describe.each(FIXTURES)(
             ]);
           }
 
-          const latestTx = await f.db.getLatestTransaction();
+          const latestTx = await f.db._getLatestTransaction();
           const result = await policy.execute();
 
           // cutoffTx should always be less than latestTx
@@ -312,7 +312,7 @@ describe.each(FIXTURES)(
         };
         const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
-        const latestTx = await f.db.getLatestTransaction();
+        const latestTx = await f.db._getLatestTransaction();
         expect(latestTx).toBe(0); // No transactions yet
 
         const result = await policy.execute();
@@ -342,7 +342,7 @@ describe.each(FIXTURES)(
           ]);
         }
 
-        const latestTx = await f.db.getLatestTransaction();
+        const latestTx = await f.db._getLatestTransaction();
         expect(latestTx).toBe(5);
 
         const result = await policy.execute();
@@ -374,7 +374,7 @@ describe.each(FIXTURES)(
           ]);
         }
 
-        const latestTx = await f.db.getLatestTransaction();
+        const latestTx = await f.db._getLatestTransaction();
         expect(latestTx).toBe(5);
 
         const result = await policy.execute();
@@ -407,7 +407,7 @@ describe.each(FIXTURES)(
           ]);
         }
 
-        const latestTx = await f.db.getLatestTransaction();
+        const latestTx = await f.db._getLatestTransaction();
         expect(latestTx).toBe(10);
 
         const result = await policy.execute();
@@ -430,7 +430,7 @@ describe.each(FIXTURES)(
         // Create a database that will fail on getLatestTransaction
         const errorDb: DatomDatabase = {
           ...f.db,
-          async getLatestTransaction() {
+          async _getLatestTransaction() {
             throw new Error("Database connection failed");
           },
         };
@@ -470,7 +470,7 @@ describe.each(FIXTURES)(
           { op: "assert", e: 1, a: "name", v: "Alice Latest" },
         ]);
 
-        const latestTx = await f.db.getLatestTransaction();
+        const latestTx = await f.db._getLatestTransaction();
         expect(latestTx).toBeGreaterThanOrEqual(4);
 
         const result = await policy.execute();
@@ -500,7 +500,7 @@ describe.each(FIXTURES)(
           ]);
         }
 
-        const latestTx = await f.db.getLatestTransaction();
+        const latestTx = await f.db._getLatestTransaction();
         expect(latestTx).toBe(20);
 
         const result = await policy.execute();

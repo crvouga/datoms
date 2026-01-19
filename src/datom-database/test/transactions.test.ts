@@ -306,7 +306,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
   describe("getLatestTransaction", () => {
     test("should return 0 for empty database", async () => {
       const { db } = f;
-      const latestTx = await db.getLatestTransaction();
+      const latestTx = await db._getLatestTransaction();
       expect(latestTx).toBe(0);
     });
 
@@ -315,13 +315,13 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const tx1 = await db.transact([
         { op: "assert", e: 1, a: "name", v: "Alice" },
       ]);
-      const latestTx = await db.getLatestTransaction();
+      const latestTx = await db._getLatestTransaction();
       expect(latestTx).toBe(tx1);
 
       const tx2 = await db.transact([
         { op: "assert", e: 2, a: "name", v: "Bob" },
       ]);
-      const latestTx2 = await db.getLatestTransaction();
+      const latestTx2 = await db._getLatestTransaction();
       expect(latestTx2).toBe(tx2);
       expect(latestTx2).toBeGreaterThan(tx1);
     });
@@ -332,7 +332,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const tx2 = await db.transact([
         { op: "retract", e: 1, a: "name", v: "Alice" },
       ]);
-      const latestTx = await db.getLatestTransaction();
+      const latestTx = await db._getLatestTransaction();
       expect(latestTx).toBe(tx2);
     });
 
@@ -343,14 +343,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "assert", e: 2, a: "name", v: "Bob" },
         { op: "retract", e: 1, a: "name", v: "Alice" },
       ]);
-      const latestTx = await db.getLatestTransaction();
+      const latestTx = await db._getLatestTransaction();
       expect(latestTx).toBe(tx2);
     });
 
     test("should work with transact()", async () => {
       const { db } = f;
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
-      const beforeTx = await db.getLatestTransaction();
+      const beforeTx = await db._getLatestTransaction();
 
       // Use transact() to commit changes
       const txId = await db.transact([
@@ -359,7 +359,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(txId).toBeGreaterThan(beforeTx);
 
       // After commit, latest should be updated
-      const afterTx = await db.getLatestTransaction();
+      const afterTx = await db._getLatestTransaction();
       expect(afterTx).toBeGreaterThan(beforeTx);
       expect(afterTx).toBe(txId);
     });

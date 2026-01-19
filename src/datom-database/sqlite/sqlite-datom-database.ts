@@ -165,7 +165,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     // Convert to datoms for transaction object
     const allDatoms: Datom[] = [];
-    const latestTx = await this.getLatestTransaction();
+    const latestTx = await this._getLatestTransaction();
     const txId = latestTx + 1;
 
     for (const sub of subs) {
@@ -347,7 +347,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
-    const speculativeTxId = (await this.getLatestTransaction()) + 1;
+    const speculativeTxId = (await this._getLatestTransaction()) + 1;
 
     // Process operations in sequence, creating speculative datoms directly
     const speculativeDatoms: Datom[] = [];
@@ -1139,7 +1139,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     return undefined;
   }
 
-  async getLatestTransaction(): Promise<TransactionId> {
+  async _getLatestTransaction(): Promise<TransactionId> {
     await this._ensureInitialized();
     const sql = `SELECT last_tx FROM ${this.tableName}_tx WHERE id = 1`;
     const result = await this.connection.query(sql);

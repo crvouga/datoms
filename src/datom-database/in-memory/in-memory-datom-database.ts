@@ -130,7 +130,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
 
     // Convert to datoms for transaction object
     const allDatoms: Datom[] = [];
-    const latestTx = await this.getLatestTransaction();
+    const latestTx = await this._getLatestTransaction();
     const txId = latestTx + 1;
 
     for (const sub of subs) {
@@ -248,7 +248,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
-    const speculativeTxId = (await this.getLatestTransaction()) + 1;
+    const speculativeTxId = (await this._getLatestTransaction()) + 1;
 
     // Process operations in sequence, creating speculative datoms directly
     const speculativeDatoms: Datom[] = [];
@@ -627,7 +627,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     return undefined;
   }
 
-  async getLatestTransaction(): Promise<TransactionId> {
+  async _getLatestTransaction(): Promise<TransactionId> {
     await this._ensureInitialized();
     // nextTx is the next transaction ID to be used, so latest is one less
     return this.nextTx > 1 ? this.nextTx - 1 : 0;

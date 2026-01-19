@@ -319,7 +319,7 @@ export class HttpClientDatomDatabaseServerComponent {
   ): Promise<GetLatestTransactionResponse> {
     await this._ensureInitialized();
 
-    const txId = await this.db.getLatestTransaction();
+    const txId = await this.db._getLatestTransaction();
     return { txId };
   }
 

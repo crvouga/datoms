@@ -199,17 +199,6 @@ export interface DatomDatabase extends DatabaseView {
   ): Promise<Record<string, unknown> | undefined>;
 
   /**
-   * Get the latest transaction ID in the database
-   * Useful for synchronization, replication, and determining the current state
-   * @returns The most recent transaction ID, or 0 if no transactions have occurred
-   * @example
-   * const latestTx = await db.getLatestTransaction();
-   * // Use for sync: only fetch changes after this transaction
-   * const changes = await db.datoms({ tx: latestTx + 1 });
-   */
-  getLatestTransaction(): Promise<TransactionId>;
-
-  /**
    * Create a database view showing the state at a specific transaction ID
    * Returns a read-only view that filters all queries to only include datoms
    * with transaction ID <= txId
@@ -280,6 +269,17 @@ export interface DatomDatabase extends DatabaseView {
    * await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
    */
   with(ops: DatomInput[]): Promise<WithResult>;
+
+  /**
+   * Get the latest transaction ID in the database
+   * Useful for synchronization, replication, and determining the current state
+   * @returns The most recent transaction ID, or 0 if no transactions have occurred
+   * @example
+   * const latestTx = await db.getLatestTransaction();
+   * // Use for sync: only fetch changes after this transaction
+   * const changes = await db.datoms({ tx: latestTx + 1 });
+   */
+  _getLatestTransaction(): Promise<TransactionId>;
 
   /**
    * Execute a query with view configuration and return metadata envelope.
