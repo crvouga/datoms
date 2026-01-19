@@ -1650,100 +1650,6 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   }
 
   /**
-   * Check if query can use pivot optimization (multiple attributes on same entity)
-   */
-  private _canUsePivotOptimization(clauses: QueryClause[]): boolean {
-    return canUsePivotOptimization(clauses);
-  }
-
-  /**
-   * Execute datalog query using pivot optimization (single scan, conditional aggregation)
-   */
-  private async _executeDatalogWithPivot(
-    query: DatalogQuery,
-    sqlQueries?: SQLQueryMetadata[]
-  ): Promise<{ results: QueryResult; sql: string }> {
-    // Use the extracted SQL building function
-    const { sql, params } = datalogToPostgresSQL(query, this.tableName);
-
-    const queryStartTime = performance.now();
-    const rows = await this.sqlDb.query(sql, params);
-    const queryDuration = performance.now() - queryStartTime;
-
-    if (sqlQueries) {
-      const queryPlan = await this._getQueryPlan(sql, params);
-      sqlQueries.push({
-        sql: formatSQLWithParams(sql, params),
-        rowCount: rows.length,
-        durationMs: queryDuration,
-        queryPlan,
-      });
-    }
-
-    // Convert SQL results back to QueryResult format
-    const results: Record<string, Value | Attribute>[] = rows.map(
-      (row: DatabaseRow) => {
-        const result: Record<string, Value | Attribute> = {};
-        for (const key of Object.keys(row)) {
-          let value: unknown = row[key];
-          if (typeof value === "string") {
-            if (/^-?\d+$/.test(value)) {
-              const num = parseInt(value, 10);
-              if (!isNaN(num)) {
-                value = num;
-              } else {
-                try {
-                  value = JSON.parse(value);
-                } catch {
-                  // Not valid JSON, keep as string
-                }
-              }
-            } else {
-              try {
-                value = JSON.parse(value);
-              } catch {
-                // Not valid JSON, keep as string
-              }
-            }
-          }
-          let finalValue = value;
-          if (typeof value === "string") {
-            if (/^-?\d+$/.test(value)) {
-              const num = parseInt(value, 10);
-              if (!isNaN(num)) {
-                finalValue = num;
-              }
-            } else if (/^-?\d*\.\d+$/.test(value)) {
-              const num = parseFloat(value);
-              if (!isNaN(num)) {
-                finalValue = num;
-              }
-            }
-          }
-          result[key] = this._reviveValue(finalValue) as Value | Attribute;
-        }
-        return result;
-      }
-    );
-
-    if (Object.keys(query.find).length === 0) {
-      return { results, sql };
-    }
-
-    // Map results to output keys
-    const finalResults = results.map((row) => {
-      const projected: Record<string, Value | Attribute> = {};
-      for (const outputKey of Object.keys(query.find)) {
-        if (outputKey in row) {
-          projected[outputKey] = row[outputKey];
-        }
-      }
-      return projected;
-    });
-    return { results: finalResults, sql };
-  }
-
-  /**
    * Execute datalog query using SQL with aggregations
    */
   private async _executeDatalogWithSQL(
@@ -1958,62 +1864,37 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     };
   }
 
-  async _destroy(query: DatomsQuery): Promise<void> {
+  async _destroy(config: { retentionCount: number }): Promise<number> {
     await this._ensureInitialized();
 
-    // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
-    const conditions: string[] = [];
-    const params: unknown[] = [];
-
-    if (query.e !== undefined) {
-      conditions.push("e = ?");
-      params.push(String(query.e));
-    }
-    if (query.a !== undefined) {
-      conditions.push("a = ?");
-      params.push(String(query.a));
-    }
-    if (query.v !== undefined) {
-      let value = query.v;
-      if (value === undefined) {
-        value = "__UNDEFINED__";
-      }
-      conditions.push("v = ?::jsonb");
-      params.push(JSON.stringify(value));
-    }
-    if (query.tx !== undefined) {
-      conditions.push("tx = ?");
-      params.push(query.tx);
-    }
-    if (query.txMax !== undefined) {
-      conditions.push("tx <= ?");
-      params.push(query.txMax);
-    }
-    if (query.op !== undefined) {
-      conditions.push("op = ?");
-      params.push(query.op);
-    }
-
-    // Require at least one condition to prevent accidental full table deletion
-    if (conditions.length === 0) {
+    if (config.retentionCount < 1) {
       throw new Error(
-        "Destroy query must include at least one filter (e, a, v, tx, txMax, op) to prevent accidental full table deletion"
+        "retentionCount must be at least 1 to ensure at least one datom is kept per (entity, attribute) pair"
       );
     }
 
-    const whereClause = `WHERE ${conditions.join(" AND ")}`;
-    const limitClause = query.limit ? "LIMIT ?" : "";
-    const offsetClause = query.offset !== undefined ? "OFFSET ?" : "";
+    // Use window function to rank datoms per (e, a) pair by transaction ID descending
+    // Delete all datoms where rank > retentionCount
+    // This keeps only the latest N datoms per (e, a) pair
+    // Only processes (e, a) pairs that have more than retentionCount datoms
+    const sql = `
+      DELETE FROM ${this.tableName}
+      WHERE (e, a, v, tx, op) IN (
+        SELECT e, a, v, tx, op
+        FROM (
+          SELECT 
+            e, a, v, tx, op,
+            ROW_NUMBER() OVER (PARTITION BY e, a ORDER BY tx DESC) as rn
+          FROM ${this.tableName}
+        ) ranked
+        WHERE rn > ?
+      )
+      RETURNING 1
+    `;
 
-    if (query.limit) {
-      params.push(query.limit);
-    }
-    if (query.offset !== undefined) {
-      params.push(query.offset);
-    }
-
-    const sql = `DELETE FROM ${this.tableName} ${whereClause} ${limitClause} ${offsetClause}`;
-    await this.sqlDb.execute(sql, params);
+    const params = [config.retentionCount];
+    const results = await this.sqlDb.query(sql, params);
+    return results.length;
   }
 
   private async _datomsWithMetadataInternal(

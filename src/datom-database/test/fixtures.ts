@@ -1,6 +1,5 @@
 import { serve } from "bun";
 import { unlinkSync } from "fs";
-import { DATABASE_URL } from "../../env.js";
 import { FetchHttpClient } from "../../http-client/http-client.js";
 import { PgSQLDatabase } from "../../sql-database/sql-database-pg.js";
 import { PGLiteSQLDatabase } from "../../sql-database/sql-database-pglite.js";
@@ -46,8 +45,10 @@ const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
   };
 };
 
+const TEST_DATABASE_URL: string =
+  "postgresql://postgres:postgres@localhost:5432/postgres";
 const createPostgresFixture = async (): Promise<Fixture> => {
-  const connection = new PgSQLDatabase(DATABASE_URL);
+  const connection = new PgSQLDatabase(TEST_DATABASE_URL);
   const db = new PostgreSQLDatomDatabase({ sqlDb: connection });
   await db.initialize();
   return {

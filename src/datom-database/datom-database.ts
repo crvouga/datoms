@@ -7,7 +7,7 @@ import type { Datom, DatomInput, TransactionId } from "../datoms.js";
 import type { EntityId } from "../entity-id.js";
 import type { Transaction } from "../types.js";
 import type { Hook } from "./hook/hook.js";
-import type { DatabaseView, DatomsQuery } from "./views/database-view.js";
+import type { DatabaseView } from "./views/database-view.js";
 
 /**
  * Datom database interface (Datomic-like minimal API)
@@ -227,12 +227,7 @@ export interface DatomDatabase extends DatabaseView {
    */
   _getLatestTransaction(): Promise<Transaction>;
 
-  /**
-   * Delete datoms from the database matching the given query.
-   * @param query Query parameters to match datoms for deletion
-   * @internal
-   */
-  _destroy(query: DatomsQuery): Promise<void>;
+  _destroy(config: { retentionCount: number }): Promise<number>;
 }
 
 /**

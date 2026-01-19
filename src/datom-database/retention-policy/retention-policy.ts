@@ -3,8 +3,6 @@
  * Lifecycle methods are managed by the user, not the database
  */
 
-import type { RetentionResult } from "./types.js";
-
 /**
  * Retention policy interface
  * Implementations handle archiving or destroying obsolete historic datoms
@@ -33,5 +31,5 @@ export interface RetentionPolicy {
    * Useful for manual execution or testing
    * @returns Result of the retention operation
    */
-  execute(): Promise<RetentionResult>;
+  execute(): Promise<Record<string, unknown>>;
 }

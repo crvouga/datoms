@@ -34,15 +34,14 @@ async function main() {
   await db.initialize();
   db.startMaintenance();
 
-  const retentionPolicy = new DestroyRetentionPolicy(
-    db,
-    {
-      retentionTxCount: 10,
-      intervalMs: 3000,
-      batchSize: 5_000,
+  const retentionPolicy = new DestroyRetentionPolicy({
+    sourceDb: db,
+    config: {
+      retentionCount: 2,
+      intervalMs: 3_000,
     },
-    logger
-  );
+    logger,
+  });
   retentionPolicy.start();
 
   const httpClient = new FetchHttpClient();

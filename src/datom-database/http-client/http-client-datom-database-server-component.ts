@@ -80,11 +80,12 @@ interface RegisterHookResponse {
 
 interface DeleteDatomsRequest {
   method: "deleteDatoms";
-  query: DatomsQuery;
+  config: { retentionCount: number };
 }
 
 interface DeleteDatomsResponse {
   success: boolean;
+  deleted?: number;
 }
 
 type TransportRequest =
@@ -335,8 +336,8 @@ export class HttpClientDatomDatabaseServerComponent {
   ): Promise<DeleteDatomsResponse> {
     await this._ensureInitialized();
 
-    await this.db._destroy(request.query);
-    return { success: true };
+    const deleted = await this.db._destroy(request.config);
+    return { success: true, deleted };
   }
 
   private _createView(viewConfig: ViewConfig) {

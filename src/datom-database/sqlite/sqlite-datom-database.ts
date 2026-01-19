@@ -1130,61 +1130,37 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     };
   }
 
-  async _destroy(query: DatomsQuery): Promise<void> {
+  async _destroy(config: { retentionCount: number }): Promise<number> {
     await this._ensureInitialized();
 
-    const conditions: string[] = [];
-    const params: unknown[] = [];
-
-    if (query.e !== undefined) {
-      conditions.push("e = ?");
-      params.push(String(query.e));
-    }
-    if (query.a !== undefined) {
-      conditions.push("a = ?");
-      params.push(String(query.a));
-    }
-    if (query.v !== undefined) {
-      let value = query.v;
-      if (value === undefined) {
-        value = "__UNDEFINED__";
-      }
-      conditions.push("v = ?");
-      params.push(JSON.stringify(value));
-    }
-    if (query.tx !== undefined) {
-      conditions.push("tx = ?");
-      params.push(query.tx);
-    }
-    if (query.txMax !== undefined) {
-      conditions.push("tx <= ?");
-      params.push(query.txMax);
-    }
-    if (query.op !== undefined) {
-      conditions.push("op = ?");
-      params.push(query.op);
-    }
-
-    // Require at least one condition to prevent accidental full table deletion
-    if (conditions.length === 0) {
+    if (config.retentionCount < 1) {
       throw new Error(
-        "Destroy query must include at least one filter (e, a, v, tx, txMax, op) to prevent accidental full table deletion"
+        "retentionCount must be at least 1 to ensure at least one datom is kept per (entity, attribute) pair"
       );
     }
 
-    const whereClause = `WHERE ${conditions.join(" AND ")}`;
-    const limitClause = query.limit ? "LIMIT ?" : "";
-    const offsetClause = query.offset !== undefined ? "OFFSET ?" : "";
+    // Use window function to rank datoms per (e, a) pair by transaction ID descending
+    // Delete all datoms where rank > retentionCount
+    // This keeps only the latest N datoms per (e, a) pair
+    // SQLite supports window functions since version 3.25.0
+    const sql = `
+      DELETE FROM ${this.tableName}
+      WHERE (e, a, v, tx, op) IN (
+        SELECT e, a, v, tx, op
+        FROM (
+          SELECT 
+            e, a, v, tx, op,
+            ROW_NUMBER() OVER (PARTITION BY e, a ORDER BY tx DESC) as rn
+          FROM ${this.tableName}
+        ) ranked
+        WHERE rn > ?
+      )
+      RETURNING 1
+    `;
 
-    if (query.limit) {
-      params.push(query.limit);
-    }
-    if (query.offset !== undefined) {
-      params.push(query.offset);
-    }
-
-    const sql = `DELETE FROM ${this.tableName} ${whereClause} ${limitClause} ${offsetClause}`;
-    await this.connection.execute(sql, params);
+    const params = [config.retentionCount];
+    const result = await this.connection.query(sql, params);
+    return result.length;
   }
 
   private async _datomsWithMetadataInternal(

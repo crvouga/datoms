@@ -22,12 +22,10 @@ export class TmdbLoader {
     this.logger.info("Starting TMDB loader");
     try {
       await this.discoverMovies();
-      this.logger.info("TMDB loader completed successfully");
     } catch (error) {
       this.logger.error("TMDB loader failed", {
         error: this.formatError(error),
       });
-      throw error;
     }
   }
 
@@ -47,39 +45,21 @@ export class TmdbLoader {
     this.logger.info("Starting movie discovery");
     let page = 1;
     let totalMoviesProcessed = 0;
-
-    while (!this.shouldStop) {
-      await this.delay(3000);
+    let totalPages = Infinity;
+    while (!this.shouldStop && page < totalPages) {
+      page++;
+      await this.delay(0);
       const startTime = Date.now();
 
-      const response = await this.tmdbClient
-        .discoverMovies({ page })
-        .catch((error) => {
-          this.logger.error("Failed to fetch movies", {
-            page,
-            error: this.formatError(error),
-          });
-          throw error;
-        });
+      const response = await this.tmdbClient.discoverMovies({ page });
 
-      if (!response) {
-        this.logger.warn("Received null response", { page });
-        break;
-      }
+      page = response?.page ?? 0;
+      totalPages = response?.total_pages ?? 0;
 
-      page = response.page ?? 0;
-      const totalPages = response.total_pages ?? 0;
-      const hasMore = page < totalPages;
-
-      if (!response.results?.length) {
-        this.logger.warn("No movies in response", { page });
-        page++;
-        continue;
-      }
-
-      const movies = response.results.map((m) =>
-        mapKeys(m, (key) => tmdbPrefixKey("movie", key))
-      );
+      const movies =
+        response?.results?.map((m) =>
+          mapKeys(m, (key) => tmdbPrefixKey("movie", key))
+        ) ?? [];
 
       const movieDatoms = datoms(
         {
@@ -103,33 +83,15 @@ export class TmdbLoader {
           })
         );
       });
-
-      try {
-        await this.db.transact(movieDatoms, { createdBy: "tmdb-loader" });
-        totalMoviesProcessed += movies.length;
-        this.logger.info("Page processed", {
-          page,
-          movies: movies.length,
-          total: totalMoviesProcessed,
-          durationMs: Date.now() - startTime,
-        });
-      } catch (error) {
-        this.logger.error("Transaction failed", {
-          page,
-          movies: movies.length,
-          error: this.formatError(error),
-        });
-        throw error;
-      }
-
-      if (hasMore) {
-        await this.delay(10);
-      }
-
-      if (!hasMore) break;
-      page++;
+      await this.db.transact(movieDatoms, { createdBy: "tmdb-loader" });
+      totalMoviesProcessed += movies.length;
+      this.logger.info("Page processed", {
+        page,
+        movies: movies.length,
+        total: totalMoviesProcessed,
+        durationMs: Date.now() - startTime,
+      });
     }
-
     this.logger.info(
       this.shouldStop ? "Movie discovery stopped" : "Movie discovery completed",
       {
@@ -137,6 +99,7 @@ export class TmdbLoader {
         totalMovies: totalMoviesProcessed,
       }
     );
+    this.logger.info("TMDB loader completed successfully");
   }
 
   private delay(ms: number): Promise<void> {

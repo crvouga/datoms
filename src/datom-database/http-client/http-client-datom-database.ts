@@ -61,6 +61,7 @@ interface GetLatestTransactionResponse {
 
 interface DeleteDatomsResponse {
   success: boolean;
+  deleted?: number;
 }
 
 interface InitializeResponse {
@@ -233,14 +234,18 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     }
   }
 
-  async _destroy(query: DatomsQuery): Promise<void> {
+  async _destroy(config: { retentionCount: number }): Promise<number> {
     await this._ensureInitialized();
 
     try {
-      await this.httpClient.post<DeleteDatomsResponse>(this.endpoint, {
-        method: "deleteDatoms",
-        query,
-      });
+      const response = await this.httpClient.post<DeleteDatomsResponse>(
+        this.endpoint,
+        {
+          method: "deleteDatoms",
+          config,
+        }
+      );
+      return response.deleted ?? 0;
     } catch (error) {
       throw new Error(
         `Failed to delete datoms: ${this._extractErrorMessage(error)}`

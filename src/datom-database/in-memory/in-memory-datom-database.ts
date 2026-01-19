@@ -615,55 +615,106 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     };
   }
 
-  async _destroy(query: DatomsQuery): Promise<void> {
+  async _destroy(config: { retentionCount: number }): Promise<number> {
     await this._ensureInitialized();
 
-    // Validate that tx and txMax are mutually exclusive
-    if (query.tx !== undefined && query.txMax !== undefined) {
+    if (config.retentionCount < 1) {
       throw new Error(
-        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
+        "retentionCount must be at least 1 to ensure at least one datom is kept per (entity, attribute) pair"
       );
     }
 
-    // Require at least one filter to prevent accidental full table deletion
-    const hasFilter =
-      query.e !== undefined ||
-      query.a !== undefined ||
-      query.v !== undefined ||
-      query.tx !== undefined ||
-      query.txMax !== undefined ||
-      query.op !== undefined;
-
-    if (!hasFilter) {
-      throw new Error(
-        "Destroy query must include at least one filter (e, a, v, tx, txMax, op) to prevent accidental full table deletion"
-      );
+    // Group datoms by (e, a) pairs
+    const datomsByEntityAttribute = new Map<string, Datom[]>();
+    for (const datom of this._datomsArray) {
+      const key = `${String(datom.e)}|${String(datom.a)}`;
+      if (!datomsByEntityAttribute.has(key)) {
+        datomsByEntityAttribute.set(key, []);
+      }
+      datomsByEntityAttribute.get(key)!.push(datom);
     }
 
-    // Filter out datoms that match the query
+    // For each (e, a) pair, keep only the latest N datoms
+    const datomsToDelete = new Set<string>();
+    for (const [, groupDatoms] of datomsByEntityAttribute.entries()) {
+      // Sort by transaction ID descending (latest first)
+      groupDatoms.sort((a, b) => b.tx - a.tx);
+
+      // If this group has more than retentionCount datoms, mark the excess for deletion
+      if (groupDatoms.length > config.retentionCount) {
+        // Keep first N datoms (indices 0 to retentionCount-1)
+        // Delete the rest (indices retentionCount onwards)
+        for (let i = config.retentionCount; i < groupDatoms.length; i++) {
+          const datom = groupDatoms[i];
+          if (datom) {
+            const deleteKey = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
+            datomsToDelete.add(deleteKey);
+          }
+        }
+      }
+    }
+
+    // Remove datoms marked for deletion
+    const beforeLength = this._datomsArray.length;
     this._datomsArray = this._datomsArray.filter((datom) => {
-      // Apply filters
-      if (query.e !== undefined && datom.e !== query.e) {
-        return true; // Keep this datom
-      }
-      if (query.a !== undefined && datom.a !== query.a) {
-        return true; // Keep this datom
-      }
-      if (query.v !== undefined && datom.v !== query.v) {
-        return true; // Keep this datom
-      }
-      if (query.tx !== undefined && datom.tx !== query.tx) {
-        return true; // Keep this datom
-      }
-      if (query.txMax !== undefined && datom.tx > query.txMax) {
-        return true; // Keep this datom
-      }
-      if (query.op !== undefined && datom.op !== query.op) {
-        return true; // Keep this datom
-      }
-      // All filters passed, remove this datom
-      return false;
+      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
+      return !datomsToDelete.has(key);
     });
+
+    return beforeLength - this._datomsArray.length;
+  }
+
+  /**
+   * Compute obsolete datoms from a list of datoms.
+   * A datom is obsolete if it has been superseded by a later transaction for the same (entity, attribute, value).
+   * @param datoms Array of datoms to analyze
+   * @returns Array of obsolete datoms (all datoms that are not the latest for their (e, a, v) group)
+   */
+  private _computeObsoleteDatoms(datoms: Datom[]): Datom[] {
+    // Group datoms by (entity, attribute, value)
+    const datomsByKey = new Map<string, Datom[]>();
+    for (const datom of datoms) {
+      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
+      if (!datomsByKey.has(key)) {
+        datomsByKey.set(key, []);
+      }
+      datomsByKey.get(key)!.push(datom);
+    }
+
+    // For each (e, a, v) group, find the latest transaction
+    // All datoms with tx < latestTx are obsolete
+    const obsoleteDatoms: Datom[] = [];
+    for (const [_key, groupDatoms] of datomsByKey.entries()) {
+      if (groupDatoms.length === 0) {
+        continue;
+      }
+
+      // Sort by transaction ID descending
+      groupDatoms.sort((a, b) => b.tx - a.tx);
+
+      // Get the latest transaction ID for this (e, a, v)
+      const latestDatom = groupDatoms[0];
+      if (!latestDatom) {
+        continue;
+      }
+
+      // All datoms with tx < latestTx are obsolete (they've been superseded)
+      for (let i = 1; i < groupDatoms.length; i++) {
+        const datom = groupDatoms[i];
+        if (datom) {
+          obsoleteDatoms.push(datom);
+        }
+      }
+    }
+
+    // Remove duplicates using a unique key
+    const uniqueObsolete = new Map<string, Datom>();
+    for (const datom of obsoleteDatoms) {
+      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
+      uniqueObsolete.set(key, datom);
+    }
+
+    return Array.from(uniqueObsolete.values());
   }
 
   private async _datomsWithMetadataInternal(

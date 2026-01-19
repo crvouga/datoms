@@ -328,7 +328,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(latestTx2.txId!).toBeGreaterThan(tx1);
     });
 
-    test("should return latest transaction after subion", async () => {
+    test("should return latest transaction after retract", async () => {
       const { db } = f;
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
       const tx2 = await db.transact([
