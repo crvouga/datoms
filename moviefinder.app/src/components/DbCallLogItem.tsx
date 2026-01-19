@@ -16,13 +16,34 @@ interface DbCallLogItemProps {
 
 type TabType = "datalog" | "sql" | "result" | "error" | "args";
 
+const DEFAULT_HEIGHT = 256;
+const STORAGE_KEY_PREFIX_HEIGHT = "db-call-log-panel-height";
+const STORAGE_KEY_PREFIX_TAB = "db-call-log-panel-tab";
+
 export function DbCallLogItem({
   log,
   isExpanded,
   onToggle,
 }: DbCallLogItemProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("datalog");
-  const [height, setHeight] = useState<number>(256); // Default height in pixels
+  const heightStorageKey = `${STORAGE_KEY_PREFIX_HEIGHT}-${log.id}`;
+  const tabStorageKey = `${STORAGE_KEY_PREFIX_TAB}-${log.id}`;
+
+  // Initialize height from localStorage
+  const [height, setHeight] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(heightStorageKey);
+      if (saved) {
+        const parsed = Number.parseInt(saved, 10);
+        if (!Number.isNaN(parsed) && parsed >= 200 && parsed <= 800) {
+          return parsed;
+        }
+      }
+    } catch {
+      // Ignore errors, use default
+    }
+    return DEFAULT_HEIGHT;
+  });
+
   const contentRef = useRef<HTMLDivElement>(null);
   const resizeHandleRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
@@ -114,13 +135,51 @@ export function DbCallLogItem({
     return tabs.length > 0 ? tabs : ["args"];
   }, [datalogQuery, sqlQuery, log.args, log.result, log.error]);
 
-  // Set default tab when expanded
+  // Initialize activeTab from localStorage, validating against available tabs
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    try {
+      const saved = localStorage.getItem(tabStorageKey);
+      if (saved) {
+        const savedTab = saved as TabType;
+        // Validate that the saved tab is a valid tab type
+        const validTabs: TabType[] = ["datalog", "sql", "result", "error", "args"];
+        if (validTabs.includes(savedTab)) {
+          return savedTab;
+        }
+      }
+    } catch {
+      // Ignore errors, use default
+    }
+    return "datalog";
+  });
+
+  // Set default tab when expanded or when saved tab is not available
   useEffect(() => {
     if (isExpanded && !availableTabs.includes(activeTab)) {
       const defaultTab = (availableTabs[0] || "args") as TabType;
       setActiveTab(defaultTab);
     }
   }, [isExpanded, availableTabs, activeTab]);
+
+  // Persist height to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(heightStorageKey, String(height));
+    } catch {
+      // Ignore errors (e.g., localStorage quota exceeded)
+    }
+  }, [height, heightStorageKey]);
+
+  // Persist activeTab to localStorage whenever it changes
+  useEffect(() => {
+    if (isExpanded && availableTabs.includes(activeTab)) {
+      try {
+        localStorage.setItem(tabStorageKey, activeTab);
+      } catch {
+        // Ignore errors (e.g., localStorage quota exceeded)
+      }
+    }
+  }, [activeTab, isExpanded, availableTabs, tabStorageKey]);
 
   // Handle mouse resize
   const handleMouseDown = useCallback(
@@ -201,11 +260,10 @@ export function DbCallLogItem({
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as TabType)}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === tab
-                    ? "border-blue-500 text-blue-400 bg-gray-800/50"
-                    : "border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/30"
-                }`}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === tab
+                  ? "border-blue-500 text-blue-400 bg-gray-800/50"
+                  : "border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/30"
+                  }`}
               >
                 {tab === "datalog"
                   ? "Datalog Query"

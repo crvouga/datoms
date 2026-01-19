@@ -46,6 +46,9 @@ export function useMonacoConfig(
           filePath: def.filePath,
         }))
       );
+
+      // Note: Formatting options are handled via the format action in useCodeStorage
+      // Aggressive whitespace cleanup is applied post-formatting
     }
-  }, [monacoRef.current, typeDefinitions]);
+  }, [monacoRef, typeDefinitions]);
 }

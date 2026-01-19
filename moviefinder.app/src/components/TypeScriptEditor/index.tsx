@@ -56,7 +56,9 @@ export function TypeScriptEditor({
   const { handleSave, saveNotification } = useCodeStorage(
     storageKey,
     code,
-    defaultValue
+    defaultValue,
+    editorRef,
+    setCode
   );
   const [showShortcuts, setShowShortcuts] = useState<boolean>(false);
 
@@ -92,7 +94,9 @@ export function TypeScriptEditor({
 
   useKeyboardShortcut({
     keys: ["mod", "S"],
-    callback: handleSave,
+    callback: () => {
+      void handleSave();
+    },
     enabled: !!storageKey,
   });
 
