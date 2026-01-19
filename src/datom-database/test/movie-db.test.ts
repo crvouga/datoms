@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
 import { FileSystemDatomDatabase } from "../filesystem/filesystem-datom-database.js";
+import { expectOrderedBy } from "./expect-ordered-by.js";
 import type { Fixture } from "./fixtures/fixture.js";
 import { FAST_TESTS, FIXTURES } from "./fixtures/fixtures.js";
 
@@ -58,17 +59,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
 
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBe(limit);
-
-      // Should be sorted descending by popularity
-      for (let i = 1; i < limit; i++) {
-        const prevPopularity = results[i - 1]?.["movie/popularity"];
-        const currPopularity = results[i]?.["movie/popularity"];
-        expect(prevPopularity).toBeDefined();
-        expect(currPopularity).toBeDefined();
-        expect(Number(prevPopularity)).toBeGreaterThanOrEqual(
-          Number(currPopularity)
-        );
-      }
+      expectOrderedBy(results, "movie/popularity", "desc", limit);
     },
     { timeout: TIMEOUT }
   );
@@ -98,15 +89,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
       expect(results.length).toBe(limit);
 
       // Should be sorted ascending by title (A to Z)
-      for (let i = 1; i < limit; i++) {
-        const prevTitle = results[i - 1]?.["movie/title"];
-        const currTitle = results[i]?.["movie/title"];
-        expect(prevTitle).toBeDefined();
-        expect(currTitle).toBeDefined();
-        expect(
-          String(prevTitle).localeCompare(String(currTitle))
-        ).toBeLessThanOrEqual(0);
-      }
+      expectOrderedBy(results, "movie/title", "asc", limit);
     },
     { timeout: TIMEOUT }
   );
@@ -155,17 +138,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBeGreaterThan(0);
       expect(results.length).toBeLessThanOrEqual(limit);
-
-      // Should be sorted descending by vote_average
-      for (let i = 1; i < results.length; i++) {
-        const prevVoteAvg = results[i - 1]?.["movie/vote_average"];
-        const currVoteAvg = results[i]?.["movie/vote_average"];
-        expect(prevVoteAvg).toBeDefined();
-        expect(currVoteAvg).toBeDefined();
-        expect(Number(prevVoteAvg)).toBeGreaterThanOrEqual(Number(currVoteAvg));
-      }
-
-      // Verify all results have required fields
+      expectOrderedBy(results, "movie/vote_average", "desc");
       for (const movie of results) {
         expect(movie["movie/id"]).toBeDefined();
         expect(movie["movie/title"]).toBeDefined();
@@ -173,6 +146,57 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
         expect(movie["movie/vote_count"]).toBeDefined();
         expect(typeof movie["movie/title"]).toBe("string");
         expect(typeof Number(movie["movie/vote_average"])).toBe("number");
+      }
+    },
+    { timeout: TIMEOUT }
+  );
+
+  it(
+    "should return movies sorted by vote count descending",
+    async () => {
+      // Get movies sorted by vote_count descending (most voted movies)
+      const limit = 10;
+      const results = await f.db.queryWithMetadata({
+        find: {
+          "movie/id": ["?id"],
+          "movie/title": ["?title"],
+          "movie/vote_count": ["?vote_count"],
+          "movie/vote_average": ["?vote_average"],
+        },
+        where: [
+          {
+            e: "?id",
+            a: "tmdb.movie/title",
+            v: "?title",
+          },
+          {
+            e: "?id",
+            a: "tmdb.movie/vote_count",
+            v: "?vote_count",
+          },
+          {
+            e: "?id",
+            a: "tmdb.movie/vote_average",
+            v: "?vote_average",
+          },
+        ],
+        orderBy: [["?vote_count", "desc"]],
+        limit: limit,
+      });
+
+      console.log(results);
+      expect(results).toBeDefined();
+      expect(Array.isArray(results.data)).toBe(true);
+      expect(results.data.length).toBe(limit);
+      expectOrderedBy(results.data, "movie/vote_count", "desc", limit);
+      for (const movie of results.data) {
+        expect(movie["movie/id"]).toBeDefined();
+        expect(movie["movie/title"]).toBeDefined();
+        expect(movie["movie/vote_count"]).toBeDefined();
+        expect(movie["movie/vote_average"]).toBeDefined();
+        expect(typeof movie["movie/title"]).toBe("string");
+        expect(typeof Number(movie["movie/vote_count"])).toBe("number");
+        expect(Number(movie["movie/vote_count"])).toBeGreaterThanOrEqual(0);
       }
     },
     { timeout: TIMEOUT }
