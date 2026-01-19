@@ -190,7 +190,7 @@ export function QueryEditor() {
                   setLoading(false);
                 }}
                 onExecuteError={handleExecuteError}
-                title="TypeScript Query"
+                title="Datoms"
                 runButtonLabel="Run Code"
                 saveButtonLabel="Save"
                 showShortcutsHelp={true}

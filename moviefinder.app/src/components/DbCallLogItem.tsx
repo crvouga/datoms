@@ -14,14 +14,17 @@ interface DbCallLogItemProps {
 type TabType = "datalog" | "sql" | "result" | "error" | "args";
 
 export function DbCallLogItem({
-  log,
-  isExpanded,
-  onToggle,
+    log,
+    isExpanded,
+    onToggle,
 }: DbCallLogItemProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("datalog");
-  const [height, setHeight] = useState<number>(256); // Default height in pixels
-  const resizeRef = useRef<HTMLDivElement>(null);
-  const isResizingRef = useRef(false);
+    const [activeTab, setActiveTab] = useState<TabType>("datalog");
+    const [height, setHeight] = useState<number>(256); // Default height in pixels
+    const contentRef = useRef<HTMLDivElement>(null);
+    const resizeHandleRef = useRef<HTMLDivElement>(null);
+    const isResizingRef = useRef(false);
+    const startYRef = useRef(0);
+    const startHeightRef = useRef(0);
 
     const formatDuration = (duration: number): string => {
         if (duration < 1) {
@@ -108,48 +111,50 @@ export function DbCallLogItem({
         return tabs.length > 0 ? tabs : ["args"];
     }, [datalogQuery, sqlQuery, log.args, log.result, log.error]);
 
-  // Set default tab when expanded
-  useEffect(() => {
-    if (isExpanded && !availableTabs.includes(activeTab)) {
-      const defaultTab = (availableTabs[0] || "args") as TabType;
-      setActiveTab(defaultTab);
-    }
-  }, [isExpanded, availableTabs, activeTab]);
+    // Set default tab when expanded
+    useEffect(() => {
+        if (isExpanded && !availableTabs.includes(activeTab)) {
+            const defaultTab = (availableTabs[0] || "args") as TabType;
+            setActiveTab(defaultTab);
+        }
+    }, [isExpanded, availableTabs, activeTab]);
 
-  // Handle mouse resize
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizingRef.current = true;
-    document.body.style.cursor = "ns-resize";
-    document.body.style.userSelect = "none";
-  }, []);
+    // Handle mouse resize
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!contentRef.current) return;
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizingRef.current) return;
-      
-      const newHeight = e.clientY - (resizeRef.current?.getBoundingClientRect().top || 0);
-      if (newHeight >= 200 && newHeight <= 800) {
-        setHeight(newHeight);
-      }
-    };
+        isResizingRef.current = true;
+        startYRef.current = e.clientY;
+        startHeightRef.current = height;
+        document.body.style.cursor = "ns-resize";
+        document.body.style.userSelect = "none";
 
-    const handleMouseUp = () => {
-      isResizingRef.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            if (!isResizingRef.current) return;
 
-    if (isResizingRef.current) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    }
+            const deltaY = moveEvent.clientY - startYRef.current;
+            const newHeight = startHeightRef.current + deltaY;
 
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, []);
+            if (newHeight >= 200 && newHeight <= 800) {
+                setHeight(newHeight);
+            }
+        };
+
+        const handleMouseUp = () => {
+            if (isResizingRef.current) {
+                isResizingRef.current = false;
+                document.body.style.cursor = "";
+                document.body.style.userSelect = "";
+                document.removeEventListener("mousemove", handleMouseMove);
+                document.removeEventListener("mouseup", handleMouseUp);
+            }
+        };
+
+        document.addEventListener("mousemove", handleMouseMove);
+        document.addEventListener("mouseup", handleMouseUp);
+    }, [height]);
 
     const statusColor = log.error
         ? "bg-red-900/30 text-red-400 border-red-700"
@@ -210,32 +215,18 @@ export function DbCallLogItem({
                         ))}
                     </div>
 
-                    {/* Tab Content */}
-                    <div className="h-64 min-h-[256px]">
-                        {activeTab === "datalog" && datalogQuery && (
-                            <Editor
-                                height="100%"
-                                defaultLanguage="json"
-                                value={JSON.stringify(datalogQuery, null, 2)}
-                                theme={MONACO_THEME}
-                                options={{
-                                    minimap: { enabled: false },
-                                    fontSize: 12,
-                                    wordWrap: "on",
-                                    readOnly: true,
-                                    scrollBeyondLastLine: false,
-                                    lineNumbers: "off",
-                                    folding: true,
-                                }}
-                            />
-                        )}
-
-                        {activeTab === "sql" && sqlQuery && !("error" in sqlQuery) && (
-                            <div className="h-full flex flex-col">
+                    {/* Tab Content Container */}
+                    <div className="relative" style={{ height: `${height + 3}px` }}>
+                        <div
+                            ref={contentRef}
+                            style={{ height: `${height}px` }}
+                            className="min-h-[200px] max-h-[800px] overflow-hidden"
+                        >
+                            {activeTab === "datalog" && datalogQuery && (
                                 <Editor
                                     height="100%"
-                                    defaultLanguage="sql"
-                                    value={sqlQuery.sql}
+                                    defaultLanguage="json"
+                                    value={JSON.stringify(datalogQuery, null, 2)}
                                     theme={MONACO_THEME}
                                     options={{
                                         minimap: { enabled: false },
@@ -243,77 +234,107 @@ export function DbCallLogItem({
                                         wordWrap: "on",
                                         readOnly: true,
                                         scrollBeyondLastLine: false,
-                                        lineNumbers: "on",
+                                        lineNumbers: "off",
                                         folding: true,
                                     }}
                                 />
-                                {sqlQuery.params.length > 0 && (
-                                    <div className="p-2 bg-gray-800/50 border-t border-gray-700 text-xs text-gray-400">
-                                        Parameters: {sqlQuery.params.length}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                            )}
 
-                        {activeTab === "sql" && sqlQuery && "error" in sqlQuery && (
-                            <div className="h-full p-4 bg-red-900/20 text-red-300 font-mono text-sm">
-                                <div className="font-semibold mb-2">SQL Generation Error:</div>
-                                <div>{sqlQuery.error}</div>
-                            </div>
-                        )}
-
-                        {activeTab === "result" && (
-                            <Editor
-                                height="100%"
-                                defaultLanguage="json"
-                                value={
-                                    log.result === undefined
-                                        ? "undefined"
-                                        : JSON.stringify(log.result, null, 2)
-                                }
-                                theme={MONACO_THEME}
-                                options={{
-                                    minimap: { enabled: false },
-                                    fontSize: 12,
-                                    wordWrap: "on",
-                                    readOnly: true,
-                                    scrollBeyondLastLine: false,
-                                    lineNumbers: "off",
-                                    folding: true,
-                                }}
-                            />
-                        )}
-
-                        {activeTab === "error" && log.error && (
-                            <div className="h-full p-4 bg-red-900/20">
-                                <div className="font-semibold text-red-400 mb-2">Error:</div>
-                                <div className="text-red-300 font-mono text-sm whitespace-pre-wrap">
-                                    {log.error}
+                            {activeTab === "sql" && sqlQuery && !("error" in sqlQuery) && (
+                                <div className="h-full flex flex-col">
+                                    <Editor
+                                        height="100%"
+                                        defaultLanguage="sql"
+                                        value={sqlQuery.sql}
+                                        theme={MONACO_THEME}
+                                        options={{
+                                            minimap: { enabled: false },
+                                            fontSize: 12,
+                                            wordWrap: "on",
+                                            readOnly: true,
+                                            scrollBeyondLastLine: false,
+                                            lineNumbers: "on",
+                                            folding: true,
+                                        }}
+                                    />
+                                    {sqlQuery.params.length > 0 && (
+                                        <div className="p-2 bg-gray-800/50 border-t border-gray-700 text-xs text-gray-400">
+                                            Parameters: {sqlQuery.params.length}
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {activeTab === "args" && (
-                            <Editor
-                                height="100%"
-                                defaultLanguage="json"
-                                value={
-                                    log.args.length === 0
-                                        ? "[]"
-                                        : JSON.stringify(log.args, null, 2)
-                                }
-                                theme={MONACO_THEME}
-                                options={{
-                                    minimap: { enabled: false },
-                                    fontSize: 12,
-                                    wordWrap: "on",
-                                    readOnly: true,
-                                    scrollBeyondLastLine: false,
-                                    lineNumbers: "off",
-                                    folding: true,
-                                }}
-                            />
-                        )}
+                            {activeTab === "sql" && sqlQuery && "error" in sqlQuery && (
+                                <div className="h-full p-4 bg-red-900/20 text-red-300 font-mono text-sm">
+                                    <div className="font-semibold mb-2">SQL Generation Error:</div>
+                                    <div>{sqlQuery.error}</div>
+                                </div>
+                            )}
+
+                            {activeTab === "result" && (
+                                <Editor
+                                    height="100%"
+                                    defaultLanguage="json"
+                                    value={
+                                        log.result === undefined
+                                            ? "undefined"
+                                            : JSON.stringify(log.result, null, 2)
+                                    }
+                                    theme={MONACO_THEME}
+                                    options={{
+                                        minimap: { enabled: false },
+                                        fontSize: 12,
+                                        wordWrap: "on",
+                                        readOnly: true,
+                                        scrollBeyondLastLine: false,
+                                        lineNumbers: "off",
+                                        folding: true,
+                                    }}
+                                />
+                            )}
+
+                            {activeTab === "error" && log.error && (
+                                <div className="h-full p-4 bg-red-900/20">
+                                    <div className="font-semibold text-red-400 mb-2">Error:</div>
+                                    <div className="text-red-300 font-mono text-sm whitespace-pre-wrap">
+                                        {log.error}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === "args" && (
+                                <Editor
+                                    height="100%"
+                                    defaultLanguage="json"
+                                    value={
+                                        log.args.length === 0
+                                            ? "[]"
+                                            : JSON.stringify(log.args, null, 2)
+                                    }
+                                    theme={MONACO_THEME}
+                                    options={{
+                                        minimap: { enabled: false },
+                                        fontSize: 12,
+                                        wordWrap: "on",
+                                        readOnly: true,
+                                        scrollBeyondLastLine: false,
+                                        lineNumbers: "off",
+                                        folding: true,
+                                    }}
+                                />
+                            )}
+                        </div>
+                        {/* Resize Handle */}
+                        <div
+                            ref={resizeHandleRef}
+                            onMouseDown={handleMouseDown}
+                            className="absolute bottom-0 left-0 right-0 h-3 bg-gray-700 hover:bg-blue-600 cursor-ns-resize transition-colors group z-20 flex items-center justify-center pointer-events-auto"
+                            style={{ top: `${height}px` }}
+                            title="Drag to resize"
+                        >
+                            <div className="w-12 h-0.5 bg-gray-500 opacity-50 group-hover:opacity-100 transition-opacity" />
+                        </div>
                     </div>
                 </div>
             )}
