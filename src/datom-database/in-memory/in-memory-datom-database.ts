@@ -633,20 +633,54 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     return this.nextTx > 1 ? this.nextTx - 1 : 0;
   }
 
-  async _destroy(datoms: Datom[]): Promise<void> {
+  async _destroy(query: DatomsParams): Promise<void> {
     await this._ensureInitialized();
 
-    // Create a set of keys for fast lookup
-    const keysToDelete = new Set<string>();
-    for (const datom of datoms) {
-      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
-      keysToDelete.add(key);
+    // Validate that tx and txMax are mutually exclusive
+    if (query.tx !== undefined && query.txMax !== undefined) {
+      throw new Error(
+        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
+      );
     }
 
-    // Filter out datoms that match the keys to delete
+    // Require at least one filter to prevent accidental full table deletion
+    const hasFilter =
+      query.e !== undefined ||
+      query.a !== undefined ||
+      query.v !== undefined ||
+      query.tx !== undefined ||
+      query.txMax !== undefined ||
+      query.op !== undefined;
+
+    if (!hasFilter) {
+      throw new Error(
+        "Destroy query must include at least one filter (e, a, v, tx, txMax, op) to prevent accidental full table deletion"
+      );
+    }
+
+    // Filter out datoms that match the query
     this._datomsArray = this._datomsArray.filter((datom) => {
-      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
-      return !keysToDelete.has(key);
+      // Apply filters
+      if (query.e !== undefined && datom.e !== query.e) {
+        return true; // Keep this datom
+      }
+      if (query.a !== undefined && datom.a !== query.a) {
+        return true; // Keep this datom
+      }
+      if (query.v !== undefined && datom.v !== query.v) {
+        return true; // Keep this datom
+      }
+      if (query.tx !== undefined && datom.tx !== query.tx) {
+        return true; // Keep this datom
+      }
+      if (query.txMax !== undefined && datom.tx > query.txMax) {
+        return true; // Keep this datom
+      }
+      if (query.op !== undefined && datom.op !== query.op) {
+        return true; // Keep this datom
+      }
+      // All filters passed, remove this datom
+      return false;
     });
   }
 

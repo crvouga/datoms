@@ -85,7 +85,7 @@ interface RegisterHookResponse {
 
 interface DeleteDatomsRequest {
   method: "deleteDatoms";
-  datoms: Datom[];
+  query: DatomsParams;
 }
 
 interface DeleteDatomsResponse {
@@ -119,7 +119,7 @@ type TransportResponse =
 export class HttpClientDatomDatabaseServerComponent {
   private initialized = false;
 
-  constructor(private db: DatomDatabase) { }
+  constructor(private db: DatomDatabase) {}
 
   /**
    * Handle an incoming HTTP request
@@ -346,7 +346,7 @@ export class HttpClientDatomDatabaseServerComponent {
   ): Promise<DeleteDatomsResponse> {
     await this._ensureInitialized();
 
-    await this.db._destroy(request.datoms);
+    await this.db._destroy(request.query);
     return { success: true };
   }
 

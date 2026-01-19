@@ -1151,30 +1151,60 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     return Number(row.last_tx);
   }
 
-  async _destroy(datoms: Datom[]): Promise<void> {
+  async _destroy(query: DatomsParams): Promise<void> {
     await this._ensureInitialized();
 
-    if (datoms.length === 0) {
-      return;
-    }
-
-    // Build DELETE statement with IN clause for each datom
-    // SQLite doesn't support multi-column IN, so we'll use OR conditions
     const conditions: string[] = [];
     const params: unknown[] = [];
 
-    for (const datom of datoms) {
-      conditions.push(`(e = ? AND a = ? AND v = ? AND tx = ? AND op = ?)`);
-      params.push(
-        String(datom.e),
-        String(datom.a),
-        JSON.stringify(datom.v),
-        datom.tx,
-        datom.op
+    if (query.e !== undefined) {
+      conditions.push("e = ?");
+      params.push(String(query.e));
+    }
+    if (query.a !== undefined) {
+      conditions.push("a = ?");
+      params.push(String(query.a));
+    }
+    if (query.v !== undefined) {
+      let value = query.v;
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      conditions.push("v = ?");
+      params.push(JSON.stringify(value));
+    }
+    if (query.tx !== undefined) {
+      conditions.push("tx = ?");
+      params.push(query.tx);
+    }
+    if (query.txMax !== undefined) {
+      conditions.push("tx <= ?");
+      params.push(query.txMax);
+    }
+    if (query.op !== undefined) {
+      conditions.push("op = ?");
+      params.push(query.op);
+    }
+
+    // Require at least one condition to prevent accidental full table deletion
+    if (conditions.length === 0) {
+      throw new Error(
+        "Destroy query must include at least one filter (e, a, v, tx, txMax, op) to prevent accidental full table deletion"
       );
     }
 
-    const sql = `DELETE FROM ${this.tableName} WHERE ${conditions.join(" OR ")}`;
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
+    const limitClause = query.limit ? "LIMIT ?" : "";
+    const offsetClause = query.offset !== undefined ? "OFFSET ?" : "";
+
+    if (query.limit) {
+      params.push(query.limit);
+    }
+    if (query.offset !== undefined) {
+      params.push(query.offset);
+    }
+
+    const sql = `DELETE FROM ${this.tableName} ${whereClause} ${limitClause} ${offsetClause}`;
     await this.connection.execute(sql, params);
   }
 

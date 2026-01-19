@@ -1731,34 +1731,61 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     return Number(row.last_tx);
   }
 
-  async _destroy(datoms: Datom[]): Promise<void> {
+  async _destroy(query: DatomsParams): Promise<void> {
     await this._ensureInitialized();
 
-    if (datoms.length === 0) {
-      return;
-    }
-
-    // Build DELETE statement with OR conditions for each datom
-    // PostgreSQL supports multi-column comparisons, but we'll use OR for clarity
+    // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
     const conditions: string[] = [];
     const params: unknown[] = [];
-    let paramIndex = 1;
 
-    for (const datom of datoms) {
-      conditions.push(
-        `(e = $${paramIndex} AND a = $${paramIndex + 1} AND v = $${paramIndex + 2}::jsonb AND tx = $${paramIndex + 3} AND op = $${paramIndex + 4})`
-      );
-      params.push(
-        String(datom.e),
-        String(datom.a),
-        JSON.stringify(datom.v),
-        datom.tx,
-        datom.op
-      );
-      paramIndex += 5;
+    if (query.e !== undefined) {
+      conditions.push("e = ?");
+      params.push(String(query.e));
+    }
+    if (query.a !== undefined) {
+      conditions.push("a = ?");
+      params.push(String(query.a));
+    }
+    if (query.v !== undefined) {
+      let value = query.v;
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      conditions.push("v = ?::jsonb");
+      params.push(JSON.stringify(value));
+    }
+    if (query.tx !== undefined) {
+      conditions.push("tx = ?");
+      params.push(query.tx);
+    }
+    if (query.txMax !== undefined) {
+      conditions.push("tx <= ?");
+      params.push(query.txMax);
+    }
+    if (query.op !== undefined) {
+      conditions.push("op = ?");
+      params.push(query.op);
     }
 
-    const sql = `DELETE FROM ${this.tableName} WHERE ${conditions.join(" OR ")}`;
+    // Require at least one condition to prevent accidental full table deletion
+    if (conditions.length === 0) {
+      throw new Error(
+        "Destroy query must include at least one filter (e, a, v, tx, txMax, op) to prevent accidental full table deletion"
+      );
+    }
+
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
+    const limitClause = query.limit ? "LIMIT ?" : "";
+    const offsetClause = query.offset !== undefined ? "OFFSET ?" : "";
+
+    if (query.limit) {
+      params.push(query.limit);
+    }
+    if (query.offset !== undefined) {
+      params.push(query.offset);
+    }
+
+    const sql = `DELETE FROM ${this.tableName} ${whereClause} ${limitClause} ${offsetClause}`;
     await this.connection.execute(sql, params);
   }
 

@@ -310,11 +310,11 @@ export interface DatomDatabase extends DatabaseView {
   ): Promise<QueryResultEnvelope>;
 
   /**
-   * Delete specific datoms from the database.
-   * @param datoms Array of datoms to delete (must match exactly by e, a, v, tx, op)
+   * Delete datoms from the database matching the given query.
+   * @param query Query parameters to match datoms for deletion
    * @internal
    */
-  _destroy(datoms: Datom[]): Promise<void>;
+  _destroy(query: DatomsParams): Promise<void>;
 }
 
 /**

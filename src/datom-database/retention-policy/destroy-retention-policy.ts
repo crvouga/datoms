@@ -13,6 +13,7 @@
 import type { Datom } from "../../datoms.js";
 import type { Logger } from "../../types.js";
 import type { DatomDatabase } from "../datom-database.js";
+import type { DatomsParams } from "../views/database-view.js";
 import type { RetentionPolicy } from "./retention-policy.js";
 import type { RetentionPolicyConfig, RetentionResult } from "./types.js";
 
@@ -306,27 +307,129 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
       });
 
       let deleted = 0;
-      const totalBatches = Math.ceil(obsoleteDatoms.length / batchSize);
 
-      // Process in batches
-      for (let i = 0; i < obsoleteDatoms.length; i += batchSize) {
-        const batch = obsoleteDatoms.slice(i, i + batchSize);
-        const batchNumber = Math.floor(i / batchSize) + 1;
+      // Group obsolete datoms by transaction ID ranges for efficient query-based deletion
+      // This allows us to delete batches using txMax queries instead of passing arrays
+      const txGroups = new Map<number, Datom[]>();
+      for (const datom of obsoleteDatoms) {
+        const tx = datom.tx;
+        if (!txGroups.has(tx)) {
+          txGroups.set(tx, []);
+        }
+        txGroups.get(tx)!.push(datom);
+      }
 
-        this.logger?.debug("Processing batch", {
+      // Sort transaction IDs to process in order
+      const sortedTxs = Array.from(txGroups.keys()).sort((a, b) => a - b);
+      const totalBatches = Math.ceil(
+        sortedTxs.length / Math.ceil(batchSize / 100)
+      ); // Approximate batches
+
+      let batchNumber = 0;
+      let currentBatch: Datom[] = [];
+
+      // Process obsolete datoms grouped by transaction ID
+      for (const tx of sortedTxs) {
+        const txDatoms = txGroups.get(tx)!;
+        currentBatch.push(...txDatoms);
+
+        // When batch reaches size limit, delete it
+        if (currentBatch.length >= batchSize) {
+          batchNumber++;
+          const batchToDelete = currentBatch.slice(0, batchSize);
+          currentBatch = currentBatch.slice(batchSize);
+
+          this.logger?.debug("Processing batch", {
+            event: "retention_policy_batch_processing",
+            policy: "destroy",
+            batchNumber,
+            totalBatches,
+            batchSize: batchToDelete.length,
+            cutoffTx,
+          });
+
+          // Safety check: Verify batch doesn't contain current datoms before deletion
+          const batchCurrentDatoms = batchToDelete.filter(
+            (d) => d.tx >= latestTx
+          );
+          if (batchCurrentDatoms.length > 0) {
+            const error = new Error(
+              `Safety check failed: Attempted to delete ${batchCurrentDatoms.length} current datoms in batch ${batchNumber}. This should never happen.`
+            );
+            this.logger?.error(
+              "Safety check failed: current datoms in deletion batch",
+              {
+                event: "retention_policy_batch_safety_check_failed",
+                policy: "destroy",
+                batchNumber,
+                latestTx,
+                cutoffTx,
+                currentDatomsCount: batchCurrentDatoms.length,
+                error: error.message,
+              }
+            );
+            throw error;
+          }
+
+          // Group batch by (e, a, v, tx, op) to construct efficient queries
+          // For each unique combination, delete using a query
+          const datomGroups = new Map<string, Datom[]>();
+          for (const datom of batchToDelete) {
+            const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
+            if (!datomGroups.has(key)) {
+              datomGroups.set(key, []);
+            }
+            datomGroups.get(key)!.push(datom);
+          }
+
+          // Delete each group using a query
+          // Since we have exact matches, we can construct queries with e, a, v, tx, op
+          for (const [, groupDatoms] of datomGroups.entries()) {
+            if (groupDatoms.length === 0) continue;
+            const datom = groupDatoms[0]!;
+
+            // Construct query to match this exact datom
+            const deleteQuery: DatomsParams = {
+              e: datom.e,
+              a: datom.a,
+              v: datom.v,
+              tx: datom.tx,
+              op: datom.op,
+            };
+
+            await this.sourceDb._destroy(deleteQuery);
+          }
+
+          deleted += batchToDelete.length;
+
+          this.logger?.debug("Batch deleted", {
+            event: "retention_policy_batch_deleted",
+            policy: "destroy",
+            batchNumber,
+            totalBatches,
+            batchSize: batchToDelete.length,
+            deletedSoFar: deleted,
+          });
+        }
+      }
+
+      // Delete remaining datoms in final batch
+      if (currentBatch.length > 0) {
+        batchNumber++;
+        this.logger?.debug("Processing final batch", {
           event: "retention_policy_batch_processing",
           policy: "destroy",
           batchNumber,
           totalBatches,
-          batchSize: batch.length,
+          batchSize: currentBatch.length,
           cutoffTx,
         });
 
-        // Safety check: Verify batch doesn't contain current datoms before deletion
-        const batchCurrentDatoms = batch.filter((d) => d.tx >= latestTx);
+        // Safety check
+        const batchCurrentDatoms = currentBatch.filter((d) => d.tx >= latestTx);
         if (batchCurrentDatoms.length > 0) {
           const error = new Error(
-            `Safety check failed: Attempted to delete ${batchCurrentDatoms.length} current datoms in batch ${batchNumber}. This should never happen.`
+            `Safety check failed: Attempted to delete ${batchCurrentDatoms.length} current datoms in final batch. This should never happen.`
           );
           this.logger?.error(
             "Safety check failed: current datoms in deletion batch",
@@ -343,17 +446,39 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
           throw error;
         }
 
-        // Delete batch from source database
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        await this.sourceDb._destroy(batch);
-        deleted += batch.length;
+        // Delete final batch
+        const datomGroups = new Map<string, Datom[]>();
+        for (const datom of currentBatch) {
+          const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
+          if (!datomGroups.has(key)) {
+            datomGroups.set(key, []);
+          }
+          datomGroups.get(key)!.push(datom);
+        }
 
-        this.logger?.debug("Batch deleted", {
+        for (const [, groupDatoms] of datomGroups.entries()) {
+          if (groupDatoms.length === 0) continue;
+          const datom = groupDatoms[0]!;
+
+          const deleteQuery: DatomsParams = {
+            e: datom.e,
+            a: datom.a,
+            v: datom.v,
+            tx: datom.tx,
+            op: datom.op,
+          };
+
+          await this.sourceDb._destroy(deleteQuery);
+        }
+
+        deleted += currentBatch.length;
+
+        this.logger?.debug("Final batch deleted", {
           event: "retention_policy_batch_deleted",
           policy: "destroy",
           batchNumber,
           totalBatches,
-          batchSize: batch.length,
+          batchSize: currentBatch.length,
           deletedSoFar: deleted,
         });
       }

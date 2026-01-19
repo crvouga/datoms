@@ -7,6 +7,7 @@ import { createLogger } from "../../../src/app/src/lib/logger.js";
 import type { Datom } from "../../datoms.js";
 import type { Logger } from "../../types.js";
 import type { DatomDatabase } from "../datom-database.js";
+import type { DatomsParams } from "../views/database-view.js";
 import type { RetentionPolicy } from "./retention-policy.js";
 import type { RetentionPolicyConfig, RetentionResult } from "./types.js";
 
@@ -284,9 +285,33 @@ export class ArchiveRetentionPolicy implements RetentionPolicy {
           archivedSoFar: archived,
         });
 
-        // Delete batch from source database
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        await this.sourceDb._destroy(batch);
+        // Delete batch from source database using query-based deletion
+        // Group batch by (e, a, v, tx, op) to construct efficient queries
+        const datomGroups = new Map<string, Datom[]>();
+        for (const datom of batch) {
+          const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
+          if (!datomGroups.has(key)) {
+            datomGroups.set(key, []);
+          }
+          datomGroups.get(key)!.push(datom);
+        }
+
+        // Delete each group using a query
+        for (const [, groupDatoms] of datomGroups.entries()) {
+          if (groupDatoms.length === 0) continue;
+          const datom = groupDatoms[0]!;
+
+          // Construct query to match this exact datom
+          const deleteQuery: DatomsParams = {
+            e: datom.e,
+            a: datom.a,
+            v: datom.v,
+            tx: datom.tx,
+            op: datom.op,
+          };
+
+          await this.sourceDb._destroy(deleteQuery);
+        }
         deleted += batch.length;
 
         this.logger?.debug("Batch deleted", {

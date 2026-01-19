@@ -262,13 +262,13 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     }
   }
 
-  async _destroy(datoms: Datom[]): Promise<void> {
+  async _destroy(query: DatomsParams): Promise<void> {
     await this._ensureInitialized();
 
     try {
       await this.httpClient.post<DeleteDatomsResponse>(this.endpoint, {
         method: "deleteDatoms",
-        datoms,
+        query,
       });
     } catch (error) {
       throw new Error(
