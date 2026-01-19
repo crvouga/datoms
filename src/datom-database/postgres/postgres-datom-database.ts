@@ -842,12 +842,12 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._executeDatoms(options, {
+      const queryPromise = this._datoms(options, {
         type: "current",
       });
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      envelope = await this._executeDatoms(options, {
+      envelope = await this._datoms(options, {
         type: "current",
       });
     }
@@ -1392,7 +1392,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResultEnvelope> {
-    return this._executeQuery(query, context, {
+    return this._query(query, context, {
       type: "current",
     });
   }
@@ -1774,7 +1774,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     await this.connection.execute(sql, params);
   }
 
-  public async _executeDatoms(
+  public async _datoms(
     options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
@@ -2062,7 +2062,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     return { sql };
   }
 
-  public async _executeQuery(
+  public async _query(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
@@ -2116,7 +2116,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const clauseDatoms = await this._executeDatoms(
+      const clauseDatoms = await this._datoms(
         {
           e: entity,
           a: attribute,
@@ -2165,7 +2165,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const firstDatoms = await this._executeDatoms(
+      const firstDatoms = await this._datoms(
         {
           e: entity,
           a: attribute,
@@ -2203,7 +2203,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           : (attributeVal as string);
         const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-        const clauseDatoms = await this._executeDatoms(
+        const clauseDatoms = await this._datoms(
           {
             e: entity,
             a: attribute,

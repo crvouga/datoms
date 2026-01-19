@@ -273,8 +273,8 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     };
   }
 
-  async datoms(options: DatomsQuery): Promise<Datom[]> {
-    const envelope = await this.datomsWithMetadata(options);
+  async datoms(query: DatomsQuery): Promise<Datom[]> {
+    const envelope = await this.datomsWithMetadata(query);
     return envelope.data;
   }
 
@@ -305,12 +305,12 @@ export class InMemoryDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._executeDatoms(options, {
+      const queryPromise = this._datoms(options, {
         type: "current",
       });
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      envelope = await this._executeDatoms(options, {
+      envelope = await this._datoms(options, {
         type: "current",
       });
     }
@@ -551,7 +551,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResultEnvelope> {
-    return this._executeQuery(query, context, {
+    return this._query(query, context, {
       type: "current",
     });
   }
@@ -673,7 +673,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     });
   }
 
-  public async _executeDatoms(
+  public async _datoms(
     options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
@@ -713,7 +713,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     };
   }
 
-  public async _executeQuery(
+  public async _query(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
@@ -769,7 +769,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
       // Use executeQueryWithViewConfig instead of datoms()
-      const clauseDatoms = await this._executeDatoms(
+      const clauseDatoms = await this._datoms(
         {
           e: entity,
           a: attribute,

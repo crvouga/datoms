@@ -304,8 +304,8 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     };
   }
 
-  async datoms(options: DatomsQuery): Promise<Datom[]> {
-    const envelope = await this.datomsWithMetadata(options);
+  async datoms(query: DatomsQuery): Promise<Datom[]> {
+    const envelope = await this.datomsWithMetadata(query);
     return envelope.data;
   }
 
@@ -324,10 +324,10 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._executeDatoms(options, this.currentViewConfig);
+      const queryPromise = this._datoms(options, this.currentViewConfig);
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      envelope = await this._executeDatoms(options, this.currentViewConfig);
+      envelope = await this._datoms(options, this.currentViewConfig);
     }
 
     // Check result size limit if specified
@@ -357,10 +357,10 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResultEnvelope> {
-    return this._executeQuery(query, context, this.currentViewConfig);
+    return this._query(query, context, this.currentViewConfig);
   }
 
-  async _executeQuery(
+  async _query(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
@@ -422,7 +422,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
       if (!hasAnyFilter) {
         // All variables - get all datoms using _executeQuery with limit to satisfy validation
         // For speculative views, this will fetch all datoms and merge with speculative ones
-        const rawDatoms = await this._executeDatoms(
+        const rawDatoms = await this._datoms(
           { limit: Number.MAX_SAFE_INTEGER },
           viewConfig
         );
@@ -435,8 +435,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         if (entity !== undefined) queryOptions.e = entity;
         if (attribute !== undefined) queryOptions.a = attribute;
         if (value !== undefined) queryOptions.v = value;
-        clauseDatoms = (await this._executeDatoms(queryOptions, viewConfig))
-          .data;
+        clauseDatoms = (await this._datoms(queryOptions, viewConfig)).data;
       }
 
       for (const datom of clauseDatoms) {
@@ -533,7 +532,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     };
   }
 
-  async _executeDatoms(
+  async _datoms(
     options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {

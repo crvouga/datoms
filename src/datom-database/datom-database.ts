@@ -253,7 +253,7 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Envelope containing datoms result and optional metadata
    * @internal
    */
-  _executeDatoms(
+  _datoms(
     options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope>;
@@ -267,7 +267,7 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Envelope containing query results and optional metadata
    * @internal
    */
-  _executeQuery(
+  _query(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
