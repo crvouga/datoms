@@ -25,8 +25,8 @@ const createInMemoryFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => { },
-    afterEach: async () => { },
+    beforeEach: async () => {},
+    afterEach: async () => {},
   };
 };
 
@@ -43,8 +43,8 @@ const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => { },
-    afterEach: async () => { },
+    beforeEach: async () => {},
+    afterEach: async () => {},
   };
 };
 
@@ -71,8 +71,8 @@ const createPGLiteFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => { },
-    afterEach: async () => { },
+    beforeEach: async () => {},
+    afterEach: async () => {},
   };
 };
 
@@ -82,7 +82,7 @@ const createLocalTransportRemoteFixture = async (): Promise<Fixture> => {
   await db.initialize();
   return {
     db,
-    beforeEach: async () => { },
+    beforeEach: async () => {},
     afterEach: async () => {
       await db.close();
     },

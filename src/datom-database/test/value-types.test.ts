@@ -37,34 +37,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should handle Date values", async () => {
-      const { db } = f;
-      const date1 = new Date("2023-01-01");
-      const date2 = new Date("2023-02-01");
-      const date3 = new Date("2023-01-01");
-
-      await db.transact([
-        { op: "assert", e: 1, a: "created", v: date1 },
-        { op: "assert", e: 2, a: "created", v: date2 },
-        { op: "assert", e: 3, a: "created", v: date3 },
-      ]);
-
-      const query: DatalogQuery = {
-        find: { e: ["?e"], d: ["?d"] },
-        where: [{ e: "?e", a: "created", v: "?d" }],
-      };
-
-      const results = await db.query(query);
-      expect(results).toHaveLength(3);
-      // Verify dates are returned correctly
-      const dates = results.map((r) => r["d"]);
-      expect(dates).toContainEqual(date1);
-      expect(dates).toContainEqual(date2);
-      expect(dates).toContainEqual(date3);
-
-      await db.close();
-    });
-
     test("should handle null values", async () => {
       const { db } = f;
       await db.transact([

@@ -721,45 +721,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.close();
     });
 
-    test("should handle time-travel queries with date values", async () => {
-      const { db } = f;
-      const date1 = new Date("2024-01-01");
-      const date2 = new Date("2024-01-02");
-      const date3 = new Date("2024-01-03");
-
-      const tx1 = await db.transact([
-        { op: "assert", e: 1, a: "created", v: date1 },
-      ]);
-      const tx2 = await db.transact([
-        { op: "assert", e: 1, a: "created", v: date2 },
-      ]);
-      await db.transact([{ op: "assert", e: 1, a: "created", v: date3 }]);
-
-      // Query at tx1
-      const atTx1Results = await db.asOf(tx1).query({
-        find: { v: ["?v"] },
-        where: [{ e: 1, a: "created", v: "?v" }],
-      });
-      expect(atTx1Results[0]?.v).toBeInstanceOf(Date);
-      expect((atTx1Results[0]?.v as Date).getTime()).toBe(date1.getTime());
-
-      // Query at tx2
-      const atTx2Results = await db.asOf(tx2).query({
-        find: { v: ["?v"] },
-        where: [{ e: 1, a: "created", v: "?v" }],
-      });
-      expect((atTx2Results[0]?.v as Date).getTime()).toBe(date2.getTime());
-
-      // Query changes since tx1
-      const sinceTx1 = await db.since(tx1).datoms({
-        e: 1,
-        a: "created",
-      });
-      expect(sinceTx1.length).toBeGreaterThanOrEqual(1);
-
-      await db.close();
-    });
-
     test("should handle time-travel queries with reference values", async () => {
       const { db } = f;
       const tx1 = await db.transact([

@@ -17,7 +17,6 @@ export type Attribute = string;
  *
  * **Supported Types:**
  * - Primitives: `string`, `number`, `boolean`
- * - Temporal: `Date` objects
  * - Nullability: `null`, `undefined` (for optional attributes)
  * - References: `EntityId` (number | string) for entity relationships
  *
@@ -30,20 +29,12 @@ export type Attribute = string;
  * { e: 1, a: "name", v: "Alice", op: "assert" }                    // string
  * { e: 1, a: "age", v: 30, op: "assert" }                          // number
  * { e: 1, a: "active", v: true, op: "assert" }                      // boolean
- * { e: 1, a: "createdAt", v: new Date(), op: "assert" }            // Date
  * { e: 1, a: "middleName", v: null, op: "assert" }                 // null
  * { e: 1, a: "optional", v: undefined, op: "assert" }              // undefined
  * { e: 1, a: "parent", v: 42, op: "assert" }                       // EntityId (number)
  * { e: 1, a: "owner", v: "user-123", op: "assert" }               // EntityId (string)
  */
-export type Value =
-  | string
-  | number
-  | boolean
-  | Date
-  | null
-  | undefined
-  | EntityId;
+export type Value = string | number | boolean | null | undefined | EntityId;
 
 /**
  * Converts an unknown input into a valid `Value` type for datoms.
@@ -52,7 +43,6 @@ export type Value =
  * - string
  * - number
  * - boolean
- * - Date
  * - null
  * - undefined
  *
@@ -65,7 +55,6 @@ export function value(v: unknown): Value {
   if (typeof v === "string") return v;
   if (typeof v === "number") return v;
   if (typeof v === "boolean") return v;
-  if (v instanceof Date) return v;
   if (v === null) return null;
   if (v === undefined) return undefined;
   return null;

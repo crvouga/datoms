@@ -32,23 +32,20 @@ describe("datoms", () => {
     });
 
     test("should handle all value types", () => {
-      const date = new Date("2023-01-01");
       const result = datoms({
         entityId: 1,
         string: "text",
         number: 42,
         boolean: true,
-        date: date,
         nullValue: null,
         undefinedValue: undefined,
         entityRef: 999 as EntityId,
       });
 
-      expect(result).toHaveLength(8);
+      expect(result).toHaveLength(7);
       expect(result.find((d: DatomInput) => d.a === "string")?.v).toBe("text");
       expect(result.find((d: DatomInput) => d.a === "number")?.v).toBe(42);
       expect(result.find((d: DatomInput) => d.a === "boolean")?.v).toBe(true);
-      expect(result.find((d: DatomInput) => d.a === "date")?.v).toBe(date);
       expect(result.find((d: DatomInput) => d.a === "nullValue")?.v).toBe(null);
       expect(result.find((d: DatomInput) => d.a === "undefinedValue")?.v).toBe(
         undefined
@@ -244,12 +241,10 @@ describe("records", () => {
     });
 
     test("should handle all value types", () => {
-      const date = new Date("2023-01-01");
       const result = records(
         { e: 1, a: "string", v: "text", op: "assert" },
         { e: 1, a: "number", v: 42, op: "assert" },
         { e: 1, a: "boolean", v: true, op: "assert" },
-        { e: 1, a: "date", v: date, op: "assert" },
         { e: 1, a: "nullValue", v: null, op: "assert" },
         { e: 1, a: "undefinedValue", v: undefined, op: "assert" },
         { e: 1, a: "entityRef", v: 999, op: "assert" }
@@ -260,7 +255,6 @@ describe("records", () => {
         string: "text",
         number: 42,
         boolean: true,
-        date: date,
         nullValue: null,
         undefinedValue: undefined,
         entityRef: 999,
