@@ -1,5 +1,5 @@
 import { PlayIcon } from "../../ui/icons";
-import { KeyboardShortcut } from "../../ui/KeyboardShortcut";
+import { Button } from "../../ui/Button";
 
 export interface RunButtonProps {
   onClick: () => void;
@@ -9,15 +9,16 @@ export interface RunButtonProps {
 
 export function RunButton({ onClick, loading, label }: RunButtonProps) {
   return (
-    <button
+    <Button
       onClick={onClick}
-      disabled={loading}
-      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors"
+      loading={loading}
+      loadingText="Running..."
+      variant="primary"
+      icon={<PlayIcon className="w-4 h-4" />}
+      keyboardShortcut={["mod", "Enter"]}
       title="Run code"
     >
-      <PlayIcon className="w-4 h-4" />
-      <span>{loading ? "Running..." : label}</span>
-      <KeyboardShortcut keys={["mod", "Enter"]} />
-    </button>
+      {label}
+    </Button>
   );
 }

@@ -59,7 +59,11 @@ export function useFontSize({
       const saved = localStorage.getItem(`${storageKey}_fontSize`);
       if (saved) {
         const parsed = parseInt(saved, 10);
-        if (!isNaN(parsed) && parsed >= MIN_FONT_SIZE && parsed <= MAX_FONT_SIZE) {
+        if (
+          !isNaN(parsed) &&
+          parsed >= MIN_FONT_SIZE &&
+          parsed <= MAX_FONT_SIZE
+        ) {
           return parsed;
         }
       }
