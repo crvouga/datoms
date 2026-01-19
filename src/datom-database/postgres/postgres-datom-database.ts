@@ -44,7 +44,7 @@ import { joinResults, project } from "../shared/query-results.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type {
   DatabaseView,
-  DatomsParams,
+  DatomsQuery,
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
@@ -802,13 +802,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     }
   }
 
-  async datoms(options: DatomsParams): Promise<Datom[]> {
+  async datoms(options: DatomsQuery): Promise<Datom[]> {
     const envelope = await this.datomsWithMetadata(options);
     return envelope.data;
   }
 
   async datomsWithMetadata(
-    options: DatomsParams
+    options: DatomsQuery
   ): Promise<DatomsResultEnvelope> {
     // Validate that tx and txMax are mutually exclusive
     if (options.tx !== undefined && options.txMax !== undefined) {
@@ -919,7 +919,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     };
   }
 
-  private async _executeCurrentQuery(options: DatomsParams): Promise<Datom[]> {
+  private async _executeCurrentQuery(options: DatomsQuery): Promise<Datom[]> {
     await this._ensureInitialized();
 
     // Note: Validation is handled by the base class query() method
@@ -1015,7 +1015,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   }
 
   private async _executeAsOfQuery(
-    options: DatomsParams,
+    options: DatomsQuery,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -1106,7 +1106,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     return this._mapRowsToDatoms(rows);
   }
 
-  private async _executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
+  private async _executeHistoryQuery(options: DatomsQuery): Promise<Datom[]> {
     await this._ensureInitialized();
 
     // Validate that tx and txMax are mutually exclusive
@@ -1178,7 +1178,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   }
 
   private async _executeSinceQuery(
-    options: DatomsParams,
+    options: DatomsQuery,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -1256,7 +1256,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   }
 
   private async _executeSpeculativeQuery(
-    options: DatomsParams,
+    options: DatomsQuery,
     speculativeDatoms: Datom[]
   ): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -1706,7 +1706,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     return Number(row.last_tx);
   }
 
-  async _destroy(query: DatomsParams): Promise<void> {
+  async _destroy(query: DatomsQuery): Promise<void> {
     await this._ensureInitialized();
 
     // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
@@ -1765,7 +1765,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   }
 
   public async _executeDatoms(
-    options: DatomsParams,
+    options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
     await this._ensureInitialized();
@@ -1828,7 +1828,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   /**
    * Build SQL string for current query (for metadata tracking)
    */
-  private _buildCurrentQuerySQL(options: DatomsParams): { sql: string } {
+  private _buildCurrentQuerySQL(options: DatomsQuery): { sql: string } {
     const conditions: string[] = [];
     const params: unknown[] = [];
 
@@ -1902,7 +1902,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
    * Build SQL string for asOf query (for metadata tracking)
    */
   private _buildAsOfQuerySQL(
-    options: DatomsParams,
+    options: DatomsQuery,
     _txId: TransactionId
   ): { sql: string } {
     const conditions: string[] = [];
@@ -1958,7 +1958,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
    * Build SQL string for since query (for metadata tracking)
    */
   private _buildSinceQuerySQL(
-    options: DatomsParams,
+    options: DatomsQuery,
     _txId: TransactionId
   ): { sql: string } {
     const conditions: string[] = [];
@@ -2013,7 +2013,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   /**
    * Build SQL string for history query (for metadata tracking)
    */
-  private _buildHistoryQuerySQL(options: DatomsParams): { sql: string } {
+  private _buildHistoryQuerySQL(options: DatomsQuery): { sql: string } {
     const conditions: string[] = [];
 
     if (options.e !== undefined) {

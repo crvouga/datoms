@@ -2,13 +2,13 @@
  * Shared query validation utilities
  */
 
-import type { DatomsParams } from "../views/database-view.js";
+import type { DatomsQuery } from "../views/database-view.js";
 import { QuerySafetyError } from "../hook/hook.js";
 
 /**
  * Validate that query has at least one filter or limit to prevent accidental full scans
  */
-export function validateQueryOptions(options: DatomsParams): void {
+export function validateQueryOptions(options: DatomsQuery): void {
   const hasFilter =
     options.e !== undefined ||
     options.a !== undefined ||

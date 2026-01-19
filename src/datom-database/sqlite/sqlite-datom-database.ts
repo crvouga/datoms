@@ -40,7 +40,7 @@ import { joinResults, project } from "../shared/query-results.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type {
   DatabaseView,
-  DatomsParams,
+  DatomsQuery,
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
@@ -254,13 +254,13 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     }
   }
 
-  async datoms(options: DatomsParams): Promise<Datom[]> {
+  async datoms(options: DatomsQuery): Promise<Datom[]> {
     const envelope = await this.datomsWithMetadata(options);
     return envelope.data;
   }
 
   async datomsWithMetadata(
-    options: DatomsParams
+    options: DatomsQuery
   ): Promise<DatomsResultEnvelope> {
     // Validate that tx and txMax are mutually exclusive
     if (options.tx !== undefined && options.txMax !== undefined) {
@@ -371,7 +371,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     };
   }
 
-  private async _executeCurrentQuery(options: DatomsParams): Promise<Datom[]> {
+  private async _executeCurrentQuery(options: DatomsQuery): Promise<Datom[]> {
     await this._ensureInitialized();
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -465,7 +465,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   }
 
   private async _executeAsOfQuery(
-    options: DatomsParams,
+    options: DatomsQuery,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -560,7 +560,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     return this._mapRowsToDatoms(rows);
   }
 
-  private async _executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
+  private async _executeHistoryQuery(options: DatomsQuery): Promise<Datom[]> {
     await this._ensureInitialized();
 
     // Validate that tx and txMax are mutually exclusive
@@ -632,7 +632,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   }
 
   private async _executeSinceQuery(
-    options: DatomsParams,
+    options: DatomsQuery,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -714,7 +714,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   }
 
   private async _executeSpeculativeQuery(
-    options: DatomsParams,
+    options: DatomsQuery,
     speculativeDatoms: Datom[]
   ): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -1126,7 +1126,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     return Number(row.last_tx);
   }
 
-  async _destroy(query: DatomsParams): Promise<void> {
+  async _destroy(query: DatomsQuery): Promise<void> {
     await this._ensureInitialized();
 
     const conditions: string[] = [];
@@ -1184,7 +1184,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   }
 
   public async _executeDatoms(
-    options: DatomsParams,
+    options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
     await this._ensureInitialized();

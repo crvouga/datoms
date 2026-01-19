@@ -50,7 +50,7 @@ export type DatabaseView = {
    * const dbPast = db.asOf(100);
    * const datoms = await dbPast.datoms({ entity: 123 });
    */
-  datoms(options: DatomsParams): Promise<DatomsResult>;
+  datoms(options: DatomsQuery): Promise<DatomsResult>;
 
   /**
    * Query datoms from the database view with metadata envelope
@@ -62,7 +62,7 @@ export type DatabaseView = {
    * console.log(envelope.data); // The datoms
    * console.log(envelope.metadata); // Implementation-specific metadata (SQL queries, etc.)
    */
-  datomsWithMetadata(options: DatomsParams): Promise<DatomsResultEnvelope>;
+  datomsWithMetadata(options: DatomsQuery): Promise<DatomsResultEnvelope>;
 
   /**
    * Execute a datalog query against this database view
@@ -98,7 +98,7 @@ export type DatabaseView = {
 /**
  * Options for querying datoms
  */
-export interface DatomsParams {
+export interface DatomsQuery {
   /** Filter by entity ID */
   e?: EntityId;
   /** Filter by attribute */

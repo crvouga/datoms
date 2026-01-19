@@ -41,7 +41,7 @@ import { joinResults, project } from "../shared/query-results.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type {
   DatabaseView,
-  DatomsParams,
+  DatomsQuery,
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
@@ -272,13 +272,13 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     };
   }
 
-  async datoms(options: DatomsParams): Promise<Datom[]> {
+  async datoms(options: DatomsQuery): Promise<Datom[]> {
     const envelope = await this.datomsWithMetadata(options);
     return envelope.data;
   }
 
   async datomsWithMetadata(
-    options: DatomsParams
+    options: DatomsQuery
   ): Promise<DatomsResultEnvelope> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
@@ -329,12 +329,12 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     return envelope;
   }
 
-  private async _executeCurrentQuery(options: DatomsParams): Promise<Datom[]> {
+  private async _executeCurrentQuery(options: DatomsQuery): Promise<Datom[]> {
     return executeQueryOnDatoms(this._datomsArray, options);
   }
 
   private async _executeAsOfQuery(
-    options: DatomsParams,
+    options: DatomsQuery,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -392,7 +392,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     return results.slice(offset, limit ? offset + limit : undefined);
   }
 
-  private async _executeHistoryQuery(options: DatomsParams): Promise<Datom[]> {
+  private async _executeHistoryQuery(options: DatomsQuery): Promise<Datom[]> {
     await this._ensureInitialized();
 
     // Validate that tx and txMax are mutually exclusive
@@ -444,7 +444,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
   }
 
   private async _executeSinceQuery(
-    options: DatomsParams,
+    options: DatomsQuery,
     txId: TransactionId
   ): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -489,7 +489,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
   }
 
   private async _executeSpeculativeQuery(
-    options: DatomsParams,
+    options: DatomsQuery,
     speculativeDatoms: Datom[]
   ): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -608,7 +608,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     return this.nextTx > 1 ? this.nextTx - 1 : 0;
   }
 
-  async _destroy(query: DatomsParams): Promise<void> {
+  async _destroy(query: DatomsQuery): Promise<void> {
     await this._ensureInitialized();
 
     // Validate that tx and txMax are mutually exclusive
@@ -660,7 +660,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
   }
 
   public async _executeDatoms(
-    options: DatomsParams,
+    options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
     await this._ensureInitialized();

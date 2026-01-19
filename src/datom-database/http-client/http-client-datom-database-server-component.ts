@@ -14,7 +14,7 @@ import {
   TransactionError,
 } from "../hook/hook.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
-import type { DatomsParams, QueryResult } from "../views/database-view.js";
+import type { DatomsQuery, QueryResult } from "../views/database-view.js";
 
 // Request/Response types for HTTP API contract
 interface InitializeRequest {
@@ -27,7 +27,7 @@ interface InitializeResponse {
 
 interface DatomsRequest {
   method: "datoms";
-  options: DatomsParams;
+  options: DatomsQuery;
   viewConfig: ViewConfig;
 }
 
@@ -76,7 +76,7 @@ interface RegisterHookResponse {
 
 interface DeleteDatomsRequest {
   method: "deleteDatoms";
-  query: DatomsParams;
+  query: DatomsQuery;
 }
 
 interface DeleteDatomsResponse {

@@ -13,7 +13,7 @@
 import type { Datom } from "../../datoms.js";
 import type { Logger } from "../../types.js";
 import type { DatomDatabase } from "../datom-database.js";
-import type { DatomsParams } from "../views/database-view.js";
+import type { DatomsQuery } from "../views/database-view.js";
 import type { RetentionPolicy } from "./retention-policy.js";
 import type { RetentionPolicyConfig, RetentionResult } from "./types.js";
 
@@ -389,7 +389,7 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
             const datom = groupDatoms[0]!;
 
             // Construct query to match this exact datom
-            const deleteQuery: DatomsParams = {
+            const deleteQuery: DatomsQuery = {
               e: datom.e,
               a: datom.a,
               v: datom.v,
@@ -460,7 +460,7 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
           if (groupDatoms.length === 0) continue;
           const datom = groupDatoms[0]!;
 
-          const deleteQuery: DatomsParams = {
+          const deleteQuery: DatomsQuery = {
             e: datom.e,
             a: datom.a,
             v: datom.v,

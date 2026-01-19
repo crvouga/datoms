@@ -9,7 +9,7 @@ import type { EntityId } from "../entity-id.js";
 import type { Hook } from "./hook/hook.js";
 import type {
   DatabaseView,
-  DatomsParams,
+  DatomsQuery,
   DatomsResultEnvelope,
   QueryResultEnvelope,
 } from "./views/database-view.js";
@@ -251,7 +251,7 @@ export interface DatomDatabase extends DatabaseView {
    * @internal
    */
   _executeDatoms(
-    options: DatomsParams,
+    options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope>;
 
@@ -275,7 +275,7 @@ export interface DatomDatabase extends DatabaseView {
    * @param query Query parameters to match datoms for deletion
    * @internal
    */
-  _destroy(query: DatomsParams): Promise<void>;
+  _destroy(query: DatomsQuery): Promise<void>;
 }
 
 /**

@@ -4,7 +4,7 @@
  */
 
 import type { Datom } from "../../datoms.js";
-import type { DatomsParams } from "../views/database-view.js";
+import type { DatomsQuery } from "../views/database-view.js";
 
 /**
  * Execute a query on an array of datoms
@@ -12,7 +12,7 @@ import type { DatomsParams } from "../views/database-view.js";
  */
 export function executeQueryOnDatoms(
   datoms: Datom[],
-  options: DatomsParams
+  options: DatomsQuery
 ): Datom[] {
   // Validate that tx and txMax are mutually exclusive
   if (options.tx !== undefined && options.txMax !== undefined) {

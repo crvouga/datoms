@@ -42,7 +42,7 @@ import { validateQueryOptions } from "../shared/query-validation.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type {
   DatabaseView,
-  DatomsParams,
+  DatomsQuery,
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
@@ -229,7 +229,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     }
   }
 
-  async _destroy(query: DatomsParams): Promise<void> {
+  async _destroy(query: DatomsQuery): Promise<void> {
     await this._ensureInitialized();
 
     try {
@@ -297,13 +297,13 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     };
   }
 
-  async datoms(options: DatomsParams): Promise<Datom[]> {
+  async datoms(options: DatomsQuery): Promise<Datom[]> {
     const envelope = await this.datomsWithMetadata(options);
     return envelope.data;
   }
 
   async datomsWithMetadata(
-    options: DatomsParams
+    options: DatomsQuery
   ): Promise<DatomsResultEnvelope> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     validateQueryOptions(options);
@@ -424,7 +424,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
       } else {
         // Has filters - use _executeQuery with viewConfig to respect time-travel views
         // Include attribute filter if specified to optimize speculative queries
-        const queryOptions: DatomsParams = {};
+        const queryOptions: DatomsQuery = {};
         if (entity !== undefined) queryOptions.e = entity;
         if (attribute !== undefined) queryOptions.a = attribute;
         if (value !== undefined) queryOptions.v = value;
@@ -527,7 +527,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
   }
 
   async _executeDatoms(
-    options: DatomsParams,
+    options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
     await this._ensureInitialized();
@@ -575,7 +575,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
   }
 
   private async _executeSpeculativeQuery(
-    options: DatomsParams,
+    options: DatomsQuery,
     speculativeDatoms: Datom[]
   ): Promise<Datom[]> {
     await this._ensureInitialized();
@@ -589,7 +589,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
       // Fetch all current datoms from server using speculative viewConfig
       // Include attribute/value filters if specified to optimize the fetch
       // Use a large limit to satisfy validation
-      const fetchOptions: DatomsParams = { limit: Number.MAX_SAFE_INTEGER };
+      const fetchOptions: DatomsQuery = { limit: Number.MAX_SAFE_INTEGER };
       if (options.a !== undefined) fetchOptions.a = options.a;
       if (options.v !== undefined) fetchOptions.v = options.v;
       try {

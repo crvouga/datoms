@@ -10,7 +10,7 @@ import type { DatomDatabase, ViewConfig } from "../datom-database.js";
 import { validateQueryOptions } from "../shared/query-validation.js";
 import type {
   DatabaseView,
-  DatomsParams,
+  DatomsQuery,
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
@@ -27,13 +27,13 @@ export class ConfiguredDatabaseView implements DatabaseView {
     private viewConfig: ViewConfig
   ) {}
 
-  async datoms(options: DatomsParams): Promise<Datom[]> {
+  async datoms(options: DatomsQuery): Promise<Datom[]> {
     const envelope = await this.datomsWithMetadata(options);
     return envelope.data;
   }
 
   async datomsWithMetadata(
-    options: DatomsParams
+    options: DatomsQuery
   ): Promise<DatomsResultEnvelope> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     validateQueryOptions(options);
