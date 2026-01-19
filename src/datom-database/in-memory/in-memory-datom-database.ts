@@ -4,7 +4,11 @@
  * Useful for testing and small datasets
  */
 
-import type { DatalogQuery, QueryClause } from "../../datalog/datalog.js";
+import type {
+  DatalogQuery,
+  DatalogQueryFindVariable,
+  QueryClause,
+} from "../../datalog/datalog.js";
 import type {
   Attribute,
   Datom,
@@ -540,12 +544,26 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     return executeQueryOnDatoms(mergedDatoms, options);
   }
 
-  async query(query: DatalogQuery): Promise<QueryResult> {
+  async query<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResult<TFind>> {
     const envelope = await this.queryWithMetadata(query);
     return envelope.data;
   }
 
-  async queryWithMetadata(query: DatalogQuery): Promise<QueryResultEnvelope> {
+  async queryWithMetadata<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResultEnvelope<TFind>> {
     // Extract viewConfig from query
     const viewConfig = query.viewConfig ?? { type: "current" };
     return this._queryWithMetadataInternal(query, viewConfig);
@@ -759,10 +777,12 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     };
   }
 
-  private async _queryWithMetadataInternal(
-    query: DatalogQuery,
+  private async _queryWithMetadataInternal<
+    TFind extends Record<string, DatalogQueryFindVariable>,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind },
     viewConfig: ViewConfig
-  ): Promise<QueryResultEnvelope> {
+  ): Promise<QueryResultEnvelope<TFind>> {
     await this._ensureInitialized();
 
     const startTime = performance.now();
@@ -976,9 +996,12 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     }
 
     // Apply limit
-    let finalResult: QueryResult = projected;
+    let finalResult: QueryResult<TFind> = projected as QueryResult<TFind>;
     if (modifiedQuery.limit) {
-      finalResult = finalResult.slice(0, modifiedQuery.limit);
+      finalResult = finalResult.slice(
+        0,
+        modifiedQuery.limit
+      ) as QueryResult<TFind>;
     }
 
     const executionTime = performance.now() - startTime;

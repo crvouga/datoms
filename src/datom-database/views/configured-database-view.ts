@@ -4,7 +4,10 @@
  * Not part of the public API
  */
 
-import type { DatalogQuery } from "../../datalog/datalog.js";
+import type {
+  DatalogQuery,
+  DatalogQueryFindVariable,
+} from "../../datalog/datalog.js";
 import type { Datom } from "../../datoms.js";
 import type { DatomDatabase } from "../datom-database.js";
 import { validateQueryOptions } from "../shared/query-validation.js";
@@ -49,7 +52,14 @@ export class ConfiguredDatabaseView implements DatabaseView {
     });
   }
 
-  async query(query: DatalogQuery): Promise<QueryResult> {
+  async query<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResult<TFind>> {
     const envelope = await this.queryWithMetadata({
       ...query,
       viewConfig: this.viewConfig,
@@ -57,7 +67,14 @@ export class ConfiguredDatabaseView implements DatabaseView {
     return envelope.data;
   }
 
-  async queryWithMetadata(query: DatalogQuery): Promise<QueryResultEnvelope> {
+  async queryWithMetadata<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResultEnvelope<TFind>> {
     return this.db.queryWithMetadata({ ...query, viewConfig: this.viewConfig });
   }
 }

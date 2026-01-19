@@ -3,7 +3,10 @@
  * Provides a high-level interface for working with datoms and datalog queries
  */
 
-import type { DatalogQuery } from "../../datalog/datalog.js";
+import type {
+  DatalogQuery,
+  DatalogQueryFindVariable,
+} from "../../datalog/datalog.js";
 import type {
   Attribute,
   Datom,
@@ -17,9 +20,26 @@ import type { ViewConfig } from "./view-config.js";
 export type DatomsResult = Array<Datom>;
 
 /**
- * Result of a datalog query execution
+ * Type helper to extract result type from a DatalogQuery's find clause
+ * Extracts the keys from the find clause and creates a record type where each key
+ * maps to Value | Attribute | EntityId
  */
-export type QueryResult = Array<Record<string, Value | Attribute | EntityId>>;
+export type QueryResultFromFind<
+  TFind extends Record<string, DatalogQueryFindVariable>,
+> = Array<{
+  [K in keyof TFind]: Value | Attribute | EntityId;
+}>;
+
+/**
+ * Result of a datalog query execution
+ * @template TFind The find clause from the DatalogQuery
+ */
+export type QueryResult<
+  TFind extends Record<string, DatalogQueryFindVariable> = Record<
+    string,
+    DatalogQueryFindVariable
+  >,
+> = QueryResultFromFind<TFind>;
 
 /**
  * Envelope containing datoms query result and optional metadata
@@ -31,9 +51,15 @@ export type DatomsResultEnvelope = {
 
 /**
  * Envelope containing datalog query result and optional metadata
+ * @template TFind The find clause from the DatalogQuery
  */
-export type QueryResultEnvelope = {
-  data: QueryResult;
+export type QueryResultEnvelope<
+  TFind extends Record<string, DatalogQueryFindVariable> = Record<
+    string,
+    DatalogQueryFindVariable
+  >,
+> = {
+  data: QueryResult<TFind>;
   metadata?: Record<string, unknown>;
 };
 
@@ -68,25 +94,47 @@ export interface DatabaseView {
   /**
    * Execute a datalog query against this database view
    * @param query Datalog query to execute
-   * @returns Query results as an array of records
+   * @returns Query results as an array of records with type-safe keys from the find clause
    * @example
    * const dbPast = db.asOf(100);
-   * const results = await dbPast.query({ find: ["?e"], where: [["?e", "name", "Alice"]] });
+   * const results = await dbPast.query({
+   *   find: { "movie/id": ["?id"], "movie/title": ["?title"] },
+   *   where: [{ e: "?id", a: "tmdb.movie/title", v: "?title" }]
+   * });
+   * // results is typed as Array<{ "movie/id": Value | Attribute | EntityId, "movie/title": Value | Attribute | EntityId }>
    */
-  query(query: DatalogQuery): Promise<QueryResult>;
+  query<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResult<TFind>>;
 
   /**
    * Execute a datalog query against this database view with metadata envelope
    * @param query Datalog query to execute
    * @param context Optional context object for hooks
-   * @returns Envelope containing query results and optional metadata
+   * @returns Envelope containing query results and optional metadata with type-safe keys from the find clause
    * @example
    * const dbPast = db.asOf(100);
-   * const envelope = await dbPast.queryWithMetadata({ find: ["?e"], where: [["?e", "name", "Alice"]] });
+   * const envelope = await dbPast.queryWithMetadata({
+   *   find: { "movie/id": ["?id"], "movie/title": ["?title"] },
+   *   where: [{ e: "?id", a: "tmdb.movie/title", v: "?title" }]
+   * });
+   * // envelope.data is typed as Array<{ "movie/id": Value | Attribute | EntityId, "movie/title": Value | Attribute | EntityId }>
    * console.log(envelope.data); // The query results
    * console.log(envelope.metadata); // Implementation-specific metadata (SQL queries, execution plans, etc.)
    */
-  queryWithMetadata(query: DatalogQuery): Promise<QueryResultEnvelope>;
+  queryWithMetadata<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResultEnvelope<TFind>>;
 }
 
 /**

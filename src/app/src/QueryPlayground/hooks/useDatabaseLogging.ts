@@ -7,7 +7,10 @@
  * minimally to capture actual results while using hooks for the logging infrastructure.
  */
 
-import type { DatalogQuery } from "../../../../datalog/datalog.js";
+import type {
+  DatalogQuery,
+  DatalogQueryFindVariable,
+} from "../../../../datalog/datalog.js";
 import type { DatomDatabase } from "../../../../datom-database/datom-database.js";
 import type {
   AfterRead,
@@ -140,10 +143,15 @@ export function createLoggedDatabaseWithHooks(
   const originalQuery = db.query.bind(db);
   const originalTransact = db.transact.bind(db);
 
-  db.query = async (
-    query: DatalogQuery,
+  db.query = async <
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind },
     context?: Record<string, unknown>
-  ): Promise<QueryResult> => {
+  ): Promise<QueryResult<TFind>> => {
     const startTime = performance.now();
     const timestamp = Date.now();
     const callId = callIdCounter++;

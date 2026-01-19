@@ -60,8 +60,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.name).toBe("Admin User");
-      expect(results[0]!.email).toBe("admin@example.com");
+      expect(results[0]?.name).toBe("Admin User");
+      expect(results[0]?.email).toBe("admin@example.com");
     });
 
     test("should create author user", async () => {
@@ -85,7 +85,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.name).toBe("Author User");
+      expect(results[0]?.name).toBe("Author User");
     });
 
     test("should create reader user", async () => {
@@ -109,7 +109,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.name).toBe("Reader User");
+      expect(results[0]?.name).toBe("Reader User");
     });
   });
 
@@ -148,8 +148,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.title).toBe("My First Post");
-      expect(results[0]!.status).toBe(POST_STATUS_DRAFT);
+      expect(results[0]?.title).toBe("My First Post");
+      expect(results[0]?.status).toBe(POST_STATUS_DRAFT);
     });
 
     test("should publish a post", async () => {
@@ -194,7 +194,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         ],
       });
       expect(results.data).toHaveLength(1);
-      expect(results.data[0]!.status).toBe(POST_STATUS_PUBLISHED);
+      expect(results.data[0]?.status).toBe(POST_STATUS_PUBLISHED);
     });
 
     test("should edit a post", async () => {
@@ -242,8 +242,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.title).toBe("Updated Title");
-      expect(results[0]!.content).toBe("Updated Content");
+      expect(results[0]?.title).toBe("Updated Title");
+      expect(results[0]?.content).toBe("Updated Content");
     });
   });
 
@@ -286,8 +286,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.title).toBe("Draft Post");
-      expect(results[0]!.status).toBe(POST_STATUS_DRAFT);
+      expect(results[0]?.title).toBe("Draft Post");
+      expect(results[0]?.status).toBe(POST_STATUS_DRAFT);
     });
 
     test("author should NOT see other authors' draft posts", async () => {
@@ -378,7 +378,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.title).toBe("Published Post");
+      expect(results[0]?.title).toBe("Published Post");
     });
 
     test("reader should only see published posts", async () => {
@@ -434,8 +434,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.title).toBe("Published Post");
-      expect(results[0]!.status).toBe(POST_STATUS_PUBLISHED);
+      expect(results[0]?.title).toBe("Published Post");
+      expect(results[0]?.status).toBe(POST_STATUS_PUBLISHED);
     });
 
     test("admin should see all posts", async () => {
@@ -531,7 +531,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.title).toBe("Valid Post");
+      expect(results[0]?.title).toBe("Valid Post");
     });
 
     test("should validate author exists", async () => {
@@ -598,7 +598,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.name).toBe("javascript");
+      expect(results[0]?.name).toBe("javascript");
     });
 
     test("should associate tags with posts", async () => {
@@ -713,7 +713,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.title).toBe("JS Post");
+      expect(results[0]?.title).toBe("JS Post");
     });
   });
 

@@ -4,7 +4,10 @@
  * Loads datoms from a CSV file on initialize() and persists after every transaction
  */
 
-import type { DatalogQuery } from "../../datalog/datalog.js";
+import type {
+  DatalogQuery,
+  DatalogQueryFindVariable,
+} from "../../datalog/datalog.js";
 import type { Datom, DatomInput, TransactionId, Value } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
 import type { Transaction } from "../../types.js";
@@ -120,14 +123,28 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   /**
    * Execute a datalog query (delegated to memory database)
    */
-  async query(query: DatalogQuery): Promise<QueryResult> {
+  async query<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResult<TFind>> {
     return this._memoryDb.query(query);
   }
 
   /**
    * Execute a datalog query with metadata (delegated to memory database)
    */
-  async queryWithMetadata(query: DatalogQuery): Promise<QueryResultEnvelope> {
+  async queryWithMetadata<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResultEnvelope<TFind>> {
     return this._memoryDb.queryWithMetadata(query);
   }
 

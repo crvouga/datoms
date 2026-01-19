@@ -3,7 +3,10 @@
  * Accepts a SqlConnection interface for SQLite-compatible databases
  */
 
-import type { DatalogQuery } from "../../datalog/datalog.js";
+import type {
+  DatalogQuery,
+  DatalogQueryFindVariable,
+} from "../../datalog/datalog.js";
 import type {
   Attribute,
   Datom,
@@ -799,12 +802,26 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     });
   }
 
-  async query(query: DatalogQuery): Promise<QueryResult> {
+  async query<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResult<TFind>> {
     const envelope = await this.queryWithMetadata(query);
     return envelope.data;
   }
 
-  async queryWithMetadata(query: DatalogQuery): Promise<QueryResultEnvelope> {
+  async queryWithMetadata<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResultEnvelope<TFind>> {
     // Extract context and viewConfig from query object
     const context = query.context;
     const viewConfig = query.viewConfig ?? { type: "current" };
@@ -1326,11 +1343,13 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     };
   }
 
-  private async _queryWithMetadataInternal(
-    query: DatalogQuery,
+  private async _queryWithMetadataInternal<
+    TFind extends Record<string, DatalogQueryFindVariable>,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind },
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
-  ): Promise<QueryResultEnvelope> {
+  ): Promise<QueryResultEnvelope<TFind>> {
     await this._ensureInitialized();
 
     const startTime = performance.now();
@@ -1428,7 +1447,10 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         modifiedQuery.find,
         modifiedQuery.where
       );
-      const finalResult = this._applyOrderAndLimit(projected, modifiedQuery);
+      const finalResult = this._applyOrderAndLimit(
+        projected,
+        modifiedQuery
+      ) as QueryResult<TFind>;
       const executionTime = performance.now() - startTime;
       metadata.executionTimeMs = executionTime;
       metadata.resultCount = finalResult.length;
@@ -1578,7 +1600,10 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         modifiedQuery.find,
         modifiedQuery.where
       );
-      const finalResult = this._applyOrderAndLimit(projected, modifiedQuery);
+      const finalResult = this._applyOrderAndLimit(
+        projected,
+        modifiedQuery
+      ) as QueryResult<TFind>;
       const executionTime = performance.now() - startTime;
       metadata.executionTimeMs = executionTime;
       metadata.resultCount = finalResult.length;
@@ -1592,10 +1617,10 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     // For non-speculative views, use SQL-based query execution
     // Re-execute query with filtered datoms
-    const finalResult = await this._executeDatalogWithSQLAndFilteredDatoms(
+    const finalResult = (await this._executeDatalogWithSQLAndFilteredDatoms(
       modifiedQuery,
       afterResult.datoms
-    );
+    )) as QueryResult<TFind>;
     const executionTime = performance.now() - startTime;
     metadata.executionTimeMs = executionTime;
     metadata.resultCount = finalResult.length;

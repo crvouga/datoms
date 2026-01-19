@@ -3,7 +3,11 @@
  * Communicates with remote database server via HTTP
  */
 
-import type { DatalogQuery, QueryClause } from "../../datalog/datalog.js";
+import type {
+  DatalogQuery,
+  DatalogQueryFindVariable,
+  QueryClause,
+} from "../../datalog/datalog.js";
 import type {
   Attribute,
   Datom,
@@ -349,23 +353,39 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     return envelope;
   }
 
-  async query(query: DatalogQuery): Promise<QueryResult> {
+  async query<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResult<TFind>> {
     const envelope = await this.queryWithMetadata(query);
     return envelope.data;
   }
 
-  async queryWithMetadata(query: DatalogQuery): Promise<QueryResultEnvelope> {
+  async queryWithMetadata<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+  ): Promise<QueryResultEnvelope<TFind>> {
     // Extract context and viewConfig from query object
     const context = query.context;
     const viewConfig = query.viewConfig ?? this.currentViewConfig;
     return this._queryWithMetadataInternal(query, context, viewConfig);
   }
 
-  private async _queryWithMetadataInternal(
-    query: DatalogQuery,
+  private async _queryWithMetadataInternal<
+    TFind extends Record<string, DatalogQueryFindVariable>,
+  >(
+    query: DatalogQuery<keyof TFind & string> & { find: TFind },
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
-  ): Promise<QueryResultEnvelope> {
+  ): Promise<QueryResultEnvelope<TFind>> {
     await this._ensureInitialized();
 
     const startTime = performance.now();
@@ -592,7 +612,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     metadata.executionStrategy = "http-remote-with-hooks";
 
     return {
-      data: finalResults,
+      data: finalResults as QueryResult<TFind>,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     };
   }
