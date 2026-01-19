@@ -42,8 +42,8 @@ import type {
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
-  ViewConfig,
 } from "../views/database-view.js";
+import type { ViewConfig } from "../views/view-config.js";
 
 interface DatomsResponse {
   datoms: Datom[];
@@ -312,6 +312,9 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     validateQueryOptions(options);
 
+    // Extract viewConfig from options
+    const viewConfig = options.viewConfig ?? this.currentViewConfig;
+
     // Execute query with timeout if specified
     let envelope: DatomsResultEnvelope;
     if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
@@ -321,10 +324,13 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._datoms(options, this.currentViewConfig);
+      const queryPromise = this._datomsWithMetadataInternal(
+        options,
+        viewConfig
+      );
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      envelope = await this._datoms(options, this.currentViewConfig);
+      envelope = await this._datomsWithMetadataInternal(options, viewConfig);
     }
 
     // Check result size limit if specified
@@ -342,22 +348,19 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     return envelope;
   }
 
-  async query(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResult> {
-    const envelope = await this.queryWithMetadata(query, context);
+  async query(query: DatalogQuery): Promise<QueryResult> {
+    const envelope = await this.queryWithMetadata(query);
     return envelope.data;
   }
 
-  async queryWithMetadata(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResultEnvelope> {
-    return this._query(query, context, this.currentViewConfig);
+  async queryWithMetadata(query: DatalogQuery): Promise<QueryResultEnvelope> {
+    // Extract context and viewConfig from query object
+    const context = query.context;
+    const viewConfig = query.viewConfig ?? this.currentViewConfig;
+    return this._queryWithMetadataInternal(query, context, viewConfig);
   }
 
-  async _query(
+  private async _queryWithMetadataInternal(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
@@ -368,13 +371,25 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     const metadata: Record<string, unknown> = {};
 
     // Create read context
+    // Extract context, but ensure db and query fields are not overwritten
+    const { db: _, query: __, ...restContext } = context || {};
+    // Merge db into query.context so hooks can access it via query.context.db
+    const enhancedQuery = {
+      ...query,
+      context: {
+        ...restContext,
+        db: this,
+      },
+    };
     const ctx: ReadContext = {
+      ...restContext,
       db: this,
-      ...(context || {}),
+      query: enhancedQuery,
     };
 
     // Run before-read hooks locally (though query executes remotely)
-    const beforeResult = await this.hooks.runBeforeRead(query, ctx);
+    // Pass enhanced query with db in context
+    const beforeResult = await this.hooks.runBeforeRead(enhancedQuery, ctx);
 
     if (beforeResult.errors.length > 0) {
       throw new QueryError("Query blocked by hooks", beforeResult.errors);
@@ -419,8 +434,8 @@ export class HttpClientDatomDatabase implements DatomDatabase {
       if (!hasAnyFilter) {
         // All variables - get all datoms using _executeQuery with limit to satisfy validation
         // For speculative views, this will fetch all datoms and merge with speculative ones
-        const rawDatoms = await this._datoms(
-          { limit: Number.MAX_SAFE_INTEGER },
+        const rawDatoms = await this._datomsWithMetadataInternal(
+          { limit: Number.MAX_SAFE_INTEGER, viewConfig },
           viewConfig
         );
         // Use shared query executor to deduplicate and filter
@@ -432,7 +447,9 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         if (entity !== undefined) queryOptions.e = entity;
         if (attribute !== undefined) queryOptions.a = attribute;
         if (value !== undefined) queryOptions.v = value;
-        clauseDatoms = (await this._datoms(queryOptions, viewConfig)).data;
+        clauseDatoms = (
+          await this._datomsWithMetadataInternal(queryOptions, viewConfig)
+        ).data;
       }
 
       for (const datom of clauseDatoms) {
@@ -529,7 +546,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     };
   }
 
-  async _datoms(
+  private async _datomsWithMetadataInternal(
     options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
@@ -562,6 +579,18 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         }
         if (mappedError.code === "QUERY_SAFETY_VIOLATION") {
           throw new QuerySafetyError(mappedError.message);
+        }
+        if (mappedError.code === "QUERY_RESULT_SIZE_EXCEEDED") {
+          const errorData = mappedError.originalError as {
+            resultSize?: number;
+            maxResultSize?: number;
+            queryOptions?: unknown;
+          };
+          throw new QueryResultSizeError(
+            errorData.resultSize ?? 0,
+            errorData.maxResultSize ?? 0,
+            errorData.queryOptions ?? options
+          );
         }
         throw new Error(`Query failed: ${mappedError.message}`);
       }
@@ -759,15 +788,23 @@ export class HttpClientDatomDatabase implements DatomDatabase {
 
       // Try to extract error response body if available
       let errorData: unknown = error;
+      let errorMessage = error.message;
       const errorWithResponse = error as unknown as { response?: unknown };
       if (errorWithResponse.response) {
         errorData = errorWithResponse.response;
+        // Extract error message from response body if available
+        const errorObj = errorData as { error?: string; message?: string };
+        if (errorObj?.error) {
+          errorMessage = errorObj.error;
+        } else if (errorObj?.message) {
+          errorMessage = errorObj.message;
+        }
       }
 
       // Map HTTP status codes to error codes
       if (status === 408) {
         return {
-          message: error.message,
+          message: errorMessage,
           code: "QUERY_TIMEOUT",
           originalError: errorData,
         };
@@ -776,12 +813,20 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         // Try to determine specific error type from error data
         const errorObj = errorData as {
           code?: string;
+          error?: string;
           errors?: Array<{ hook: string; message: string; code?: string }>;
         };
         if (errorObj?.code === "QUERY_SAFETY_VIOLATION") {
           return {
-            message: error.message,
+            message: errorMessage,
             code: "QUERY_SAFETY_VIOLATION",
+            originalError: errorData,
+          };
+        }
+        if (errorObj?.code === "QUERY_RESULT_SIZE_EXCEEDED") {
+          return {
+            message: errorMessage,
+            code: "QUERY_RESULT_SIZE_EXCEEDED",
             originalError: errorData,
           };
         }
@@ -790,7 +835,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
           errorObj?.code === "TRANSACTION_ERROR"
         ) {
           return {
-            message: error.message,
+            message: errorMessage,
             code: "TRANSACTION_HOOK_ERROR",
             originalError: errorData,
           };
@@ -800,20 +845,20 @@ export class HttpClientDatomDatabase implements DatomDatabase {
           errorObj?.code === "QUERY_ERROR"
         ) {
           return {
-            message: error.message,
+            message: errorMessage,
             code: "QUERY_HOOK_ERROR",
             originalError: errorData,
           };
         }
         return {
-          message: error.message,
+          message: errorMessage,
           code: "DATABASE_ERROR",
           originalError: errorData,
         };
       }
       if (status === 500) {
         return {
-          message: error.message,
+          message: errorMessage,
           code: "DATABASE_ERROR",
           originalError: errorData,
         };
@@ -821,7 +866,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
 
       // Default: map to DATABASE_ERROR
       return {
-        message: error.message,
+        message: errorMessage,
         code: "DATABASE_ERROR",
         originalError: errorData,
       };

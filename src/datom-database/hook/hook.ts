@@ -30,6 +30,7 @@ export type HookErrorWithName = {
  */
 export type ReadContext = {
   db: DatabaseView;
+  query: DatalogQuery;
   [key: string]: unknown;
 };
 

@@ -9,16 +9,14 @@ import type { DatomDatabase } from "../datom-database.js";
 import type { Hook } from "../hook/hook.js";
 import {
   QueryError,
+  QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
   TransactionError,
 } from "../hook/hook.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
-import type {
-  DatomsQuery,
-  QueryResult,
-  ViewConfig,
-} from "../views/database-view.js";
+import type { DatomsQuery, QueryResult } from "../views/database-view.js";
+import type { ViewConfig } from "../views/view-config.js";
 
 // Request/Response types for HTTP API contract
 interface InitializeRequest {
@@ -287,7 +285,13 @@ export class HttpClientDatomDatabaseServerComponent {
     await this._ensureInitialized();
 
     const view = this._createView(request.viewConfig);
-    const results = await view.query(request.query, request.context);
+    // Merge context and viewConfig into query object for DatabaseView interface
+    const queryWithContext = {
+      ...request.query,
+      context: request.context ?? request.query.context,
+      viewConfig: request.viewConfig,
+    };
+    const results = await view.query(queryWithContext);
     return { results };
   }
 
@@ -356,6 +360,19 @@ export class HttpClientDatomDatabaseServerComponent {
     if (error instanceof QuerySafetyError) {
       return this._errorResponse(400, error.message, "QUERY_SAFETY_VIOLATION");
     }
+    if (error instanceof QueryResultSizeError) {
+      return this._errorResponse(
+        400,
+        error.message,
+        "QUERY_RESULT_SIZE_EXCEEDED",
+        undefined,
+        {
+          resultSize: error.resultSize,
+          maxResultSize: error.maxResultSize,
+          queryOptions: error.queryOptions,
+        }
+      );
+    }
     if (error instanceof TransactionError) {
       return this._errorResponse(
         400,
@@ -385,12 +402,14 @@ export class HttpClientDatomDatabaseServerComponent {
     status: number,
     message: string,
     code: string,
-    errors?: Array<{ hook: string; message: string; code?: string }>
+    errors?: Array<{ hook: string; message: string; code?: string }>,
+    extraData?: Record<string, unknown>
   ): Response {
     const errorBody: {
       error: string;
       code: string;
       errors?: Array<{ hook: string; message: string; code?: string }>;
+      [key: string]: unknown;
     } = {
       error: message,
       code,
@@ -398,6 +417,10 @@ export class HttpClientDatomDatabaseServerComponent {
 
     if (errors && errors.length > 0) {
       errorBody.errors = errors;
+    }
+
+    if (extraData) {
+      Object.assign(errorBody, extraData);
     }
 
     return new Response(JSON.stringify(errorBody), {

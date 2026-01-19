@@ -14,8 +14,8 @@ import type {
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
-  ViewConfig,
 } from "./database-view.js";
+import type { ViewConfig } from "./view-config.js";
 
 /**
  * Database view that is configured with a view config
@@ -29,7 +29,10 @@ export class ConfiguredDatabaseView implements DatabaseView {
   ) {}
 
   async datoms(options: DatomsQuery): Promise<Datom[]> {
-    const envelope = await this.datomsWithMetadata(options);
+    const envelope = await this.datomsWithMetadata({
+      ...options,
+      viewConfig: this.viewConfig,
+    });
     return envelope.data;
   }
 
@@ -40,21 +43,21 @@ export class ConfiguredDatabaseView implements DatabaseView {
     validateQueryOptions(options);
 
     // Route to implementation with view config
-    return this.db._datoms(options, this.viewConfig);
+    return this.db.datomsWithMetadata({
+      ...options,
+      viewConfig: this.viewConfig,
+    });
   }
 
-  async query(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResult> {
-    const envelope = await this.queryWithMetadata(query, context);
+  async query(query: DatalogQuery): Promise<QueryResult> {
+    const envelope = await this.queryWithMetadata({
+      ...query,
+      viewConfig: this.viewConfig,
+    });
     return envelope.data;
   }
 
-  async queryWithMetadata(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResultEnvelope> {
-    return this.db._query(query, context, this.viewConfig);
+  async queryWithMetadata(query: DatalogQuery): Promise<QueryResultEnvelope> {
+    return this.db.queryWithMetadata({ ...query, viewConfig: this.viewConfig });
   }
 }

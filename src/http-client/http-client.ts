@@ -42,7 +42,17 @@ export class FetchHttpClient implements HttpClient {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const error = new Error(`HTTP error! status: ${response.status}`);
+      // Attach response body to error for error handling
+      const contentType = response.headers.get("content-type");
+      if (contentType?.includes("application/json")) {
+        (error as unknown as { response: unknown }).response =
+          await response.json();
+      } else {
+        (error as unknown as { response: unknown }).response =
+          await response.text();
+      }
+      throw error;
     }
 
     const contentType = response.headers.get("content-type");

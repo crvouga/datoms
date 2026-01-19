@@ -149,8 +149,14 @@ export function createLoggedDatabaseWithHooks(
     const callId = callIdCounter++;
 
     try {
-      const result = await originalQuery(query, {
-        ...context,
+      const result = await originalQuery({
+        ...query,
+        context: {
+          ...query.context,
+          ...context,
+        },
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
         __logOperationId: callId,
       });
 

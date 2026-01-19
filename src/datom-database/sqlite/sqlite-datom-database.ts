@@ -40,8 +40,8 @@ import type {
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
-  ViewConfig,
 } from "../views/database-view.js";
+import type { ViewConfig } from "../views/view-config.js";
 
 /**
  * SQLite database implementation
@@ -282,6 +282,9 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       );
     }
 
+    // Extract viewConfig from options
+    const viewConfig = options.viewConfig ?? { type: "current" };
+
     // Execute query with timeout if specified
     let envelope: DatomsResultEnvelope;
     if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
@@ -291,14 +294,13 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._datoms(options, {
-        type: "current",
-      });
+      const queryPromise = this._datomsWithMetadataInternal(
+        options,
+        viewConfig
+      );
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      envelope = await this._datoms(options, {
-        type: "current",
-      });
+      envelope = await this._datomsWithMetadataInternal(options, viewConfig);
     }
 
     // Check result size limit if specified
@@ -797,21 +799,16 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     });
   }
 
-  async query(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResult> {
-    const envelope = await this.queryWithMetadata(query, context);
+  async query(query: DatalogQuery): Promise<QueryResult> {
+    const envelope = await this.queryWithMetadata(query);
     return envelope.data;
   }
 
-  async queryWithMetadata(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResultEnvelope> {
-    return this._query(query, context, {
-      type: "current",
-    });
+  async queryWithMetadata(query: DatalogQuery): Promise<QueryResultEnvelope> {
+    // Extract context and viewConfig from query object
+    const context = query.context;
+    const viewConfig = query.viewConfig ?? { type: "current" };
+    return this._queryWithMetadataInternal(query, context, viewConfig);
   }
 
   /**
@@ -1190,7 +1187,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     await this.connection.execute(sql, params);
   }
 
-  public async _datoms(
+  private async _datomsWithMetadataInternal(
     options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
@@ -1229,7 +1226,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     };
   }
 
-  public async _query(
+  private async _queryWithMetadataInternal(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
@@ -1240,13 +1237,24 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     const metadata: Record<string, unknown> = {};
 
     // Create read context
+    // Extract context, but ensure db and query fields are not overwritten
+    const { db: _, query: __, ...restContext } = context || {};
+    // Merge db into query.context so hooks can access it via query.context.db
+    const enhancedQuery = {
+      ...query,
+      context: {
+        ...restContext,
+        db: this,
+      },
+    };
     const ctx: ReadContext = {
+      ...restContext,
       db: this,
-      ...(context || {}),
+      query: enhancedQuery,
     };
 
-    // Run before-read hooks
-    const beforeResult = await this.hooks.runBeforeRead(query, ctx);
+    // Run before-read hooks (pass enhanced query with db in context)
+    const beforeResult = await this.hooks.runBeforeRead(enhancedQuery, ctx);
 
     if (beforeResult.errors.length > 0) {
       throw new QueryError("Query blocked by hooks", beforeResult.errors);
@@ -1280,12 +1288,13 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const datoms = await this._datoms(
+      const datoms = await this._datomsWithMetadataInternal(
         {
           e: entity,
           a: attribute,
           v: value,
           op: "assert",
+          viewConfig,
         },
         viewConfig
       );
@@ -1348,12 +1357,13 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const clauseDatoms = await this._datoms(
+      const clauseDatoms = await this._datomsWithMetadataInternal(
         {
           e: entity,
           a: attribute,
           v: value,
           op: "assert",
+          viewConfig,
         },
         viewConfig
       );
@@ -1394,11 +1404,12 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const firstDatoms = await this._datoms(
+      const firstDatoms = await this._datomsWithMetadataInternal(
         {
           e: entity,
           a: attribute,
           v: value,
+          viewConfig,
         },
         viewConfig
       );
@@ -1432,7 +1443,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
           : (attributeVal as string);
         const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-        const clauseDatoms = await this._datoms(
+        const clauseDatoms = await this._datomsWithMetadataInternal(
           {
             e: entity,
             a: attribute,

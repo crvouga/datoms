@@ -222,18 +222,19 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       const hook: BeforeRead = {
         type: "beforeRead",
         name: "context-test",
-        execute: async (query, ctx) => {
-          receivedContext = ctx as Record<string, unknown>;
+        execute: async (query, _ctx) => {
+          receivedContext = query.context;
           return { query };
         },
       };
 
       db.hook(hook);
 
-      await db.query(
-        { find: { e: ["?e"] }, where: [{ e: "?e", a: "name", v: "Alice" }] },
-        { userId: "alice", source: "test" }
-      );
+      await db.query({
+        find: { e: ["?e"] },
+        where: [{ e: "?e", a: "name", v: "Alice" }],
+        context: { userId: "alice", source: "test" },
+      });
 
       expect(receivedContext).toBeDefined();
       expect(receivedContext?.userId).toBe("alice");
@@ -355,17 +356,18 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         type: "afterRead",
         name: "context-test",
         execute: async (datoms, ctx) => {
-          receivedContext = ctx as Record<string, unknown>;
+          receivedContext = ctx.query.context;
           return { datoms };
         },
       };
 
       db.hook(hook);
 
-      await db.query(
-        { find: { e: ["?e"] }, where: [{ e: 1, a: "name", v: "?v" }] },
-        { userId: "alice", source: "test" }
-      );
+      await db.query({
+        find: { e: ["?e"] },
+        where: [{ e: 1, a: "name", v: "?v" }],
+        context: { userId: "alice", source: "test" },
+      });
 
       expect(receivedContext).toBeDefined();
       expect(receivedContext?.userId).toBe("alice");

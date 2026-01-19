@@ -3,18 +3,11 @@
  * Provides a high-level interface for working with datoms and datalog queries
  */
 
-import type { DatalogQuery } from "../datalog/datalog.js";
 import type { Datom, DatomInput, TransactionId } from "../datoms.js";
 import type { EntityId } from "../entity-id.js";
 import type { Transaction } from "../types.js";
 import type { Hook } from "./hook/hook.js";
-import type {
-  DatabaseView,
-  DatomsQuery,
-  DatomsResultEnvelope,
-  QueryResultEnvelope,
-  ViewConfig,
-} from "./views/database-view.js";
+import type { DatabaseView, DatomsQuery } from "./views/database-view.js";
 
 /**
  * Datom database interface (Datomic-like minimal API)
@@ -233,34 +226,6 @@ export interface DatomDatabase extends DatabaseView {
    * console.log(`Transaction ${latestTx.txId} has ${latestTx.datoms.length} datoms`);
    */
   _getLatestTransaction(): Promise<Transaction>;
-
-  /**
-   * Execute a query with view configuration and return metadata envelope.
-   * This method routes queries to the appropriate implementation method based on view config.
-   * @param options Query options
-   * @param viewConfig View configuration (asOf, since, history, current, or speculative)
-   * @returns Envelope containing datoms result and optional metadata
-   * @internal
-   */
-  _datoms(
-    options: DatomsQuery,
-    viewConfig: ViewConfig
-  ): Promise<DatomsResultEnvelope>;
-
-  /**
-   * Execute a datalog query with view configuration and return metadata envelope.
-   * This method routes datalog queries to the appropriate implementation method based on view config.
-   * @param query Datalog query to execute
-   * @param context Optional context object for hooks
-   * @param viewConfig View configuration (asOf, since, history, current, or speculative)
-   * @returns Envelope containing query results and optional metadata
-   * @internal
-   */
-  _query(
-    query: DatalogQuery,
-    context: Record<string, unknown> | undefined,
-    viewConfig: ViewConfig
-  ): Promise<QueryResultEnvelope>;
 
   /**
    * Delete datoms from the database matching the given query.

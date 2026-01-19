@@ -282,16 +282,14 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as the author
-      const results = await db.query(
-        {
-          find: { e: ["?e"], title: ["?title"], status: ["?status"] },
-          where: [
-            { e: "?e", a: POST_TITLE, v: "?title" },
-            { e: "?e", a: POST_STATUS, v: "?status" },
-          ],
-        },
-        { userId: authorId, userType: USER_TYPE_AUTHOR }
-      );
+      const results = await db.query({
+        find: { e: ["?e"], title: ["?title"], status: ["?status"] },
+        where: [
+          { e: "?e", a: POST_TITLE, v: "?title" },
+          { e: "?e", a: POST_STATUS, v: "?status" },
+        ],
+        context: { userId: authorId, userType: USER_TYPE_AUTHOR },
+      });
 
       expect(results).toHaveLength(1);
       expect(results[0]!.title).toBe("Draft Post");
@@ -335,13 +333,11 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should NOT see author 2's draft)
-      const results = await db.query(
-        {
-          find: { e: ["?e"], title: ["?title"] },
-          where: [{ e: "?e", a: POST_TITLE, v: "?title" }],
-        },
-        { userId: author1Id, userType: USER_TYPE_AUTHOR }
-      );
+      const results = await db.query({
+        find: { e: ["?e"], title: ["?title"] },
+        where: [{ e: "?e", a: POST_TITLE, v: "?title" }],
+        context: { userId: author1Id, userType: USER_TYPE_AUTHOR },
+      });
 
       expect(results).toHaveLength(0);
       await db.close();
@@ -383,13 +379,11 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should see author 2's published post)
-      const results = await db.query(
-        {
-          find: { e: ["?e"], title: ["?title"] },
-          where: [{ e: "?e", a: POST_TITLE, v: "?title" }],
-        },
-        { userId: author1Id, userType: USER_TYPE_AUTHOR }
-      );
+      const results = await db.query({
+        find: { e: ["?e"], title: ["?title"] },
+        where: [{ e: "?e", a: POST_TITLE, v: "?title" }],
+        context: { userId: author1Id, userType: USER_TYPE_AUTHOR },
+      });
 
       expect(results).toHaveLength(1);
       expect(results[0]!.title).toBe("Published Post");
@@ -439,16 +433,14 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as reader (should only see published post)
-      const results = await db.query(
-        {
-          find: { e: ["?e"], title: ["?title"], status: ["?status"] },
-          where: [
-            { e: "?e", a: POST_TITLE, v: "?title" },
-            { e: "?e", a: POST_STATUS, v: "?status" },
-          ],
-        },
-        { userId: readerId, userType: USER_TYPE_READER }
-      );
+      const results = await db.query({
+        find: { e: ["?e"], title: ["?title"], status: ["?status"] },
+        where: [
+          { e: "?e", a: POST_TITLE, v: "?title" },
+          { e: "?e", a: POST_STATUS, v: "?status" },
+        ],
+        context: { userId: readerId, userType: USER_TYPE_READER },
+      });
 
       expect(results).toHaveLength(1);
       expect(results[0]!.title).toBe("Published Post");
@@ -499,16 +491,14 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as admin (should see all posts)
-      const results = await db.query(
-        {
-          find: { e: ["?e"], title: ["?title"], status: ["?status"] },
-          where: [
-            { e: "?e", a: POST_TITLE, v: "?title" },
-            { e: "?e", a: POST_STATUS, v: "?status" },
-          ],
-        },
-        { userId: adminId, userType: USER_TYPE_ADMIN }
-      );
+      const results = await db.query({
+        find: { e: ["?e"], title: ["?title"], status: ["?status"] },
+        where: [
+          { e: "?e", a: POST_TITLE, v: "?title" },
+          { e: "?e", a: POST_STATUS, v: "?status" },
+        ],
+        context: { userId: adminId, userType: USER_TYPE_ADMIN },
+      });
 
       expect(results).toHaveLength(2);
       const titles = results.map((r) => r.title).sort();

@@ -41,8 +41,8 @@ import type {
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
-  ViewConfig,
 } from "../views/database-view.js";
+import type { ViewConfig } from "../views/view-config.js";
 
 /**
  * In-memory database implementation
@@ -293,6 +293,9 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       );
     }
 
+    // Extract viewConfig from options
+    const viewConfig = options.viewConfig ?? { type: "current" };
+
     // Execute query with timeout if specified
     let envelope: DatomsResultEnvelope;
     if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
@@ -302,14 +305,13 @@ export class InMemoryDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._datoms(options, {
-        type: "current",
-      });
+      const queryPromise = this._datomsWithMetadataInternal(
+        options,
+        viewConfig
+      );
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      envelope = await this._datoms(options, {
-        type: "current",
-      });
+      envelope = await this._datomsWithMetadataInternal(options, viewConfig);
     }
 
     // Check result size limit if specified
@@ -536,21 +538,15 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     return executeQueryOnDatoms(mergedDatoms, options);
   }
 
-  async query(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResult> {
-    const envelope = await this.queryWithMetadata(query, context);
+  async query(query: DatalogQuery): Promise<QueryResult> {
+    const envelope = await this.queryWithMetadata(query);
     return envelope.data;
   }
 
-  async queryWithMetadata(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResultEnvelope> {
-    return this._query(query, context, {
-      type: "current",
-    });
+  async queryWithMetadata(query: DatalogQuery): Promise<QueryResultEnvelope> {
+    // Extract viewConfig from query
+    const viewConfig = query.viewConfig ?? { type: "current" };
+    return this._queryWithMetadataInternal(query, viewConfig);
   }
 
   /**
@@ -670,7 +666,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     });
   }
 
-  public async _datoms(
+  private async _datomsWithMetadataInternal(
     options: DatomsQuery,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
@@ -710,9 +706,8 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     };
   }
 
-  public async _query(
+  private async _queryWithMetadataInternal(
     query: DatalogQuery,
-    context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
   ): Promise<QueryResultEnvelope> {
     await this._ensureInitialized();
@@ -721,19 +716,32 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     const metadata: Record<string, unknown> = {};
 
     // Create read context
+    // Extract context from query, but ensure db and query fields are not overwritten
+    const { db: _, query: __, ...restContext } = query.context || {};
+    // Merge db into query.context so hooks can access it via query.context.db
+    const enhancedQuery = {
+      ...query,
+      context: {
+        ...restContext,
+        db: this,
+      },
+    };
     const ctx: ReadContext = {
+      ...restContext,
       db: this,
-      ...(context || {}),
+      query: enhancedQuery,
     };
 
-    // Run before-read hooks
-    const beforeResult = await this.hooks.runBeforeRead(query, ctx);
+    // Run before-read hooks (pass enhanced query with db in context)
+    const beforeResult = await this.hooks.runBeforeRead(enhancedQuery, ctx);
 
     if (beforeResult.errors.length > 0) {
       throw new QueryError("Query blocked by hooks", beforeResult.errors);
     }
 
     const modifiedQuery = beforeResult.query;
+    // Extract viewConfig from modified query if it was changed
+    const finalViewConfig = modifiedQuery.viewConfig ?? viewConfig;
 
     // Simple implementation: for each where clause, query the database
     // and join the results
@@ -765,14 +773,15 @@ export class InMemoryDatomDatabase implements DatomDatabase {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      // Use executeQueryWithViewConfig instead of datoms()
-      const clauseDatoms = await this._datoms(
+      // Use internal method with finalViewConfig
+      const clauseDatoms = await this._datomsWithMetadataInternal(
         {
           e: entity,
           a: attribute,
           v: value,
+          viewConfig: finalViewConfig,
         },
-        viewConfig
+        finalViewConfig
       );
 
       for (const datom of clauseDatoms.data) {

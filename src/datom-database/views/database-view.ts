@@ -12,18 +12,7 @@ import type {
   Value,
 } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
-
-/**
- * Configuration for database views
- * Views use this to pass their configuration to implementations
- * @internal
- */
-export type ViewConfig =
-  | { type: "current" }
-  | { type: "asOf"; txId: TransactionId }
-  | { type: "since"; txId: TransactionId }
-  | { type: "history" }
-  | { type: "speculative"; datoms: Datom[] };
+import type { ViewConfig } from "./view-config.js";
 
 export type DatomsResult = Array<Datom>;
 
@@ -53,7 +42,7 @@ export type QueryResultEnvelope = {
  * Provides minimal interface for querying historical or filtered database states
  * Views are immutable and cannot modify the database
  */
-export type DatabaseView = {
+export interface DatabaseView {
   /**
    * Query datoms from the database view using query options
    * @param options Query options (must include at least one filter or limit to prevent full scans)
@@ -74,26 +63,17 @@ export type DatabaseView = {
    * console.log(envelope.data); // The datoms
    * console.log(envelope.metadata); // Implementation-specific metadata (SQL queries, etc.)
    */
-  datomsWithMetadata(
-    options: DatomsQuery & {
-      viewConfig: ViewConfig;
-      context?: Record<string, unknown>;
-    }
-  ): Promise<DatomsResultEnvelope>;
+  datomsWithMetadata(options: DatomsQuery): Promise<DatomsResultEnvelope>;
 
   /**
    * Execute a datalog query against this database view
    * @param query Datalog query to execute
-   * @param context Optional context object for hooks
    * @returns Query results as an array of records
    * @example
    * const dbPast = db.asOf(100);
    * const results = await dbPast.query({ find: ["?e"], where: [["?e", "name", "Alice"]] });
    */
-  query(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
-  ): Promise<QueryResult>;
+  query(query: DatalogQuery): Promise<QueryResult>;
 
   /**
    * Execute a datalog query against this database view with metadata envelope
@@ -106,13 +86,8 @@ export type DatabaseView = {
    * console.log(envelope.data); // The query results
    * console.log(envelope.metadata); // Implementation-specific metadata (SQL queries, execution plans, etc.)
    */
-  queryWithMetadata(
-    query: DatalogQuery & {
-      viewConfig: ViewConfig;
-      context?: Record<string, unknown>;
-    }
-  ): Promise<QueryResultEnvelope>;
-};
+  queryWithMetadata(query: DatalogQuery): Promise<QueryResultEnvelope>;
+}
 
 /**
  * Options for querying datoms
@@ -140,4 +115,8 @@ export interface DatomsQuery {
   timeoutMs?: number;
   /** Maximum number of results allowed (throws QueryResultSizeError if exceeded) */
   maxResultSize?: number;
+  /** Optional context for the query */
+  context?: Record<string, unknown>;
+  /** Optional view configuration */
+  viewConfig?: ViewConfig;
 }

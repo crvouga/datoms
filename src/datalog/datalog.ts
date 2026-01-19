@@ -2,6 +2,7 @@
  * Datalog query interface and parser
  */
 
+import type { ViewConfig } from "../datom-database/views/view-config.js";
 import type { Attribute, Value } from "../datoms.js";
 import type { EntityId } from "../entity-id.js";
 
@@ -82,6 +83,10 @@ export interface DatalogQuery {
   orderBy?: [variable: DatalogQueryVariable, direction: "asc" | "desc"][];
   /** Optional limit */
   limit?: number;
+  /** Optional context for the query */
+  context?: Record<string, unknown>;
+  /** Optional view configuration */
+  viewConfig?: ViewConfig;
 }
 
 export const d: DatalogQuery = {
