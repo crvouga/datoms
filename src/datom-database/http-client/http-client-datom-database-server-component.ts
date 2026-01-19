@@ -65,15 +65,6 @@ interface GetLatestTransactionResponse {
   txId: TransactionId;
 }
 
-interface GetTransactionMetadataRequest {
-  method: "getTransactionMetadata";
-  txId: TransactionId;
-}
-
-interface GetTransactionMetadataResponse {
-  metadata?: Record<string, unknown>;
-}
-
 interface RegisterHookRequest {
   method: "registerHook";
   hook: Hook;
@@ -98,7 +89,6 @@ type TransportRequest =
   | QueryRequest
   | TransactRequest
   | GetLatestTransactionRequest
-  | GetTransactionMetadataRequest
   | RegisterHookRequest
   | DeleteDatomsRequest;
 
@@ -108,7 +98,6 @@ type TransportResponse =
   | QueryResponse
   | TransactResponse
   | GetLatestTransactionResponse
-  | GetTransactionMetadataResponse
   | RegisterHookResponse
   | DeleteDatomsResponse;
 
@@ -187,11 +176,6 @@ export class HttpClientDatomDatabaseServerComponent {
         case "getLatestTransaction":
           response = await this._handleGetLatestTransaction(
             transportRequest as GetLatestTransactionRequest
-          );
-          break;
-        case "getTransactionMetadata":
-          response = await this._handleGetTransactionMetadata(
-            transportRequest as GetTransactionMetadataRequest
           );
           break;
         case "registerHook":
@@ -321,15 +305,6 @@ export class HttpClientDatomDatabaseServerComponent {
 
     const txId = await this.db._getLatestTransaction();
     return { txId };
-  }
-
-  private async _handleGetTransactionMetadata(
-    request: GetTransactionMetadataRequest
-  ): Promise<GetTransactionMetadataResponse> {
-    await this._ensureInitialized();
-
-    const metadata = await this.db.getTransactionMetadata(request.txId);
-    return { metadata };
   }
 
   private async _handleRegisterHook(

@@ -118,21 +118,21 @@ export interface DatomDatabase extends DatabaseView {
   initialize(): Promise<void>;
 
   /**
-   * Register a database-level hook for validation, authorization, audit trails, etc.
-   * Preferred over the old `.hook()` method. Call this at startup before transactions.
-   *
-   * @param hook The hook to register (see Hook type for details)
-   * @example
-   * db.registerHook(myValidatorHook);
-   */
-  hook(hook: Hook): void;
-
-  /**
    * Close the database and clean up resources
    * @example
    * await db.close();
    */
   close(): Promise<void>;
+
+  /**
+   * Register a database-level hook for validation, authorization, audit trails, etc.
+   * Preferred over the old `.hook()` method. Call this at startup before transactions.
+   *
+   * @param hook The hook to register (see Hook type for details)
+   * @example
+   * db.hook(myValidatorHook);
+   */
+  hook(hook: Hook): void;
 
   /**
    * Execute bulk operations atomically (Datomic-like transact)
@@ -158,45 +158,6 @@ export interface DatomDatabase extends DatabaseView {
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>
   ): Promise<TransactionId>;
-
-  /**
-   * Hook for implementations to store transaction metadata.
-   * Called after a transaction commits successfully.
-   *
-   * **Optional Implementation:** This method is optional - implementations can override
-   * it to persist metadata if needed. The default implementation is a no-op, meaning
-   * metadata is ignored unless the implementation provides storage.
-   *
-   * **Note:** Metadata is still emitted in transaction events even if not persisted,
-   * so event listeners can access it regardless of whether this method is overridden.
-   *
-   * @param txId The transaction ID
-   * @param metadata The metadata object provided to transact()
-   * @example
-   * // Override in your subclass to store metadata:
-   * protected async onTransactionMetadata(
-   *   txId: TransactionId,
-   *   metadata: Record<string, unknown>
-   * ): Promise<void> {
-   *   await this.metadataTable.insert({ txId, ...metadata });
-   * }
-   */
-  onTransactionMetadata(
-    txId: TransactionId,
-    metadata: Record<string, unknown>
-  ): Promise<void>;
-
-  /**
-   * Get metadata associated with a transaction
-   * @param txId Transaction ID
-   * @returns Metadata object or undefined if no metadata was stored
-   * @example
-   * const metadata = await db.getTransactionMetadata(123);
-   * // Returns: { userId: "alice", reason: "update" } or undefined
-   */
-  getTransactionMetadata(
-    txId: TransactionId
-  ): Promise<Record<string, unknown> | undefined>;
 
   /**
    * Create a database view showing the state at a specific transaction ID
@@ -289,7 +250,7 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Envelope containing datoms result and optional metadata
    * @internal
    */
-  _executeQuery(
+  _executeDatoms(
     options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope>;
@@ -303,7 +264,7 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Envelope containing query results and optional metadata
    * @internal
    */
-  _executeDatalogQuery(
+  _executeQuery(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig

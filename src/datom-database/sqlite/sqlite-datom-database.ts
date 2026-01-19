@@ -217,11 +217,6 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     // If there are no operations, still create a new transaction ID
     const committedTxId = await this._writeDatoms(allFinalDatoms);
 
-    // Store metadata if provided
-    if (metadata !== undefined) {
-      await this.onTransactionMetadata(committedTxId, metadata);
-    }
-
     // Create write result for after-write hooks
     const writeResult: WriteResult = {
       txId: committedTxId,
@@ -235,14 +230,6 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     });
 
     return committedTxId;
-  }
-
-  async onTransactionMetadata(
-    _txId: TransactionId,
-    _metadata: Record<string, unknown>
-  ): Promise<void> {
-    // Optional: Override in implementations if metadata storage is needed
-    // Default: no-op (metadata is ignored but still emitted in events)
   }
 
   private async _validateDatoms(
@@ -306,12 +293,12 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._executeQuery(options, {
+      const queryPromise = this._executeDatoms(options, {
         type: "current",
       });
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      envelope = await this._executeQuery(options, {
+      envelope = await this._executeDatoms(options, {
         type: "current",
       });
     }
@@ -824,7 +811,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResultEnvelope> {
-    return this._executeDatalogQuery(query, context, {
+    return this._executeQuery(query, context, {
       type: "current",
     });
   }
@@ -1127,18 +1114,6 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     await this.connection.execute(sql, params);
   }
 
-  /**
-   * Get metadata associated with a transaction
-   * Default implementation returns undefined (metadata storage not implemented)
-   * Override onTransactionMetadata and this method to support metadata storage
-   */
-  async getTransactionMetadata(
-    _txId: TransactionId
-  ): Promise<Record<string, unknown> | undefined> {
-    // Default: no metadata storage
-    return undefined;
-  }
-
   async _getLatestTransaction(): Promise<TransactionId> {
     await this._ensureInitialized();
     const sql = `SELECT last_tx FROM ${this.tableName}_tx WHERE id = 1`;
@@ -1208,7 +1183,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     await this.connection.execute(sql, params);
   }
 
-  public async _executeQuery(
+  public async _executeDatoms(
     options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
@@ -1247,7 +1222,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     };
   }
 
-  public async _executeDatalogQuery(
+  public async _executeQuery(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
@@ -1298,7 +1273,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const datoms = await this._executeQuery(
+      const datoms = await this._executeDatoms(
         {
           e: entity,
           a: attribute,
@@ -1366,7 +1341,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const clauseDatoms = await this._executeQuery(
+      const clauseDatoms = await this._executeDatoms(
         {
           e: entity,
           a: attribute,
@@ -1412,7 +1387,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const firstDatoms = await this._executeQuery(
+      const firstDatoms = await this._executeDatoms(
         {
           e: entity,
           a: attribute,
@@ -1450,7 +1425,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
           : (attributeVal as string);
         const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-        const clauseDatoms = await this._executeQuery(
+        const clauseDatoms = await this._executeDatoms(
           {
             e: entity,
             a: attribute,

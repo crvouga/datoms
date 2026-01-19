@@ -60,10 +60,6 @@ interface GetLatestTransactionResponse {
   txId: TransactionId;
 }
 
-interface GetTransactionMetadataResponse {
-  metadata?: Record<string, unknown>;
-}
-
 interface DeleteDatomsResponse {
   success: boolean;
 }
@@ -215,35 +211,6 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     }
   }
 
-  async onTransactionMetadata(
-    _txId: TransactionId,
-    _metadata: Record<string, unknown>
-  ): Promise<void> {
-    // Metadata is stored remotely, no local action needed
-  }
-
-  async getTransactionMetadata(
-    txId: TransactionId
-  ): Promise<Record<string, unknown> | undefined> {
-    await this._ensureInitialized();
-
-    try {
-      const response =
-        await this.httpClient.post<GetTransactionMetadataResponse>(
-          this.endpoint,
-          {
-            method: "getTransactionMetadata",
-            txId,
-          }
-        );
-      return response.metadata;
-    } catch (error) {
-      throw new Error(
-        `Failed to get transaction metadata: ${this._extractErrorMessage(error)}`
-      );
-    }
-  }
-
   async _getLatestTransaction(): Promise<TransactionId> {
     await this._ensureInitialized();
 
@@ -350,10 +317,10 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._executeQuery(options, this.currentViewConfig);
+      const queryPromise = this._executeDatoms(options, this.currentViewConfig);
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      envelope = await this._executeQuery(options, this.currentViewConfig);
+      envelope = await this._executeDatoms(options, this.currentViewConfig);
     }
 
     // Check result size limit if specified
@@ -383,10 +350,10 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResultEnvelope> {
-    return this._executeDatalogQuery(query, context, this.currentViewConfig);
+    return this._executeQuery(query, context, this.currentViewConfig);
   }
 
-  async _executeDatalogQuery(
+  async _executeQuery(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
@@ -448,7 +415,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
       if (!hasAnyFilter) {
         // All variables - get all datoms using _executeQuery with limit to satisfy validation
         // For speculative views, this will fetch all datoms and merge with speculative ones
-        const rawDatoms = await this._executeQuery(
+        const rawDatoms = await this._executeDatoms(
           { limit: Number.MAX_SAFE_INTEGER },
           viewConfig
         );
@@ -461,7 +428,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         if (entity !== undefined) queryOptions.e = entity;
         if (attribute !== undefined) queryOptions.a = attribute;
         if (value !== undefined) queryOptions.v = value;
-        clauseDatoms = (await this._executeQuery(queryOptions, viewConfig))
+        clauseDatoms = (await this._executeDatoms(queryOptions, viewConfig))
           .data;
       }
 
@@ -559,7 +526,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     };
   }
 
-  async _executeQuery(
+  async _executeDatoms(
     options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
