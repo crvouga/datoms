@@ -6,7 +6,7 @@
 
 import type { DatalogQuery } from "../../datalog/datalog.js";
 import type { Datom } from "../../datoms.js";
-import type { DatomDatabase, ViewConfig } from "../datom-database.js";
+import type { DatomDatabase } from "../datom-database.js";
 import { validateQueryOptions } from "../shared/query-validation.js";
 import type {
   DatabaseView,
@@ -14,6 +14,7 @@ import type {
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
+  ViewConfig,
 } from "./database-view.js";
 
 /**

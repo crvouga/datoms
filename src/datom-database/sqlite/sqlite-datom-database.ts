@@ -14,11 +14,7 @@ import type {
 import type { EntityId } from "../../entity-id.js";
 import type { SQLDatabase } from "../../sql-database/sql-database.js";
 import type { Transaction } from "../../types.js";
-import type {
-  DatomDatabase,
-  ViewConfig,
-  WithResult,
-} from "../datom-database.js";
+import type { DatomDatabase, WithResult } from "../datom-database.js";
 import {
   HookEngine,
   QueryError,
@@ -44,6 +40,7 @@ import type {
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
+  ViewConfig,
 } from "../views/database-view.js";
 
 /**

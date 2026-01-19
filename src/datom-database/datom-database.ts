@@ -13,19 +13,8 @@ import type {
   DatomsQuery,
   DatomsResultEnvelope,
   QueryResultEnvelope,
+  ViewConfig,
 } from "./views/database-view.js";
-
-/**
- * Configuration for database views
- * Views use this to pass their configuration to implementations
- * @internal
- */
-export type ViewConfig =
-  | { type: "current" }
-  | { type: "asOf"; txId: TransactionId }
-  | { type: "since"; txId: TransactionId }
-  | { type: "history" }
-  | { type: "speculative"; datoms: Datom[] };
 
 /**
  * Datom database interface (Datomic-like minimal API)

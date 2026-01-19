@@ -5,7 +5,7 @@
 
 import type { DatalogQuery } from "../../datalog/datalog.js";
 import type { Datom, DatomInput, TransactionId } from "../../datoms.js";
-import type { DatomDatabase, ViewConfig } from "../datom-database.js";
+import type { DatomDatabase } from "../datom-database.js";
 import type { Hook } from "../hook/hook.js";
 import {
   QueryError,
@@ -14,7 +14,11 @@ import {
   TransactionError,
 } from "../hook/hook.js";
 import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
-import type { DatomsQuery, QueryResult } from "../views/database-view.js";
+import type {
+  DatomsQuery,
+  QueryResult,
+  ViewConfig,
+} from "../views/database-view.js";
 
 // Request/Response types for HTTP API contract
 interface InitializeRequest {

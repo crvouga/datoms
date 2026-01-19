@@ -13,6 +13,18 @@ import type {
 } from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
 
+/**
+ * Configuration for database views
+ * Views use this to pass their configuration to implementations
+ * @internal
+ */
+export type ViewConfig =
+  | { type: "current" }
+  | { type: "asOf"; txId: TransactionId }
+  | { type: "since"; txId: TransactionId }
+  | { type: "history" }
+  | { type: "speculative"; datoms: Datom[] };
+
 export type DatomsResult = Array<Datom>;
 
 /**
@@ -62,7 +74,12 @@ export type DatabaseView = {
    * console.log(envelope.data); // The datoms
    * console.log(envelope.metadata); // Implementation-specific metadata (SQL queries, etc.)
    */
-  datomsWithMetadata(options: DatomsQuery): Promise<DatomsResultEnvelope>;
+  datomsWithMetadata(
+    options: DatomsQuery & {
+      viewConfig: ViewConfig;
+      context?: Record<string, unknown>;
+    }
+  ): Promise<DatomsResultEnvelope>;
 
   /**
    * Execute a datalog query against this database view
@@ -90,8 +107,10 @@ export type DatabaseView = {
    * console.log(envelope.metadata); // Implementation-specific metadata (SQL queries, execution plans, etc.)
    */
   queryWithMetadata(
-    query: DatalogQuery,
-    context?: Record<string, unknown>
+    query: DatalogQuery & {
+      viewConfig: ViewConfig;
+      context?: Record<string, unknown>;
+    }
   ): Promise<QueryResultEnvelope>;
 };
 
