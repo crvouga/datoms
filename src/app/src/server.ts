@@ -51,6 +51,30 @@ async function main() {
 
   tmdbLoader.start();
 
+  const allDatoms = await db.datoms({ limit: 1_000_000 })
+
+  try {
+    allDatoms.sort((a, b) => a['e'] > b['e'] ? 1 : -1);
+
+    // Convert datoms to tuples
+    const tuples = allDatoms.map(datom => [
+      datom.e,
+      datom.a,
+      datom.v,
+      datom.tx,
+      datom.op
+    ]);
+
+    // Write tuples to file as a JSON array, one tuple per line for formatting
+    const jsonArrayLines = '[\n' + tuples.map(t => '  ' + JSON.stringify(t)).join(',\n') + '\n]\n';
+    await Bun.write("datoms.json", jsonArrayLines);
+
+    logger.info("allDatoms written to datoms.json");
+  } catch (err) {
+    logger.error("Failed to write allDatoms", { error: getErrorMsg(err) });
+  }
+
+
   const server = serve({
     port,
     routes: {
