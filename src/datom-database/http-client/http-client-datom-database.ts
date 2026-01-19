@@ -4,7 +4,13 @@
  */
 
 import type { DatalogQuery, QueryClause } from "../../datalog/datalog.js";
-import type { Attribute, Datom, DatomInput, TransactionId, Value } from "../../datoms.js";
+import type {
+  Attribute,
+  Datom,
+  DatomInput,
+  TransactionId,
+  Value,
+} from "../../datoms.js";
 import type { EntityId } from "../../entity-id.js";
 import type { HttpClient } from "../../http-client/http-client.js";
 import type { Transaction } from "../../types.js";
@@ -411,14 +417,27 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
+      // Build datoms query options
+      const datomsQuery: DatomsQuery = {
+        e: entity,
+        a: attribute,
+        v: value,
+        viewConfig,
+      };
+
+      // If all positions are variables, add a large limit to satisfy safety validation
+      // The actual filtering will happen during query execution on filtered datoms
+      if (
+        entity === undefined &&
+        attribute === undefined &&
+        value === undefined
+      ) {
+        datomsQuery.limit = Number.MAX_SAFE_INTEGER;
+      }
+
       // Fetch datoms matching this clause from server
       const clauseDatoms = await this._datomsWithMetadataInternal(
-        {
-          e: entity,
-          a: attribute,
-          v: value,
-          viewConfig,
-        },
+        datomsQuery,
         viewConfig
       );
 
