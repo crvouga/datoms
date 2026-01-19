@@ -39,7 +39,7 @@ export class ConfiguredDatabaseView implements DatabaseView {
     validateQueryOptions(options);
 
     // Route to implementation with view config
-    return this.db._executeQueryWithMetadata(options, this.viewConfig);
+    return this.db._executeQuery(options, this.viewConfig);
   }
 
   async query(
@@ -54,10 +54,6 @@ export class ConfiguredDatabaseView implements DatabaseView {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResultEnvelope> {
-    return this.db._executeDatalogQueryWithMetadata(
-      query,
-      context,
-      this.viewConfig
-    );
+    return this.db._executeDatalogQuery(query, context, this.viewConfig);
   }
 }

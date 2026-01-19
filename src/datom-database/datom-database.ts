@@ -11,7 +11,6 @@ import type {
   DatabaseView,
   DatomsParams,
   DatomsResultEnvelope,
-  QueryResult,
   QueryResultEnvelope,
 } from "./views/database-view.js";
 
@@ -283,19 +282,6 @@ export interface DatomDatabase extends DatabaseView {
   with(ops: DatomInput[]): Promise<WithResult>;
 
   /**
-   * Execute a query with view configuration.
-   * This method routes queries to the appropriate implementation method based on view config.
-   * @param options Query options
-   * @param viewConfig View configuration (asOf, since, history, current, or speculative)
-   * @returns Array of matching datoms
-   * @internal
-   */
-  _executeQuery(
-    options: DatomsParams,
-    viewConfig: ViewConfig
-  ): Promise<Datom[]>;
-
-  /**
    * Execute a query with view configuration and return metadata envelope.
    * This method routes queries to the appropriate implementation method based on view config.
    * @param options Query options
@@ -303,25 +289,10 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Envelope containing datoms result and optional metadata
    * @internal
    */
-  _executeQueryWithMetadata(
+  _executeQuery(
     options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope>;
-
-  /**
-   * Execute a datalog query with view configuration.
-   * This method routes datalog queries to the appropriate implementation method based on view config.
-   * @param query Datalog query to execute
-   * @param context Optional context object for hooks
-   * @param viewConfig View configuration (asOf, since, history, current, or speculative)
-   * @returns Query results as an array of records
-   * @internal
-   */
-  _executeDatalogQuery(
-    query: DatalogQuery,
-    context: Record<string, unknown> | undefined,
-    viewConfig: ViewConfig
-  ): Promise<QueryResult>;
 
   /**
    * Execute a datalog query with view configuration and return metadata envelope.
@@ -332,7 +303,7 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Envelope containing query results and optional metadata
    * @internal
    */
-  _executeDatalogQueryWithMetadata(
+  _executeDatalogQuery(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig

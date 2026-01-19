@@ -317,12 +317,12 @@ export class InMemoryDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._executeQueryWithMetadata(options, {
+      const queryPromise = this._executeQuery(options, {
         type: "current",
       });
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      envelope = await this._executeQueryWithMetadata(options, {
+      envelope = await this._executeQuery(options, {
         type: "current",
       });
     }
@@ -563,7 +563,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResultEnvelope> {
-    return this._executeDatalogQueryWithMetadata(query, context, {
+    return this._executeDatalogQuery(query, context, {
       type: "current",
     });
   }
@@ -653,14 +653,6 @@ export class InMemoryDatomDatabase implements DatomDatabase {
   public async _executeQuery(
     options: DatomsParams,
     viewConfig: ViewConfig
-  ): Promise<Datom[]> {
-    const envelope = await this._executeQueryWithMetadata(options, viewConfig);
-    return envelope.data;
-  }
-
-  public async _executeQueryWithMetadata(
-    options: DatomsParams,
-    viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
     await this._ensureInitialized();
 
@@ -699,19 +691,6 @@ export class InMemoryDatomDatabase implements DatomDatabase {
   }
 
   public async _executeDatalogQuery(
-    query: DatalogQuery,
-    context: Record<string, unknown> | undefined,
-    viewConfig: ViewConfig
-  ): Promise<QueryResult> {
-    const envelope = await this._executeDatalogQueryWithMetadata(
-      query,
-      context,
-      viewConfig
-    );
-    return envelope.data;
-  }
-
-  public async _executeDatalogQueryWithMetadata(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
@@ -776,7 +755,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
         viewConfig
       );
 
-      for (const datom of clauseDatoms) {
+      for (const datom of clauseDatoms.data) {
         const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
         if (!allDatomsSet.has(key)) {
           allDatomsSet.add(key);

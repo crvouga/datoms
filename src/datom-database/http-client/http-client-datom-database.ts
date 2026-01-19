@@ -350,16 +350,10 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._executeQueryWithMetadata(
-        options,
-        this.currentViewConfig
-      );
+      const queryPromise = this._executeQuery(options, this.currentViewConfig);
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      envelope = await this._executeQueryWithMetadata(
-        options,
-        this.currentViewConfig
-      );
+      envelope = await this._executeQuery(options, this.currentViewConfig);
     }
 
     // Check result size limit if specified
@@ -389,27 +383,10 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResultEnvelope> {
-    return this._executeDatalogQueryWithMetadata(
-      query,
-      context,
-      this.currentViewConfig
-    );
+    return this._executeDatalogQuery(query, context, this.currentViewConfig);
   }
 
   async _executeDatalogQuery(
-    query: DatalogQuery,
-    context: Record<string, unknown> | undefined,
-    viewConfig: ViewConfig
-  ): Promise<QueryResult> {
-    const envelope = await this._executeDatalogQueryWithMetadata(
-      query,
-      context,
-      viewConfig
-    );
-    return envelope.data;
-  }
-
-  async _executeDatalogQueryWithMetadata(
     query: DatalogQuery,
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
@@ -476,7 +453,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
           viewConfig
         );
         // Use shared query executor to deduplicate and filter
-        clauseDatoms = executeQueryOnDatoms(rawDatoms, {});
+        clauseDatoms = executeQueryOnDatoms(rawDatoms.data, {});
       } else {
         // Has filters - use _executeQuery with viewConfig to respect time-travel views
         // Include attribute filter if specified to optimize speculative queries
@@ -484,7 +461,8 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         if (entity !== undefined) queryOptions.e = entity;
         if (attribute !== undefined) queryOptions.a = attribute;
         if (value !== undefined) queryOptions.v = value;
-        clauseDatoms = await this._executeQuery(queryOptions, viewConfig);
+        clauseDatoms = (await this._executeQuery(queryOptions, viewConfig))
+          .data;
       }
 
       for (const datom of clauseDatoms) {
@@ -582,14 +560,6 @@ export class HttpClientDatomDatabase implements DatomDatabase {
   }
 
   async _executeQuery(
-    options: DatomsParams,
-    viewConfig: ViewConfig
-  ): Promise<Datom[]> {
-    const envelope = await this._executeQueryWithMetadata(options, viewConfig);
-    return envelope.data;
-  }
-
-  async _executeQueryWithMetadata(
     options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<DatomsResultEnvelope> {
