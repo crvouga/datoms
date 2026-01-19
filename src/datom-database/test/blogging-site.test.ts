@@ -61,7 +61,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       expect(results[0]!.name).toBe("Admin User");
       expect(results[0]!.email).toBe("admin@example.com");
-      await db.close();
     });
 
     test("should create author user", async () => {
@@ -86,7 +85,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       expect(results).toHaveLength(1);
       expect(results[0]!.name).toBe("Author User");
-      await db.close();
     });
 
     test("should create reader user", async () => {
@@ -111,7 +109,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       expect(results).toHaveLength(1);
       expect(results[0]!.name).toBe("Reader User");
-      await db.close();
     });
   });
 
@@ -152,7 +149,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       expect(results[0]!.title).toBe("My First Post");
       expect(results[0]!.status).toBe(POST_STATUS_DRAFT);
-      await db.close();
     });
 
     test("should publish a post", async () => {
@@ -199,7 +195,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       expect(results).toHaveLength(1);
       expect(results[0]!.status).toBe(POST_STATUS_PUBLISHED);
-      await db.close();
     });
 
     test("should edit a post", async () => {
@@ -249,7 +244,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       expect(results[0]!.title).toBe("Updated Title");
       expect(results[0]!.content).toBe("Updated Content");
-      await db.close();
     });
   });
 
@@ -294,7 +288,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       expect(results[0]!.title).toBe("Draft Post");
       expect(results[0]!.status).toBe(POST_STATUS_DRAFT);
-      await db.close();
     });
 
     test("author should NOT see other authors' draft posts", async () => {
@@ -340,7 +333,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(0);
-      await db.close();
     });
 
     test("author should see published posts from other authors", async () => {
@@ -387,7 +379,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       expect(results).toHaveLength(1);
       expect(results[0]!.title).toBe("Published Post");
-      await db.close();
     });
 
     test("reader should only see published posts", async () => {
@@ -445,7 +436,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       expect(results[0]!.title).toBe("Published Post");
       expect(results[0]!.status).toBe(POST_STATUS_PUBLISHED);
-      await db.close();
     });
 
     test("admin should see all posts", async () => {
@@ -503,7 +493,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(2);
       const titles = results.map((r) => r.title).sort();
       expect(titles).toEqual(["Draft Post", "Published Post"]);
-      await db.close();
     });
   });
 
@@ -543,7 +532,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       expect(results).toHaveLength(1);
       expect(results[0]!.title).toBe("Valid Post");
-      await db.close();
     });
 
     test("should validate author exists", async () => {
@@ -586,7 +574,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      await db.close();
     });
   });
 
@@ -612,7 +599,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       expect(results).toHaveLength(1);
       expect(results[0]!.name).toBe("javascript");
-      await db.close();
     });
 
     test("should associate tags with posts", async () => {
@@ -675,7 +661,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       const tagNames = results.map((r) => r.tagName).sort();
       expect(tagNames).toContain("javascript");
       expect(tagNames).toContain("typescript");
-      await db.close();
     });
 
     test("should query posts by tag", async () => {
@@ -729,7 +714,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
 
       expect(results).toHaveLength(1);
       expect(results[0]!.title).toBe("JS Post");
-      await db.close();
     });
   });
 
@@ -820,7 +804,6 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       if (tagName) {
         expect(["javascript", "tutorial"]).toContain(tagName);
       }
-      await db.close();
     });
   });
 });

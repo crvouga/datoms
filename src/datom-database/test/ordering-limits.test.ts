@@ -35,8 +35,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(2);
       expect(results[0]!["s"]).toBe(400);
       expect(results[1]!["s"]).toBe(250);
-
-      await db.close();
     });
 
     test("should handle queries with ordering on multiple variables", async () => {
@@ -74,8 +72,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[1]!.age).toBe(25);
       expect(results[2]!.score).toBe(100); // Alice third (same score, older)
       expect(results[2]!.age).toBe(30);
-
-      await db.close();
     });
 
     test("should handle limit 0", async () => {
@@ -97,8 +93,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // This test documents the current behavior - limit 0 doesn't apply the limit
       // In a proper implementation, limit 0 should return empty array
       expect(results.length).toBeGreaterThanOrEqual(0);
-
-      await db.close();
     });
 
     test("should handle limit larger than results", async () => {
@@ -114,8 +108,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         limit: 10,
       });
       expect(results).toHaveLength(2);
-
-      await db.close();
     });
 
     test("should handle limit with ordering", async () => {
@@ -136,8 +128,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(2);
       expect(results[0]!["s"]).toBe(400);
       expect(results[1]!["s"]).toBe(300);
-
-      await db.close();
     });
 
     test("should handle ordering on variable not in find", async () => {
@@ -182,8 +172,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(resultsWithScore[0]!.score).toBe(200);
       expect(resultsWithScore[1]!.name).toBe("Alice");
       expect(resultsWithScore[1]!.score).toBe(100);
-
-      await db.close();
     });
 
     test("should handle ordering with null values", async () => {
@@ -207,8 +195,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const scores = results.map((r) => r["s"]);
       expect(scores).toContain(100);
       expect(scores).toContain(200);
-
-      await db.close();
     });
 
     test("should handle ordering with mixed types", async () => {
@@ -230,8 +216,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(4);
       // Mixed types should be sortable (strings vs numbers)
       // The exact order depends on implementation, but should be consistent
-
-      await db.close();
     });
   });
 });

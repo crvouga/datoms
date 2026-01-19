@@ -32,8 +32,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBe(30);
-
-      await db.close();
     });
 
     test("should return null or 0 for empty results", async () => {
@@ -51,8 +49,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
           results[0]!["average"] === undefined ||
           results[0]!["average"] === 0
       ).toBe(true);
-
-      await db.close();
     });
 
     test("should calculate average of single value", async () => {
@@ -67,8 +63,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBe(85);
-
-      await db.close();
     });
 
     test("should calculate average of decimal numbers", async () => {
@@ -87,8 +81,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBeCloseTo(20.333, 2);
-
-      await db.close();
     });
 
     test("should calculate average with negative numbers", async () => {
@@ -107,8 +99,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBeCloseTo(6.667, 2);
-
-      await db.close();
     });
 
     test("should calculate average with filters", async () => {
@@ -133,8 +123,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBe(85);
-
-      await db.close();
     });
 
     test("should calculate average with duplicate values", async () => {
@@ -153,8 +141,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBe(10);
-
-      await db.close();
     });
 
     test("should calculate average with zero values", async () => {
@@ -173,8 +159,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBe(10);
-
-      await db.close();
     });
 
     test("should calculate average after updates", async () => {
@@ -197,8 +181,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Average of [50, 60, 70, 80] = 65
       expect(results[0]!["average"]).toBeCloseTo(65, 1);
-
-      await db.close();
     });
   });
 });

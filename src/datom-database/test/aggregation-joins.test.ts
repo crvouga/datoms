@@ -44,8 +44,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["total"]).toBe(600);
       expect(results[0]!["average"]).toBe(200);
       expect(results[0]!["count"]).toBe(3);
-
-      await db.close();
     });
 
     test("should aggregate with relationship joins", async () => {
@@ -76,8 +74,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       expect(results[0]!["orderCount"]).toBe(3);
       expect(results[0]!["customerCount"]).toBe(2);
-
-      await db.close();
     });
 
     test("should aggregate with multiple join conditions", async () => {
@@ -112,8 +108,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["total"]).toBe(300);
       expect(results[0]!["average"]).toBe(150);
       expect(results[0]!["maxPrice"]).toBe(200);
-
-      await db.close();
     });
 
     test("should aggregate with self-joins", async () => {
@@ -147,8 +141,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["childCount"]).toBe(2);
       expect(results[0]!["childTotal"]).toBe(125);
       expect(results[0]!["childAvg"]).toBe(62.5);
-
-      await db.close();
     });
 
     test("should handle aggregations with empty joins", async () => {
@@ -174,8 +166,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       expect(results[0]!["total"]).toBe(0);
       expect(results[0]!["count"]).toBe(0);
-
-      await db.close();
     });
   });
 });

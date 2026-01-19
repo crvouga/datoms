@@ -6,26 +6,27 @@ export const notepad = async (db: DatomDatabase) => {
       "movie/id": ["?id"],
       "movie/title": ["?title"],
       "movie/popularity": ["?popularity"],
+      "movie/overview": ["?overview"],
     },
     where: [
       {
-        e: "?movie/id",
-        a: "tmdb.movie/id",
-        v: "?id",
+        e: "?id",
+        a: "tmdb.movie/overview",
+        v: "?overview",
       },
       {
-        e: "?movie/id",
+        e: "?id",
         a: "tmdb.movie/title",
         v: "?title",
       },
       {
-        e: "?movie/id",
+        e: "?id",
         a: "tmdb.movie/popularity",
         v: "?popularity",
       },
     ],
     orderBy: [["?popularity", "desc"]],
-    limit: 100,
+    limit: 5,
   });
 
   return results;

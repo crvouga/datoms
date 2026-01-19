@@ -42,8 +42,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["max"]).toBe(0);
       expect(results[0]!["min"]).toBe(0);
       expect(results[0]!["count"]).toBe(3);
-
-      await db.close();
     });
 
     test("should handle aggregations with very large numbers", async () => {
@@ -69,8 +67,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["min"]).toBe(1000);
       // Sum might overflow, so just check it's a number
       expect(typeof results[0]!["sum"]).toBe("number");
-
-      await db.close();
     });
 
     test("should handle aggregations with very small numbers", async () => {
@@ -95,8 +91,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["sum"]).toBeCloseTo(0.0000006, 7);
       expect(results[0]!["avg"]).toBeCloseTo(0.0000002, 7);
       expect(results[0]!["max"]).toBe(0.0000003);
-
-      await db.close();
     });
 
     test("should handle aggregations with mixed positive and negative values summing to zero", async () => {
@@ -123,8 +117,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["avg"]).toBeCloseTo(0, 1);
       expect(results[0]!["max"]).toBe(100);
       expect(results[0]!["min"]).toBe(-50);
-
-      await db.close();
     });
 
     test("should handle count with retractions", async () => {
@@ -150,8 +142,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       expect(results[0]!["count"]).toBe(2);
       expect(results[0]!["distinct"]).toBe(2);
-
-      await db.close();
     });
 
     test("should handle aggregations with updates (assert over existing)", async () => {
@@ -182,8 +172,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["avg"]).toBeCloseTo(67.5, 1);
       expect(results[0]!["max"]).toBe(90);
       expect(results[0]!["count"]).toBe(4);
-
-      await db.close();
     });
 
     test("should handle variance and stddev with two identical values", async () => {
@@ -206,8 +194,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Variance and stddev of two identical values should be 0
       expect(results[0]!["variance"]).toBe(0);
       expect(results[0]!["stddev"]).toBe(0);
-
-      await db.close();
     });
 
     test("should handle median with two values", async () => {
@@ -228,8 +214,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Median of two values is their average
       expect(results[0]!["median"]).toBe(15);
-
-      await db.close();
     });
 
     test("should handle aggregations with single value after retractions", async () => {
@@ -264,8 +248,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["max"]).toBe(200);
       expect(results[0]!["min"]).toBe(200);
       expect(results[0]!["count"]).toBe(1);
-
-      await db.close();
     });
   });
 });

@@ -35,8 +35,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(entities).toEqual([1, 2]);
       const values = results.map((r) => r["v"]).sort();
       expect(values).toEqual(["Alice", "Bob"]);
-
-      await db.close();
     });
 
     test("should handle variable in attribute position", async () => {
@@ -59,8 +57,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(attrs).toEqual(["age", "name"]);
       const values = results.map((r) => r["v"]).sort();
       expect(values).toEqual([30, "Alice"]);
-
-      await db.close();
     });
 
     test("should handle all positions as variables", async () => {
@@ -89,8 +85,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(combinations).toContainEqual({ e: 1, a: "age", v: 30 });
       expect(combinations).toContainEqual({ e: 2, a: "name", v: "Bob" });
       expect(combinations).toContainEqual({ e: 2, a: "age", v: 25 });
-
-      await db.close();
     });
 
     test("should handle string entity IDs", async () => {
@@ -100,21 +94,16 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "assert", e: "user-2", a: "name", v: "Bob" },
         { op: "assert", e: "user-1", a: "age", v: 30 },
       ]);
-
-      const query: DatalogQuery = {
+      const results = await db.query({
         find: { e: ["?e"], n: ["?n"] },
         where: [
           { e: "?e", a: "name", v: "?n" },
           { e: "?e", a: "age", v: "?a" },
         ],
-      };
-
-      const results = await db.query(query);
+      });
       expect(results).toHaveLength(1);
       expect(results[0]!["e"]).toBe("user-1");
       expect(results[0]!["n"]).toBe("Alice");
-
-      await db.close();
     });
   });
 });

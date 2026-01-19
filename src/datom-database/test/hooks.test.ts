@@ -46,7 +46,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       });
 
       expect(called).toBe(true);
-      await db.close();
     });
 
     test("should register after-read hook", async () => {
@@ -71,7 +70,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       });
 
       expect(called).toBe(true);
-      await db.close();
     });
 
     test("should register before-write hook", async () => {
@@ -91,7 +89,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       expect(called).toBe(true);
-      await db.close();
     });
 
     test("should register after-write hook", async () => {
@@ -113,7 +110,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(called).toBe(true);
-      await db.close();
     });
   });
 
@@ -148,7 +144,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       expect(results).toHaveLength(1);
       expect(results[0]!.v).toBe("Alice");
-      await db.close();
     });
 
     test("should block query with errors", async () => {
@@ -173,8 +168,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
           where: [{ e: "?e", a: "name", v: "Alice" }],
         })
       ).rejects.toThrow(QueryError);
-
-      await db.close();
     });
 
     test("should stop processing on stopProcessing flag", async () => {
@@ -211,7 +204,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       expect(firstCalled).toBe(true);
       expect(secondCalled).toBe(false);
-      await db.close();
     });
 
     test("should pass context to before-read hook", async () => {
@@ -240,7 +232,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       expect(receivedContext?.userId).toBe("alice");
       expect(receivedContext?.source).toBe("test");
       expect(receivedContext?.db).toBe(db);
-      await db.close();
     });
   });
 
@@ -272,7 +263,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       expect(results).toHaveLength(2);
       expect(results.every((r) => r.v === "Alice")).toBe(true);
-      await db.close();
     });
 
     test("should transform results", async () => {
@@ -304,7 +294,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      await db.close();
     });
 
     test("should chain multiple after-read hooks", async () => {
@@ -342,7 +331,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       expect(results).toHaveLength(1);
       expect(results[0]!.e).toBe(1);
-      await db.close();
     });
 
     test("should pass context to after-read hook", async () => {
@@ -373,7 +361,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       expect(receivedContext?.userId).toBe("alice");
       expect(receivedContext?.source).toBe("test");
       expect(receivedContext?.db).toBe(db);
-      await db.close();
     });
   });
 
@@ -416,8 +403,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       await expect(
         db.transact([{ op: "assert", e: 2, a: "email", v: "invalid-email" }])
       ).rejects.toThrow(TransactionError);
-
-      await db.close();
     });
 
     test("should modify transaction", async () => {
@@ -458,7 +443,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       const datoms = await db.datoms({ e: 1 });
       const hasTimestamp = datoms.some((d) => d.a === "updatedAt");
       expect(hasTimestamp).toBe(true);
-      await db.close();
     });
 
     test("should stop processing on stopProcessing flag", async () => {
@@ -492,7 +476,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       expect(firstCalled).toBe(true);
       expect(secondCalled).toBe(false);
-      await db.close();
     });
 
     test("should pass context and metadata to before-write hook", async () => {
@@ -527,7 +510,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       expect(receivedContext?.source).toBe("client");
       expect(receivedContext?.ip).toBe("127.0.0.1");
       expect(receivedContext?.db).toBe(db);
-      await db.close();
     });
 
     test("should collect multiple errors from hooks", async () => {
@@ -576,8 +558,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       await expect(
         db.transact([{ op: "assert", e: 2, a: "age", v: -5 }])
       ).rejects.toThrow(TransactionError);
-
-      await db.close();
     });
   });
 
@@ -610,7 +590,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         (receivedTx as { datoms: unknown[]; txId: unknown }).datoms
       ).toBeDefined();
       expect((receivedTx as { txId: unknown }).txId).toBeDefined();
-      await db.close();
     });
 
     test("should not block transaction on failure", async () => {
@@ -648,8 +627,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         // Restore console.error
         console.error = originalConsoleError;
       }
-
-      await db.close();
     });
 
     test("should execute multiple after-write hooks", async () => {
@@ -682,7 +659,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(executionOrder.length).toBeGreaterThanOrEqual(2);
-      await db.close();
     });
 
     test("should pass context and metadata to after-write hook", async () => {
@@ -719,7 +695,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       expect(receivedContext?.source).toBe("client");
       expect(receivedContext?.ip).toBe("127.0.0.1");
       expect(receivedContext?.db).toBe(db);
-      await db.close();
     });
   });
 
@@ -803,8 +778,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         where: [{ e: 1, a: "name", v: "?v" }],
       });
       expect(readCalled).toBe(true);
-
-      await db.close();
     });
 
     test("should handle hook errors with proper error structure", async () => {
@@ -846,8 +819,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
           expect(error.errors[1]!.message).toBe("Another error");
         }
       }
-
-      await db.close();
     });
 
     test("should execute hooks in registration order", async () => {
@@ -889,7 +860,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       expect(executionOrder).toEqual(["first", "second", "third"]);
-      await db.close();
     });
 
     test("should handle empty transaction with hooks", async () => {
@@ -912,7 +882,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       await db.transact([]);
 
       expect(called).toBe(true);
-      await db.close();
     });
 
     test("should handle sub operations with hooks", async () => {
@@ -939,7 +908,6 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       expect(called).toBe(true);
       const datoms = await db.datoms({ e: 1 });
       expect(datoms).toHaveLength(0);
-      await db.close();
     });
   });
 });

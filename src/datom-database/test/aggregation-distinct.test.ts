@@ -42,8 +42,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         // Could be a set or other representation
         expect(distinctValue).toBeDefined();
       }
-
-      await db.close();
     });
 
     test("should return empty array or null for empty results", async () => {
@@ -61,8 +59,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
           distinctValue === undefined ||
           (Array.isArray(distinctValue) && distinctValue.length === 0)
       ).toBe(true);
-
-      await db.close();
     });
 
     test("should return single value when only one exists", async () => {
@@ -83,8 +79,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       } else {
         expect(distinctValue).toBe("Alice");
       }
-
-      await db.close();
     });
 
     test("should return distinct numeric values", async () => {
@@ -111,8 +105,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       } else {
         expect(distinctValue).toBeDefined();
       }
-
-      await db.close();
     });
 
     test("should return distinct values with filters", async () => {
@@ -145,8 +137,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       } else {
         expect(distinctValue).toBeDefined();
       }
-
-      await db.close();
     });
 
     test("should return distinct different data types", async () => {
@@ -170,8 +160,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       if (Array.isArray(distinctValue)) {
         expect(distinctValue.length).toBe(3);
       }
-
-      await db.close();
     });
   });
 });

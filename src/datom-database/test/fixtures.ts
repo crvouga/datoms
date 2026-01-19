@@ -48,17 +48,28 @@ const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
 const TEST_DATABASE_URL: string =
   "postgresql://postgres:postgres@localhost:5432/postgres";
 const createPostgresFixture = async (): Promise<Fixture> => {
-  const connection = new PgSQLDatabase(TEST_DATABASE_URL);
-  const db = new PostgreSQLDatomDatabase({ sqlDb: connection });
+  const sqlDb = new PgSQLDatabase(TEST_DATABASE_URL);
+  const tableName = "datoms";
+  const db = new PostgreSQLDatomDatabase({ sqlDb: sqlDb, tableName });
   await db.initialize();
+  const cleanUp = async () => {
+    await sqlDb.execute(
+      `TRUNCATE TABLE ${tableName}, ${tableName}_tx RESTART IDENTITY CASCADE`
+    );
+    const initTxSql = `
+      INSERT INTO ${tableName}_tx (id, last_tx)
+      VALUES (1, 0)
+      ON CONFLICT (id) DO UPDATE SET last_tx = 0
+    `;
+    await sqlDb.execute(initTxSql);
+  };
   return {
     db,
     beforeEach: async () => {
-      // @ts-expect-error - Accessing protected method for test cleanup
-      await db.cleanUp();
+      await cleanUp();
     },
     afterEach: async () => {
-      // Ensure connection is properly closed/released after each test
+      await cleanUp();
       await db.close();
     },
   };
@@ -100,7 +111,7 @@ const createHttpClientTransportRemoteFixture = async (): Promise<Fixture> => {
       await serverDb.initialize();
       // Also reset t
       // he remote database's initialization state
-      await db.close();
+
       await db.initialize();
     },
     afterEach: async () => {

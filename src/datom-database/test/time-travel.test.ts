@@ -45,8 +45,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(atTx3).toHaveLength(2);
       const nameAtTx3 = atTx3.find((d) => d.a === "name");
       expect(nameAtTx3?.v).toBe("Alice Updated");
-
-      await db.close();
     });
 
     test("should handle subs in time-travel queries", async () => {
@@ -63,8 +61,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const atTx3 = await db.asOf(tx3).datoms({ e: 1 });
       expect(atTx3).toHaveLength(1);
       expect(atTx3[0]!.a).toBe("name");
-
-      await db.close();
     });
 
     test("should query full history of changes", async () => {
@@ -85,8 +81,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const names = history.map((d) => d.v);
       expect(names).toContain("Alice");
       expect(names).toContain("Alice Updated");
-
-      await db.close();
     });
 
     test("should get entity at specific transaction", async () => {
@@ -102,8 +96,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const entityAtTx2 = await db.asOf(tx2).datoms({ e: 1 });
       expect(entityAtTx2).toHaveLength(2);
-
-      await db.close();
     });
 
     test("should get value at specific transaction", async () => {
@@ -118,8 +110,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: 1, a: "name", v: "?v" }],
       });
       expect(nameAtTx1Results[0]?.name).toBe("Alice");
-
-      await db.close();
     });
 
     test("should support time-travel in datalog queries", async () => {
@@ -151,8 +141,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(resultsAtTx2).toHaveLength(3);
       const namesAtTx2 = resultsAtTx2.map((r) => r["name"]).sort();
       expect(namesAtTx2).toEqual(["Alice", "Bob", "Charlie"]);
-
-      await db.close();
     });
 
     test("should handle time-travel queries within transactions", async () => {
@@ -174,8 +162,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const atTx1 = await db.asOf(tx1).datoms({ e: 1 });
       expect(atTx1).toHaveLength(1);
       expect(atTx1[0]!.a).toBe("name");
-
-      await db.close();
     });
 
     test("should handle complex time-travel scenario", async () => {
@@ -235,8 +221,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const currentDatoms = await db.datoms({ e: 1, a: "status" });
       const currentSorted = currentDatoms.sort((a, b) => b.tx - a.tx);
       expect(currentSorted[0]?.v).toBe("failed");
-
-      await db.close();
     });
 
     test("should sub all datoms for an entity", async () => {
@@ -266,8 +250,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Verify transaction ID was returned
       expect(typeof tx).toBe("number");
       expect(tx).toBeGreaterThan(0);
-
-      await db.close();
     });
 
     test("should sub entity within transaction", async () => {
@@ -306,8 +288,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const after = await db.datoms({ e: 1, op: "assert" });
       expect(after).toHaveLength(0);
-
-      await db.close();
     });
 
     test("should execute bulk operations atomically with transact", async () => {
@@ -332,8 +312,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Charlie should not exist (or was sub if existed)
       const charlie = await db.datoms({ e: 3, op: "assert" });
       expect(charlie).toHaveLength(0);
-
-      await db.close();
     });
 
     test("should execute bulk operations within transaction", async () => {
@@ -358,8 +336,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.datoms({ e: 1, op: "assert" });
       expect(entity).toHaveLength(2);
-
-      await db.close();
     });
 
     test("should query history with history flag", async () => {
@@ -382,8 +358,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Should include subions
       const subions = history.filter((d) => d.op === "retract");
       expect(subions.length).toBeGreaterThan(0);
-
-      await db.close();
     });
 
     test("should require at least one filter or limit for query", async () => {
@@ -395,16 +369,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.datoms({ limit: 10 });
       await db.history().datoms({ limit: 100 });
       await db.history().datoms({ e: 1 });
-
-      await db.close();
     });
 
     test("should handle empty transact operations", async () => {
       const { db } = f;
       const tx = await db.transact([]);
       expect(typeof tx).toBe("number");
-
-      await db.close();
     });
 
     test("should query changes since a specific transaction ID", async () => {
@@ -435,8 +405,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(sinceTx3).toHaveLength(1);
       expect(sinceTx3[0]!.a).toBe("name");
       expect(sinceTx3[0]!.v).toBe("Alice Updated");
-
-      await db.close();
     });
 
     test("should handle subions in since queries", async () => {
@@ -457,8 +425,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(attributes).toContain("email");
       // Age should not be present (it was sub)
       expect(attributes).not.toContain("age");
-
-      await db.close();
     });
 
     test("should support since queries in datalog", async () => {
@@ -491,8 +457,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const namesSinceTx2 = resultsSinceTx2.map((r) => r["name"]).sort();
       expect(namesSinceTx2).toContain("David");
       expect(namesSinceTx2).not.toContain("Charlie");
-
-      await db.close();
     });
 
     test("should handle since queries with filters", async () => {
@@ -520,8 +484,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       });
       expect(sinceTx2Name).toHaveLength(1);
       expect(sinceTx2Name[0]!.v).toBe("Alice Updated");
-
-      await db.close();
     });
 
     test("should handle since queries with no changes", async () => {
@@ -532,8 +494,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query changes since tx2 - should be empty (no changes after tx2)
       const sinceTx2 = await db.since(tx2).datoms({ e: 1 });
       expect(sinceTx2).toHaveLength(0);
-
-      await db.close();
     });
 
     test("should handle asOf queries at transaction ID 0", async () => {
@@ -549,8 +509,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query at tx1 should work
       const atTx1 = await db.asOf(tx1).datoms({ e: 1 });
       expect(atTx1).toHaveLength(1);
-
-      await db.close();
     });
 
     test("should handle asOf queries with tx filter", async () => {
@@ -568,8 +526,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         tx: tx2,
       });
       expect(atTx3WithTx2Filter.length).toBeGreaterThanOrEqual(0);
-
-      await db.close();
     });
 
     test("should handle history queries with pagination", async () => {
@@ -602,8 +558,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         limit: 2,
       });
       expect(offset.length).toBeGreaterThanOrEqual(1);
-
-      await db.close();
     });
 
     test("should handle asOf queries with pagination", async () => {
@@ -625,8 +579,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         limit: 1,
       });
       expect(limited).toHaveLength(1);
-
-      await db.close();
     });
 
     test("should handle since queries with pagination", async () => {
@@ -650,8 +602,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         limit: 2,
       });
       expect(limited).toHaveLength(2);
-
-      await db.close();
     });
 
     test("should handle multi-valued attributes in time-travel queries", async () => {
@@ -717,8 +667,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         .map((d) => d.v);
       expect(historyValuesAtTx2).toContain("red");
       expect(historyValuesAtTx2).toContain("blue");
-
-      await db.close();
     });
 
     test("should handle time-travel queries with reference values", async () => {
@@ -747,8 +695,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query changes since tx1 for all entities
       const allSinceTx1 = await db.since(tx1).datoms({ a: "parent" });
       expect(allSinceTx1.length).toBeGreaterThanOrEqual(2);
-
-      await db.close();
     });
 
     test("should handle empty history queries", async () => {
@@ -756,8 +702,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Query history before adding anything
       const history = await db.history().datoms({ e: 1 });
       expect(history).toHaveLength(0);
-
-      await db.close();
     });
 
     test("should handle since queries starting from transaction 0", async () => {
@@ -775,8 +719,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const sinceTx1 = await db.since(tx1).datoms({ e: 1 });
       expect(sinceTx1.length).toBeGreaterThanOrEqual(1);
       expect(sinceTx1[0]!.a).toBe("age");
-
-      await db.close();
     });
 
     test("should handle complex since query scenario", async () => {
@@ -811,8 +753,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(sinceTx3.length).toBeGreaterThanOrEqual(1);
       const values = sinceTx3.map((d) => d.v);
       expect(values).toContain("failed");
-
-      await db.close();
     });
 
     test("should handle asOf queries with future transaction IDs", async () => {
@@ -864,8 +804,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(queryAtFuture.length).toBeGreaterThanOrEqual(1);
       expect(queryAtFuture[0]?.name).toBe("Alice");
       expect(queryAtFuture[0]?.age).toBe(30);
-
-      await db.close();
     });
   });
 });

@@ -74,9 +74,11 @@ export type QueryClause = QueryPattern | QueryOr | QueryNot;
 /**
  * A parsed datalog query
  */
-export interface DatalogQuery {
+export interface DatalogQuery<
+  TKey extends keyof Record<string, DatalogQueryFindVariable> = string,
+> {
   /** Find clause - what variables to return */
-  find: Record<string, DatalogQueryFindVariable>;
+  find: Record<TKey, DatalogQueryFindVariable>;
   /** Where clause - the query patterns */
   where: QueryClause[];
   /** Optional ordering */

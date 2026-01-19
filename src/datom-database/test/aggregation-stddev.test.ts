@@ -33,8 +33,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Mean = 20, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
-
-      await db.close();
     });
 
     test("should return null or undefined for empty results", async () => {
@@ -49,8 +47,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(
         results[0]!["stddev"] === null || results[0]!["stddev"] === undefined
       ).toBe(true);
-
-      await db.close();
     });
 
     test("should return 0 or null for single value", async () => {
@@ -70,8 +66,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
           results[0]!["stddev"] === null ||
           results[0]!["stddev"] === undefined
       ).toBe(true);
-
-      await db.close();
     });
 
     test("should calculate standard deviation with identical values", async () => {
@@ -91,8 +85,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Standard deviation of identical values should be 0
       expect(results[0]!["stddev"]).toBe(0);
-
-      await db.close();
     });
 
     test("should calculate standard deviation with negative numbers", async () => {
@@ -112,8 +104,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Mean = 0, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
-
-      await db.close();
     });
 
     test("should calculate standard deviation with decimal numbers", async () => {
@@ -133,8 +123,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Mean = 20.5, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
-
-      await db.close();
     });
 
     test("should calculate standard deviation with filters", async () => {
@@ -162,8 +150,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Mean = 90, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
-
-      await db.close();
     });
 
     test("should calculate standard deviation with larger dataset", async () => {
@@ -185,8 +171,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Mean = 3, variance = 2, stddev = sqrt(2) ≈ 1.41
       expect(results[0]!["stddev"]).toBeCloseTo(1.41, 1);
-
-      await db.close();
     });
   });
 });

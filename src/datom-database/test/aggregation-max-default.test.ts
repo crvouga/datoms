@@ -32,8 +32,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(30);
-
-      await db.close();
     });
 
     test("should return default value for empty results", async () => {
@@ -47,8 +45,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Should return the default value when no results
       expect(results[0]!["maximum"]).toBe(0);
-
-      await db.close();
     });
 
     test("should find maximum of single value", async () => {
@@ -63,8 +59,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(100);
-
-      await db.close();
     });
 
     test("should find maximum with numeric default", async () => {
@@ -82,8 +76,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(20);
-
-      await db.close();
     });
 
     test("should use default when all values are filtered out", async () => {
@@ -104,8 +96,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(0);
-
-      await db.close();
     });
 
     test("should find maximum with string default", async () => {
@@ -124,8 +114,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe("Charlie");
-
-      await db.close();
     });
 
     test("should handle default with different data types", async () => {
@@ -144,8 +132,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Should return the maximum value (20) when values exist
       expect(results[0]!["maximum"]).toBe(20);
-
-      await db.close();
     });
   });
 });

@@ -38,8 +38,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const ages = results.map((r) => r["a"]);
       expect(ages).toContain(30);
       expect(ages).toContain(40);
-
-      await db.close();
     });
 
     test("should handle complex joins with multiple entities and attributes", async () => {
@@ -84,8 +82,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         expect(r["dept"]).toBe(10);
         expect(r["budget"]).toBe("100_000");
       });
-
-      await db.close();
     });
 
     test("should handle queries with multiple constraints on same entity", async () => {
@@ -115,8 +111,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!.name).toBe("Alice");
-
-      await db.close();
     });
 
     test("should handle complex variable bindings across multiple clauses", async () => {
@@ -148,8 +142,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const paths = results.map((r) => [r["a"], r["b"], r["c"]]);
       expect(paths).toContainEqual([1, 2, 3]);
       expect(paths).toContainEqual([2, 3, 4]);
-
-      await db.close();
     });
 
     test("should handle join with no matching results", async () => {
@@ -172,8 +164,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Entity 3 has age but no name, entities 1 and 2 have name but no age
       // So no results should match both conditions
       expect(results).toHaveLength(0);
-
-      await db.close();
     });
 
     test("should handle join with incompatible variable bindings", async () => {
@@ -200,8 +190,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!.e).toBe(3);
-
-      await db.close();
     });
 
     test("should handle join with multiple common variables", async () => {
@@ -230,8 +218,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(alice).toBeDefined();
       expect(alice?.["age"]).toBe(30);
       expect(alice?.["city"]).toBe("NYC");
-
-      await db.close();
     });
 
     test("should handle variable binding across disconnected clauses", async () => {
@@ -262,8 +248,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const alice = results.find((r) => r["name"] === "Alice");
       expect(alice).toBeDefined();
       expect(alice?.["dept"]).toBe("Engineering");
-
-      await db.close();
     });
   });
 });

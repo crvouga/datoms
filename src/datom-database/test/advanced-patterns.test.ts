@@ -36,8 +36,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(2);
       const names = results.map((r) => r["name"]).sort();
       expect(names).toEqual(["Alice", "Charlie"]);
-
-      await db.close();
     });
 
     test("should handle self-joins", async () => {
@@ -76,8 +74,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(selfConnections).toHaveLength(2);
       const selfNodes = selfConnections.map((r) => r["from"]).sort();
       expect(selfNodes).toEqual([1, 3]);
-
-      await db.close();
     });
 
     test("should handle circular relationships", async () => {
@@ -101,8 +97,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(relationships).toContainEqual([1, 2]);
       expect(relationships).toContainEqual([2, 3]);
       expect(relationships).toContainEqual([3, 1]);
-
-      await db.close();
     });
 
     test("should handle variable binding across disconnected clauses", async () => {
@@ -133,8 +127,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const alice = results.find((r) => r["name"] === "Alice");
       expect(alice).toBeDefined();
       expect(alice?.["dept"]).toBe("Engineering");
-
-      await db.close();
     });
   });
 });

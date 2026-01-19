@@ -242,9 +242,15 @@ export function datalogToPostgresSQL(
     }
 
     // Add CASE WHEN for each attribute->variable mapping
+    // Use array_agg with FILTER instead of MAX because PostgreSQL's MAX() doesn't work on JSONB
+    // FILTER ensures we only aggregate non-NULL values (matching attributes)
+    // Since we're grouping by entity and each entity-attribute pair should have one value,
+    // array_agg[1] will get that single value
     for (const [attr, varName] of attrToVar.entries()) {
       const varColName = stripQuestionMark(varName);
-      pivotSelects.push(`MAX(CASE WHEN a = ? THEN v END) AS "${varColName}"`);
+      pivotSelects.push(
+        `(array_agg(v) FILTER (WHERE a = ?))[1] AS "${varColName}"`
+      );
       params.push(attr);
     }
 
@@ -312,9 +318,10 @@ export function datalogToPostgresSQL(
     }
 
     // Build HAVING clause to ensure we have at least one required attribute
+    // Use array_agg with FILTER instead of MAX because PostgreSQL's MAX() doesn't work on JSONB
     const havingClause =
       attributes.length > 0
-        ? `HAVING MAX(CASE WHEN a = ? THEN v END) IS NOT NULL`
+        ? `HAVING (array_agg(v) FILTER (WHERE a = ?))[1] IS NOT NULL`
         : "";
     if (havingClause) {
       params.push(attributes[0]);
@@ -414,6 +421,7 @@ export function datalogToPostgresSQL(
   }
 
   // Map variables to their column references for aggregations
+  // Use first occurrence (lowest index) to ensure the table is definitely in FROM/JOIN
   const variableToColumn: Map<string, string> = new Map();
   for (let i = 0; i < clauses.length; i++) {
     const clause = clauses[i];
@@ -423,13 +431,22 @@ export function datalogToPostgresSQL(
     const { e: entityVal, a: attributeVal, v: valueVal } = clause;
     const alias = `d${i}`;
     if (isVariable(entityVal)) {
-      variableToColumn.set(entityVal as string, `${alias}.e`);
+      // Only set if not already mapped (prefer first occurrence)
+      if (!variableToColumn.has(entityVal as string)) {
+        variableToColumn.set(entityVal as string, `${alias}.e`);
+      }
     }
     if (isVariable(attributeVal)) {
-      variableToColumn.set(attributeVal as string, `${alias}.a`);
+      // Only set if not already mapped (prefer first occurrence)
+      if (!variableToColumn.has(attributeVal as string)) {
+        variableToColumn.set(attributeVal as string, `${alias}.a`);
+      }
     }
     if (isVariable(valueVal)) {
-      variableToColumn.set(valueVal as string, `${alias}.v`);
+      // Only set if not already mapped (prefer first occurrence)
+      if (!variableToColumn.has(valueVal as string)) {
+        variableToColumn.set(valueVal as string, `${alias}.v`);
+      }
     }
   }
 
@@ -480,14 +497,37 @@ export function datalogToPostgresSQL(
         if (!prev || !curr) continue;
         const prevAlias = `d${prev.clauseIndex}`;
         const currAlias = `d${curr.clauseIndex}`;
-        joinConditions.push(
-          `${prevAlias}.${prev.field} = ${currAlias}.${curr.field}`
-        );
+
+        // Handle type casting: v is jsonb, e and a are text
+        // When comparing v with e or a, cast v to text
+        let prevExpr = `${prevAlias}.${prev.field}`;
+        let currExpr = `${currAlias}.${curr.field}`;
+
+        if (prev.field === "v" && (curr.field === "e" || curr.field === "a")) {
+          // v (jsonb) = e/a (text): cast v to text
+          prevExpr = `${prevAlias}.v::text`;
+        } else if (
+          (prev.field === "e" || prev.field === "a") &&
+          curr.field === "v"
+        ) {
+          // e/a (text) = v (jsonb): cast v to text
+          currExpr = `${currAlias}.v::text`;
+        } else if (prev.field === "v" && curr.field === "v") {
+          // v (jsonb) = v (jsonb): cast both to text for comparison
+          prevExpr = `${prevAlias}.v::text`;
+          currExpr = `${currAlias}.v::text`;
+        }
+
+        joinConditions.push(`${prevExpr} = ${currExpr}`);
       }
     }
   }
 
   // Build aggregation SELECT columns
+  // First check if we have any aggregations
+  const hasAggregations = Object.values(query.find).some((expr) =>
+    parseAggregation(expr)
+  );
   const groupByColumns: string[] = [];
   const findKeys = Object.keys(query.find);
   for (const outputKey of findKeys) {
@@ -511,7 +551,7 @@ export function datalogToPostgresSQL(
         selectColumns.push(`NULL AS "${outputKey}"`);
       }
     } else {
-      // Regular variable - include in SELECT and GROUP BY
+      // Regular variable - include in SELECT
       let varName: string;
       if (
         Array.isArray(expr) &&
@@ -528,7 +568,10 @@ export function datalogToPostgresSQL(
       const columnRef = variableToColumn.get(varName);
       if (columnRef) {
         selectColumns.push(`${columnRef} AS "${outputKey}"`);
-        groupByColumns.push(columnRef);
+        // Only add to GROUP BY if we have aggregations (required by SQL)
+        if (hasAggregations) {
+          groupByColumns.push(columnRef);
+        }
       }
     }
   }
@@ -544,13 +587,38 @@ export function datalogToPostgresSQL(
     const conditions: string[] = [];
 
     for (const joinCond of joinConditions) {
-      if (joinCond.includes(`${alias}.`)) {
-        const parts = joinCond.split(" = ");
-        if (parts.length === 2 && parts[0] && parts[1]) {
-          if (parts[0].startsWith(`${alias}.`)) {
+      const parts = joinCond.split(" = ");
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        // Extract table aliases from both sides (handle type casting like ::text)
+        // Match alias at the start, which may be followed by field access and type casts
+        const leftMatch = parts[0].trim().match(/^(d\d+)\./);
+        const rightMatch = parts[1].trim().match(/^(d\d+)\./);
+
+        if (!leftMatch || !rightMatch || !leftMatch[1] || !rightMatch[1])
+          continue;
+
+        const leftAlias = leftMatch[1];
+        const rightAlias = rightMatch[1];
+
+        // Check if this condition involves the current alias
+        if (leftAlias !== alias && rightAlias !== alias) {
+          // Current alias not in this condition, skip
+          continue;
+        }
+
+        // Determine which side is the current alias and which is the other
+        const otherAlias = leftAlias === alias ? rightAlias : leftAlias;
+
+        // Only include condition if the other table has already been joined
+        // (i.e., has a lower index than the current table)
+        const otherIndex = parseInt(otherAlias.substring(1));
+        if (otherIndex < i) {
+          // Other table is already joined, include this condition
+          // Keep original order if current alias is on right, otherwise use as-is
+          if (rightAlias === alias) {
+            conditions.push(`${parts[1].trim()} = ${parts[0].trim()}`);
+          } else {
             conditions.push(joinCond);
-          } else if (parts[1].startsWith(`${alias}.`)) {
-            conditions.push(`${parts[1]} = ${parts[0]}`);
           }
         }
       }
@@ -559,32 +627,43 @@ export function datalogToPostgresSQL(
     if (conditions.length > 0) {
       joinClauses.push(`JOIN ${alias} ON ${conditions.join(" AND ")}`);
     } else {
-      joinClauses.push(`CROSS JOIN ${alias}`);
+      // If no explicit JOIN conditions found, try to join to the previous table
+      // This handles cases where variables might not be properly tracked
+      const prevAlias = `d${i - 1}`;
+      // Try to find any shared variables between current and previous clause
+      const currentClause = clauses[i];
+      const prevClause = clauses[i - 1];
+      if (
+        currentClause &&
+        prevClause &&
+        isQueryPattern(currentClause) &&
+        isQueryPattern(prevClause)
+      ) {
+        // Check if they share the same entity variable
+        const currE = currentClause.e;
+        const prevE = prevClause.e;
+        if (isVariable(currE) && isVariable(prevE) && currE === prevE) {
+          joinClauses.push(`JOIN ${alias} ON ${prevAlias}.e = ${alias}.e`);
+        } else {
+          joinClauses.push(`CROSS JOIN ${alias}`);
+        }
+      } else {
+        joinClauses.push(`CROSS JOIN ${alias}`);
+      }
     }
   }
 
   const joinClause = joinClauses.join(" ");
 
   // Build ORDER BY clause
+  // Use variableToColumn map to ensure we reference columns from tables that are definitely joined
   let orderByClause = "";
   if (query.orderBy && query.orderBy.length > 0) {
     const orderParts = query.orderBy
       .map(([variable, direction]) => {
-        for (let i = 0; i < clauses.length; i++) {
-          const clause = clauses[i];
-          if (!clause || !isQueryPattern(clause)) {
-            continue;
-          }
-          const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-          if (entityVal === variable) {
-            return `d${i}.e ${direction.toUpperCase()}`;
-          }
-          if (attributeVal === variable) {
-            return `d${i}.a ${direction.toUpperCase()}`;
-          }
-          if (valueVal === variable) {
-            return `d${i}.v ${direction.toUpperCase()}`;
-          }
+        const columnRef = variableToColumn.get(variable);
+        if (columnRef) {
+          return `${columnRef} ${direction.toUpperCase()}`;
         }
         return "";
       })
@@ -1748,26 +1827,6 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     return { results: finalResults, sql };
   }
 
-  /**
-   * Clean up tables for test isolation
-   * This method can be called before each test to ensure a clean state
-   * @internal - This method is for internal testing use only and should not be called in production
-   */
-  protected async cleanUp(): Promise<void> {
-    await this._ensureInitialized();
-    await this.sqlDb.execute(
-      `TRUNCATE TABLE ${this.tableName}, ${this.tableName}_tx RESTART IDENTITY CASCADE`
-    );
-    // Re-initialize transaction counter after truncate
-    // Use ON CONFLICT to handle race conditions safely
-    const initTxSql = `
-      INSERT INTO ${this.tableName}_tx (id, last_tx)
-      VALUES (1, 0)
-      ON CONFLICT (id) DO UPDATE SET last_tx = 0
-    `;
-    await this.sqlDb.execute(initTxSql);
-  }
-
   private async _getNextTransactionId(
     sqlQueries?: SQLQueryMetadata[]
   ): Promise<{ txId: TransactionId; sql: string }> {
@@ -2524,6 +2583,39 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       metadata.executionTimeMs = executionTime;
       metadata.resultCount = sqlResult.results.length;
       metadata.executionStrategy = "sql-aggregations";
+      if (sqlQueries.length > 0) {
+        metadata.sql = sqlQueries;
+      }
+
+      return {
+        data: sqlResult.results,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      };
+    }
+
+    // For multi-clause queries without aggregations, use SQL execution if:
+    // 1. Query qualifies for pivot optimization (same entity variable, multiple bound attributes), OR
+    // 2. Query has multiple clauses and hooks didn't filter datoms
+    // This avoids inefficient in-memory joins when SQL can handle it efficiently
+    if (
+      modifiedQuery.where.length > 1 &&
+      !hasAggs &&
+      // Check if hooks filtered datoms - if length changed, hooks filtered and we need in-memory execution
+      afterResult.datoms.length === allDatoms.length
+    ) {
+      // Check if query qualifies for pivot optimization
+      const usePivot = canUsePivotOptimization(modifiedQuery.where);
+
+      // Use SQL execution for pivot-optimized queries or regular multi-clause joins
+      const sqlResult = await this._executeDatalogWithSQL(
+        modifiedQuery,
+        sqlQueries
+      );
+
+      const executionTime = performance.now() - startTime;
+      metadata.executionTimeMs = executionTime;
+      metadata.resultCount = sqlResult.results.length;
+      metadata.executionStrategy = usePivot ? "sql-pivot" : "sql-joins";
       if (sqlQueries.length > 0) {
         metadata.sql = sqlQueries;
       }

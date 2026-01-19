@@ -32,8 +32,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(30);
-
-      await db.close();
     });
 
     test("should return null or undefined for empty results", async () => {
@@ -48,8 +46,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(
         results[0]!["maximum"] === null || results[0]!["maximum"] === undefined
       ).toBe(true);
-
-      await db.close();
     });
 
     test("should find maximum of single value", async () => {
@@ -64,8 +60,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(100);
-
-      await db.close();
     });
 
     test("should find maximum with negative numbers", async () => {
@@ -84,8 +78,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(-5);
-
-      await db.close();
     });
 
     test("should find maximum decimal numbers", async () => {
@@ -104,8 +96,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(15.75);
-
-      await db.close();
     });
 
     test("should find maximum string values", async () => {
@@ -124,8 +114,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe("Charlie");
-
-      await db.close();
     });
 
     test("should find maximum with filters", async () => {
@@ -150,8 +138,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(200);
-
-      await db.close();
     });
 
     test("should find maximum with duplicate values", async () => {
@@ -170,8 +156,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(20);
-
-      await db.close();
     });
 
     test("should find maximum with zero values", async () => {
@@ -190,8 +174,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(5);
-
-      await db.close();
     });
 
     test("should find maximum after updates", async () => {
@@ -212,8 +194,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const results = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["maximum"]).toBe(300);
-
-      await db.close();
     });
   });
 });

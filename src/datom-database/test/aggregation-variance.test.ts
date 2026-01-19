@@ -33,8 +33,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Mean = 20, variance = ((10-20)^2 + (20-20)^2 + (30-20)^2) / 3 = (100 + 0 + 100) / 3 = 66.67
       expect(results[0]!["variance"]).toBeCloseTo(66.67, 1);
-
-      await db.close();
     });
 
     test("should return null or undefined for empty results", async () => {
@@ -50,8 +48,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         results[0]!["variance"] === null ||
           results[0]!["variance"] === undefined
       ).toBe(true);
-
-      await db.close();
     });
 
     test("should return 0 or null for single value", async () => {
@@ -71,8 +67,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
           results[0]!["variance"] === null ||
           results[0]!["variance"] === undefined
       ).toBe(true);
-
-      await db.close();
     });
 
     test("should calculate variance with identical values", async () => {
@@ -92,8 +86,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Variance of identical values should be 0
       expect(results[0]!["variance"]).toBe(0);
-
-      await db.close();
     });
 
     test("should calculate variance with negative numbers", async () => {
@@ -113,8 +105,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Mean = 0, variance = ((-10-0)^2 + (0-0)^2 + (10-0)^2) / 3 = (100 + 0 + 100) / 3 = 66.67
       expect(results[0]!["variance"]).toBeCloseTo(66.67, 1);
-
-      await db.close();
     });
 
     test("should calculate variance with decimal numbers", async () => {
@@ -134,8 +124,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Mean = 20.5, variance = ((10.5-20.5)^2 + (20.5-20.5)^2 + (30.5-20.5)^2) / 3 = (100 + 0 + 100) / 3 = 66.67
       expect(results[0]!["variance"]).toBeCloseTo(66.67, 1);
-
-      await db.close();
     });
 
     test("should calculate variance with filters", async () => {
@@ -163,8 +151,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Mean = 90, variance = ((80-90)^2 + (90-90)^2 + (100-90)^2) / 3 = (100 + 0 + 100) / 3 = 66.67
       expect(results[0]!["variance"]).toBeCloseTo(66.67, 1);
-
-      await db.close();
     });
 
     test("should calculate variance with larger dataset", async () => {
@@ -186,8 +172,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(1);
       // Mean = 3, variance = ((1-3)^2 + (2-3)^2 + (3-3)^2 + (4-3)^2 + (5-3)^2) / 5 = (4 + 1 + 0 + 1 + 4) / 5 = 2
       expect(results[0]!["variance"]).toBeCloseTo(2, 1);
-
-      await db.close();
     });
   });
 });

@@ -42,8 +42,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["maximum"]).toBe(300);
       expect(results[0]!["minimum"]).toBe(100);
       expect(results[0]!["count"]).toBe(3);
-
-      await db.close();
     });
 
     test("should compute statistical aggregations together", async () => {
@@ -72,8 +70,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["median"]).toBe(30);
       expect(results[0]!["variance"]).toBeCloseTo(200, 1);
       expect(results[0]!["stddev"]).toBeCloseTo(14.14, 1);
-
-      await db.close();
     });
 
     test("should compute aggregations on different variables", async () => {
@@ -106,8 +102,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["totalQuantity"]).toBe(10);
       expect(results[0]!["avgPrice"]).toBe(200);
       expect(results[0]!["maxQuantity"]).toBe(5);
-
-      await db.close();
     });
 
     test("should handle multiple aggregations with filters", async () => {
@@ -140,8 +134,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results[0]!["total"]).toBe(300);
       expect(results[0]!["average"]).toBe(150);
       expect(results[0]!["maximum"]).toBe(200);
-
-      await db.close();
     });
 
     test("should compute distinct and count-distinct together", async () => {
@@ -175,8 +167,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
           "Charlie",
         ]);
       }
-
-      await db.close();
     });
 
     test("should handle empty results with multiple aggregations", async () => {
@@ -207,8 +197,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(
         results[0]!["minimum"] === null || results[0]!["minimum"] === undefined
       ).toBe(true);
-
-      await db.close();
     });
 
     test("should compute aggregations with sample and rand", async () => {
@@ -239,8 +227,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(Array.isArray(random)).toBe(true);
       expect((sample as unknown as number[]).length).toBe(3);
       expect((random as unknown as number[]).length).toBe(2);
-
-      await db.close();
     });
   });
 });

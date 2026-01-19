@@ -39,8 +39,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const values = final.map((d) => d.v);
       expect(values).toContain("Alice");
       expect(values).toContain("pending");
-
-      await db.close();
     });
 
     test("should not commit changes when using with()", async () => {
@@ -61,8 +59,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const final = await db.datoms({ e: 1 });
       expect(final).toHaveLength(1);
       expect(final[0]!.v).toBe("Alice");
-
-      await db.close();
     });
 
     test("should see speculative changes with with()", async () => {
@@ -85,8 +81,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const values = after.map((d) => d.v);
       expect(values).toContain("Alice");
       expect(values).toContain(30);
-
-      await db.close();
     });
 
     test("should handle sub with with()", async () => {
@@ -114,8 +108,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const final = await db.datoms({ e: 1 });
       expect(final).toHaveLength(1);
       expect(final[0]!.v).toBe("Alice");
-
-      await db.close();
     });
 
     test("should handle query with with()", async () => {
@@ -140,8 +132,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(3);
       const entities = results.map((r) => r["x"]).sort();
       expect(entities).toEqual([1, 2, 3]);
-
-      await db.close();
     });
 
     test("should handle multiple operations with transact()", async () => {
@@ -171,8 +161,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const bob = await db.datoms({ e: 2 });
       expect(bob).toHaveLength(1);
       expect(bob[0]!.v).toBe("Bob");
-
-      await db.close();
     });
 
     test("should not commit changes when using with()", async () => {
@@ -198,8 +186,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       const entity2 = await db.datoms({ e: 2 });
       expect(entity2).toHaveLength(0);
-
-      await db.close();
     });
 
     test("should handle query with with()", async () => {
@@ -222,8 +208,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: 1, a: "age", v: "?v" }],
       });
       expect(ageResults[0]?.v).toBe(30);
-
-      await db.close();
     });
 
     test("should handle datoms query with with()", async () => {
@@ -240,8 +224,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
       entity = await withResult.dbAfter.datoms({ e: 1, op: "assert" });
       expect(entity).toHaveLength(2);
-
-      await db.close();
     });
 
     test("should handle hasFact with with()", async () => {
@@ -266,8 +248,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         v: "active",
       });
       expect(statusDatoms.length).toBeGreaterThan(0);
-
-      await db.close();
     });
 
     test("should handle complex query with with()", async () => {
@@ -298,8 +278,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(2);
       const names = results.map((r) => r["name"]).sort();
       expect(names).toEqual(["Alice", "Charlie"]);
-
-      await db.close();
     });
   });
 

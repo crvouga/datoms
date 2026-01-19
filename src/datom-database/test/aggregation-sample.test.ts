@@ -42,8 +42,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Should have no duplicates (sample is without replacement)
       const unique = new Set(sampleValues as unknown as number[]);
       expect(unique.size).toBe(2);
-
-      await db.close();
     });
 
     test("should return null for empty results", async () => {
@@ -58,8 +56,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(
         results[0]!["sample"] === null || results[0]!["sample"] === undefined
       ).toBe(true);
-
-      await db.close();
     });
 
     test("should return single value when N=1", async () => {
@@ -81,8 +77,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(sampleValue).toBeDefined();
       expect([10, 20, 30]).toContain(sampleValue as number);
       expect(Array.isArray(sampleValue)).toBe(false);
-
-      await db.close();
     });
 
     test("should return all values when N >= total", async () => {
@@ -103,8 +97,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(Array.isArray(sampleValues)).toBe(true);
       expect((sampleValues as unknown as number[]).length).toBe(2);
       expect((sampleValues as unknown as number[]).sort()).toEqual([10, 20]);
-
-      await db.close();
     });
 
     test("should return array of N values without duplicates", async () => {
@@ -130,8 +122,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       // Check no duplicates
       const unique = new Set(sampleValues as unknown as number[]);
       expect(unique.size).toBe(3);
-
-      await db.close();
     });
 
     test("should work with string values", async () => {
@@ -155,8 +145,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       (sampleValues as unknown as string[]).forEach((val) => {
         expect(["Alice", "Bob", "Charlie"]).toContain(val);
       });
-
-      await db.close();
     });
 
     test("should work with filters", async () => {
@@ -184,8 +172,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(Array.isArray(sampleValues)).toBe(true);
       expect((sampleValues as unknown as number[]).length).toBe(2);
       expect((sampleValues as unknown as number[]).sort()).toEqual([100, 200]);
-
-      await db.close();
     });
   });
 });

@@ -33,8 +33,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(2);
       const entities = results.map((r) => r["e"]).sort();
       expect(entities).toEqual([1, 3]);
-
-      await db.close();
     });
 
     test("should handle null values", async () => {
@@ -54,8 +52,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(2);
       const entities = results.map((r) => r["e"]).sort();
       expect(entities).toEqual([1, 3]);
-
-      await db.close();
     });
 
     test("should handle undefined values", async () => {
@@ -80,8 +76,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         .map((r) => r["e"])
         .sort();
       expect(undefinedEntities.length).toBeGreaterThanOrEqual(2);
-
-      await db.close();
     });
 
     test("should handle mixed value types", async () => {
@@ -104,8 +98,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(values).toContain("string");
       expect(values).toContain(42);
       expect(values).toContain(true);
-
-      await db.close();
     });
   });
 });

@@ -39,8 +39,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       (randomValues as unknown as number[]).forEach((val) => {
         expect([10, 20, 30]).toContain(val);
       });
-
-      await db.close();
     });
 
     test("should return null for empty results", async () => {
@@ -55,8 +53,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(
         results[0]!["random"] === null || results[0]!["random"] === undefined
       ).toBe(true);
-
-      await db.close();
     });
 
     test("should return single value when N=1", async () => {
@@ -78,8 +74,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(randomValue).toBeDefined();
       expect([10, 20, 30]).toContain(randomValue as number);
       expect(Array.isArray(randomValue)).toBe(false);
-
-      await db.close();
     });
 
     test("should allow duplicates (with replacement)", async () => {
@@ -103,8 +97,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       (randomValues as unknown as number[]).forEach((val) => {
         expect([10, 20]).toContain(val);
       });
-
-      await db.close();
     });
 
     test("should work with string values", async () => {
@@ -128,8 +120,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       (randomValues as unknown as string[]).forEach((val) => {
         expect(["Alice", "Bob", "Charlie"]).toContain(val);
       });
-
-      await db.close();
     });
 
     test("should work with filters", async () => {
@@ -159,8 +149,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       (randomValues as unknown as number[]).forEach((val) => {
         expect([100, 200]).toContain(val);
       });
-
-      await db.close();
     });
   });
 });

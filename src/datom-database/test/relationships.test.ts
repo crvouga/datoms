@@ -47,8 +47,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const friendships = results.map((r) => [r["from"], r["to"]]);
       expect(friendships).toContainEqual([1, 2]);
       expect(friendships).toContainEqual([2, 3]);
-
-      await db.close();
     });
 
     test("should handle transitive relationships (friends of friends)", async () => {
@@ -83,8 +81,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(results).toHaveLength(2);
       const friendOfFriends = results.map((r) => r["friendOfFriend"]).sort();
       expect(friendOfFriends).toEqual([3, 4]);
-
-      await db.close();
     });
 
     test("should handle parent-child relationships", async () => {
@@ -121,8 +117,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(relationships).toContainEqual(["Alice", "Bob"]);
       expect(relationships).toContainEqual(["Alice", "Charlie"]);
       expect(relationships).toContainEqual(["Bob", "Diana"]);
-
-      await db.close();
     });
 
     test("should handle many-to-many relationships", async () => {
@@ -161,8 +155,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(enrollments).toContainEqual(["Alice", "Math 101"]);
       expect(enrollments).toContainEqual(["Alice", "CS 101"]);
       expect(enrollments).toContainEqual(["Bob", "Math 101"]);
-
-      await db.close();
     });
 
     test("should handle multi-valued attributes", async () => {
@@ -186,8 +178,6 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         .map((r) => r["tag"])
         .sort();
       expect(entity1Tags).toEqual(["blue", "green", "red"]);
-
-      await db.close();
     });
   });
 });
