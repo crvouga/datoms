@@ -307,7 +307,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     test("should return 0 for empty database", async () => {
       const { db } = f;
       const latestTx = await db._getLatestTransaction();
-      expect(latestTx).toBe(0);
+      expect(latestTx.txId).toBe(0);
+      expect(latestTx.datoms).toEqual([]);
     });
 
     test("should return latest transaction ID after adding datoms", async () => {
@@ -316,14 +317,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "assert", e: 1, a: "name", v: "Alice" },
       ]);
       const latestTx = await db._getLatestTransaction();
-      expect(latestTx).toBe(tx1);
+      expect(latestTx.txId).toBe(tx1);
+      expect(latestTx.datoms.length).toBeGreaterThan(0);
 
       const tx2 = await db.transact([
         { op: "assert", e: 2, a: "name", v: "Bob" },
       ]);
       const latestTx2 = await db._getLatestTransaction();
-      expect(latestTx2).toBe(tx2);
-      expect(latestTx2).toBeGreaterThan(tx1);
+      expect(latestTx2.txId).toBe(tx2);
+      expect(latestTx2.txId!).toBeGreaterThan(tx1);
     });
 
     test("should return latest transaction after subion", async () => {
@@ -333,7 +335,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "retract", e: 1, a: "name", v: "Alice" },
       ]);
       const latestTx = await db._getLatestTransaction();
-      expect(latestTx).toBe(tx2);
+      expect(latestTx.txId).toBe(tx2);
     });
 
     test("should return latest transaction after transact", async () => {
@@ -344,7 +346,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "retract", e: 1, a: "name", v: "Alice" },
       ]);
       const latestTx = await db._getLatestTransaction();
-      expect(latestTx).toBe(tx2);
+      expect(latestTx.txId).toBe(tx2);
     });
 
     test("should work with transact()", async () => {
@@ -356,12 +358,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const txId = await db.transact([
         { op: "assert", e: 2, a: "name", v: "Bob" },
       ]);
-      expect(txId).toBeGreaterThan(beforeTx);
+      expect(txId).toBeGreaterThan(beforeTx.txId!);
 
       // After commit, latest should be updated
       const afterTx = await db._getLatestTransaction();
-      expect(afterTx).toBeGreaterThan(beforeTx);
-      expect(afterTx).toBe(txId);
+      expect(afterTx.txId!).toBeGreaterThan(beforeTx.txId!);
+      expect(afterTx.txId).toBe(txId);
     });
   });
 

@@ -526,7 +526,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const tx1 = await db.transact([
         { op: "assert", e: 1, a: "name", v: "Alice" },
       ]);
-      expect(tx1).toBeGreaterThan(initialTx);
+      expect(tx1).toBeGreaterThan(initialTx.txId!);
 
       const nameDatoms = await db.datoms({ e: 1, a: "name" });
       const tx2 = await db.transact(
@@ -545,7 +545,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       expect(tx3).toBeGreaterThan(tx2);
 
       const latestTx = await db._getLatestTransaction();
-      expect(latestTx).toBe(tx3);
+      expect(latestTx.txId).toBe(tx3);
     });
   });
 });

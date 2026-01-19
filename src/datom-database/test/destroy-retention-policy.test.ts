@@ -160,13 +160,13 @@ describe.each(FIXTURES)(
         ]);
 
         const latestTx = await f.db._getLatestTransaction();
-        expect(latestTx).toBeGreaterThanOrEqual(13);
+        expect(latestTx.txId!).toBeGreaterThanOrEqual(13);
 
         const result = await policy.execute();
 
         // Should have processed some obsolete datoms
         expect(result.cutoffTx).toBeGreaterThan(0);
-        expect(result.cutoffTx).toBeLessThan(latestTx);
+        expect(result.cutoffTx).toBeLessThan(latestTx.txId!);
         expect(result.error).toBeUndefined();
 
         // Verify current state is preserved
@@ -193,12 +193,12 @@ describe.each(FIXTURES)(
         }
 
         const latestTx = await f.db._getLatestTransaction();
-        expect(latestTx).toBeGreaterThanOrEqual(10);
+        expect(latestTx.txId!).toBeGreaterThanOrEqual(10);
 
         const result = await policy.execute();
 
         expect(result.cutoffTx).toBeGreaterThan(0);
-        expect(result.cutoffTx).toBeLessThan(latestTx);
+        expect(result.cutoffTx).toBeLessThan(latestTx.txId!);
         expect(result.error).toBeUndefined();
       });
     });
@@ -219,7 +219,7 @@ describe.each(FIXTURES)(
         }
 
         const latestTxBefore = await f.db._getLatestTransaction();
-        expect(latestTxBefore).toBe(10);
+        expect(latestTxBefore.txId).toBe(10);
 
         // Get current datoms before execution
         const currentDatomsBefore = await f.db.datoms({ e: 10 });
@@ -228,7 +228,7 @@ describe.each(FIXTURES)(
 
         // Verify cutoffTx < latestTx
         const latestTxAfter = await f.db._getLatestTransaction();
-        expect(result.cutoffTx).toBeLessThan(latestTxAfter);
+        expect(result.cutoffTx).toBeLessThan(latestTxAfter.txId!);
 
         // Verify current datoms are still present
         const currentDatomsAfter = await f.db.datoms({ e: 10 });
@@ -254,13 +254,13 @@ describe.each(FIXTURES)(
         }
 
         const latestTx = await f.db._getLatestTransaction();
-        expect(latestTx).toBe(20);
+        expect(latestTx.txId).toBe(20);
 
         const result = await policy.execute();
 
         // cutoffTx should be 20 - 5 = 15
         expect(result.cutoffTx).toBe(15);
-        expect(result.cutoffTx).toBeLessThan(latestTx);
+        expect(result.cutoffTx).toBeLessThan(latestTx.txId!);
 
         // Verify transactions 16-20 are still accessible
         const dbAsOf15 = f.db.asOf(15);
@@ -295,10 +295,10 @@ describe.each(FIXTURES)(
           const result = await policy.execute();
 
           // cutoffTx should always be less than latestTx
-          expect(result.cutoffTx).toBeLessThan(latestTx);
+          expect(result.cutoffTx).toBeLessThan(latestTx.txId!);
           // cutoffTx should be latestTx - retentionTxCount (when enough transactions)
-          if (latestTx >= 3) {
-            expect(result.cutoffTx).toBe(latestTx - 3);
+          if (latestTx.txId! >= 3) {
+            expect(result.cutoffTx).toBe(latestTx.txId! - 3);
           }
         }
       });
@@ -313,7 +313,7 @@ describe.each(FIXTURES)(
         const policy = new DestroyRetentionPolicy(f.db, config, logger);
 
         const latestTx = await f.db._getLatestTransaction();
-        expect(latestTx).toBe(0); // No transactions yet
+        expect(latestTx.txId).toBe(0); // No transactions yet
 
         const result = await policy.execute();
 
@@ -343,7 +343,7 @@ describe.each(FIXTURES)(
         }
 
         const latestTx = await f.db._getLatestTransaction();
-        expect(latestTx).toBe(5);
+        expect(latestTx.txId).toBe(5);
 
         const result = await policy.execute();
 
@@ -375,7 +375,7 @@ describe.each(FIXTURES)(
         }
 
         const latestTx = await f.db._getLatestTransaction();
-        expect(latestTx).toBe(5);
+        expect(latestTx.txId).toBe(5);
 
         const result = await policy.execute();
 
@@ -408,7 +408,7 @@ describe.each(FIXTURES)(
         }
 
         const latestTx = await f.db._getLatestTransaction();
-        expect(latestTx).toBe(10);
+        expect(latestTx.txId).toBe(10);
 
         const result = await policy.execute();
 
@@ -471,13 +471,13 @@ describe.each(FIXTURES)(
         ]);
 
         const latestTx = await f.db._getLatestTransaction();
-        expect(latestTx).toBeGreaterThanOrEqual(4);
+        expect(latestTx.txId!).toBeGreaterThanOrEqual(4);
 
         const result = await policy.execute();
 
         // cutoffTx = latestTx - 3
         expect(result.cutoffTx).toBeGreaterThan(0);
-        expect(result.cutoffTx).toBeLessThan(latestTx);
+        expect(result.cutoffTx).toBeLessThan(latestTx.txId!);
 
         // Verify current value is preserved
         const currentDatoms = await f.db.datoms({ e: 1, a: "name" });
@@ -501,7 +501,7 @@ describe.each(FIXTURES)(
         }
 
         const latestTx = await f.db._getLatestTransaction();
-        expect(latestTx).toBe(20);
+        expect(latestTx.txId).toBe(20);
 
         const result = await policy.execute();
 

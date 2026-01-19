@@ -58,6 +58,8 @@ interface TransactResponse {
 
 interface GetLatestTransactionResponse {
   txId: TransactionId;
+  datoms: Datom[];
+  meta?: Record<string, unknown>;
 }
 
 interface DeleteDatomsResponse {
@@ -133,7 +135,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     // Flatten ops and convert to datoms for transaction object
     const flatOps = ops.flat();
     const latestTx = await this._getLatestTransaction();
-    const txId = latestTx + 1;
+    const txId = latestTx.txId! + 1;
 
     // Convert ops to datoms for transaction object
     const datoms: Datom[] = flatOps.map((op) => ({
@@ -146,6 +148,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
 
     // Create transaction object for hooks
     const tx: Transaction = {
+      txId: txId,
       datoms,
       meta: metadata,
     };
@@ -211,7 +214,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     }
   }
 
-  async _getLatestTransaction(): Promise<TransactionId> {
+  async _getLatestTransaction(): Promise<Transaction> {
     await this._ensureInitialized();
 
     try {
@@ -221,7 +224,11 @@ export class HttpClientDatomDatabase implements DatomDatabase {
           method: "getLatestTransaction",
         }
       );
-      return response.txId;
+      return {
+        txId: response.txId,
+        datoms: response.datoms,
+        meta: response.meta,
+      };
     } catch (error) {
       throw new Error(
         `Failed to get latest transaction: ${this._extractErrorMessage(error)}`
@@ -260,7 +267,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
-    const speculativeTxId = (await this._getLatestTransaction()) + 1;
+    const speculativeTxId = (await this._getLatestTransaction()).txId! + 1;
 
     // Process operations in sequence, creating speculative datoms directly
     const speculativeDatoms: Datom[] = [];

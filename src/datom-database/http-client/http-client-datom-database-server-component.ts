@@ -63,6 +63,8 @@ interface GetLatestTransactionRequest {
 
 interface GetLatestTransactionResponse {
   txId: TransactionId;
+  datoms: Datom[];
+  meta?: Record<string, unknown>;
 }
 
 interface RegisterHookRequest {
@@ -303,8 +305,12 @@ export class HttpClientDatomDatabaseServerComponent {
   ): Promise<GetLatestTransactionResponse> {
     await this._ensureInitialized();
 
-    const txId = await this.db._getLatestTransaction();
-    return { txId };
+    const transaction = await this.db._getLatestTransaction();
+    return {
+      txId: transaction.txId!,
+      datoms: transaction.datoms,
+      meta: transaction.meta,
+    };
   }
 
   private async _handleRegisterHook(

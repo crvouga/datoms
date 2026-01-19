@@ -278,9 +278,11 @@ export class TestLogger implements Logger {
 export type BatchQueryKey = string;
 
 /**
- * Transaction data structure for hooks
+ * Transaction data structure for hooks and transaction retrieval
  */
 export type Transaction = {
+  /** Transaction ID (optional for hooks, required for transaction retrieval) */
+  txId: TransactionId;
   datoms: Datom[];
   meta?: Record<string, unknown>;
 };

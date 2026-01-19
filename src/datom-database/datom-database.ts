@@ -6,6 +6,7 @@
 import type { DatalogQuery } from "../datalog/datalog.js";
 import type { Datom, DatomInput, TransactionId } from "../datoms.js";
 import type { EntityId } from "../entity-id.js";
+import type { Transaction } from "../types.js";
 import type { Hook } from "./hook/hook.js";
 import type {
   DatabaseView,
@@ -232,15 +233,17 @@ export interface DatomDatabase extends DatabaseView {
   with(ops: DatomInput[]): Promise<WithResult>;
 
   /**
-   * Get the latest transaction ID in the database
+   * Get the latest transaction in the database
    * Useful for synchronization, replication, and determining the current state
-   * @returns The most recent transaction ID, or 0 if no transactions have occurred
+   * @returns The most recent transaction containing txId, datoms, and metadata
    * @example
-   * const latestTx = await db.getLatestTransaction();
+   * const latestTx = await db._getLatestTransaction();
    * // Use for sync: only fetch changes after this transaction
-   * const changes = await db.datoms({ tx: latestTx + 1 });
+   * const changes = await db.datoms({ tx: latestTx.txId! + 1 });
+   * // Access transaction data
+   * console.log(`Transaction ${latestTx.txId} has ${latestTx.datoms.length} datoms`);
    */
-  _getLatestTransaction(): Promise<TransactionId>;
+  _getLatestTransaction(): Promise<Transaction>;
 
   /**
    * Execute a query with view configuration and return metadata envelope.

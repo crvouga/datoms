@@ -714,7 +714,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Convert to datoms for transaction object
     const allDatoms: Datom[] = [];
     const latestTx = await this._getLatestTransaction();
-    const txId = latestTx + 1;
+    const txId = latestTx.txId! + 1;
 
     for (const sub of subs) {
       allDatoms.push({
@@ -738,6 +738,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // Create transaction object
     const tx: Transaction = {
+      txId: txId,
       datoms: allDatoms,
       meta: metadata,
     };
@@ -882,7 +883,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
-    const speculativeTxId = (await this._getLatestTransaction()) + 1;
+    const speculativeTxId = (await this._getLatestTransaction()).txId! + 1;
 
     // Process operations in sequence, creating speculative datoms directly
     const speculativeDatoms: Datom[] = [];
@@ -1694,16 +1695,25 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     await this.connection.execute(sql, params);
   }
 
-  async _getLatestTransaction(): Promise<TransactionId> {
+  async _getLatestTransaction(): Promise<Transaction> {
     await this._ensureInitialized();
     const sql = `SELECT last_tx FROM ${this.tableName}_tx WHERE id = 1`;
     const result = await this.connection.query(sql);
     if (!result || result.length === 0) {
       // No transactions yet
-      return 0;
+      return { txId: 0, datoms: [], meta: undefined };
     }
     const row = result[0] as Record<string, unknown>;
-    return Number(row.last_tx);
+    const txId = Number(row.last_tx);
+
+    // Get all datoms for this transaction using history view
+    const datoms = await this._executeHistoryQuery({ tx: txId });
+
+    return {
+      txId,
+      datoms,
+      meta: undefined, // Metadata is not persisted in PostgreSQL implementation
+    };
   }
 
   async _destroy(query: DatomsQuery): Promise<void> {

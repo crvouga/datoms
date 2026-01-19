@@ -131,7 +131,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     // Convert to datoms for transaction object
     const allDatoms: Datom[] = [];
     const latestTx = await this._getLatestTransaction();
-    const txId = latestTx + 1;
+    const txId = latestTx.txId! + 1;
 
     for (const sub of subs) {
       allDatoms.push({
@@ -155,6 +155,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
 
     // Create transaction object
     const tx: Transaction = {
+      txId: txId,
       datoms: allDatoms,
       meta: metadata,
     };
@@ -235,7 +236,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
-    const speculativeTxId = (await this._getLatestTransaction()) + 1;
+    const speculativeTxId = (await this._getLatestTransaction()).txId! + 1;
 
     // Process operations in sequence, creating speculative datoms directly
     const speculativeDatoms: Datom[] = [];
@@ -602,10 +603,23 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     });
   }
 
-  async _getLatestTransaction(): Promise<TransactionId> {
+  async _getLatestTransaction(): Promise<Transaction> {
     await this._ensureInitialized();
     // nextTx is the next transaction ID to be used, so latest is one less
-    return this.nextTx > 1 ? this.nextTx - 1 : 0;
+    const txId = this.nextTx > 1 ? this.nextTx - 1 : 0;
+
+    if (txId === 0) {
+      return { txId: 0, datoms: [], meta: undefined };
+    }
+
+    // Get all datoms for this transaction using history view
+    const datoms = await this._executeHistoryQuery({ tx: txId });
+
+    return {
+      txId,
+      datoms,
+      meta: undefined, // Metadata is not persisted in in-memory implementation
+    };
   }
 
   async _destroy(query: DatomsQuery): Promise<void> {

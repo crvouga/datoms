@@ -186,7 +186,8 @@ export class ArchiveRetentionPolicy implements RetentionPolicy {
 
     try {
       // Get latest transaction ID
-      const latestTx = await this.sourceDb._getLatestTransaction();
+      const latestTxResult = await this.sourceDb._getLatestTransaction();
+      const latestTx = latestTxResult.txId!;
       this.logger?.debug("Retrieved latest transaction", {
         event: "retention_policy_latest_tx_retrieved",
         policy: "archive",

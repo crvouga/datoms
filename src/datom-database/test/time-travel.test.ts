@@ -825,14 +825,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Get the latest transaction ID
       const latestTx = await db._getLatestTransaction();
-      expect(latestTx).toBeGreaterThanOrEqual(tx3);
+      expect(latestTx.txId!).toBeGreaterThanOrEqual(tx3);
 
       // Query at current state (should match asOf with latestTx)
       const current = await db.datoms({ e: 1 });
       expect(current.length).toBeGreaterThanOrEqual(2);
 
       // Query asOf with latestTx - should return current state
-      const atLatest = await db.asOf(latestTx).datoms({ e: 1 });
+      const atLatest = await db.asOf(latestTx.txId).datoms({ e: 1 });
       expect(atLatest.length).toBeGreaterThanOrEqual(2);
       const attributesAtLatest = atLatest.map((d) => d.a);
       expect(attributesAtLatest).toContain("name");
@@ -840,7 +840,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Query asOf with a future transaction ID (larger than latest)
       // Should return current state (all datoms have tx <= futureTx)
-      const futureTx = latestTx + 1000;
+      const futureTx = latestTx.txId + 1000;
       const atFuture = await db.asOf(futureTx).datoms({ e: 1 });
       expect(atFuture.length).toBeGreaterThanOrEqual(2);
       const attributesAtFuture = atFuture.map((d) => d.a);
