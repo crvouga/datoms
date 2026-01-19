@@ -11,7 +11,9 @@ import { validateQueryOptions } from "../shared/query-validation.js";
 import type {
   DatabaseView,
   DatomsParams,
+  DatomsResultEnvelope,
   QueryResult,
+  QueryResultEnvelope,
 } from "./database-view.js";
 
 /**
@@ -26,17 +28,36 @@ export class ConfiguredDatabaseView implements DatabaseView {
   ) {}
 
   async datoms(options: DatomsParams): Promise<Datom[]> {
+    const envelope = await this.datomsWithMetadata(options);
+    return envelope.data;
+  }
+
+  async datomsWithMetadata(
+    options: DatomsParams
+  ): Promise<DatomsResultEnvelope> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     validateQueryOptions(options);
 
     // Route to implementation with view config
-    return this.db._executeQuery(options, this.viewConfig);
+    return this.db._executeQueryWithMetadata(options, this.viewConfig);
   }
 
   async query(
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResult> {
-    return this.db._executeDatalogQuery(query, context, this.viewConfig);
+    const envelope = await this.queryWithMetadata(query, context);
+    return envelope.data;
+  }
+
+  async queryWithMetadata(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResultEnvelope> {
+    return this.db._executeDatalogQueryWithMetadata(
+      query,
+      context,
+      this.viewConfig
+    );
   }
 }

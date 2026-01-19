@@ -21,6 +21,22 @@ export type DatomsResult = Array<Datom>;
 export type QueryResult = Array<Record<string, Value | Attribute | EntityId>>;
 
 /**
+ * Envelope containing datoms query result and optional metadata
+ */
+export type DatomsResultEnvelope = {
+  data: DatomsResult;
+  metadata?: Record<string, unknown>;
+};
+
+/**
+ * Envelope containing datalog query result and optional metadata
+ */
+export type QueryResultEnvelope = {
+  data: QueryResult;
+  metadata?: Record<string, unknown>;
+};
+
+/**
  * Read-only database view for time-travel queries (Datomic-like)
  * Provides minimal interface for querying historical or filtered database states
  * Views are immutable and cannot modify the database
@@ -37,6 +53,18 @@ export type DatabaseView = {
   datoms(options: DatomsParams): Promise<DatomsResult>;
 
   /**
+   * Query datoms from the database view with metadata envelope
+   * @param options Query options (must include at least one filter or limit to prevent full scans)
+   * @returns Envelope containing datoms result and optional metadata
+   * @example
+   * const dbPast = db.asOf(100);
+   * const envelope = await dbPast.datomsWithMetadata({ entity: 123 });
+   * console.log(envelope.data); // The datoms
+   * console.log(envelope.metadata); // Implementation-specific metadata (SQL queries, etc.)
+   */
+  datomsWithMetadata(options: DatomsParams): Promise<DatomsResultEnvelope>;
+
+  /**
    * Execute a datalog query against this database view
    * @param query Datalog query to execute
    * @param context Optional context object for hooks
@@ -49,6 +77,22 @@ export type DatabaseView = {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResult>;
+
+  /**
+   * Execute a datalog query against this database view with metadata envelope
+   * @param query Datalog query to execute
+   * @param context Optional context object for hooks
+   * @returns Envelope containing query results and optional metadata
+   * @example
+   * const dbPast = db.asOf(100);
+   * const envelope = await dbPast.queryWithMetadata({ find: ["?e"], where: [["?e", "name", "Alice"]] });
+   * console.log(envelope.data); // The query results
+   * console.log(envelope.metadata); // Implementation-specific metadata (SQL queries, execution plans, etc.)
+   */
+  queryWithMetadata(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResultEnvelope>;
 };
 
 /**

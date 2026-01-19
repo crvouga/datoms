@@ -10,7 +10,9 @@ import type { Hook } from "./hook/hook.js";
 import type {
   DatabaseView,
   DatomsParams,
+  DatomsResultEnvelope,
   QueryResult,
+  QueryResultEnvelope,
 } from "./views/database-view.js";
 
 /**
@@ -294,6 +296,19 @@ export interface DatomDatabase extends DatabaseView {
   ): Promise<Datom[]>;
 
   /**
+   * Execute a query with view configuration and return metadata envelope.
+   * This method routes queries to the appropriate implementation method based on view config.
+   * @param options Query options
+   * @param viewConfig View configuration (asOf, since, history, current, or speculative)
+   * @returns Envelope containing datoms result and optional metadata
+   * @internal
+   */
+  _executeQueryWithMetadata(
+    options: DatomsParams,
+    viewConfig: ViewConfig
+  ): Promise<DatomsResultEnvelope>;
+
+  /**
    * Execute a datalog query with view configuration.
    * This method routes datalog queries to the appropriate implementation method based on view config.
    * @param query Datalog query to execute
@@ -307,6 +322,21 @@ export interface DatomDatabase extends DatabaseView {
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
   ): Promise<QueryResult>;
+
+  /**
+   * Execute a datalog query with view configuration and return metadata envelope.
+   * This method routes datalog queries to the appropriate implementation method based on view config.
+   * @param query Datalog query to execute
+   * @param context Optional context object for hooks
+   * @param viewConfig View configuration (asOf, since, history, current, or speculative)
+   * @returns Envelope containing query results and optional metadata
+   * @internal
+   */
+  _executeDatalogQueryWithMetadata(
+    query: DatalogQuery,
+    context: Record<string, unknown> | undefined,
+    viewConfig: ViewConfig
+  ): Promise<QueryResultEnvelope>;
 
   /**
    * Get obsolete datoms that don't affect the current state up to a cutoff transaction ID.

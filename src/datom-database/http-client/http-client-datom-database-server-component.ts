@@ -255,7 +255,11 @@ export class HttpClientDatomDatabaseServerComponent {
     // Handle speculative queries - need to merge speculative datoms with current state
     if (request.viewConfig.type === "speculative") {
       const currentView = this._createView({ type: "current" });
-      const currentDatoms = await currentView.datoms({});
+      // Use a large limit to fetch all current datoms for speculative queries
+      // This bypasses validation that requires at least one filter or limit
+      const currentDatoms = await currentView.datoms({
+        limit: Number.MAX_SAFE_INTEGER,
+      });
       const speculativeDatoms = request.viewConfig.datoms;
 
       // Merge speculative datoms with current state

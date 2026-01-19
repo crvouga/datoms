@@ -41,7 +41,9 @@ import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type {
   DatabaseView,
   DatomsParams,
+  DatomsResultEnvelope,
   QueryResult,
+  QueryResultEnvelope,
 } from "../views/database-view.js";
 
 /**
@@ -266,7 +268,13 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   }
 
   async datoms(options: DatomsParams): Promise<Datom[]> {
-    await this._ensureInitialized();
+    const envelope = await this.datomsWithMetadata(options);
+    return envelope.data;
+  }
+
+  async datomsWithMetadata(
+    options: DatomsParams
+  ): Promise<DatomsResultEnvelope> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
       options.e !== undefined ||
@@ -282,7 +290,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     }
 
     // Execute query with timeout if specified
-    let results: Datom[];
+    let envelope: DatomsResultEnvelope;
     if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
@@ -290,25 +298,29 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._executeCurrentQuery(options);
-      results = await Promise.race([queryPromise, timeoutPromise]);
+      const queryPromise = this._executeQueryWithMetadata(options, {
+        type: "current",
+      });
+      envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      results = await this._executeCurrentQuery(options);
+      envelope = await this._executeQueryWithMetadata(options, {
+        type: "current",
+      });
     }
 
     // Check result size limit if specified
     if (
       options.maxResultSize !== undefined &&
-      results.length > options.maxResultSize
+      envelope.data.length > options.maxResultSize
     ) {
       throw new QueryResultSizeError(
-        results.length,
+        envelope.data.length,
         options.maxResultSize,
         options
       );
     }
 
-    return results;
+    return envelope;
   }
 
   asOf(txId: TransactionId): DatabaseView {
@@ -769,98 +781,17 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResult> {
-    await this._ensureInitialized();
+    const envelope = await this.queryWithMetadata(query, context);
+    return envelope.data;
+  }
 
-    // Create read context
-    const ctx: ReadContext = {
-      db: this,
-      ...(context || {}),
-    };
-
-    // Run before-read hooks
-    const beforeResult = await this.hooks.runBeforeRead(query, ctx);
-
-    if (beforeResult.errors.length > 0) {
-      throw new QueryError("Query blocked by hooks", beforeResult.errors);
-    }
-
-    const modifiedQuery = beforeResult.query;
-
-    if (modifiedQuery.where.length === 0) {
-      return [];
-    }
-
-    // For single clause queries, use the optimized query method
-    if (modifiedQuery.where.length === 1) {
-      const clause = modifiedQuery.where[0];
-      if (!clause || !isQueryPattern(clause)) {
-        throw new Error("Only QueryPattern clauses are supported");
-      }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-      const entity = isVariable(entityVal)
-        ? undefined
-        : (entityVal as EntityId);
-      const attribute = isVariable(attributeVal)
-        ? undefined
-        : (attributeVal as string);
-      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
-
-      const datoms = await this._executeCurrentQuery({
-        e: entity,
-        a: attribute,
-        v: value,
-        op: "assert",
-      });
-
-      // Run after-read hooks
-      const afterResult = await this.hooks.runAfterRead(datoms, ctx);
-
-      if (afterResult.errors && afterResult.errors.length > 0) {
-        throw new QueryError(
-          "Query blocked by after-read hooks",
-          afterResult.errors
-        );
-      }
-
-      const results = afterResult.datoms.map((datom) => {
-        const result: Record<string, Value | Attribute> = {};
-        if (isVariable(entityVal)) {
-          result[entityVal as string] = datom.e;
-        }
-        if (isVariable(attributeVal)) {
-          result[attributeVal as string] = datom.a;
-        }
-        if (isVariable(valueVal)) {
-          result[valueVal as string] = datom.v;
-        }
-        return result;
-      });
-
-      const projected = project(
-        results,
-        modifiedQuery.find,
-        modifiedQuery.where
-      );
-      return this._applyOrderAndLimit(projected, modifiedQuery);
-    }
-
-    // For multi-clause queries, build a single SQL query with JOINs
-    // Extract datoms first for afterRead hooks
-    const allDatoms = await this._extractDatomsFromQuery(modifiedQuery);
-    const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
-
-    if (afterResult.errors && afterResult.errors.length > 0) {
-      throw new QueryError(
-        "Query blocked by after-read hooks",
-        afterResult.errors
-      );
-    }
-
-    // Re-execute query with filtered datoms
-    return this._executeDatalogWithSQLAndFilteredDatoms(
-      modifiedQuery,
-      afterResult.datoms
-    );
+  async queryWithMetadata(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResultEnvelope> {
+    return this._executeDatalogQueryWithMetadata(query, context, {
+      type: "current",
+    });
   }
 
   /**
@@ -1243,29 +1174,47 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<Datom[]> {
+    const envelope = await this._executeQueryWithMetadata(options, viewConfig);
+    return envelope.data;
+  }
+
+  public async _executeQueryWithMetadata(
+    options: DatomsParams,
+    viewConfig: ViewConfig
+  ): Promise<DatomsResultEnvelope> {
     await this._ensureInitialized();
 
+    const startTime = performance.now();
+    const metadata: Record<string, unknown> = {};
+
+    let result: Datom[];
+
     if (viewConfig.type === "current") {
-      return this._executeCurrentQuery(options);
-    }
-    if (viewConfig.type === "asOf") {
-      return this._executeAsOfQuery(options, viewConfig.txId);
-    }
-    if (viewConfig.type === "since") {
-      return this._executeSinceQuery(options, viewConfig.txId);
-    }
-    if (viewConfig.type === "history") {
-      return this._executeHistoryQuery(options);
-    }
-    if (viewConfig.type === "speculative") {
-      return this._executeSpeculativeQuery(options, viewConfig.datoms);
+      result = await this._executeCurrentQuery(options);
+    } else if (viewConfig.type === "asOf") {
+      result = await this._executeAsOfQuery(options, viewConfig.txId);
+    } else if (viewConfig.type === "since") {
+      result = await this._executeSinceQuery(options, viewConfig.txId);
+    } else if (viewConfig.type === "history") {
+      result = await this._executeHistoryQuery(options);
+    } else if (viewConfig.type === "speculative") {
+      result = await this._executeSpeculativeQuery(options, viewConfig.datoms);
+    } else {
+      // TypeScript exhaustiveness check
+      const _exhaustive: never = viewConfig;
+      throw new Error(
+        `Unknown view config type: ${(_exhaustive as ViewConfig).type}`
+      );
     }
 
-    // TypeScript exhaustiveness check
-    const _exhaustive: never = viewConfig;
-    throw new Error(
-      `Unknown view config type: ${(_exhaustive as ViewConfig).type}`
-    );
+    const executionTime = performance.now() - startTime;
+    metadata.executionTimeMs = executionTime;
+    metadata.resultCount = result.length;
+
+    return {
+      data: result,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+    };
   }
 
   public async _executeDatalogQuery(
@@ -1273,7 +1222,23 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
   ): Promise<QueryResult> {
+    const envelope = await this._executeDatalogQueryWithMetadata(
+      query,
+      context,
+      viewConfig
+    );
+    return envelope.data;
+  }
+
+  public async _executeDatalogQueryWithMetadata(
+    query: DatalogQuery,
+    context: Record<string, unknown> | undefined,
+    viewConfig: ViewConfig
+  ): Promise<QueryResultEnvelope> {
     await this._ensureInitialized();
+
+    const startTime = performance.now();
+    const metadata: Record<string, unknown> = {};
 
     // Create read context
     const ctx: ReadContext = {
@@ -1291,7 +1256,14 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     const modifiedQuery = beforeResult.query;
 
     if (modifiedQuery.where.length === 0) {
-      return [];
+      const executionTime = performance.now() - startTime;
+      return {
+        data: [],
+        metadata: {
+          executionTimeMs: executionTime,
+          resultCount: 0,
+        },
+      };
     }
 
     // For single clause queries, use optimized path
@@ -1348,7 +1320,16 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         modifiedQuery.find,
         modifiedQuery.where
       );
-      return this._applyOrderAndLimit(projected, modifiedQuery);
+      const finalResult = this._applyOrderAndLimit(projected, modifiedQuery);
+      const executionTime = performance.now() - startTime;
+      metadata.executionTimeMs = executionTime;
+      metadata.resultCount = finalResult.length;
+      metadata.executionStrategy = "single-clause-optimized";
+
+      return {
+        data: finalResult,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      };
     }
 
     // For multi-clause queries, extract datoms first for afterRead hooks
@@ -1487,14 +1468,32 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         modifiedQuery.find,
         modifiedQuery.where
       );
-      return this._applyOrderAndLimit(projected, modifiedQuery);
+      const finalResult = this._applyOrderAndLimit(projected, modifiedQuery);
+      const executionTime = performance.now() - startTime;
+      metadata.executionTimeMs = executionTime;
+      metadata.resultCount = finalResult.length;
+      metadata.executionStrategy = "in-memory-speculative";
+
+      return {
+        data: finalResult,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      };
     }
 
     // For non-speculative views, use SQL-based query execution
     // Re-execute query with filtered datoms
-    return this._executeDatalogWithSQLAndFilteredDatoms(
+    const finalResult = await this._executeDatalogWithSQLAndFilteredDatoms(
       modifiedQuery,
       afterResult.datoms
     );
+    const executionTime = performance.now() - startTime;
+    metadata.executionTimeMs = executionTime;
+    metadata.resultCount = finalResult.length;
+    metadata.executionStrategy = "sql-joins";
+
+    return {
+      data: finalResult,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+    };
   }
 }

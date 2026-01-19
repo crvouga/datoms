@@ -45,7 +45,9 @@ import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
 import type {
   DatabaseView,
   DatomsParams,
+  DatomsResultEnvelope,
   QueryResult,
+  QueryResultEnvelope,
 } from "../views/database-view.js";
 import {
   aggregationToSQL,
@@ -814,7 +816,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   }
 
   async datoms(options: DatomsParams): Promise<Datom[]> {
-    await this._ensureInitialized();
+    const envelope = await this.datomsWithMetadata(options);
+    return envelope.data;
+  }
+
+  async datomsWithMetadata(
+    options: DatomsParams
+  ): Promise<DatomsResultEnvelope> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     const hasFilter =
       options.e !== undefined ||
@@ -830,7 +838,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     }
 
     // Execute query with timeout if specified
-    let results: Datom[];
+    let envelope: DatomsResultEnvelope;
     if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
@@ -838,25 +846,29 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._executeCurrentQuery(options);
-      results = await Promise.race([queryPromise, timeoutPromise]);
+      const queryPromise = this._executeQueryWithMetadata(options, {
+        type: "current",
+      });
+      envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
-      results = await this._executeCurrentQuery(options);
+      envelope = await this._executeQueryWithMetadata(options, {
+        type: "current",
+      });
     }
 
     // Check result size limit if specified
     if (
       options.maxResultSize !== undefined &&
-      results.length > options.maxResultSize
+      envelope.data.length > options.maxResultSize
     ) {
       throw new QueryResultSizeError(
-        results.length,
+        envelope.data.length,
         options.maxResultSize,
         options
       );
     }
 
-    return results;
+    return envelope;
   }
 
   asOf(txId: TransactionId): DatabaseView {
@@ -1349,175 +1361,17 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     query: DatalogQuery,
     context?: Record<string, unknown>
   ): Promise<QueryResult> {
-    await this._ensureInitialized();
+    const envelope = await this.queryWithMetadata(query, context);
+    return envelope.data;
+  }
 
-    // Create read context
-    const ctx: ReadContext = {
-      db: this,
-      ...(context || {}),
-    };
-
-    // Run before-read hooks
-    const beforeResult = await this.hooks.runBeforeRead(query, ctx);
-
-    if (beforeResult.errors.length > 0) {
-      throw new QueryError("Query blocked by hooks", beforeResult.errors);
-    }
-
-    const modifiedQuery = beforeResult.query;
-
-    if (modifiedQuery.where.length === 0) {
-      return [];
-    }
-
-    // Extract all datoms from all clauses for afterRead hooks
-    const allDatomsSet = new Set<string>();
-    const allDatoms: Datom[] = [];
-
-    for (const clause of modifiedQuery.where) {
-      if (!isQueryPattern(clause)) {
-        continue;
-      }
-      const clauseDatoms = await this._executeClauseAsDatoms(clause);
-      for (const datom of clauseDatoms) {
-        const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
-        if (!allDatomsSet.has(key)) {
-          allDatomsSet.add(key);
-          allDatoms.push(datom);
-        }
-      }
-    }
-
-    // Run after-read hooks
-    const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
-
-    if (afterResult.errors && afterResult.errors.length > 0) {
-      throw new QueryError(
-        "Query blocked by after-read hooks",
-        afterResult.errors
-      );
-    }
-
-    // Check if we have aggregations - if so, use SQL query building
-    const aggCheck = checkSQLAggregations(modifiedQuery.find);
-    const hasAggs = aggCheck.hasAggregations;
-    const allAggsSupported = aggCheck.allSupported;
-
-    // If we have unsupported aggregations, use in-memory approach (for both single and multi-clause)
-    if (hasAggs && !allAggsSupported) {
-      // Use in-memory joins and aggregations
-      const firstClause = modifiedQuery.where[0];
-      if (!firstClause) {
-        return [];
-      }
-      const firstResults = await this._executeClauseWithFilteredDatoms(
-        firstClause,
-        afterResult.datoms
-      );
-
-      let results = firstResults;
-      for (let i = 1; i < modifiedQuery.where.length; i++) {
-        const clause = modifiedQuery.where[i];
-        if (!clause) continue;
-        const clauseResults = await this._executeClauseWithFilteredDatoms(
-          clause,
-          afterResult.datoms
-        );
-        results = joinResults(
-          results,
-          clauseResults,
-          modifiedQuery.where.slice(0, i + 1)
-        );
-      }
-
-      // Apply aggregations in-memory
-      const aggregated = applyAggregations(results, modifiedQuery.find);
-      const projected = project(
-        aggregated,
-        modifiedQuery.find,
-        modifiedQuery.where
-      );
-
-      if (modifiedQuery.orderBy) {
-        projected.sort((a, b) => {
-          for (const [variable, direction] of modifiedQuery.orderBy!) {
-            const key = stripQuestionMark(variable);
-            const aVal = a[key];
-            const bVal = b[key];
-
-            if (aVal == null && bVal == null) continue;
-            if (aVal == null) return direction === "asc" ? -1 : 1;
-            if (bVal == null) return direction === "asc" ? 1 : -1;
-
-            if (aVal < bVal) return direction === "asc" ? -1 : 1;
-            if (aVal > bVal) return direction === "asc" ? 1 : -1;
-          }
-          return 0;
-        });
-      }
-
-      if (modifiedQuery.limit) {
-        return projected.slice(0, modifiedQuery.limit);
-      }
-
-      return projected;
-    }
-
-    // For multi-clause queries with all aggregations supported, use SQL query building
-    if (modifiedQuery.where.length > 1 && hasAggs && allAggsSupported) {
-      return this._executeDatalogWithSQL(modifiedQuery);
-    }
-
-    // Now execute the query with filtered datoms (no aggregations or single clause with supported aggregations)
-    const firstClause = modifiedQuery.where[0];
-    if (!firstClause) {
-      return [];
-    }
-    const firstResults = await this._executeClauseWithFilteredDatoms(
-      firstClause,
-      afterResult.datoms
-    );
-
-    let results = firstResults;
-    for (let i = 1; i < modifiedQuery.where.length; i++) {
-      const clause = modifiedQuery.where[i];
-      if (!clause) continue;
-      const clauseResults = await this._executeClauseWithFilteredDatoms(
-        clause,
-        afterResult.datoms
-      );
-      results = joinResults(
-        results,
-        clauseResults,
-        modifiedQuery.where.slice(0, i + 1)
-      );
-    }
-
-    const projected = project(results, modifiedQuery.find, modifiedQuery.where);
-
-    if (modifiedQuery.orderBy) {
-      projected.sort((a, b) => {
-        for (const [variable, direction] of modifiedQuery.orderBy!) {
-          const key = stripQuestionMark(variable);
-          const aVal = a[key];
-          const bVal = b[key];
-
-          if (aVal == null && bVal == null) continue;
-          if (aVal == null) return direction === "asc" ? -1 : 1;
-          if (bVal == null) return direction === "asc" ? 1 : -1;
-
-          if (aVal < bVal) return direction === "asc" ? -1 : 1;
-          if (aVal > bVal) return direction === "asc" ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-
-    if (modifiedQuery.limit) {
-      return projected.slice(0, modifiedQuery.limit);
-    }
-
-    return projected;
+  async queryWithMetadata(
+    query: DatalogQuery,
+    context?: Record<string, unknown>
+  ): Promise<QueryResultEnvelope> {
+    return this._executeDatalogQueryWithMetadata(query, context, {
+      type: "current",
+    });
   }
 
   /**
@@ -1904,29 +1758,296 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     options: DatomsParams,
     viewConfig: ViewConfig
   ): Promise<Datom[]> {
+    const envelope = await this._executeQueryWithMetadata(options, viewConfig);
+    return envelope.data;
+  }
+
+  public async _executeQueryWithMetadata(
+    options: DatomsParams,
+    viewConfig: ViewConfig
+  ): Promise<DatomsResultEnvelope> {
     await this._ensureInitialized();
 
+    const startTime = performance.now();
+    const metadata: Record<string, unknown> = {};
+
+    let result: Datom[];
+    const sqlQueries: string[] = [];
+
     if (viewConfig.type === "current") {
-      return this._executeCurrentQuery(options);
-    }
-    if (viewConfig.type === "asOf") {
-      return this._executeAsOfQuery(options, viewConfig.txId);
-    }
-    if (viewConfig.type === "since") {
-      return this._executeSinceQuery(options, viewConfig.txId);
-    }
-    if (viewConfig.type === "history") {
-      return this._executeHistoryQuery(options);
-    }
-    if (viewConfig.type === "speculative") {
-      return this._executeSpeculativeQuery(options, viewConfig.datoms);
+      const sqlInfo = this._buildCurrentQuerySQL(options);
+      if (sqlInfo.sql) {
+        sqlQueries.push(sqlInfo.sql);
+      }
+      result = await this._executeCurrentQuery(options);
+    } else if (viewConfig.type === "asOf") {
+      const sqlInfo = this._buildAsOfQuerySQL(options, viewConfig.txId);
+      if (sqlInfo.sql) {
+        sqlQueries.push(sqlInfo.sql);
+      }
+      result = await this._executeAsOfQuery(options, viewConfig.txId);
+    } else if (viewConfig.type === "since") {
+      const sqlInfo = this._buildSinceQuerySQL(options, viewConfig.txId);
+      if (sqlInfo.sql) {
+        sqlQueries.push(sqlInfo.sql);
+      }
+      result = await this._executeSinceQuery(options, viewConfig.txId);
+    } else if (viewConfig.type === "history") {
+      const sqlInfo = this._buildHistoryQuerySQL(options);
+      if (sqlInfo.sql) {
+        sqlQueries.push(sqlInfo.sql);
+      }
+      result = await this._executeHistoryQuery(options);
+    } else if (viewConfig.type === "speculative") {
+      result = await this._executeSpeculativeQuery(options, viewConfig.datoms);
+      // Speculative queries don't generate SQL directly
+    } else {
+      // TypeScript exhaustiveness check
+      const _exhaustive: never = viewConfig;
+      throw new Error(
+        `Unknown view config type: ${(_exhaustive as ViewConfig).type}`
+      );
     }
 
-    // TypeScript exhaustiveness check
-    const _exhaustive: never = viewConfig;
-    throw new Error(
-      `Unknown view config type: ${(_exhaustive as ViewConfig).type}`
-    );
+    const executionTime = performance.now() - startTime;
+
+    if (sqlQueries.length > 0) {
+      metadata.sqlQueries = sqlQueries;
+    }
+    metadata.executionTimeMs = executionTime;
+    metadata.resultCount = result.length;
+
+    return {
+      data: result,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+    };
+  }
+
+  /**
+   * Build SQL string for current query (for metadata tracking)
+   */
+  private _buildCurrentQuerySQL(options: DatomsParams): { sql: string } {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (options.e !== undefined) {
+      conditions.push("e = ?");
+      params.push(String(options.e));
+    }
+    if (options.a !== undefined) {
+      conditions.push("a = ?");
+      params.push(String(options.a));
+    }
+    if (options.v !== undefined) {
+      let value = options.v;
+      if (value === undefined) {
+        value = "__UNDEFINED__";
+      }
+      conditions.push("v = ?::jsonb");
+      params.push(JSON.stringify(value));
+    }
+    if (options.tx !== undefined) {
+      conditions.push("tx = ?");
+      params.push(options.tx);
+    }
+
+    const limitClause = options.limit ? "LIMIT ?" : "";
+    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+
+    const combinedWhereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const distinctOnColumns = "e, a, v";
+    const orderByColumns = "e, a, v, tx DESC";
+
+    let opFilterAfter = "";
+    if (options.op === undefined || options.op === "assert") {
+      opFilterAfter = "WHERE op = 'assert'";
+    } else if (options.op === "retract") {
+      opFilterAfter = "WHERE op = 'retract'";
+    }
+
+    const sql = `
+      WITH latest_datoms AS (
+        SELECT DISTINCT ON (${distinctOnColumns})
+          e, a, v, tx, op
+        FROM ${this.tableName}
+        ${combinedWhereClause}
+        ORDER BY ${orderByColumns}
+      )
+      SELECT 
+        e,
+        a,
+        v,
+        tx,
+        op
+      FROM latest_datoms
+      ${opFilterAfter}
+      ORDER BY
+        CASE 
+          WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
+          ELSE 0 
+        END,
+        a
+      ${limitClause}
+      ${offsetClause}
+    `.trim();
+
+    return { sql };
+  }
+
+  /**
+   * Build SQL string for asOf query (for metadata tracking)
+   */
+  private _buildAsOfQuerySQL(
+    options: DatomsParams,
+    _txId: TransactionId
+  ): { sql: string } {
+    const conditions: string[] = [];
+
+    if (options.e !== undefined) {
+      conditions.push("e = ?");
+    }
+    if (options.a !== undefined) {
+      conditions.push("a = ?");
+    }
+    if (options.v !== undefined) {
+      conditions.push("v = ?::jsonb");
+    }
+
+    conditions.push("tx <= ?");
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const limitClause = options.limit ? "LIMIT ?" : "";
+    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+
+    const sql = `
+      WITH latest_datoms AS (
+        SELECT DISTINCT ON (e, a)
+          e, a, v, tx, op
+        FROM ${this.tableName}
+        ${whereClause}
+        ORDER BY e, a, tx DESC
+      )
+      SELECT 
+        e,
+        a,
+        v,
+        tx,
+        op
+      FROM latest_datoms
+      WHERE op = 'assert'
+      ORDER BY
+        CASE 
+          WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
+          ELSE 0 
+        END,
+        a
+      ${limitClause}
+      ${offsetClause}
+    `.trim();
+
+    return { sql };
+  }
+
+  /**
+   * Build SQL string for since query (for metadata tracking)
+   */
+  private _buildSinceQuerySQL(
+    options: DatomsParams,
+    _txId: TransactionId
+  ): { sql: string } {
+    const conditions: string[] = [];
+
+    if (options.e !== undefined) {
+      conditions.push("e = ?");
+    }
+    if (options.a !== undefined) {
+      conditions.push("a = ?");
+    }
+    if (options.v !== undefined) {
+      conditions.push("v = ?::jsonb");
+    }
+
+    conditions.push("tx > ?");
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const limitClause = options.limit ? "LIMIT ?" : "";
+    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+
+    const sql = `
+      WITH latest_datoms AS (
+        SELECT DISTINCT ON (e, a, v)
+          e, a, v, tx, op
+        FROM ${this.tableName}
+        ${whereClause}
+        ORDER BY e, a, v, tx DESC
+      )
+      SELECT 
+        e,
+        a,
+        v,
+        tx,
+        op
+      FROM latest_datoms
+      WHERE op = 'assert'
+      ORDER BY
+        CASE 
+          WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
+          ELSE 0 
+        END,
+        a
+      ${limitClause}
+      ${offsetClause}
+    `.trim();
+
+    return { sql };
+  }
+
+  /**
+   * Build SQL string for history query (for metadata tracking)
+   */
+  private _buildHistoryQuerySQL(options: DatomsParams): { sql: string } {
+    const conditions: string[] = [];
+
+    if (options.e !== undefined) {
+      conditions.push("e = ?");
+    }
+    if (options.a !== undefined) {
+      conditions.push("a = ?");
+    }
+    if (options.v !== undefined) {
+      conditions.push("v = ?::jsonb");
+    }
+    if (options.tx !== undefined) {
+      conditions.push("tx = ?");
+    }
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const limitClause = options.limit ? "LIMIT ?" : "";
+    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+
+    const sql = `
+      SELECT 
+        e,
+        a,
+        v,
+        tx,
+        op
+      FROM ${this.tableName}
+      ${whereClause}
+      ORDER BY tx ASC, e ASC, a ASC
+      ${limitClause}
+      ${offsetClause}
+    `.trim();
+
+    return { sql };
   }
 
   public async _executeDatalogQuery(
@@ -1934,7 +2055,24 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     context: Record<string, unknown> | undefined,
     viewConfig: ViewConfig
   ): Promise<QueryResult> {
+    const envelope = await this._executeDatalogQueryWithMetadata(
+      query,
+      context,
+      viewConfig
+    );
+    return envelope.data;
+  }
+
+  public async _executeDatalogQueryWithMetadata(
+    query: DatalogQuery,
+    context: Record<string, unknown> | undefined,
+    viewConfig: ViewConfig
+  ): Promise<QueryResultEnvelope> {
     await this._ensureInitialized();
+
+    const startTime = performance.now();
+    const metadata: Record<string, unknown> = {};
+    const sqlQueries: string[] = [];
 
     // Create read context
     const ctx: ReadContext = {
@@ -1952,7 +2090,14 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const modifiedQuery = beforeResult.query;
 
     if (modifiedQuery.where.length === 0) {
-      return [];
+      const executionTime = performance.now() - startTime;
+      return {
+        data: [],
+        metadata: {
+          executionTimeMs: executionTime,
+          resultCount: 0,
+        },
+      };
     }
 
     // Extract all datoms from all clauses for afterRead hooks
@@ -2096,13 +2241,16 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       );
 
       // Apply aggregations if needed
+      let finalResult: QueryResult;
       if (hasAggs) {
-        return applyAggregations(projected, modifiedQuery.find);
+        finalResult = applyAggregations(projected, modifiedQuery.find);
+      } else {
+        finalResult = projected;
       }
 
       // Apply ordering if specified
       if (modifiedQuery.orderBy) {
-        projected.sort((a, b) => {
+        finalResult.sort((a, b) => {
           for (const [variable, direction] of modifiedQuery.orderBy!) {
             const key = stripQuestionMark(variable);
             const aVal = a[key];
@@ -2121,10 +2269,18 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
       // Apply limit if specified
       if (modifiedQuery.limit !== undefined) {
-        return projected.slice(0, modifiedQuery.limit);
+        finalResult = finalResult.slice(0, modifiedQuery.limit);
       }
 
-      return projected;
+      const executionTime = performance.now() - startTime;
+      metadata.executionTimeMs = executionTime;
+      metadata.resultCount = finalResult.length;
+      metadata.executionStrategy = "in-memory-speculative";
+
+      return {
+        data: finalResult,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      };
     }
 
     // For non-speculative views, use the same logic as regular query() method
@@ -2133,7 +2289,15 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       // Use in-memory joins and aggregations
       const firstClause = modifiedQuery.where[0];
       if (!firstClause) {
-        return [];
+        const executionTime = performance.now() - startTime;
+        return {
+          data: [],
+          metadata: {
+            executionTimeMs: executionTime,
+            resultCount: 0,
+            executionStrategy: "in-memory-unsupported-aggregations",
+          },
+        };
       }
       const firstResults = await this._executeClauseWithFilteredDatoms(
         firstClause,
@@ -2181,22 +2345,54 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         });
       }
 
+      let finalResult: QueryResult = projected;
       if (modifiedQuery.limit) {
-        return projected.slice(0, modifiedQuery.limit);
+        finalResult = finalResult.slice(0, modifiedQuery.limit);
       }
 
-      return projected;
+      const executionTime = performance.now() - startTime;
+      metadata.executionTimeMs = executionTime;
+      metadata.resultCount = finalResult.length;
+      metadata.executionStrategy = "in-memory-speculative";
+
+      return {
+        data: finalResult,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      };
     }
 
     // For multi-clause queries with all aggregations supported, use SQL query building
     if (modifiedQuery.where.length > 1 && hasAggs && allAggsSupported) {
-      return this._executeDatalogWithSQL(modifiedQuery);
+      const sqlResult = await this._executeDatalogWithSQL(modifiedQuery);
+      const { sql } = datalogToPostgresSQL(modifiedQuery, this.tableName);
+      sqlQueries.push(sql);
+
+      const executionTime = performance.now() - startTime;
+      metadata.executionTimeMs = executionTime;
+      metadata.resultCount = sqlResult.length;
+      metadata.executionStrategy = "sql-aggregations";
+      if (sqlQueries.length > 0) {
+        metadata.sqlQueries = sqlQueries;
+      }
+
+      return {
+        data: sqlResult,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      };
     }
 
     // Now execute the query with filtered datoms (no aggregations or single clause with supported aggregations)
     const firstClause = modifiedQuery.where[0];
     if (!firstClause) {
-      return [];
+      const executionTime = performance.now() - startTime;
+      return {
+        data: [],
+        metadata: {
+          executionTimeMs: executionTime,
+          resultCount: 0,
+          executionStrategy: "in-memory-filtered-datoms",
+        },
+      };
     }
     const firstResults = await this._executeClauseWithFilteredDatoms(
       firstClause,
@@ -2238,11 +2434,20 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       });
     }
 
+    let finalResult: QueryResult = projected;
     if (modifiedQuery.limit) {
-      return projected.slice(0, modifiedQuery.limit);
+      finalResult = finalResult.slice(0, modifiedQuery.limit);
     }
 
-    return projected;
+    const executionTime = performance.now() - startTime;
+    metadata.executionTimeMs = executionTime;
+    metadata.resultCount = finalResult.length;
+    metadata.executionStrategy = "in-memory-filtered-datoms";
+
+    return {
+      data: finalResult,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+    };
   }
 
   /**
