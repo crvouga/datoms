@@ -24,11 +24,15 @@ export function QueryEditor() {
   const [results, setResults] = useState<QueryResult | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [latency, setLatency] = useState<number | null>(null);
 
   const handleRunQuery = async () => {
     setLoading(true);
     setError(null);
     setResults(null);
+    setLatency(null);
+
+    const startTime = performance.now();
 
     try {
       // Parse the query text as JSON
@@ -46,10 +50,18 @@ export function QueryEditor() {
       // Execute the query
       const queryResults = await db.query(query);
 
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
       setResults(queryResults);
+      setLatency(duration);
     } catch (err) {
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(errorMessage);
+      setLatency(duration);
       console.error("Query execution error:", err);
     } finally {
       setLoading(false);
@@ -102,9 +114,20 @@ export function QueryEditor() {
         {/* Output Section */}
         <Panel defaultSize={25} minSize={20} className="flex flex-col">
           <div className="p-2 border-b border-gray-700 bg-gray-900">
-            <h2 className="text-lg font-semibold">
-              Results {results && `(${results.length} rows)`}
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                Results {results && `(${results.length} rows)`}
+              </h2>
+              {latency !== null && (
+                <div className="text-sm text-gray-400 font-mono">
+                  {latency < 1
+                    ? `${(latency * 1000).toFixed(2)}μs`
+                    : latency < 1000
+                      ? `${latency.toFixed(2)}ms`
+                      : `${(latency / 1000).toFixed(2)}s`}
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex-1 overflow-auto">
             {error && (
