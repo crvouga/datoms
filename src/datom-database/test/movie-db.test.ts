@@ -183,8 +183,6 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
         orderBy: [["?vote_count", "desc"]],
         limit: limit,
       });
-
-      console.log(results);
       expect(results).toBeDefined();
       expect(Array.isArray(results.data)).toBe(true);
       expect(results.data.length).toBe(limit);

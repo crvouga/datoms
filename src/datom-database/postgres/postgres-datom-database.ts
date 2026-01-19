@@ -382,25 +382,41 @@ export function datalogToPostgresSQL(
         : "";
 
     // Build ORDER BY clause
-    // For JSONB value columns, extract text before sorting for proper alphabetical ordering
+    // For JSONB value columns, handle different types appropriately:
+    // - Numbers: cast to numeric for proper numeric sorting
+    // - Strings: extract text for alphabetical sorting
+    // - Other types: convert to text
+    // Use two ORDER BY expressions per variable:
+    // 1. Numeric ordering (NULLS LAST for non-numeric values)
+    // 2. Text ordering (NULLS LAST for numeric values)
+    // This ensures numeric values are sorted numerically and text values alphabetically
     let orderByClause = "";
     if (query.orderBy && query.orderBy.length > 0) {
-      const orderParts = query.orderBy
-        .map(([variable, direction]) => {
-          const colName = varToColumn.get(variable);
-          if (colName) {
-            const columnRef = `"${colName}"`;
-            // Value columns from pivot are JSONB, extract text for proper sorting
-            const orderExpr = `CASE 
-              WHEN jsonb_typeof(${columnRef}::jsonb) = 'string' 
-              THEN ${columnRef}::jsonb#>>'{}'
-              ELSE ${columnRef}::jsonb::text
-            END`;
-            return `${orderExpr} ${direction.toUpperCase()}`;
-          }
-          return "";
-        })
-        .filter(Boolean);
+      const orderParts: string[] = [];
+      for (const [variable, direction] of query.orderBy) {
+        const colName = varToColumn.get(variable);
+        if (colName) {
+          const columnRef = `"${colName}"`;
+          const dir = direction.toUpperCase();
+          // First expression: numeric ordering (NULL for non-numeric values)
+          orderParts.push(
+            `CASE WHEN jsonb_typeof(${columnRef}::jsonb) = 'number' 
+              THEN (${columnRef}::jsonb)::text::numeric
+              ELSE NULL
+            END ${dir} NULLS LAST`
+          );
+          // Second expression: text ordering (NULL for numeric values)
+          orderParts.push(
+            `CASE WHEN jsonb_typeof(${columnRef}::jsonb) != 'number' 
+              THEN CASE WHEN jsonb_typeof(${columnRef}::jsonb) = 'string' 
+                THEN ${columnRef}::jsonb#>>'{}'
+                ELSE ${columnRef}::jsonb::text
+              END
+              ELSE NULL
+            END ${dir} NULLS LAST`
+          );
+        }
+      }
       if (orderParts.length > 0) {
         orderByClause = `ORDER BY ${orderParts.join(", ")}`;
       }
@@ -728,28 +744,45 @@ export function datalogToPostgresSQL(
 
   // Build ORDER BY clause
   // Use variableToColumn map to ensure we reference columns from tables that are definitely joined
-  // For JSONB value columns (.v), extract text before sorting for proper alphabetical ordering
+  // For JSONB value columns (.v), handle different types appropriately:
+  // - Numbers: cast to numeric for proper numeric sorting
+  // - Strings: extract text for alphabetical sorting
+  // - Other types: convert to text
+  // Use two ORDER BY expressions per variable for JSONB columns:
+  // 1. Numeric ordering (NULLS LAST for non-numeric values)
+  // 2. Text ordering (NULLS LAST for numeric values)
   let orderByClause = "";
   if (query.orderBy && query.orderBy.length > 0) {
-    const orderParts = query.orderBy
-      .map(([variable, direction]) => {
-        const columnRef = variableToColumn.get(variable);
-        if (columnRef) {
-          // Check if this is a value column (JSONB) by checking if it contains .v
-          const isValueColumn = columnRef.includes(".v");
-          if (isValueColumn) {
-            const orderExpr = `CASE 
-              WHEN jsonb_typeof(${columnRef}::jsonb) = 'string' 
-              THEN ${columnRef}::jsonb#>>'{}'
-              ELSE ${columnRef}::jsonb::text
-            END`;
-            return `${orderExpr} ${direction.toUpperCase()}`;
-          }
-          return `${columnRef} ${direction.toUpperCase()}`;
+    const orderParts: string[] = [];
+    for (const [variable, direction] of query.orderBy) {
+      const columnRef = variableToColumn.get(variable);
+      if (columnRef) {
+        const dir = direction.toUpperCase();
+        // Check if this is a value column (JSONB) by checking if it contains .v
+        const isValueColumn = columnRef.includes(".v");
+        if (isValueColumn) {
+          // First expression: numeric ordering (NULL for non-numeric values)
+          orderParts.push(
+            `CASE WHEN jsonb_typeof(${columnRef}::jsonb) = 'number' 
+              THEN (${columnRef}::jsonb)::text::numeric
+              ELSE NULL
+            END ${dir} NULLS LAST`
+          );
+          // Second expression: text ordering (NULL for numeric values)
+          orderParts.push(
+            `CASE WHEN jsonb_typeof(${columnRef}::jsonb) != 'number' 
+              THEN CASE WHEN jsonb_typeof(${columnRef}::jsonb) = 'string' 
+                THEN ${columnRef}::jsonb#>>'{}'
+                ELSE ${columnRef}::jsonb::text
+              END
+              ELSE NULL
+            END ${dir} NULLS LAST`
+          );
+        } else {
+          orderParts.push(`${columnRef} ${dir}`);
         }
-        return "";
-      })
-      .filter(Boolean);
+      }
+    }
     if (orderParts.length > 0) {
       orderByClause = `ORDER BY ${orderParts.join(", ")}`;
     }
