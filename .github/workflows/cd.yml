@@ -93,7 +93,7 @@ jobs:
       - name: Set up Docker Compose
         run: |
           docker compose --version
-          docker compose up -d postgres
+          docker compose up -d postgres-app
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
