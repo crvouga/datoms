@@ -805,59 +805,58 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   }
 
   async initialize(): Promise<void> {
-    if (!this.initialized) {
-      const createTableSql = `
-        CREATE TABLE IF NOT EXISTS ${this.tableName} (
-          e TEXT NOT NULL,
-          a TEXT NOT NULL,
-          v JSONB NOT NULL,
-          tx BIGINT NOT NULL,
-          op BOOLEAN NOT NULL,
-          PRIMARY KEY (e, a, v, tx, op)
-        )
-      `;
+    if (this.initialized) return;
+    const createTableSql = `
+      CREATE TABLE IF NOT EXISTS ${this.tableName} (
+        e TEXT NOT NULL,
+        a TEXT NOT NULL,
+        v JSONB NOT NULL,
+        tx BIGINT NOT NULL,
+        op BOOLEAN NOT NULL,
+        PRIMARY KEY (e, a, v, tx, op)
+      )
+    `;
 
-      // PostgreSQL-optimized indexes
-      // Note: INCLUDE clause not used for PGLite compatibility (requires PostgreSQL 11+)
-      const indexes = [
-        // Composite index for entity+attribute queries (most common pattern)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_e_a_tx ON ${this.tableName}(e, a, tx DESC)`,
-        // Composite index for attribute+value queries
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_v_tx ON ${this.tableName}(a, v, tx DESC)`,
-        // Partial index for op=true (most common case - only active datoms)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(e, a, tx DESC) WHERE op = true`,
-        // Optimized index for attribute-based queries (used by pivot optimization)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_tx ON ${this.tableName}(a, tx DESC) WHERE op = true`,
-        // GIN index for JSONB value queries (containment, key existence, etc.)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_v_gin ON ${this.tableName} USING GIN (v)`,
-        // Index on tx for transaction-based queries
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx DESC)`,
-      ];
+    // PostgreSQL-optimized indexes
+    // Note: INCLUDE clause not used for PGLite compatibility (requires PostgreSQL 11+)
+    const indexes = [
+      // Composite index for entity+attribute queries (most common pattern)
+      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_e_a_tx ON ${this.tableName}(e, a, tx DESC)`,
+      // Composite index for attribute+value queries
+      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_v_tx ON ${this.tableName}(a, v, tx DESC)`,
+      // Partial index for op=true (most common case - only active datoms)
+      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(e, a, tx DESC) WHERE op = true`,
+      // Optimized index for attribute-based queries (used by pivot optimization)
+      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_tx ON ${this.tableName}(a, tx DESC) WHERE op = true`,
+      // GIN index for JSONB value queries (containment, key existence, etc.)
+      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_v_gin ON ${this.tableName} USING GIN (v)`,
+      // Index on tx for transaction-based queries
+      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx DESC)`,
+    ];
 
-      await this.sqlDb.execute(createTableSql);
-      for (const indexSql of indexes) {
-        await this.sqlDb.execute(indexSql);
-      }
-
-      // Create transaction counter table
-      const txTableSql = `
-        CREATE TABLE IF NOT EXISTS ${this.tableName}_tx (
-          id BIGINT PRIMARY KEY,
-          last_tx BIGINT NOT NULL DEFAULT 0
-        )
-      `;
-      await this.sqlDb.execute(txTableSql);
-
-      // Initialize transaction counter if needed
-      const initTxSql = `
-        INSERT INTO ${this.tableName}_tx (id, last_tx)
-        SELECT 1, 0
-        WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
-      `;
-      await this.sqlDb.execute(initTxSql);
-
-      this.initialized = true;
+    await this.sqlDb.execute(createTableSql);
+    for (const indexSql of indexes) {
+      await this.sqlDb.execute(indexSql);
     }
+
+    // Create transaction counter table
+    const txTableSql = `
+      CREATE TABLE IF NOT EXISTS ${this.tableName}_tx (
+        id BIGINT PRIMARY KEY,
+        last_tx BIGINT NOT NULL DEFAULT 0
+      )
+    `;
+    await this.sqlDb.execute(txTableSql);
+
+    // Initialize transaction counter if needed
+    const initTxSql = `
+      INSERT INTO ${this.tableName}_tx (id, last_tx)
+      SELECT 1, 0
+      WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
+    `;
+    await this.sqlDb.execute(initTxSql);
+
+    this.initialized = true;
   }
 
   async close(): Promise<void> {
