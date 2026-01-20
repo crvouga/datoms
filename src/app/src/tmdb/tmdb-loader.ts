@@ -70,7 +70,7 @@ export class TmdbLoader {
           (genreId): DatomInput => ({
             a: 'tmdb.movie/genre_id',
             v: value(genreId),
-            op: 'assert',
+            op: true,
             e: datom.e,
           }),
         );

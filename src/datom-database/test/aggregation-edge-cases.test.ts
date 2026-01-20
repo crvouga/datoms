@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle aggregations with all zero values', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 0},
-        {op: 'assert', e: 2, a: 'value', v: 0},
-        {op: 'assert', e: 3, a: 'value', v: 0},
+        {op: true, e: 1, a: 'value', v: 0},
+        {op: true, e: 2, a: 'value', v: 0},
+        {op: true, e: 3, a: 'value', v: 0},
       ]);
 
       const query: DatalogQuery = {
@@ -49,8 +49,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       const largeNumber = Number.MAX_SAFE_INTEGER - 1000;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: largeNumber},
-        {op: 'assert', e: 2, a: 'value', v: 1000},
+        {op: true, e: 1, a: 'value', v: largeNumber},
+        {op: true, e: 2, a: 'value', v: 1000},
       ]);
 
       const query: DatalogQuery = {
@@ -73,9 +73,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle aggregations with very small numbers', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 0.0000001},
-        {op: 'assert', e: 2, a: 'value', v: 0.0000002},
-        {op: 'assert', e: 3, a: 'value', v: 0.0000003},
+        {op: true, e: 1, a: 'value', v: 0.0000001},
+        {op: true, e: 2, a: 'value', v: 0.0000002},
+        {op: true, e: 3, a: 'value', v: 0.0000003},
       ]);
 
       const query: DatalogQuery = {
@@ -97,9 +97,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle aggregations with mixed positive and negative values summing to zero', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 100},
-        {op: 'assert', e: 2, a: 'value', v: -50},
-        {op: 'assert', e: 3, a: 'value', v: -50},
+        {op: true, e: 1, a: 'value', v: 100},
+        {op: true, e: 2, a: 'value', v: -50},
+        {op: true, e: 3, a: 'value', v: -50},
       ]);
 
       const query: DatalogQuery = {
@@ -120,16 +120,16 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(results[0]?.min).toBe(-50);
     });
 
-    test('should handle count with retractions', async () => {
+    test('should handle count with falseions', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'item', v: 'A'},
-        {op: 'assert', e: 2, a: 'item', v: 'B'},
-        {op: 'assert', e: 3, a: 'item', v: 'C'},
+        {op: true, e: 1, a: 'item', v: 'A'},
+        {op: true, e: 2, a: 'item', v: 'B'},
+        {op: true, e: 3, a: 'item', v: 'C'},
       ]);
 
-      // Retract one item
-      await db.transact([{op: 'retract', e: 2, a: 'item', v: 'B'}]);
+      // false one item
+      await db.transact([{op: false, e: 2, a: 'item', v: 'B'}]);
 
       const query: DatalogQuery = {
         find: {
@@ -145,16 +145,16 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(results[0]?.distinct).toBe(2);
     });
 
-    test('should handle aggregations with updates (assert over existing)', async () => {
+    test('should handle aggregations with updates (true over existing)', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'score', v: 50},
-        {op: 'assert', e: 2, a: 'score', v: 60},
-        {op: 'assert', e: 3, a: 'score', v: 70},
+        {op: true, e: 1, a: 'score', v: 50},
+        {op: true, e: 2, a: 'score', v: 60},
+        {op: true, e: 3, a: 'score', v: 70},
       ]);
 
-      // Update entity 1's score (assert adds a new value, doesn't replace)
-      await db.transact([{op: 'assert', e: 1, a: 'score', v: 90}]);
+      // Update entity 1's score (true adds a new value, doesn't replace)
+      await db.transact([{op: true, e: 1, a: 'score', v: 90}]);
 
       const query: DatalogQuery = {
         find: {
@@ -178,8 +178,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle variance and stddev with two identical values', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 10},
-        {op: 'assert', e: 2, a: 'value', v: 10},
+        {op: true, e: 1, a: 'value', v: 10},
+        {op: true, e: 2, a: 'value', v: 10},
       ]);
 
       const query: DatalogQuery = {
@@ -200,8 +200,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle median with two values', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 10},
-        {op: 'assert', e: 2, a: 'value', v: 20},
+        {op: true, e: 1, a: 'value', v: 10},
+        {op: true, e: 2, a: 'value', v: 20},
       ]);
 
       const query: DatalogQuery = {
@@ -217,18 +217,18 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(results[0]?.median).toBe(15);
     });
 
-    test('should handle aggregations with single value after retractions', async () => {
+    test('should handle aggregations with single value after falseions', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'price', v: 100},
-        {op: 'assert', e: 2, a: 'price', v: 200},
-        {op: 'assert', e: 3, a: 'price', v: 300},
+        {op: true, e: 1, a: 'price', v: 100},
+        {op: true, e: 2, a: 'price', v: 200},
+        {op: true, e: 3, a: 'price', v: 300},
       ]);
 
-      // Retract two values
+      // false two values
       await db.transact([
-        {op: 'retract', e: 1, a: 'price', v: 100},
-        {op: 'retract', e: 3, a: 'price', v: 300},
+        {op: false, e: 1, a: 'price', v: 100},
+        {op: false, e: 3, a: 'price', v: 300},
       ]);
 
       const query: DatalogQuery = {

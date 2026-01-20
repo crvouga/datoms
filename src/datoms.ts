@@ -26,13 +26,13 @@ export type Attribute = string;
  *
  * @example
  * // Valid values in datoms:
- * { e: 1, a: "name", v: "Alice", op: "assert" }                    // string
- * { e: 1, a: "age", v: 30, op: "assert" }                          // number
- * { e: 1, a: "active", v: true, op: "assert" }                      // boolean
- * { e: 1, a: "middleName", v: null, op: "assert" }                 // null
- * { e: 1, a: "optional", v: undefined, op: "assert" }              // undefined
- * { e: 1, a: "parent", v: 42, op: "assert" }                       // EntityId (number)
- * { e: 1, a: "owner", v: "user-123", op: "assert" }               // EntityId (string)
+ * { e: 1, a: "name", v: "Alice", op: true }                    // string
+ * { e: 1, a: "age", v: 30, op: true }                          // number
+ * { e: 1, a: "active", v: true, op: true }                      // boolean
+ * { e: 1, a: "middleName", v: null, op: true }                 // null
+ * { e: 1, a: "optional", v: undefined, op: true }              // undefined
+ * { e: 1, a: "parent", v: 42, op: true }                       // EntityId (number)
+ * { e: 1, a: "owner", v: "user-123", op: true }               // EntityId (string)
  */
 export type Value = string | number | boolean | null | undefined | EntityId;
 
@@ -65,38 +65,38 @@ export function value(v: unknown): Value {
  */
 export type TransactionId = number;
 
-export type DatomOperation = 'assert' | 'retract';
+export type DatomOperation = true | false;
 
 /**
- * A datom represents a fact: { e: entity, a: attribute, v: value, tx: transaction, op: "assert" | "retract" }
+ * A datom represents a fact: { e: entity, a: attribute, v: value, tx: transaction, op: true | false }
  * This is the fundamental unit of data in a datalog database
  */
 export type Datom = {
   /** The entity this datom describes */
   e: EntityId;
-  /** The attribute being asserted */
+  /** The attribute being trueed */
   a: Attribute;
   /** The value of the attribute */
   v: Value;
   /** The transaction ID when this datom was added */
   tx: TransactionId;
-  /** The operation type (assert or retract) */
+  /** The operation type (true or false) */
   op: DatomOperation;
 };
 
 /**
- * A partial datom for asserting/retracting facts (without tx)
+ * A partial datom for trueing/falseing facts (without tx)
  * Object format: { e: entity, a: attribute, v: value, op: operation }
  * This is more efficient and aligns with the fixed EAV structure
  */
 export type DatomInput = {
   /** The entity this datom describes */
   e: EntityId;
-  /** The attribute being asserted */
+  /** The attribute being trueed */
   a: Attribute;
   /** The value of the attribute */
   v: Value;
-  /** The operation type (assert or retract) */
+  /** The operation type (true or false) */
   op: DatomOperation;
 };
 
@@ -104,14 +104,14 @@ export type DatomInput = {
  * Converts records with an `entityId` property into an array of `DatomInput` objects.
  *
  * This utility function simplifies the creation of datoms from object records by automatically
- * converting each property (except `entityId`) into a datom with `op: "assert"`.
+ * converting each property (except `entityId`) into a datom with `op: true`.
  *
  * **Features:**
  * - Accepts variadic arguments (multiple records or arrays of records)
  * - Flattens nested arrays automatically
  * - Converts each property to a datom attribute-value pair
  * - Uses the record's `entityId` as the entity ID for all generated datoms
- * - Sets operation to `"assert"` for all generated datoms
+ * - Sets operation to `true` for all generated datoms
  *
  * **Type Safety:**
  * - Requires records to have an `entityId` property of type `EntityId`
@@ -132,10 +132,10 @@ export type DatomInput = {
  * });
  * // Returns:
  * // [
- * //   { e: 1, a: "entityId", v: 1, op: "assert" },
- * //   { e: 1, a: "name", v: "Alice", op: "assert" },
- * //   { e: 1, a: "age", v: 30, op: "assert" },
- * //   { e: 1, a: "active", v: true, op: "assert" }
+ * //   { e: 1, a: "entityId", v: 1, op: true },
+ * //   { e: 1, a: "name", v: "Alice", op: true },
+ * //   { e: 1, a: "age", v: 30, op: true },
+ * //   { e: 1, a: "active", v: true, op: true }
  * // ]
  *
  * @example
@@ -216,7 +216,7 @@ export function datoms<T extends Record<string, unknown>>(
             e: template.e(r as T),
             a: key,
             v: value as Value,
-            op: template.op ?? 'assert',
+            op: template.op ?? true,
           });
         }
         return datoms;
@@ -239,7 +239,7 @@ export function datoms<T extends Record<string, unknown>>(
           e: entityId,
           a: key,
           v: value as Value,
-          op: 'assert',
+          op: true,
         });
       }
       return datoms;
@@ -276,25 +276,25 @@ export function datoms<T extends Record<string, unknown>>(
  * @example
  * // Single entity from datoms
  * const result = records(
- *   { e: 1, a: "name", v: "Alice", op: "assert" },
- *   { e: 1, a: "age", v: 30, op: "assert" }
+ *   { e: 1, a: "name", v: "Alice", op: true },
+ *   { e: 1, a: "age", v: 30, op: true }
  * );
  * // Returns: [{ name: "Alice", age: 30 }]
  *
  * @example
  * // Multiple entities
  * const result = records(
- *   { e: 1, a: "name", v: "Alice", op: "assert" },
- *   { e: 2, a: "name", v: "Bob", op: "assert" }
+ *   { e: 1, a: "name", v: "Alice", op: true },
+ *   { e: 2, a: "name", v: "Bob", op: true }
  * );
  * // Returns: [{ name: "Alice" }, { name: "Bob" }]
  *
  * @example
  * // Array of datoms
  * const datoms = [
- *   { e: 1, a: "name", v: "Alice", op: "assert" },
- *   { e: 1, a: "age", v: 30, op: "assert" },
- *   { e: 2, a: "name", v: "Bob", op: "assert" }
+ *   { e: 1, a: "name", v: "Alice", op: true },
+ *   { e: 1, a: "age", v: 30, op: true },
+ *   { e: 2, a: "name", v: "Bob", op: true }
  * ];
  * const result = records(datoms);
  * // Returns: [{ name: "Alice", age: 30 }, { name: "Bob" }]
@@ -302,10 +302,10 @@ export function datoms<T extends Record<string, unknown>>(
  * @example
  * // Mixed datoms and arrays
  * const result = records(
- *   { e: 1, a: "name", v: "Alice", op: "assert" },
+ *   { e: 1, a: "name", v: "Alice", op: true },
  *   [
- *     { e: 2, a: "name", v: "Bob", op: "assert" },
- *     { e: 3, a: "name", v: "Charlie", op: "assert" }
+ *     { e: 2, a: "name", v: "Bob", op: true },
+ *     { e: 3, a: "name", v: "Charlie", op: true }
  *   ]
  * );
  * // Returns: [{ name: "Alice" }, { name: "Bob" }, { name: "Charlie" }]

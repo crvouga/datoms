@@ -20,12 +20,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should aggregate values across joined entities', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Product A'},
-        {op: 'assert', e: 1, a: 'price', v: 100},
-        {op: 'assert', e: 2, a: 'name', v: 'Product B'},
-        {op: 'assert', e: 2, a: 'price', v: 200},
-        {op: 'assert', e: 3, a: 'name', v: 'Product C'},
-        {op: 'assert', e: 3, a: 'price', v: 300},
+        {op: true, e: 1, a: 'name', v: 'Product A'},
+        {op: true, e: 1, a: 'price', v: 100},
+        {op: true, e: 2, a: 'name', v: 'Product B'},
+        {op: true, e: 2, a: 'price', v: 200},
+        {op: true, e: 3, a: 'name', v: 'Product C'},
+        {op: true, e: 3, a: 'price', v: 300},
       ]);
 
       const query: DatalogQuery = {
@@ -50,14 +50,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should aggregate with relationship joins', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Order 1'},
-        {op: 'assert', e: 1, a: 'customer', v: 10},
-        {op: 'assert', e: 2, a: 'name', v: 'Order 2'},
-        {op: 'assert', e: 2, a: 'customer', v: 10},
-        {op: 'assert', e: 3, a: 'name', v: 'Order 3'},
-        {op: 'assert', e: 3, a: 'customer', v: 20},
-        {op: 'assert', e: 10, a: 'name', v: 'Customer A'},
-        {op: 'assert', e: 20, a: 'name', v: 'Customer B'},
+        {op: true, e: 1, a: 'name', v: 'Order 1'},
+        {op: true, e: 1, a: 'customer', v: 10},
+        {op: true, e: 2, a: 'name', v: 'Order 2'},
+        {op: true, e: 2, a: 'customer', v: 10},
+        {op: true, e: 3, a: 'name', v: 'Order 3'},
+        {op: true, e: 3, a: 'customer', v: 20},
+        {op: true, e: 10, a: 'name', v: 'Customer A'},
+        {op: true, e: 20, a: 'name', v: 'Customer B'},
       ]);
 
       const query: DatalogQuery = {
@@ -80,15 +80,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should aggregate with multiple join conditions', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'type', v: 'product'},
-        {op: 'assert', e: 1, a: 'category', v: 'electronics'},
-        {op: 'assert', e: 1, a: 'price', v: 100},
-        {op: 'assert', e: 2, a: 'type', v: 'product'},
-        {op: 'assert', e: 2, a: 'category', v: 'electronics'},
-        {op: 'assert', e: 2, a: 'price', v: 200},
-        {op: 'assert', e: 3, a: 'type', v: 'product'},
-        {op: 'assert', e: 3, a: 'category', v: 'clothing'},
-        {op: 'assert', e: 3, a: 'price', v: 50},
+        {op: true, e: 1, a: 'type', v: 'product'},
+        {op: true, e: 1, a: 'category', v: 'electronics'},
+        {op: true, e: 1, a: 'price', v: 100},
+        {op: true, e: 2, a: 'type', v: 'product'},
+        {op: true, e: 2, a: 'category', v: 'electronics'},
+        {op: true, e: 2, a: 'price', v: 200},
+        {op: true, e: 3, a: 'type', v: 'product'},
+        {op: true, e: 3, a: 'category', v: 'clothing'},
+        {op: true, e: 3, a: 'price', v: 50},
       ]);
 
       const query: DatalogQuery = {
@@ -114,14 +114,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should aggregate with self-joins', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Parent'},
-        {op: 'assert', e: 1, a: 'value', v: 100},
-        {op: 'assert', e: 2, a: 'name', v: 'Child 1'},
-        {op: 'assert', e: 2, a: 'parent', v: 1},
-        {op: 'assert', e: 2, a: 'value', v: 50},
-        {op: 'assert', e: 3, a: 'name', v: 'Child 2'},
-        {op: 'assert', e: 3, a: 'parent', v: 1},
-        {op: 'assert', e: 3, a: 'value', v: 75},
+        {op: true, e: 1, a: 'name', v: 'Parent'},
+        {op: true, e: 1, a: 'value', v: 100},
+        {op: true, e: 2, a: 'name', v: 'Child 1'},
+        {op: true, e: 2, a: 'parent', v: 1},
+        {op: true, e: 2, a: 'value', v: 50},
+        {op: true, e: 3, a: 'name', v: 'Child 2'},
+        {op: true, e: 3, a: 'parent', v: 1},
+        {op: true, e: 3, a: 'value', v: 75},
       ]);
 
       const query: DatalogQuery = {
@@ -147,8 +147,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle aggregations with empty joins', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Product A'},
-        {op: 'assert', e: 1, a: 'price', v: 100},
+        {op: true, e: 1, a: 'name', v: 'Product A'},
+        {op: true, e: 1, a: 'price', v: 100},
       ]);
 
       const query: DatalogQuery = {

@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should query database state at specific transaction ID', async () => {
       const {db} = f;
       // Add datoms in sequence
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      const tx2 = await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
-      const tx3 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice Updated'}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      const tx2 = await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
+      const tx3 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice Updated'}]);
 
       // Query at tx1 - should only see name
       const {data: atTx1} = await db.asOf(tx1).datoms({e: 1});
@@ -46,9 +46,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle subs in time-travel queries', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      const tx2 = await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
-      const tx3 = await db.transact([{op: 'retract', e: 1, a: 'age', v: 30}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      const tx2 = await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
+      const tx3 = await db.transact([{op: false, e: 1, a: 'age', v: 30}]);
 
       // Query at tx2 - should see both name and age
       const {data: atTx2} = await db.asOf(tx2).datoms({e: 1});
@@ -62,9 +62,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should query full history of changes', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice Updated'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice Updated'}]);
+      await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
 
       // Query history - should return all changes
       const {data: history} = await db.history().datoms({
@@ -80,8 +80,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should get entity at specific transaction', async () => {
       const {db} = f;
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      const tx2 = await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      const tx2 = await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
 
       const {data: entityAtTx1} = await db.asOf(tx1).datoms({e: 1});
       expect(entityAtTx1).toHaveLength(1);
@@ -93,8 +93,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should get value at specific transaction', async () => {
       const {db} = f;
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Bob'}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Bob'}]);
 
       const {data: nameAtTx1Results} = await db.asOf(tx1).query({
         find: {name: ['?v']},
@@ -106,10 +106,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should support time-travel in datalog queries', async () => {
       const {db} = f;
       const tx1 = await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
-      const tx2 = await db.transact([{op: 'assert', e: 3, a: 'name', v: 'Charlie'}]);
+      const tx2 = await db.transact([{op: true, e: 3, a: 'name', v: 'Charlie'}]);
 
       // Query at tx1 - should only see Alice and Bob
       const queryAtTx1: DatalogQuery = {
@@ -134,10 +134,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle time-travel queries within transactions', async () => {
       const {db} = f;
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       // Use with() to see what adding age would look like
-      const withResult = await db.with([{op: 'assert', e: 1, a: 'age', v: 30}]);
+      const withResult = await db.with([{op: true, e: 1, a: 'age', v: 30}]);
 
       // Query dbAfter - should see speculative age
       const {data: current} = await withResult.dbAfter.datoms({e: 1});
@@ -152,11 +152,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle complex time-travel scenario', async () => {
       const {db} = f;
       // Create a timeline of changes
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'status', v: 'pending'}]);
-      const tx2 = await db.transact([{op: 'assert', e: 1, a: 'status', v: 'processing'}]);
-      const tx3 = await db.transact([{op: 'assert', e: 1, a: 'status', v: 'completed'}]);
-      const tx4 = await db.transact([{op: 'retract', e: 1, a: 'status', v: 'completed'}]);
-      const tx5 = await db.transact([{op: 'assert', e: 1, a: 'status', v: 'failed'}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'status', v: 'pending'}]);
+      const tx2 = await db.transact([{op: true, e: 1, a: 'status', v: 'processing'}]);
+      const tx3 = await db.transact([{op: true, e: 1, a: 'status', v: 'completed'}]);
+      const tx4 = await db.transact([{op: false, e: 1, a: 'status', v: 'completed'}]);
+      const tx5 = await db.transact([{op: true, e: 1, a: 'status', v: 'failed'}]);
 
       // Verify state at each transaction
       const {data: atTx1Results} = await db.asOf(tx1).query({
@@ -201,25 +201,25 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should sub all datoms for an entity', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
-        {op: 'assert', e: 1, a: 'email', v: 'alice@example.com'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
+        {op: true, e: 1, a: 'email', v: 'alice@example.com'},
       ]);
 
-      const {data: before} = await db.datoms({e: 1, op: 'assert'});
+      const {data: before} = await db.datoms({e: 1, op: true});
       expect(before).toHaveLength(3);
 
       const {data: entityDatoms} = await db.datoms({e: 1});
       const tx = await db.transact(
         entityDatoms.map(d => ({
-          op: 'retract' as const,
+          op: false,
           e: d.e,
           a: d.a,
           v: d.v,
         })),
       );
 
-      const {data: after} = await db.datoms({e: 1, op: 'assert'});
+      const {data: after} = await db.datoms({e: 1, op: true});
       expect(after).toHaveLength(0);
 
       // Verify transaction ID was returned
@@ -230,8 +230,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should sub entity within transaction', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
       ]);
 
       const {data: entityDatoms} = await db.datoms({e: 1});
@@ -239,7 +239,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Use with() to see what subion would look like
       const withResult = await db.with(
         entityDatoms.map(d => ({
-          op: 'retract' as const,
+          op: false,
           e: d.e,
           a: d.a,
           v: d.v,
@@ -247,45 +247,45 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       );
       const {data: during} = await withResult.dbAfter.datoms({
         e: 1,
-        op: 'assert',
+        op: true,
       });
       expect(during).toHaveLength(0);
 
       // Now commit the subion
       await db.transact(
         entityDatoms.map(d => ({
-          op: 'retract' as const,
+          op: false,
           e: d.e,
           a: d.a,
           v: d.v,
         })),
       );
 
-      const {data: after} = await db.datoms({e: 1, op: 'assert'});
+      const {data: after} = await db.datoms({e: 1, op: true});
       expect(after).toHaveLength(0);
     });
 
     test('should execute bulk operations atomically with transact', async () => {
       const {db} = f;
       const tx = await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'retract', e: 3, a: 'name', v: 'Charlie'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: false, e: 3, a: 'name', v: 'Charlie'},
       ]);
 
       expect(typeof tx).toBe('number');
       expect(tx).toBeGreaterThan(0);
 
-      const {data: alice} = await db.datoms({e: 1, op: 'assert'});
+      const {data: alice} = await db.datoms({e: 1, op: true});
       expect(alice).toHaveLength(1);
       expect(alice[0]?.v).toBe('Alice');
 
-      const {data: bob} = await db.datoms({e: 2, op: 'assert'});
+      const {data: bob} = await db.datoms({e: 2, op: true});
       expect(bob).toHaveLength(1);
       expect(bob[0]?.v).toBe('Bob');
 
       // Charlie should not exist (or was sub if existed)
-      const {data: charlie} = await db.datoms({e: 3, op: 'assert'});
+      const {data: charlie} = await db.datoms({e: 3, op: true});
       expect(charlie).toHaveLength(0);
     });
 
@@ -293,32 +293,32 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       // Use with() to see what adding would look like
       const withResult = await db.with([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
       ]);
 
       const {data: entity} = await withResult.dbAfter.datoms({
         e: 1,
-        op: 'assert',
+        op: true,
       });
       expect(entity).toHaveLength(2);
 
       // Now commit the changes
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
       ]);
 
-      await db.datoms({e: 1, op: 'assert'});
+      await db.datoms({e: 1, op: true});
       expect(entity).toHaveLength(2);
     });
 
     test('should query history with history flag', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Bob'}]);
-      await db.transact([{op: 'retract', e: 1, a: 'name', v: 'Bob'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Charlie'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Bob'}]);
+      await db.transact([{op: false, e: 1, a: 'name', v: 'Bob'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Charlie'}]);
 
       const {data: history} = await db.history().datoms({
         e: 1,
@@ -331,7 +331,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(txs).toEqual([...txs].sort((a, b) => a - b));
 
       // Should include subions
-      const subions = history.filter(d => d.op === 'retract');
+      const subions = history.filter(d => d.op === false);
       expect(subions.length).toBeGreaterThan(0);
     });
 
@@ -354,10 +354,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should query changes since a specific transaction ID', async () => {
       const {db} = f;
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      const tx2 = await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
-      const tx3 = await db.transact([{op: 'assert', e: 2, a: 'name', v: 'Bob'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice Updated'}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      const tx2 = await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
+      const tx3 = await db.transact([{op: true, e: 2, a: 'name', v: 'Bob'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice Updated'}]);
 
       // Query changes since tx1 - should see age and Bob and updated name
       const {data: sinceTx1} = await db.since(tx1).datoms({limit: 100});
@@ -378,10 +378,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle subions in since queries', async () => {
       const {db} = f;
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
-      await db.transact([{op: 'retract', e: 1, a: 'age', v: 30}]);
-      await db.transact([{op: 'assert', e: 1, a: 'email', v: 'alice@example.com'}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
+      await db.transact([{op: false, e: 1, a: 'age', v: 30}]);
+      await db.transact([{op: true, e: 1, a: 'email', v: 'alice@example.com'}]);
 
       // Query changes since tx1 - should see age, subion, and email
       const {data: sinceTx1} = await db.since(tx1).datoms({e: 1});
@@ -395,11 +395,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should support since queries in datalog', async () => {
       const {db} = f;
       const tx1 = await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
-      const tx2 = await db.transact([{op: 'assert', e: 3, a: 'name', v: 'Charlie'}]);
-      await db.transact([{op: 'assert', e: 4, a: 'name', v: 'David'}]);
+      const tx2 = await db.transact([{op: true, e: 3, a: 'name', v: 'Charlie'}]);
+      await db.transact([{op: true, e: 4, a: 'name', v: 'David'}]);
 
       // Query changes since tx1
       const querySinceTx1: DatalogQuery = {
@@ -424,10 +424,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle since queries with filters', async () => {
       const {db} = f;
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      const tx2 = await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
-      await db.transact([{op: 'assert', e: 2, a: 'name', v: 'Bob'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice Updated'}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      const tx2 = await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
+      await db.transact([{op: true, e: 2, a: 'name', v: 'Bob'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice Updated'}]);
 
       // Query changes since tx1 for entity 1 only
       const {data: sinceTx1Entity1} = await db.since(tx1).datoms({e: 1});
@@ -447,8 +447,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle since queries with no changes', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      const tx2 = await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      const tx2 = await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
 
       // Query changes since tx2 - should be empty (no changes after tx2)
       const {data: sinceTx2} = await db.since(tx2).datoms({e: 1});
@@ -457,7 +457,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle asOf queries at transaction ID 0', async () => {
       const {db} = f;
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       // Query at tx 0 (before any transactions) - should return empty
       const {data: atTx0} = await db.asOf(0).datoms({e: 1});
@@ -470,9 +470,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle asOf queries with tx filter', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      const tx2 = await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
-      const tx3 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Bob'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      const tx2 = await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
+      const tx3 = await db.transact([{op: true, e: 1, a: 'name', v: 'Bob'}]);
 
       // Query at tx3 but filter to only tx2 datoms - should return empty
       // (tx2 datoms are before tx3, but the tx filter restricts to exactly tx2)
@@ -486,10 +486,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle history queries with pagination', async () => {
       const {db} = f;
       // Create multiple changes
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Bob'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Charlie'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'David'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Bob'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Charlie'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'David'}]);
 
       await db.history().datoms({
         e: 1,
@@ -517,10 +517,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle asOf queries with pagination', async () => {
       const {db} = f;
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
-      await db.transact([{op: 'assert', e: 1, a: 'email', v: 'alice@example.com'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'phone', v: '123-456-7890'}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
+      await db.transact([{op: true, e: 1, a: 'email', v: 'alice@example.com'}]);
+      await db.transact([{op: true, e: 1, a: 'phone', v: '123-456-7890'}]);
 
       await db.asOf(tx1).datoms({e: 1});
       const {data: limited} = await db.asOf(tx1).datoms({
@@ -532,10 +532,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle since queries with pagination', async () => {
       const {db} = f;
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
-      await db.transact([{op: 'assert', e: 1, a: 'email', v: 'alice@example.com'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'phone', v: '123-456-7890'}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
+      await db.transact([{op: true, e: 1, a: 'email', v: 'alice@example.com'}]);
+      await db.transact([{op: true, e: 1, a: 'phone', v: '123-456-7890'}]);
 
       const {data: allSince} = await db.since(tx1).datoms({e: 1});
       expect(allSince.length).toBeGreaterThanOrEqual(3);
@@ -549,10 +549,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle multi-valued attributes in time-travel queries', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'tag', v: 'red'}]);
-      const tx2 = await db.transact([{op: 'assert', e: 1, a: 'tag', v: 'blue'}]);
-      const tx3 = await db.transact([{op: 'assert', e: 1, a: 'tag', v: 'green'}]);
-      const tx4 = await db.transact([{op: 'retract', e: 1, a: 'tag', v: 'blue'}]);
+      await db.transact([{op: true, e: 1, a: 'tag', v: 'red'}]);
+      const tx2 = await db.transact([{op: true, e: 1, a: 'tag', v: 'blue'}]);
+      const tx3 = await db.transact([{op: true, e: 1, a: 'tag', v: 'green'}]);
+      const tx4 = await db.transact([{op: false, e: 1, a: 'tag', v: 'blue'}]);
 
       // Note: asOf deduplicates by (entity, attribute), returning the latest value per attribute
       // Query at tx2 - should see "blue" (latest tag value at tx2)
@@ -600,7 +600,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         a: 'tag',
       });
       const historyValuesAtTx2 = historyAtTx2
-        .filter(d => d.tx <= tx2 && d.op === 'assert')
+        .filter(d => d.tx <= tx2 && d.op === true)
         .map(d => d.v);
       expect(historyValuesAtTx2).toContain('red');
       expect(historyValuesAtTx2).toContain('blue');
@@ -608,9 +608,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle time-travel queries with reference values', async () => {
       const {db} = f;
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'parent', v: 10}]);
-      await db.transact([{op: 'assert', e: 1, a: 'parent', v: 20}]);
-      await db.transact([{op: 'assert', e: 2, a: 'parent', v: 10}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'parent', v: 10}]);
+      await db.transact([{op: true, e: 1, a: 'parent', v: 20}]);
+      await db.transact([{op: true, e: 2, a: 'parent', v: 10}]);
 
       // Query at tx1
       const {data: atTx1Results} = await db.asOf(tx1).query({
@@ -641,8 +641,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle since queries starting from transaction 0', async () => {
       const {db} = f;
-      const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
+      const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
 
       // Query changes since tx 0 - should see all changes
       const {data: sinceTx0} = await db.since(0).datoms({e: 1});
@@ -658,16 +658,16 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       // Create initial state
       await db.transact([
-        {op: 'assert', e: 1, a: 'status', v: 'pending'},
-        {op: 'assert', e: 2, a: 'status', v: 'pending'},
+        {op: true, e: 1, a: 'status', v: 'pending'},
+        {op: true, e: 2, a: 'status', v: 'pending'},
       ]);
       const tx2 = await db.transact([
-        {op: 'assert', e: 1, a: 'status', v: 'processing'},
-        {op: 'assert', e: 3, a: 'status', v: 'pending'},
+        {op: true, e: 1, a: 'status', v: 'processing'},
+        {op: true, e: 3, a: 'status', v: 'pending'},
       ]);
-      const tx3 = await db.transact([{op: 'assert', e: 1, a: 'status', v: 'completed'}]);
-      await db.transact([{op: 'retract', e: 1, a: 'status', v: 'completed'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'status', v: 'failed'}]);
+      const tx3 = await db.transact([{op: true, e: 1, a: 'status', v: 'completed'}]);
+      await db.transact([{op: false, e: 1, a: 'status', v: 'completed'}]);
+      await db.transact([{op: true, e: 1, a: 'status', v: 'failed'}]);
 
       // Query changes since tx2
       const {data: sinceTx2} = await db.since(tx2).datoms({a: 'status'});
@@ -688,9 +688,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle asOf queries with future transaction IDs', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      await db.transact([{op: 'assert', e: 1, a: 'age', v: 30}]);
-      const tx3 = await db.transact([{op: 'assert', e: 2, a: 'name', v: 'Bob'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
+      const tx3 = await db.transact([{op: true, e: 2, a: 'name', v: 'Bob'}]);
 
       // Get the latest transaction ID
       const latestTx = await db._getLatestTransaction();

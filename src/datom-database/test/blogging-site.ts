@@ -73,9 +73,9 @@ export const POST_ACCESS_CONTROL: Hook = {
     for (const postId of postEntities) {
       const entityDatoms = postDatoms.filter(d => d.e === postId);
       const entityRecords = records(entityDatoms);
-      if (entityRecords.length > 0) {
-        // biome-ignore lint/style/noNonNullAssertion: length check guarantees element exists
-        postData.set(postId, entityRecords[0]!);
+      const firstRecord = entityRecords[0];
+      if (firstRecord) {
+        postData.set(postId, firstRecord);
       }
     }
 
@@ -169,19 +169,19 @@ export const POST_VALIDATOR: Hook = {
       const finalHasAuthor = hasAuthor || existingHasAuthor;
       const finalHasStatus = hasStatus || existingHasStatus;
 
-      validator.assert(
+      validator.true(
         finalHasTitle,
         'Post must have a title',
         'MISSING_TITLE',
         postDatoms.find(d => d.e === postId),
       );
-      validator.assert(
+      validator.true(
         finalHasAuthor,
         'Post must have an author',
         'MISSING_AUTHOR',
         postDatoms.find(d => d.e === postId),
       );
-      validator.assert(
+      validator.true(
         finalHasStatus,
         'Post must have a status',
         'MISSING_STATUS',
@@ -210,7 +210,7 @@ export const AUTHOR_VALIDATOR: Hook = {
 
     // Find all post author assignments
     for (const datom of tx.datoms) {
-      if (datom.a === POST_AUTHOR && datom.op === 'assert') {
+      if (datom.a === POST_AUTHOR && datom.op === true) {
         const authorId = datom.v as number;
         const {data: authorDatoms} = await db.datoms({e: authorId});
         const authorRecord = records(authorDatoms)[0] || {};
@@ -218,7 +218,7 @@ export const AUTHOR_VALIDATOR: Hook = {
         const isAuthor = userType === USER_TYPE_AUTHOR;
         const isAdmin = userType === USER_TYPE_ADMIN;
 
-        validator.assert(
+        validator.true(
           isAuthor || isAdmin,
           `User ${authorId} is not an author or admin`,
           'INVALID_AUTHOR',

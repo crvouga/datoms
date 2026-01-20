@@ -20,8 +20,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should execute simple query', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
 
       const query: DatalogQuery = {
@@ -53,9 +53,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should filter by constant in where clause', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'type', v: 'person'},
-        {op: 'assert', e: 2, a: 'type', v: 'car'},
-        {op: 'assert', e: 3, a: 'type', v: 'person'},
+        {op: true, e: 1, a: 'type', v: 'person'},
+        {op: true, e: 2, a: 'type', v: 'car'},
+        {op: true, e: 3, a: 'type', v: 'person'},
       ]);
 
       const query: DatalogQuery = {
@@ -70,8 +70,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle empty find clause', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
 
       const query: DatalogQuery = {
@@ -82,15 +82,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2);
       // Empty find should return all variables from where clause
-      // biome-ignore lint/style/noNonNullAssertion: results[0] is guaranteed to exist after length check
-      expect(Object.keys(results[0]!).length).toBeGreaterThan(0);
+      expect(Object.keys(results[0] ?? {}).length).toBeGreaterThan(0);
     });
 
     test('should handle find variables not in where clause', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
 
       const query: DatalogQuery = {

@@ -1,7 +1,7 @@
 import {expect} from 'bun:test';
 
 /**
- * Asserts that an array of objects is ordered by a specified field,
+ * trues that an array of objects is ordered by a specified field,
  * in either ascending ("asc") or descending ("desc") order.
  * If a `limit` is provided, only checks the first `limit` results.
  *
@@ -11,7 +11,7 @@ import {expect} from 'bun:test';
  * @param {"asc" | "desc"} direction - The order to check: "asc" for ascending, "desc" for descending.
  * @param {number} [limit] - Optional limit for the number of items to check. If not provided, checks entire array.
  *
- * @throws AssertionError If the order of elements does not match the expected direction.
+ * @throws trueionError If the order of elements does not match the expected direction.
  */
 export function expectOrderedBy<T extends Record<string, unknown>>(
   results: T[],

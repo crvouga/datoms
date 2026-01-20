@@ -28,7 +28,7 @@ declare global {
    * @example
    * // Transact data
    * await db.transact([
-   *   { op: "assert", e: 1, a: "name", v: "Alice" }
+   *   { op: true, e: 1, a: "name", v: "Alice" }
    * ]);
    */
   const db: DatomDatabase;

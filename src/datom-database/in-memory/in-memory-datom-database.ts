@@ -106,7 +106,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     for (const op of ops.flat()) {
       const datom = {e: op.e, a: op.a, v: op.v, op: op.op};
 
-      if (op.op === 'assert') {
+      if (op.op === true) {
         // Validate add, accounting for subs already processed
         await this._validateDatoms([datom], true, subs);
         adds.push(datom);
@@ -129,7 +129,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
         a: sub.a,
         v: sub.v,
         tx: txId,
-        op: 'retract',
+        op: false,
       });
     }
 
@@ -139,7 +139,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
         a: add.a,
         v: add.v,
         tx: txId,
-        op: 'assert',
+        op: true,
       });
     }
 
@@ -351,8 +351,8 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       }
     }
 
-    // Filter out sub datoms (keep only op: "assert")
-    results = Array.from(deduplicated.values()).filter(d => d.op === 'assert');
+    // Filter out sub datoms (keep only op: true)
+    results = Array.from(deduplicated.values()).filter(d => d.op === true);
 
     // Apply pagination
     const offset = options.offset ?? 0;
@@ -440,8 +440,8 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       }
     }
 
-    // Filter out sub datoms (keep only op: "assert")
-    results = Array.from(deduplicated.values()).filter(d => d.op === 'assert');
+    // Filter out sub datoms (keep only op: true)
+    results = Array.from(deduplicated.values()).filter(d => d.op === true);
 
     // Apply pagination
     const offset = options.offset ?? 0;
@@ -456,7 +456,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get all base datoms using _executeHistoryQuery to bypass validation
-    // This returns all datoms including retracted ones, so we need to deduplicate
+    // This returns all datoms including falseed ones, so we need to deduplicate
     const allBaseDatoms = await this._executeHistoryQuery({});
 
     // Create a map of base datoms by (entity, attribute, value) for efficient lookup
@@ -470,8 +470,8 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       }
     }
 
-    // Filter to only asserted datoms (current state)
-    const currentStateDatoms = Array.from(baseMap.values()).filter(d => d.op === 'assert');
+    // Filter to only trueed datoms (current state)
+    const currentStateDatoms = Array.from(baseMap.values()).filter(d => d.op === true);
 
     // Create a map for merging with speculative changes
     const mergedMap = new Map<string, Datom>();
@@ -480,10 +480,10 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       mergedMap.set(key, datom);
     }
 
-    // Apply speculative datoms (retracts remove, asserts add/update)
+    // Apply speculative datoms (falses remove, trues add/update)
     for (const speculativeDatom of speculativeDatoms) {
       const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-      if (speculativeDatom.op === 'retract') {
+      if (speculativeDatom.op === false) {
         mergedMap.delete(key);
       } else {
         mergedMap.set(key, speculativeDatom);

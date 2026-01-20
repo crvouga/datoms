@@ -18,7 +18,7 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
   describe('timeoutMs option', () => {
     test('should complete query within timeout', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       const {data: results} = await db.datoms({
         e: 1,
@@ -30,7 +30,7 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
 
     test('should throw QueryTimeoutError when timeout exceeded', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       // Use a very short timeout - may or may not trigger depending on query speed
       try {
@@ -50,8 +50,8 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
     test('should work with other query options', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
       ]);
 
       const {data: results} = await db.datoms({
@@ -66,7 +66,7 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
     test('should work with pagination', async () => {
       const {db} = f;
       for (let i = 1; i <= 5; i++) {
-        await db.transact([{op: 'assert', e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.transact([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
       }
 
       const {data: results} = await db.datoms({

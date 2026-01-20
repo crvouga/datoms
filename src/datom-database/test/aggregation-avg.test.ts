@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate average of numeric values', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'age', v: 20},
-        {op: 'assert', e: 2, a: 'age', v: 30},
-        {op: 'assert', e: 3, a: 'age', v: 40},
+        {op: true, e: 1, a: 'age', v: 20},
+        {op: true, e: 2, a: 'age', v: 30},
+        {op: true, e: 3, a: 'age', v: 40},
       ]);
 
       const query: DatalogQuery = {
@@ -54,7 +54,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should calculate average of single value', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'score', v: 85}]);
+      await db.transact([{op: true, e: 1, a: 'score', v: 85}]);
 
       const query: DatalogQuery = {
         find: {average: ['avg', '?score']},
@@ -69,9 +69,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate average of decimal numbers', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'price', v: 10.5},
-        {op: 'assert', e: 2, a: 'price', v: 20.5},
-        {op: 'assert', e: 3, a: 'price', v: 30.0},
+        {op: true, e: 1, a: 'price', v: 10.5},
+        {op: true, e: 2, a: 'price', v: 20.5},
+        {op: true, e: 3, a: 'price', v: 30.0},
       ]);
 
       const query: DatalogQuery = {
@@ -87,9 +87,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate average with negative numbers', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 10},
-        {op: 'assert', e: 2, a: 'value', v: -5},
-        {op: 'assert', e: 3, a: 'value', v: 15},
+        {op: true, e: 1, a: 'value', v: 10},
+        {op: true, e: 2, a: 'value', v: -5},
+        {op: true, e: 3, a: 'value', v: 15},
       ]);
 
       const query: DatalogQuery = {
@@ -105,12 +105,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate average with filters', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'type', v: 'student'},
-        {op: 'assert', e: 1, a: 'score', v: 80},
-        {op: 'assert', e: 2, a: 'type', v: 'student'},
-        {op: 'assert', e: 2, a: 'score', v: 90},
-        {op: 'assert', e: 3, a: 'type', v: 'teacher'},
-        {op: 'assert', e: 3, a: 'score', v: 95},
+        {op: true, e: 1, a: 'type', v: 'student'},
+        {op: true, e: 1, a: 'score', v: 80},
+        {op: true, e: 2, a: 'type', v: 'student'},
+        {op: true, e: 2, a: 'score', v: 90},
+        {op: true, e: 3, a: 'type', v: 'teacher'},
+        {op: true, e: 3, a: 'score', v: 95},
       ]);
 
       const query: DatalogQuery = {
@@ -129,9 +129,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate average with duplicate values', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 10},
-        {op: 'assert', e: 2, a: 'value', v: 10},
-        {op: 'assert', e: 3, a: 'value', v: 10},
+        {op: true, e: 1, a: 'value', v: 10},
+        {op: true, e: 2, a: 'value', v: 10},
+        {op: true, e: 3, a: 'value', v: 10},
       ]);
 
       const query: DatalogQuery = {
@@ -147,9 +147,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate average with zero values', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 0},
-        {op: 'assert', e: 2, a: 'value', v: 0},
-        {op: 'assert', e: 3, a: 'value', v: 30},
+        {op: true, e: 1, a: 'value', v: 0},
+        {op: true, e: 2, a: 'value', v: 0},
+        {op: true, e: 3, a: 'value', v: 30},
       ]);
 
       const query: DatalogQuery = {
@@ -165,13 +165,13 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate average after updates', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'score', v: 50},
-        {op: 'assert', e: 2, a: 'score', v: 60},
-        {op: 'assert', e: 3, a: 'score', v: 70},
+        {op: true, e: 1, a: 'score', v: 50},
+        {op: true, e: 2, a: 'score', v: 60},
+        {op: true, e: 3, a: 'score', v: 70},
       ]);
 
-      // Update a value (assert adds a new value, doesn't replace)
-      await db.transact([{op: 'assert', e: 1, a: 'score', v: 80}]);
+      // Update a value (true adds a new value, doesn't replace)
+      await db.transact([{op: true, e: 1, a: 'score', v: 80}]);
 
       const query: DatalogQuery = {
         find: {average: ['avg', '?score']},

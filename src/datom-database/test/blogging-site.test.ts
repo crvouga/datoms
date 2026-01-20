@@ -178,7 +178,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Publish the post
       const now = new Date().toISOString();
       await db.transact([
-        {op: 'retract', e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT},
+        {op: false, e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT},
         ...datoms({
           entityId: 100,
           [POST_STATUS]: POST_STATUS_PUBLISHED,
@@ -223,8 +223,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Edit the post
       const now = new Date().toISOString();
       await db.transact([
-        {op: 'retract', e: 100, a: POST_TITLE, v: 'Original Title'},
-        {op: 'retract', e: 100, a: POST_CONTENT, v: 'Original Content'},
+        {op: false, e: 100, a: POST_TITLE, v: 'Original Title'},
+        {op: false, e: 100, a: POST_CONTENT, v: 'Original Content'},
         ...datoms({
           entityId: 100,
           [POST_TITLE]: 'Updated Title',
@@ -738,7 +738,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Edit post
       await db.transact([
-        {op: 'retract', e: 100, a: POST_CONTENT, v: 'Initial content'},
+        {op: false, e: 100, a: POST_CONTENT, v: 'Initial content'},
         ...datoms({
           entityId: 100,
           [POST_CONTENT]: 'Updated content',
@@ -755,7 +755,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Publish post
       await db.transact([
-        {op: 'retract', e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT},
+        {op: false, e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT},
         datoms({
           entityId: 100,
           [POST_STATUS]: POST_STATUS_PUBLISHED,
@@ -765,7 +765,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Verify final state
       const {data: results} = await db.query({
         find: {
-          e: ['?e'],
+          id: ['?e'],
           title: ['?title'],
           content: ['?content'],
           status: ['?status'],

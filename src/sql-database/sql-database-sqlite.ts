@@ -23,7 +23,7 @@ export class SQLiteSQLDatabase implements SQLDatabase {
   async query(sql: string, params?: SQLParams): Promise<DatabaseRow[]> {
     const stmt = this.db.prepare(sql);
     // Bun SQLite accepts positional parameters via spread operator
-    // Type assertion needed because SQLParams (unknown[]) is more permissive
+    // Type trueion needed because SQLParams (unknown[]) is more permissive
     // than Bun's strict SQLQueryBindings type, but runtime values are valid
     // @ts-expect-error - SQLParams is unknown[] but Bun expects specific types; values are valid at runtime
     const results = stmt.all(...(params || []));
@@ -33,7 +33,7 @@ export class SQLiteSQLDatabase implements SQLDatabase {
   async execute(sql: string, params?: SQLParams): Promise<void> {
     const stmt = this.db.prepare(sql);
     // Bun SQLite accepts positional parameters via spread operator
-    // Type assertion needed because SQLParams (unknown[]) is more permissive
+    // Type trueion needed because SQLParams (unknown[]) is more permissive
     // than Bun's strict SQLQueryBindings type, but runtime values are valid
     // @ts-expect-error - SQLParams is unknown[] but Bun expects specific types; values are valid at runtime
     stmt.run(...(params || []));

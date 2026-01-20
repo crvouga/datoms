@@ -20,7 +20,7 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
     test('should allow queries within limit', async () => {
       const {db} = f;
       for (let i = 1; i <= 5; i++) {
-        await db.transact([{op: 'assert', e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.transact([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
       }
 
       const {data: results} = await db.datoms({
@@ -34,7 +34,7 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
       const {db} = f;
       // Add more datoms than the limit
       for (let i = 1; i <= 10; i++) {
-        await db.transact([{op: 'assert', e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.transact([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
       }
 
       try {
@@ -52,7 +52,7 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
     test('should work with limit option', async () => {
       const {db} = f;
       for (let i = 1; i <= 10; i++) {
-        await db.transact([{op: 'assert', e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.transact([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
       }
 
       // limit should be applied first, then maxResultSize check
@@ -66,7 +66,7 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
 
     test('should work with filters', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       const {data: results} = await db.datoms({
         e: 1,

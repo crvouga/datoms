@@ -719,10 +719,10 @@ export class HttpClientDatomDatabase implements DatomDatabase {
       mergedMap.set(key, datom);
     }
 
-    // Apply speculative datoms (retracts remove, asserts add/update)
+    // Apply speculative datoms (falses remove, trues add/update)
     for (const speculativeDatom of speculativeDatoms) {
       const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-      if (speculativeDatom.op === 'retract') {
+      if (speculativeDatom.op === false) {
         mergedMap.delete(key);
       } else {
         mergedMap.set(key, speculativeDatom);

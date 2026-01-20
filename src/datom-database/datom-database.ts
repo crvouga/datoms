@@ -119,19 +119,19 @@ export interface DatomDatabase extends DatabaseView {
 
   /**
    * Execute bulk operations atomically (Datomic-like transact)
-   * @param ops Array of operations, each specifying whether to assert or retract a datom
+   * @param ops Array of operations, each specifying whether to true or false a datom
    * @param metadata Optional metadata to associate with this transaction
    * @param context Optional context object for hooks (can contain any data)
    * @returns The transaction ID
    * @example
    * await db.transact([
-   *   { op: "assert", e: 300, a: "status", v: "active" },
-   *   { op: "retract", e: 42, a: "type", v: "cat" }
+   *   { op: true, e: 300, a: "status", v: "active" },
+   *   { op: false, e: 42, a: "type", v: "cat" }
    * ]);
    *
    * // With metadata and context
    * await db.transact(
-   *   [{ op: "assert", e: 300, a: "status", v: "active" }],
+   *   [{ op: true, e: 300, a: "status", v: "active" }],
    *   { userId: "alice", reason: "status_update" },
    *   { userId: "alice", syncSource: "client" }
    * );
@@ -200,8 +200,8 @@ export interface DatomDatabase extends DatabaseView {
    * @example
    * // Speculate on a transaction
    * const result = await db.with([
-   *   { op: "assert", e: 1, a: "name", v: "Alice" },
-   *   { op: "retract", e: 1, a: "oldName", v: "Bob" }
+   *   { op: true, e: 1, a: "name", v: "Alice" },
+   *   { op: false, e: 1, a: "oldName", v: "Bob" }
    * ]);
    *
    * // Query the speculative state
@@ -210,7 +210,7 @@ export interface DatomDatabase extends DatabaseView {
    * console.log(result.txData);
    *
    * // To actually commit, use transact()
-   * await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+   * await db.transact([{ op: true, e: 1, a: "name", v: "Alice" }]);
    */
   with(ops: DatomInput[]): Promise<WithResult>;
 

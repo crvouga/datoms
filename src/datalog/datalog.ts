@@ -91,8 +91,8 @@ export interface DatalogQuery<
   viewConfig?: ViewConfig;
 }
 
-export function datalog<
-    TKey extends keyof Record<string, DatalogQueryFindVariable> = string,
-  >(query: DatalogQuery<TKey>): DatalogQuery<TKey> {
-    return query;
-  }
+export function datalog<TKey extends keyof Record<string, DatalogQueryFindVariable> = string>(
+  query: DatalogQuery<TKey>,
+): DatalogQuery<TKey> {
+  return query;
+}

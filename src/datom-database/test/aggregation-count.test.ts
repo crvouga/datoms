@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should count all matching values', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'age', v: 25},
-        {op: 'assert', e: 2, a: 'age', v: 30},
-        {op: 'assert', e: 3, a: 'age', v: 35},
+        {op: true, e: 1, a: 'age', v: 25},
+        {op: true, e: 2, a: 'age', v: 30},
+        {op: true, e: 3, a: 'age', v: 35},
       ]);
 
       const {data: results} = await db.query({
@@ -47,7 +47,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should count single value', async () => {
       const {db} = f;
-      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
+      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       const query: DatalogQuery = {
         find: {total: ['count', '?name']},
@@ -62,9 +62,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should count with filters', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'type', v: 'person'},
-        {op: 'assert', e: 2, a: 'type', v: 'person'},
-        {op: 'assert', e: 3, a: 'type', v: 'car'},
+        {op: true, e: 1, a: 'type', v: 'person'},
+        {op: true, e: 2, a: 'type', v: 'person'},
+        {op: true, e: 3, a: 'type', v: 'car'},
       ]);
 
       const query: DatalogQuery = {
@@ -80,10 +80,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should count with multiple clauses', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 25},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 2, a: 'age', v: 30},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 25},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 2, a: 'age', v: 30},
       ]);
 
       const query: DatalogQuery = {
@@ -102,9 +102,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should count different data types', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 42},
-        {op: 'assert', e: 2, a: 'value', v: 'test'},
-        {op: 'assert', e: 3, a: 'value', v: true},
+        {op: true, e: 1, a: 'value', v: 42},
+        {op: true, e: 2, a: 'value', v: 'test'},
+        {op: true, e: 3, a: 'value', v: true},
       ]);
 
       const query: DatalogQuery = {
@@ -117,19 +117,19 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(results[0]?.total).toBe(3);
     });
 
-    test('should count after retractions', async () => {
+    test('should count after falseions', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'item', v: 'A'},
-        {op: 'assert', e: 2, a: 'item', v: 'B'},
-        {op: 'assert', e: 3, a: 'item', v: 'C'},
-        {op: 'assert', e: 4, a: 'item', v: 'D'},
+        {op: true, e: 1, a: 'item', v: 'A'},
+        {op: true, e: 2, a: 'item', v: 'B'},
+        {op: true, e: 3, a: 'item', v: 'C'},
+        {op: true, e: 4, a: 'item', v: 'D'},
       ]);
 
-      // Retract two items
+      // false two items
       await db.transact([
-        {op: 'retract', e: 2, a: 'item', v: 'B'},
-        {op: 'retract', e: 4, a: 'item', v: 'D'},
+        {op: false, e: 2, a: 'item', v: 'B'},
+        {op: false, e: 4, a: 'item', v: 'D'},
       ]);
 
       const query: DatalogQuery = {
@@ -145,12 +145,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should count with complex joins', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'order', v: 100},
-        {op: 'assert', e: 1, a: 'product', v: 1},
-        {op: 'assert', e: 2, a: 'order', v: 100},
-        {op: 'assert', e: 2, a: 'product', v: 2},
-        {op: 'assert', e: 3, a: 'order', v: 200},
-        {op: 'assert', e: 3, a: 'product', v: 1},
+        {op: true, e: 1, a: 'order', v: 100},
+        {op: true, e: 1, a: 'product', v: 1},
+        {op: true, e: 2, a: 'order', v: 100},
+        {op: true, e: 2, a: 'product', v: 2},
+        {op: true, e: 3, a: 'order', v: 200},
+        {op: true, e: 3, a: 'product', v: 1},
       ]);
 
       const query: DatalogQuery = {

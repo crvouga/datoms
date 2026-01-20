@@ -37,10 +37,10 @@
     "preview": "docker build --no-cache -t datoms-preview -f Dockerfile . && docker run --name datoms-preview --rm --env-file .env -p 8080:8080 datoms-preview",
     "psql": "psql postgresql://postgres:postgres@localhost:5434/postgres",
     "server": "bun --watch src/app/src/server.ts",
-    "test": "bun test",
+    "test": "bun test --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:fast": "FAST_TESTS=true bun test",
+    "test:fast": "FAST_TESTS=true bun test --coverage",
     "typecheck": "bun x tsgo --noEmit"
   },
   "dependencies": {

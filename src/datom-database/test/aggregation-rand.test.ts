@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should return N random values with replacement', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 10},
-        {op: 'assert', e: 2, a: 'value', v: 20},
-        {op: 'assert', e: 3, a: 'value', v: 30},
+        {op: true, e: 1, a: 'value', v: 10},
+        {op: true, e: 2, a: 'value', v: 20},
+        {op: true, e: 3, a: 'value', v: 30},
       ]);
 
       const query: DatalogQuery = {
@@ -57,9 +57,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should return single value when N=1', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 10},
-        {op: 'assert', e: 2, a: 'value', v: 20},
-        {op: 'assert', e: 3, a: 'value', v: 30},
+        {op: true, e: 1, a: 'value', v: 10},
+        {op: true, e: 2, a: 'value', v: 20},
+        {op: true, e: 3, a: 'value', v: 30},
       ]);
 
       const query: DatalogQuery = {
@@ -78,8 +78,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should allow duplicates (with replacement)', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'value', v: 10},
-        {op: 'assert', e: 2, a: 'value', v: 20},
+        {op: true, e: 1, a: 'value', v: 10},
+        {op: true, e: 2, a: 'value', v: 20},
       ]);
 
       const query: DatalogQuery = {
@@ -101,9 +101,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should work with string values', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 3, a: 'name', v: 'Charlie'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 3, a: 'name', v: 'Charlie'},
       ]);
 
       const query: DatalogQuery = {
@@ -124,12 +124,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should work with filters', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'type', v: 'product'},
-        {op: 'assert', e: 1, a: 'price', v: 100},
-        {op: 'assert', e: 2, a: 'type', v: 'product'},
-        {op: 'assert', e: 2, a: 'price', v: 200},
-        {op: 'assert', e: 3, a: 'type', v: 'service'},
-        {op: 'assert', e: 3, a: 'price', v: 50},
+        {op: true, e: 1, a: 'type', v: 'product'},
+        {op: true, e: 1, a: 'price', v: 100},
+        {op: true, e: 2, a: 'type', v: 'product'},
+        {op: true, e: 2, a: 'price', v: 200},
+        {op: true, e: 3, a: 'type', v: 'service'},
+        {op: true, e: 3, a: 'price', v: 50},
       ]);
 
       const query: DatalogQuery = {

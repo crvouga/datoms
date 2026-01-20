@@ -198,16 +198,17 @@ export class FileSystemDatomDatabase implements DatomDatabase {
           continue; // Skip malformed rows
         }
 
-        const [eStr, a, vStr, txStr, op] = fields;
-        if (!eStr || !a || vStr === undefined || !txStr || !op) {
+        const [eStr, a, vStr, txStr, opStr] = fields;
+        if (!eStr || !a || vStr === undefined || !txStr || !opStr) {
           continue; // Skip rows with missing fields
         }
 
         const e = this._parseEntityId(eStr);
         const v = this._parseValue(vStr);
         const tx = Number.parseInt(txStr, 10);
+        const op = opStr === 'true' ? true : opStr === 'false' ? false : null;
 
-        if (Number.isNaN(tx) || (op !== 'assert' && op !== 'retract')) {
+        if (Number.isNaN(tx) || op === null) {
           continue; // Skip invalid rows
         }
 

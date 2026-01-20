@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle variable in entity position', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 3, a: 'age', v: 30},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 3, a: 'age', v: 30},
       ]);
 
       const query: DatalogQuery = {
@@ -41,10 +41,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle variable in attribute position', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 2, a: 'city', v: 'NYC'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 2, a: 'city', v: 'NYC'},
       ]);
 
       const query: DatalogQuery = {
@@ -63,10 +63,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle all positions as variables', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 2, a: 'age', v: 25},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 2, a: 'age', v: 25},
       ]);
 
       const query: DatalogQuery = {
@@ -91,9 +91,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle string entity IDs', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 'user-1', a: 'name', v: 'Alice'},
-        {op: 'assert', e: 'user-2', a: 'name', v: 'Bob'},
-        {op: 'assert', e: 'user-1', a: 'age', v: 30},
+        {op: true, e: 'user-1', a: 'name', v: 'Alice'},
+        {op: true, e: 'user-2', a: 'name', v: 'Bob'},
+        {op: true, e: 'user-1', a: 'age', v: 30},
       ]);
       const {data: results} = await db.query({
         find: {e: ['?e'], n: ['?n']},

@@ -146,26 +146,25 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
 
       // Create transactions 1-10
       for (let tx = 1; tx <= 10; tx++) {
-        await f.db.transact([{op: 'assert', e: tx, a: 'name', v: `Entity-${tx}`}]);
+        await f.db.transact([{op: true, e: tx, a: 'name', v: `Entity-${tx}`}]);
       }
 
       // Update entity 1 multiple times to create historical datoms
       // Entity 1 will have: Entity-1 (tx 1), Entity-1-v2 (tx 11), Entity-1-v3 (tx 12), Entity-1-v4 (tx 13)
       // With retentionCount = 5, we should keep all 4 (less than 5, so nothing deleted)
-      await f.db.transact([{op: 'assert', e: 1, a: 'name', v: 'Entity-1-v2'}]);
-      await f.db.transact([{op: 'assert', e: 1, a: 'name', v: 'Entity-1-v3'}]);
-      await f.db.transact([{op: 'assert', e: 1, a: 'name', v: 'Entity-1-v4'}]);
+      await f.db.transact([{op: true, e: 1, a: 'name', v: 'Entity-1-v2'}]);
+      await f.db.transact([{op: true, e: 1, a: 'name', v: 'Entity-1-v3'}]);
+      await f.db.transact([{op: true, e: 1, a: 'name', v: 'Entity-1-v4'}]);
 
       // Create entity 1 with more than 5 historical values
       // This adds transactions 14-19 (v5 through v10)
       for (let i = 5; i <= 10; i++) {
-        await f.db.transact([{op: 'assert', e: 1, a: 'name', v: `Entity-1-v${i}`}]);
+        await f.db.transact([{op: true, e: 1, a: 'name', v: `Entity-1-v${i}`}]);
       }
 
       const latestTx = await f.db._getLatestTransaction();
       // Total: 10 initial + 3 updates (v2-v4) + 6 updates (v5-v10) = 19 transactions
-      // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
-      expect(latestTx.txId!).toBeGreaterThanOrEqual(19);
+      expect(latestTx.txId).toBeGreaterThanOrEqual(19);
 
       const result = await policy.execute();
 
@@ -182,7 +181,7 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
 
       // Verify that only the latest 5 historical datoms are kept for entity 1
       const {data: historyDatoms} = await f.db.history().datoms({e: 1, a: 'name'});
-      // Should have at most 5 datoms (or fewer if some were retracted)
+      // Should have at most 5 datoms (or fewer if some were falseed)
       expect(historyDatoms.length).toBeLessThanOrEqual(5);
     });
 
@@ -200,12 +199,11 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       // Create many transactions with updates to generate historical datoms
       // Entity 1 will have 10 historical values, with retentionCount = 5, we keep latest 5
       for (let i = 1; i <= 10; i++) {
-        await f.db.transact([{op: 'assert', e: 1, a: 'value', v: `value-${i}`}]);
+        await f.db.transact([{op: true, e: 1, a: 'value', v: `value-${i}`}]);
       }
 
       const latestTx = await f.db._getLatestTransaction();
-      // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
-      expect(latestTx.txId!).toBeGreaterThanOrEqual(10);
+      expect(latestTx.txId).toBeGreaterThanOrEqual(10);
 
       const result = await policy.execute();
 
@@ -233,7 +231,7 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
 
       // Create transactions 1-10
       for (let tx = 1; tx <= 10; tx++) {
-        await f.db.transact([{op: 'assert', e: tx, a: 'name', v: `Entity-${tx}`}]);
+        await f.db.transact([{op: true, e: tx, a: 'name', v: `Entity-${tx}`}]);
       }
 
       const latestTxBefore = await f.db._getLatestTransaction();
@@ -274,7 +272,7 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
 
       // Create entity 1 with 10 historical values
       for (let i = 1; i <= 10; i++) {
-        await f.db.transact([{op: 'assert', e: 1, a: 'value', v: `value-${i}`}]);
+        await f.db.transact([{op: true, e: 1, a: 'value', v: `value-${i}`}]);
       }
 
       const latestTx = await f.db._getLatestTransaction();
@@ -311,7 +309,7 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       for (const numValues of [5, 10, 20]) {
         // Create entity 1 with numValues historical values
         for (let i = 1; i <= numValues; i++) {
-          await f.db.transact([{op: 'assert', e: 1, a: 'value', v: `value-${i}`}]);
+          await f.db.transact([{op: true, e: 1, a: 'value', v: `value-${i}`}]);
         }
 
         const result = await policy.execute();
@@ -372,7 +370,7 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
 
       // Create entities with only 1 datom each (less than retentionCount of 10)
       for (let tx = 1; tx <= 5; tx++) {
-        await f.db.transact([{op: 'assert', e: tx, a: 'name', v: `Entity-${tx}`}]);
+        await f.db.transact([{op: true, e: tx, a: 'name', v: `Entity-${tx}`}]);
       }
 
       const latestTx = await f.db._getLatestTransaction();
@@ -406,7 +404,7 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
 
       // Create entity 1 with exactly 5 historical values
       for (let i = 1; i <= 5; i++) {
-        await f.db.transact([{op: 'assert', e: 1, a: 'name', v: `Entity-1-v${i}`}]);
+        await f.db.transact([{op: true, e: 1, a: 'name', v: `Entity-1-v${i}`}]);
       }
 
       const latestTx = await f.db._getLatestTransaction();
@@ -436,7 +434,7 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
 
       // Create transactions but each entity has only 1 datom (no history to clean)
       for (let tx = 1; tx <= 10; tx++) {
-        await f.db.transact([{op: 'assert', e: tx, a: 'name', v: `Entity-${tx}`}]);
+        await f.db.transact([{op: true, e: tx, a: 'name', v: `Entity-${tx}`}]);
       }
 
       const latestTx = await f.db._getLatestTransaction();
@@ -497,14 +495,13 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
 
       // Simulate entity updates: entity 1's name changes over time
       // Creates 4 historical values, with retentionCount = 3, keeps latest 3
-      await f.db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
-      await f.db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice Updated'}]);
-      await f.db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice Current'}]);
-      await f.db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice Latest'}]);
+      await f.db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await f.db.transact([{op: true, e: 1, a: 'name', v: 'Alice Updated'}]);
+      await f.db.transact([{op: true, e: 1, a: 'name', v: 'Alice Current'}]);
+      await f.db.transact([{op: true, e: 1, a: 'name', v: 'Alice Latest'}]);
 
       const latestTx = await f.db._getLatestTransaction();
-      // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
-      expect(latestTx.txId!).toBeGreaterThanOrEqual(4);
+      expect(latestTx.txId).toBeGreaterThanOrEqual(4);
 
       const result = await policy.execute();
 
@@ -536,7 +533,7 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
 
       // Create entity 1 with 20 historical values
       for (let i = 1; i <= 20; i++) {
-        await f.db.transact([{op: 'assert', e: 1, a: 'value', v: `value-${i}`}]);
+        await f.db.transact([{op: true, e: 1, a: 'value', v: `value-${i}`}]);
       }
 
       const latestTx = await f.db._getLatestTransaction();

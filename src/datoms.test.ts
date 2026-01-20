@@ -14,9 +14,9 @@ describe('datoms', () => {
 
       expect(result).toHaveLength(3);
       expect(result).toEqual([
-        {e: 1, a: 'entityId', v: 1, op: 'assert'},
-        {e: 1, a: 'name', v: 'Alice', op: 'assert'},
-        {e: 1, a: 'age', v: 30, op: 'assert'},
+        {e: 1, a: 'entityId', v: 1, op: true},
+        {e: 1, a: 'name', v: 'Alice', op: true},
+        {e: 1, a: 'age', v: 30, op: true},
       ]);
     });
 
@@ -51,14 +51,14 @@ describe('datoms', () => {
       expect(result.find((d: DatomInput) => d.a === 'entityRef')?.v).toBe(999);
     });
 
-    test("should set op to 'assert' for all datoms", () => {
+    test('should set op to true for all datoms', () => {
       const result = datoms({
         entityId: 1,
         name: 'Alice',
         age: 30,
       });
 
-      expect(result.every((d: DatomInput) => d.op === 'assert')).toBe(true);
+      expect(result.every((d: DatomInput) => d.op === true)).toBe(true);
     });
   });
 
@@ -68,10 +68,10 @@ describe('datoms', () => {
 
       expect(result).toHaveLength(4);
       expect(result).toEqual([
-        {e: 1, a: 'entityId', v: 1, op: 'assert'},
-        {e: 1, a: 'name', v: 'Alice', op: 'assert'},
-        {e: 2, a: 'entityId', v: 2, op: 'assert'},
-        {e: 2, a: 'name', v: 'Bob', op: 'assert'},
+        {e: 1, a: 'entityId', v: 1, op: true},
+        {e: 1, a: 'name', v: 'Alice', op: true},
+        {e: 2, a: 'entityId', v: 2, op: true},
+        {e: 2, a: 'name', v: 'Bob', op: true},
       ]);
     });
 
@@ -137,7 +137,7 @@ describe('datoms', () => {
     test('should handle record with only entityId', () => {
       const result = datoms({entityId: 1});
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({e: 1, a: 'entityId', v: 1, op: 'assert'});
+      expect(result[0]).toEqual({e: 1, a: 'entityId', v: 1, op: true});
     });
 
     test('should handle record with numeric keys', () => {
@@ -194,13 +194,12 @@ describe('datoms', () => {
   describe('type safety', () => {
     test('should return DatomInput[] type', () => {
       const result = datoms({e: r => r.entityId}, {entityId: 1, name: 'Alice'});
-      // biome-ignore lint/style/noNonNullAssertion: result is guaranteed to have at least one element
-      const first: DatomInput = result[0]!;
+      const first = result[0];
       expect(first).toBeDefined();
-      expect(first.e).toBeDefined();
-      expect(first.a).toBeDefined();
-      expect(first.v).toBeDefined();
-      expect(first.op).toBe('assert');
+      expect(first?.e).toBeDefined();
+      expect(first?.a).toBeDefined();
+      expect(first?.v).toBeDefined();
+      expect(first?.op).toBe(true);
     });
   });
 });
@@ -209,8 +208,8 @@ describe('records', () => {
   describe('single entity', () => {
     test('should convert datoms for a single entity to a record', () => {
       const result = records(
-        {e: 1, a: 'name', v: 'Alice', op: 'assert'},
-        {e: 1, a: 'age', v: 30, op: 'assert'},
+        {e: 1, a: 'name', v: 'Alice', op: true},
+        {e: 1, a: 'age', v: 30, op: true},
       );
 
       expect(result).toHaveLength(1);
@@ -218,7 +217,7 @@ describe('records', () => {
     });
 
     test('should handle single datom', () => {
-      const result = records({e: 1, a: 'name', v: 'Alice', op: 'assert'});
+      const result = records({e: 1, a: 'name', v: 'Alice', op: true});
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({name: 'Alice'});
@@ -226,12 +225,12 @@ describe('records', () => {
 
     test('should handle all value types', () => {
       const result = records(
-        {e: 1, a: 'string', v: 'text', op: 'assert'},
-        {e: 1, a: 'number', v: 42, op: 'assert'},
-        {e: 1, a: 'boolean', v: true, op: 'assert'},
-        {e: 1, a: 'nullValue', v: null, op: 'assert'},
-        {e: 1, a: 'undefinedValue', v: undefined, op: 'assert'},
-        {e: 1, a: 'entityRef', v: 999, op: 'assert'},
+        {e: 1, a: 'string', v: 'text', op: true},
+        {e: 1, a: 'number', v: 42, op: true},
+        {e: 1, a: 'boolean', v: true, op: true},
+        {e: 1, a: 'nullValue', v: null, op: true},
+        {e: 1, a: 'undefinedValue', v: undefined, op: true},
+        {e: 1, a: 'entityRef', v: 999, op: true},
       );
 
       expect(result).toHaveLength(1);
@@ -247,8 +246,8 @@ describe('records', () => {
 
     test('should handle string entityId', () => {
       const result = records(
-        {e: 'user-123', a: 'name', v: 'Bob', op: 'assert'},
-        {e: 'user-123', a: 'age', v: 25, op: 'assert'},
+        {e: 'user-123', a: 'name', v: 'Bob', op: true},
+        {e: 'user-123', a: 'age', v: 25, op: true},
       );
 
       expect(result).toHaveLength(1);
@@ -259,8 +258,8 @@ describe('records', () => {
   describe('multiple entities', () => {
     test('should convert datoms for multiple entities to separate records', () => {
       const result = records(
-        {e: 1, a: 'name', v: 'Alice', op: 'assert'},
-        {e: 2, a: 'name', v: 'Bob', op: 'assert'},
+        {e: 1, a: 'name', v: 'Alice', op: true},
+        {e: 2, a: 'name', v: 'Bob', op: true},
       );
 
       expect(result).toHaveLength(2);
@@ -270,10 +269,10 @@ describe('records', () => {
 
     test('should group datoms by entity ID', () => {
       const result = records(
-        {e: 1, a: 'name', v: 'Alice', op: 'assert'},
-        {e: 1, a: 'age', v: 30, op: 'assert'},
-        {e: 2, a: 'name', v: 'Bob', op: 'assert'},
-        {e: 2, a: 'age', v: 25, op: 'assert'},
+        {e: 1, a: 'name', v: 'Alice', op: true},
+        {e: 1, a: 'age', v: 30, op: true},
+        {e: 2, a: 'name', v: 'Bob', op: true},
+        {e: 2, a: 'age', v: 25, op: true},
       );
 
       expect(result).toHaveLength(2);
@@ -285,9 +284,9 @@ describe('records', () => {
   describe('array of datoms', () => {
     test('should convert an array of datoms to records', () => {
       const datomsArray: DatomInput[] = [
-        {e: 1, a: 'name', v: 'Alice', op: 'assert'},
-        {e: 1, a: 'age', v: 30, op: 'assert'},
-        {e: 2, a: 'name', v: 'Bob', op: 'assert'},
+        {e: 1, a: 'name', v: 'Alice', op: true},
+        {e: 1, a: 'age', v: 30, op: true},
+        {e: 2, a: 'name', v: 'Bob', op: true},
       ];
       const result = records(datomsArray);
 
@@ -302,7 +301,7 @@ describe('records', () => {
     });
 
     test('should handle array with single datom', () => {
-      const result = records([{e: 1, a: 'name', v: 'Alice', op: 'assert'}]);
+      const result = records([{e: 1, a: 'name', v: 'Alice', op: true}]);
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({name: 'Alice'});
     });
@@ -310,9 +309,9 @@ describe('records', () => {
 
   describe('mixed datoms and arrays', () => {
     test('should handle mix of datoms and arrays', () => {
-      const result = records({e: 1, a: 'name', v: 'Alice', op: 'assert'}, [
-        {e: 2, a: 'name', v: 'Bob', op: 'assert'},
-        {e: 3, a: 'name', v: 'Charlie', op: 'assert'},
+      const result = records({e: 1, a: 'name', v: 'Alice', op: true}, [
+        {e: 2, a: 'name', v: 'Bob', op: true},
+        {e: 3, a: 'name', v: 'Charlie', op: true},
       ]);
 
       expect(result).toHaveLength(3);
@@ -323,8 +322,8 @@ describe('records', () => {
 
     test('should handle multiple arrays', () => {
       const result = records(
-        [{e: 1, a: 'name', v: 'Alice', op: 'assert'}],
-        [{e: 2, a: 'name', v: 'Bob', op: 'assert'}],
+        [{e: 1, a: 'name', v: 'Alice', op: true}],
+        [{e: 2, a: 'name', v: 'Bob', op: true}],
       );
 
       expect(result).toHaveLength(2);
@@ -336,8 +335,8 @@ describe('records', () => {
   describe('edge cases', () => {
     test('should handle duplicate attributes (last wins)', () => {
       const result = records(
-        {e: 1, a: 'name', v: 'Alice', op: 'assert'},
-        {e: 1, a: 'name', v: 'Alicia', op: 'assert'},
+        {e: 1, a: 'name', v: 'Alice', op: true},
+        {e: 1, a: 'name', v: 'Alicia', op: true},
       );
 
       expect(result).toHaveLength(1);
@@ -346,9 +345,9 @@ describe('records', () => {
 
     test('should handle special characters in attribute names', () => {
       const result = records(
-        {e: 1, a: 'user/name', v: 'Alice', op: 'assert'},
-        {e: 1, a: 'user.email', v: 'alice@example.com', op: 'assert'},
-        {e: 1, a: 'user-name', v: 'Alice', op: 'assert'},
+        {e: 1, a: 'user/name', v: 'Alice', op: true},
+        {e: 1, a: 'user.email', v: 'alice@example.com', op: true},
+        {e: 1, a: 'user-name', v: 'Alice', op: true},
       );
 
       expect(result).toHaveLength(1);
@@ -361,8 +360,8 @@ describe('records', () => {
 
     test('should handle numeric attribute names', () => {
       const result = records(
-        {e: 1, a: '0', v: 'zero', op: 'assert'},
-        {e: 1, a: '1', v: 'one', op: 'assert'},
+        {e: 1, a: '0', v: 'zero', op: true},
+        {e: 1, a: '1', v: 'one', op: true},
       );
 
       expect(result).toHaveLength(1);
@@ -406,20 +405,20 @@ describe('records', () => {
   });
 
   describe('operation type', () => {
-    test("should work with 'assert' operation", () => {
-      const result = records({e: 1, a: 'name', v: 'Alice', op: 'assert'});
+    test('should work with true operation', () => {
+      const result = records({e: 1, a: 'name', v: 'Alice', op: true});
       expect(result[0]).toEqual({name: 'Alice'});
     });
 
-    test("should work with 'retract' operation", () => {
-      const result = records({e: 1, a: 'name', v: 'Alice', op: 'retract'});
+    test('should work with false operation', () => {
+      const result = records({e: 1, a: 'name', v: 'Alice', op: false});
       expect(result[0]).toEqual({name: 'Alice'});
     });
 
     test('should handle mixed operations', () => {
       const result = records(
-        {e: 1, a: 'name', v: 'Alice', op: 'assert'},
-        {e: 1, a: 'age', v: 30, op: 'retract'},
+        {e: 1, a: 'name', v: 'Alice', op: true},
+        {e: 1, a: 'age', v: 30, op: false},
       );
       // Both operations are treated the same way - just converted to records
       expect(result[0]).toEqual({name: 'Alice', age: 30});

@@ -22,6 +22,7 @@ import {
   type WriteResult,
 } from '../hook/hook.js';
 import {isQueryPattern, isVariable, stripQuestionMark} from '../shared/datalog-helpers.js';
+import {executeQueryOnDatoms} from '../shared/in-memory-query-executor.js';
 import {joinResults, project} from '../shared/query-results.js';
 import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
 import type {
@@ -57,7 +58,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
           a TEXT NOT NULL,
           v TEXT NOT NULL,
           tx INTEGER NOT NULL,
-          op TEXT NOT NULL CHECK(op IN ('assert', 'retract')),
+          op BOOLEAN NOT NULL,
           PRIMARY KEY (e, a, v, tx, op)
         )
       `;
@@ -139,7 +140,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     for (const op of ops.flat()) {
       const datom = {e: op.e, a: op.a, v: op.v, op: op.op};
 
-      if (op.op === 'assert') {
+      if (op.op === true) {
         // Validate add, accounting for subs already processed
         await this._validateDatoms([datom], true, subs);
         adds.push(datom);
@@ -162,7 +163,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         a: sub.a,
         v: sub.v,
         tx: txId,
-        op: 'retract',
+        op: false,
       });
     }
 
@@ -172,7 +173,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         a: add.a,
         v: add.v,
         tx: txId,
-        op: 'assert',
+        op: true,
       });
     }
 
@@ -379,10 +380,10 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     // Build the op filter
     let opFilter = '';
-    if (options.op === undefined || options.op === 'assert') {
-      opFilter = "AND op = 'assert'";
-    } else if (options.op === 'retract') {
-      opFilter = "AND op = 'retract'";
+    if (options.op === undefined || options.op === true) {
+      opFilter = 'AND op = true';
+    } else if (options.op === false) {
+      opFilter = 'AND op = false';
     }
 
     const limitClause = options.limit ? 'LIMIT ?' : '';
@@ -501,7 +502,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         tx,
         op
       FROM ranked_datoms
-      WHERE rn = 1 AND op = 'assert'
+      WHERE rn = 1 AND op = true
       ORDER BY
         CASE 
           WHEN e GLOB '-[0-9]*' OR e GLOB '[0-9]*' THEN CAST(e AS INTEGER)
@@ -647,7 +648,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         tx,
         op
       FROM ranked_datoms
-      WHERE rn = 1 AND op = 'assert'
+      WHERE rn = 1 AND op = true
       ORDER BY
         CASE 
           WHEN e GLOB '-[0-9]*' OR e GLOB '[0-9]*' THEN CAST(e AS INTEGER)
@@ -675,21 +676,21 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   ): Promise<Datom[]> {
     await this._ensureInitialized();
 
-    // For speculative queries, we need to merge base datoms with speculative changes
-    // Get all base datoms (current state)
-    const baseDatoms = await this._executeCurrentQuery({});
+    // Get all base datoms using _executeCurrentQuery with a large limit
+    // This gets current datoms (already deduplicated and filtered to op=true)
+    const allBaseDatoms = await this._executeCurrentQuery({limit: Number.MAX_SAFE_INTEGER});
 
     // Create a map of base datoms by (entity, attribute, value) for efficient lookup
     const baseMap = new Map<string, Datom>();
-    for (const datom of baseDatoms) {
+    for (const datom of allBaseDatoms) {
       const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
       baseMap.set(key, datom);
     }
 
-    // Apply speculative datoms (retracts remove, asserts add/update)
+    // Apply speculative datoms (falses remove, trues add/update)
     for (const speculativeDatom of speculativeDatoms) {
       const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-      if (speculativeDatom.op === 'retract') {
+      if (speculativeDatom.op === false) {
         baseMap.delete(key);
       } else {
         baseMap.set(key, speculativeDatom);
@@ -699,31 +700,8 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     // Create merged datoms array
     const mergedDatoms = Array.from(baseMap.values());
 
-    // Apply filters from options
-    let results = mergedDatoms;
-    if (options.e !== undefined) {
-      results = results.filter(d => d.e === options.e);
-    }
-    if (options.a !== undefined) {
-      results = results.filter(d => d.a === options.a);
-    }
-    if (options.v !== undefined) {
-      results = results.filter(d => d.v === options.v);
-    }
-    if (options.tx !== undefined) {
-      results = results.filter(d => d.tx === options.tx);
-    }
-    if (options.op !== undefined) {
-      results = results.filter(d => d.op === options.op);
-    } else {
-      // Default: only assert
-      results = results.filter(d => d.op === 'assert');
-    }
-
-    // Apply pagination
-    const offset = options.offset ?? 0;
-    const limit = options.limit;
-    return results.slice(offset, limit ? offset + limit : undefined);
+    // Use the shared query execution logic
+    return executeQueryOnDatoms(mergedDatoms, options);
   }
 
   /**
@@ -747,7 +725,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: typeof row.op === 'string' && row.op === 'assert' ? 'assert' : 'retract',
+        op: typeof row.op === 'string' ? row.op === 'true' : Boolean(row.op),
       };
     });
   }
@@ -786,7 +764,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         e: entity,
         a: attribute,
         v: value,
-        op: 'assert',
+        op: true,
       });
 
       for (const datom of clauseDatoms) {
@@ -919,8 +897,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
       projected.sort(
         (a: Record<string, Value | Attribute>, b: Record<string, Value | Attribute>) => {
-          // biome-ignore lint/style/noNonNullAssertion: orderBy is guaranteed to exist when sorting
-          for (const [variable, direction] of query.orderBy!) {
+          for (const [variable, direction] of query.orderBy ?? []) {
             // Map variable to output key, or fall back to stripped variable name
             const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
             const aVal = a[outputKey];
@@ -1304,7 +1281,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
           e: entity,
           a: attribute,
           v: value,
-          op: 'assert',
+          op: true,
           viewConfig,
         },
         viewConfig,
@@ -1362,7 +1339,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
           e: entity,
           a: attribute,
           v: value,
-          op: 'assert',
+          op: true,
           viewConfig,
         },
         viewConfig,

@@ -57,11 +57,11 @@ export function executeQueryOnDatoms(datoms: Datom[], options: DatomsQuery): Dat
 
   // Apply op filter after deduplication
   // Default behavior: filter to only added datoms (exclude subed)
-  if (options.op === undefined || options.op === 'assert') {
-    results = results.filter(d => d.op === 'assert');
-  } else if (options.op === 'retract') {
-    // If explicitly requesting subions, filter by op: "retract"
-    results = results.filter(d => d.op === 'retract');
+  if (options.op === undefined || options.op === true) {
+    results = results.filter(d => d.op === true);
+  } else if (options.op === false) {
+    // If explicitly requesting subions, filter by op: false
+    results = results.filter(d => d.op === false);
   }
 
   // Apply pagination

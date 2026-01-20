@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle boolean values', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'active', v: true},
-        {op: 'assert', e: 2, a: 'active', v: false},
-        {op: 'assert', e: 3, a: 'active', v: true},
+        {op: true, e: 1, a: 'active', v: true},
+        {op: true, e: 2, a: 'active', v: false},
+        {op: true, e: 3, a: 'active', v: true},
       ]);
 
       const query: DatalogQuery = {
@@ -39,9 +39,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle null values', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'middleName', v: null},
-        {op: 'assert', e: 2, a: 'middleName', v: 'Smith'},
-        {op: 'assert', e: 3, a: 'middleName', v: null},
+        {op: true, e: 1, a: 'middleName', v: null},
+        {op: true, e: 2, a: 'middleName', v: 'Smith'},
+        {op: true, e: 3, a: 'middleName', v: null},
       ]);
 
       const query: DatalogQuery = {
@@ -58,9 +58,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle undefined values', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'optional', v: undefined},
-        {op: 'assert', e: 2, a: 'optional', v: 'value'},
-        {op: 'assert', e: 3, a: 'optional', v: undefined},
+        {op: true, e: 1, a: 'optional', v: undefined},
+        {op: true, e: 2, a: 'optional', v: 'value'},
+        {op: true, e: 3, a: 'optional', v: undefined},
       ]);
 
       // Querying for undefined doesn't filter properly due to how undefined is handled in queries
@@ -82,11 +82,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle mixed value types', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'data', v: 'string'},
-        {op: 'assert', e: 1, a: 'data', v: 42},
-        {op: 'assert', e: 1, a: 'data', v: true},
-        {op: 'assert', e: 2, a: 'data', v: 'string'},
-        {op: 'assert', e: 2, a: 'data', v: 100},
+        {op: true, e: 1, a: 'data', v: 'string'},
+        {op: true, e: 1, a: 'data', v: 42},
+        {op: true, e: 1, a: 'data', v: true},
+        {op: true, e: 2, a: 'data', v: 'string'},
+        {op: true, e: 2, a: 'data', v: 100},
       ]);
 
       const {data: results} = await db.query({

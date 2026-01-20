@@ -228,7 +228,7 @@ export class HttpClientDatomDatabaseServerComponent {
 
       for (const speculativeDatom of speculativeDatoms) {
         const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-        if (speculativeDatom.op === 'retract') {
+        if (speculativeDatom.op === false) {
           mergedMap.delete(key);
         } else {
           mergedMap.set(key, speculativeDatom);

@@ -89,7 +89,7 @@ function formatSQLWithParams(sql: string, params: unknown[]): string {
 
     // Handle booleans
     if (typeof param === 'boolean') {
-      return param ? 'TRUE' : 'FALSE';
+      return param ? 'true' : 'false';
     }
 
     // Handle strings
@@ -235,8 +235,8 @@ function datalogToPostgresSQL(
       }
     }
 
-    // We need to include retractions in DISTINCT ON to correctly determine the latest state.
-    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was asserted then retracted, the retraction wins.
+    // We need to include falseions in DISTINCT ON to correctly determine the latest state.
+    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was trueed then falseed, the falseion wins.
     const cte = `
       all_datoms AS (
         SELECT DISTINCT ON (e, a, v)
@@ -248,7 +248,7 @@ function datalogToPostgresSQL(
       active_datoms AS (
         SELECT e, a, v, tx
         FROM all_datoms
-        WHERE op = 'assert'
+        WHERE op = true
       )`;
 
     // Build pivot SELECT with conditional aggregation
@@ -453,8 +453,8 @@ function datalogToPostgresSQL(
       params.push(JSON.stringify(value));
     }
 
-    // We need to include retractions in DISTINCT ON to correctly determine the latest state.
-    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was asserted then retracted, the retraction wins.
+    // We need to include falseions in DISTINCT ON to correctly determine the latest state.
+    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was trueed then falseed, the falseion wins.
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // PostgreSQL uses DISTINCT ON for deduplication
@@ -469,7 +469,7 @@ function datalogToPostgresSQL(
       ${alias}_active AS (
         SELECT e, a, v, tx
         FROM ${alias}
-        WHERE op = 'assert'
+        WHERE op = true
       )`;
 
     ctes.push(cte);
@@ -477,7 +477,7 @@ function datalogToPostgresSQL(
 
   // Map variables to their column references for aggregations
   // Use first occurrence (lowest index) to ensure the table is definitely in FROM/JOIN
-  // Use _active CTEs which filter to only assertions after DISTINCT ON
+  // Use _active CTEs which filter to only trueions after DISTINCT ON
   const variableToColumn: Map<string, string> = new Map();
   for (let i = 0; i < clauses.length; i++) {
     const clause = clauses[i];
@@ -540,7 +540,7 @@ function datalogToPostgresSQL(
   }
 
   // Build JOIN conditions for shared variables
-  // Use _active CTEs which filter to only assertions after DISTINCT ON
+  // Use _active CTEs which filter to only trueions after DISTINCT ON
   for (const occurrences of variableToClause.values()) {
     if (occurrences.length > 1) {
       for (let i = 1; i < occurrences.length; i++) {
@@ -620,7 +620,7 @@ function datalogToPostgresSQL(
   }
 
   // Build the final SQL query
-  // Use _active CTEs which filter to only assertions after DISTINCT ON
+  // Use _active CTEs which filter to only trueions after DISTINCT ON
   const cteClause = ctes.length > 0 ? `WITH ${ctes.join(', ')}` : '';
   const fromClause = 'FROM d0_active';
 
@@ -806,23 +806,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
   async initialize(): Promise<void> {
     if (!this.initialized) {
-      // Create enum type for op column (handle error if already exists)
-      try {
-        await this.sqlDb.execute(`
-          CREATE TYPE datom_op AS ENUM ('assert', 'retract')
-        `);
-      } catch (_error) {
-        // Type already exists, ignore error
-        // PostgreSQL doesn't support IF NOT EXISTS for CREATE TYPE
-      }
-
       const createTableSql = `
         CREATE TABLE IF NOT EXISTS ${this.tableName} (
           e TEXT NOT NULL,
           a TEXT NOT NULL,
           v JSONB NOT NULL,
           tx BIGINT NOT NULL,
-          op datom_op NOT NULL,
+          op BOOLEAN NOT NULL,
           PRIMARY KEY (e, a, v, tx, op)
         )
       `;
@@ -834,10 +824,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_e_a_tx ON ${this.tableName}(e, a, tx DESC)`,
         // Composite index for attribute+value queries
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_v_tx ON ${this.tableName}(a, v, tx DESC)`,
-        // Partial index for op='assert' (most common case - only active datoms)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(e, a, tx DESC) WHERE op = 'assert'`,
+        // Partial index for op=true (most common case - only active datoms)
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(e, a, tx DESC) WHERE op = true`,
         // Optimized index for attribute-based queries (used by pivot optimization)
-        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_tx ON ${this.tableName}(a, tx DESC) WHERE op = 'assert'`,
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_tx ON ${this.tableName}(a, tx DESC) WHERE op = true`,
         // GIN index for JSONB value queries (containment, key existence, etc.)
         `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_v_gin ON ${this.tableName} USING GIN (v)`,
         // Index on tx for transaction-based queries
@@ -927,7 +917,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     for (const op of ops.flat()) {
       const datom = {e: op.e, a: op.a, v: op.v, op: op.op};
 
-      if (op.op === 'assert') {
+      if (op.op === true) {
         // Validate add, accounting for subs already processed
         await this._validateDatoms([datom], true, subs);
         adds.push(datom);
@@ -950,7 +940,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         a: sub.a,
         v: sub.v,
         tx: txId,
-        op: 'retract',
+        op: false,
       });
     }
 
@@ -960,7 +950,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         a: add.a,
         v: add.v,
         tx: txId,
-        op: 'assert',
+        op: true,
       });
     }
 
@@ -1206,8 +1196,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const limitClause = options.limit ? 'LIMIT ?' : '';
     const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
-    // We need to include retractions in DISTINCT ON to correctly determine the latest state.
-    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was asserted then retracted, the retraction wins.
+    // We need to include falseions in DISTINCT ON to correctly determine the latest state.
+    // We filter by op AFTER DISTINCT ON. This ensures that if a datom was trueed then falseed, the falseion wins.
     const combinedWhereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Use DISTINCT ON (e, a, v) to support multi-valued attributes
@@ -1217,10 +1207,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Build the op filter for after DISTINCT ON
     // Default behavior: filter to only add datoms (exclude sub)
     let opFilterAfter = '';
-    if (options.op === undefined || options.op === 'assert') {
-      opFilterAfter = "WHERE op = 'assert'";
-    } else if (options.op === 'retract') {
-      opFilterAfter = "WHERE op = 'retract'";
+    if (options.op === undefined || options.op === true) {
+      opFilterAfter = 'WHERE op = true';
+    } else if (options.op === false) {
+      opFilterAfter = 'WHERE op = false';
     }
 
     const sql = `
@@ -1341,7 +1331,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         tx,
         op
       FROM latest_datoms
-      WHERE op = 'assert'
+      WHERE op = true
       ORDER BY
         CASE 
           WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
@@ -1516,7 +1506,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         tx,
         op
       FROM latest_datoms
-      WHERE op = 'assert'
+      WHERE op = true
       ORDER BY
         CASE 
           WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
@@ -1572,10 +1562,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       baseMap.set(key, datom);
     }
 
-    // Apply speculative datoms (retracts remove, asserts add/update)
+    // Apply speculative datoms (falses remove, trues add/update)
     for (const speculativeDatom of speculativeDatoms) {
       const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-      if (speculativeDatom.op === 'retract') {
+      if (speculativeDatom.op === false) {
         baseMap.delete(key);
       } else {
         baseMap.set(key, speculativeDatom);
@@ -1602,8 +1592,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     if (options.op !== undefined) {
       results = results.filter(d => d.op === options.op);
     } else {
-      // Default: only assert
-      results = results.filter(d => d.op === 'assert');
+      // Default: only true
+      results = results.filter(d => d.op === true);
     }
 
     // Apply pagination
@@ -1652,7 +1642,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op: typeof row.op === 'string' && row.op === 'assert' ? 'assert' : 'retract',
+        op: typeof row.op === 'string' ? row.op === 'true' : Boolean(row.op),
       };
     });
   }
@@ -1713,7 +1703,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       e: entity,
       a: attribute,
       v: value,
-      op: 'assert',
+      op: true,
     });
     return result.datoms;
   }

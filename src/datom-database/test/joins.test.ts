@@ -20,10 +20,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle multiple where clauses (join)', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 2, a: 'age', v: 40},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 2, a: 'age', v: 40},
       ]);
 
       const query: DatalogQuery = {
@@ -46,21 +46,21 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Create a company structure: employees, departments, and their relationships
       await db.transact([
         // Employees
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'role', v: 'engineer'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 2, a: 'role', v: 'manager'},
-        {op: 'assert', e: 3, a: 'name', v: 'Charlie'},
-        {op: 'assert', e: 3, a: 'role', v: 'engineer'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'role', v: 'engineer'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 2, a: 'role', v: 'manager'},
+        {op: true, e: 3, a: 'name', v: 'Charlie'},
+        {op: true, e: 3, a: 'role', v: 'engineer'},
         // Departments
-        {op: 'assert', e: 10, a: 'name', v: 'Engineering'},
-        {op: 'assert', e: 10, a: 'budget', v: '100_000'},
-        {op: 'assert', e: 11, a: 'name', v: 'Sales'},
-        {op: 'assert', e: 11, a: 'budget', v: '50_000'},
+        {op: true, e: 10, a: 'name', v: 'Engineering'},
+        {op: true, e: 10, a: 'budget', v: '100_000'},
+        {op: true, e: 11, a: 'name', v: 'Sales'},
+        {op: true, e: 11, a: 'budget', v: '50_000'},
         // Employee-Department relationships
-        {op: 'assert', e: 1, a: 'department', v: 10},
-        {op: 'assert', e: 2, a: 'department', v: 10},
-        {op: 'assert', e: 3, a: 'department', v: 10},
+        {op: true, e: 1, a: 'department', v: 10},
+        {op: true, e: 2, a: 'department', v: 10},
+        {op: true, e: 3, a: 'department', v: 10},
       ]);
 
       // Find all engineers in the Engineering department with the department budget
@@ -88,15 +88,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle queries with multiple constraints on same entity', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
-        {op: 'assert', e: 1, a: 'city', v: 'NYC'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 2, a: 'age', v: 25},
-        {op: 'assert', e: 2, a: 'city', v: 'NYC'},
-        {op: 'assert', e: 3, a: 'name', v: 'Charlie'},
-        {op: 'assert', e: 3, a: 'age', v: 30},
-        {op: 'assert', e: 3, a: 'city', v: 'LA'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
+        {op: true, e: 1, a: 'city', v: 'NYC'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 2, a: 'age', v: 25},
+        {op: true, e: 2, a: 'city', v: 'NYC'},
+        {op: true, e: 3, a: 'name', v: 'Charlie'},
+        {op: true, e: 3, a: 'age', v: 30},
+        {op: true, e: 3, a: 'city', v: 'LA'},
       ]);
       const {data: results} = await db.query({
         find: {name: ['?name']},
@@ -114,15 +114,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       // Create a network of connections
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Node1'},
-        {op: 'assert', e: 2, a: 'name', v: 'Node2'},
-        {op: 'assert', e: 3, a: 'name', v: 'Node3'},
-        {op: 'assert', e: 4, a: 'name', v: 'Node4'},
+        {op: true, e: 1, a: 'name', v: 'Node1'},
+        {op: true, e: 2, a: 'name', v: 'Node2'},
+        {op: true, e: 3, a: 'name', v: 'Node3'},
+        {op: true, e: 4, a: 'name', v: 'Node4'},
         // Connections: 1->2, 2->3, 3->4, 1->4
-        {op: 'assert', e: 1, a: 'connects', v: 2},
-        {op: 'assert', e: 2, a: 'connects', v: 3},
-        {op: 'assert', e: 3, a: 'connects', v: 4},
-        {op: 'assert', e: 1, a: 'connects', v: 4},
+        {op: true, e: 1, a: 'connects', v: 2},
+        {op: true, e: 2, a: 'connects', v: 3},
+        {op: true, e: 3, a: 'connects', v: 4},
+        {op: true, e: 1, a: 'connects', v: 4},
       ]);
 
       // Find all paths of length 2: A -> B -> C
@@ -144,9 +144,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle join with no matching results', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 3, a: 'age', v: 30},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 3, a: 'age', v: 30},
       ]);
 
       const query: DatalogQuery = {
@@ -166,13 +166,13 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle join with incompatible variable bindings', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 2, a: 'age', v: 25},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 2, a: 'age', v: 25},
         // Entity 3 has name "Alice" but age 25 (different from entity 1)
-        {op: 'assert', e: 3, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 3, a: 'age', v: 25},
+        {op: true, e: 3, a: 'name', v: 'Alice'},
+        {op: true, e: 3, a: 'age', v: 25},
       ]);
 
       // Find entities where name is Alice AND age is 25
@@ -192,12 +192,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle join with multiple common variables', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
-        {op: 'assert', e: 1, a: 'city', v: 'NYC'},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 2, a: 'age', v: 30},
-        {op: 'assert', e: 2, a: 'city', v: 'LA'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
+        {op: true, e: 1, a: 'city', v: 'NYC'},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 2, a: 'age', v: 30},
+        {op: true, e: 2, a: 'city', v: 'LA'},
       ]);
 
       const query: DatalogQuery = {
@@ -220,14 +220,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle variable binding across disconnected clauses', async () => {
       const {db} = f;
       await db.transact([
-        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
-        {op: 'assert', e: 1, a: 'age', v: 30},
-        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
-        {op: 'assert', e: 2, a: 'age', v: 25},
-        {op: 'assert', e: 10, a: 'employee', v: 1},
-        {op: 'assert', e: 10, a: 'department', v: 'Engineering'},
-        {op: 'assert', e: 11, a: 'employee', v: 2},
-        {op: 'assert', e: 11, a: 'department', v: 'Sales'},
+        {op: true, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: 1, a: 'age', v: 30},
+        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 2, a: 'age', v: 25},
+        {op: true, e: 10, a: 'employee', v: 1},
+        {op: true, e: 10, a: 'department', v: 'Engineering'},
+        {op: true, e: 11, a: 'employee', v: 2},
+        {op: true, e: 11, a: 'department', v: 'Sales'},
       ]);
 
       // Find employees and their departments through a join entity
