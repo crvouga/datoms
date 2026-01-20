@@ -8,14 +8,12 @@ import type {
   DatalogQuery,
   DatalogQueryFindVariable,
 } from "../../datalog/datalog.js";
-import type { Datom } from "../../datoms.js";
 import type { DatomDatabase } from "../datom-database.js";
 import { validateQueryOptions } from "../shared/query-validation.js";
 import type {
   DatabaseView,
   DatomsQuery,
   DatomsResultEnvelope,
-  QueryResult,
   QueryResultEnvelope,
 } from "./database-view.js";
 import type { ViewConfig } from "./view-config.js";
@@ -31,22 +29,12 @@ export class ConfiguredDatabaseView implements DatabaseView {
     private viewConfig: ViewConfig
   ) {}
 
-  async datoms(options: DatomsQuery): Promise<Datom[]> {
-    const envelope = await this.datomsWithMetadata({
-      ...options,
-      viewConfig: this.viewConfig,
-    });
-    return envelope.data;
-  }
-
-  async datomsWithMetadata(
-    options: DatomsQuery
-  ): Promise<DatomsResultEnvelope> {
+  async datoms(options: DatomsQuery): Promise<DatomsResultEnvelope> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     validateQueryOptions(options);
 
     // Route to implementation with view config
-    return this.db.datomsWithMetadata({
+    return this.db.datoms({
       ...options,
       viewConfig: this.viewConfig,
     });
@@ -59,22 +47,7 @@ export class ConfiguredDatabaseView implements DatabaseView {
     >,
   >(
     query: DatalogQuery<keyof TFind & string> & { find: TFind }
-  ): Promise<QueryResult<TFind>> {
-    const envelope = await this.queryWithMetadata({
-      ...query,
-      viewConfig: this.viewConfig,
-    });
-    return envelope.data;
-  }
-
-  async queryWithMetadata<
-    TFind extends Record<string, DatalogQueryFindVariable> = Record<
-      string,
-      DatalogQueryFindVariable
-    >,
-  >(
-    query: DatalogQuery<keyof TFind & string> & { find: TFind }
   ): Promise<QueryResultEnvelope<TFind>> {
-    return this.db.queryWithMetadata({ ...query, viewConfig: this.viewConfig });
+    return this.db.query({ ...query, viewConfig: this.viewConfig });
   }
 }

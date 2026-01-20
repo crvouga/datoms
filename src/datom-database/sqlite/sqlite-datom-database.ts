@@ -255,14 +255,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     }
   }
 
-  async datoms(options: DatomsQuery): Promise<Datom[]> {
-    const envelope = await this.datomsWithMetadata(options);
-    return envelope.data;
-  }
-
-  async datomsWithMetadata(
-    options: DatomsQuery
-  ): Promise<DatomsResultEnvelope> {
+  async datoms(options: DatomsQuery): Promise<DatomsResultEnvelope> {
     // Validate that tx and txMax are mutually exclusive
     if (options.tx !== undefined && options.txMax !== undefined) {
       throw new Error(
@@ -803,18 +796,6 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   }
 
   async query<
-    TFind extends Record<string, DatalogQueryFindVariable> = Record<
-      string,
-      DatalogQueryFindVariable
-    >,
-  >(
-    query: DatalogQuery<keyof TFind & string> & { find: TFind }
-  ): Promise<QueryResult<TFind>> {
-    const envelope = await this.queryWithMetadata(query);
-    return envelope.data;
-  }
-
-  async queryWithMetadata<
     TFind extends Record<string, DatalogQueryFindVariable> = Record<
       string,
       DatalogQueryFindVariable

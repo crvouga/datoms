@@ -30,7 +30,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["total"]).toBe(90);
     });
@@ -42,7 +42,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["total"]).toBe(0);
     });
@@ -56,7 +56,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "price", v: "?price" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["total"]).toBe(100);
     });
@@ -74,7 +74,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["total"]).toBe(8);
     });
@@ -92,7 +92,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "price", v: "?price" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["total"]).toBeCloseTo(36.5, 2);
     });
@@ -116,7 +116,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["total"]).toBe(300);
     });
@@ -134,7 +134,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["total"]).toBe(6000000);
     });
@@ -152,7 +152,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["total"]).toBe(10);
     });
@@ -173,7 +173,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "price", v: "?price" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["total"]).toBe(400);
     });
@@ -191,7 +191,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["total"]).toBeCloseTo(0.0006, 4);
     });

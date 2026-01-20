@@ -150,8 +150,8 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Read-only database view
    * @example
    * const dbPast = db.asOf(100);
-   * const datoms = await dbPast.datoms({ entity: 42 });
-   * const results = await dbPast.query({ find: ["?v"], where: [[42, "name", "?v"]] });
+   * const { data: datoms } = await dbPast.datoms({ e: 42 });
+   * const { data: results } = await dbPast.query({ find: ["?v"], where: [[42, "name", "?v"]] });
    */
   asOf(txId: TransactionId): DatabaseView;
 
@@ -161,7 +161,7 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Read-only database view showing full history
    * @example
    * const dbHistory = db.history();
-   * const allChanges = await dbHistory.datoms({ entity: 42 });
+   * const { data: allChanges } = await dbHistory.datoms({ e: 42 });
    * // Includes both add and sub datoms
    */
   history(): DatabaseView;
@@ -174,7 +174,7 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Read-only database view
    * @example
    * const dbSince = db.since(100);
-   * const recentChanges = await dbSince.datoms({ entity: 42 });
+   * const { data: recentChanges } = await dbSince.datoms({ e: 42 });
    */
   since(txId: TransactionId): DatabaseView;
 
@@ -205,7 +205,7 @@ export interface DatomDatabase extends DatabaseView {
    * ]);
    *
    * // Query the speculative state
-   * const datoms = await result.dbAfter.datoms({ entity: 1 });
+   * const { data: datoms } = await result.dbAfter.datoms({ e: 1 });
    * // Preview what would change
    * console.log(result.txData);
    *
@@ -221,7 +221,7 @@ export interface DatomDatabase extends DatabaseView {
    * @example
    * const latestTx = await db._getLatestTransaction();
    * // Use for sync: only fetch changes after this transaction
-   * const changes = await db.datoms({ tx: latestTx.txId! + 1 });
+   * const { data: changes } = await db.datoms({ tx: latestTx.txId! + 1 });
    * // Access transaction data
    * console.log(`Transaction ${latestTx.txId} has ${latestTx.datoms.length} datoms`);
    */

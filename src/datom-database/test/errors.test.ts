@@ -123,7 +123,7 @@ describe.each(FIXTURES)("Custom Errors (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
-      const results = await db.datoms({
+      const { data: results } = await db.datoms({
         e: 1,
         maxResultSize: 10,
       });

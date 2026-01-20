@@ -22,20 +22,20 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       // Use with() to see what the transaction would look like
-      const initial = await db.datoms({ e: 1 });
+      const { data: initial } = await db.datoms({ e: 1 });
       expect(initial).toHaveLength(1);
 
       const withResult = await db.with([
         { op: "assert", e: 1, a: "status", v: "pending" },
       ]);
-      const updated = await withResult.dbAfter.datoms({ e: 1 });
+      const { data: updated } = await withResult.dbAfter.datoms({ e: 1 });
       expect(updated).toHaveLength(2);
 
       // Now commit the changes
       await db.transact([{ op: "assert", e: 1, a: "status", v: "pending" }]);
 
       // Verify changes are committed
-      const final = await db.datoms({ e: 1 });
+      const { data: final } = await db.datoms({ e: 1 });
       expect(final).toHaveLength(2);
       const values = final.map((d) => d.v);
       expect(values).toContain("Alice");
@@ -53,11 +53,11 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Query dbAfter to see speculative state
-      const speculative = await withResult.dbAfter.datoms({ e: 1 });
+      const { data: speculative } = await withResult.dbAfter.datoms({ e: 1 });
       expect(speculative).toHaveLength(2);
 
       // But actual database should not be changed (with() doesn't commit)
-      const final = await db.datoms({ e: 1 });
+      const { data: final } = await db.datoms({ e: 1 });
       expect(final).toHaveLength(1);
       expect(final[0]!.v).toBe("Alice");
     });
@@ -68,7 +68,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       // Query before adding
-      const before = await db.datoms({ e: 1 });
+      const { data: before } = await db.datoms({ e: 1 });
       expect(before).toHaveLength(1);
 
       // Use with() to see what adding would look like
@@ -77,7 +77,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Query dbAfter - should see speculative change
-      const after = await withResult.dbAfter.datoms({ e: 1 });
+      const { data: after } = await withResult.dbAfter.datoms({ e: 1 });
       expect(after).toHaveLength(2);
       const values = after.map((d) => d.v);
       expect(values).toContain("Alice");
@@ -98,7 +98,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Query dbAfter should not see sub datom
-      const result = await withResult.dbAfter.datoms({ e: 1 });
+      const { data: result } = await withResult.dbAfter.datoms({ e: 1 });
       expect(result).toHaveLength(1);
       expect(result[0]!.v).toBe("Alice");
 
@@ -106,7 +106,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "retract", e: 1, a: "age", v: 30 }]);
 
       // Verify subion is committed
-      const final = await db.datoms({ e: 1 });
+      const { data: final } = await db.datoms({ e: 1 });
       expect(final).toHaveLength(1);
       expect(final[0]!.v).toBe("Alice");
     });
@@ -125,7 +125,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Query dbAfter should see speculative change
-      const results = await withResult.dbAfter.query({
+      const { data: results } = await withResult.dbAfter.query({
         find: { x: ["?x"] },
         where: [{ e: "?x", a: "name", v: "?y" }],
       });
@@ -152,14 +152,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Verify all operations were applied
-      const alice = await db.datoms({ e: 1 });
+      const { data: alice } = await db.datoms({ e: 1 });
       expect(alice).toHaveLength(2);
       const aliceValues = alice.map((d) => d.v);
       expect(aliceValues).toContain("Alice");
       expect(aliceValues).toContain(31);
       expect(aliceValues).not.toContain(30);
 
-      const bob = await db.datoms({ e: 2 });
+      const { data: bob } = await db.datoms({ e: 2 });
       expect(bob).toHaveLength(1);
       expect(bob[0]!.v).toBe("Bob");
     });
@@ -177,15 +177,15 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Query dbAfter to see speculative state
-      const speculative = await withResult.dbAfter.datoms({ e: 1 });
+      const { data: speculative } = await withResult.dbAfter.datoms({ e: 1 });
       expect(speculative.length).toBeGreaterThan(0);
 
       // But actual database should not be changed (with() doesn't commit)
-      const result = await db.datoms({ e: 1 });
+      const { data: result } = await db.datoms({ e: 1 });
       expect(result).toHaveLength(1);
       expect(result[0]!.v).toBe("Initial");
 
-      const entity2 = await db.datoms({ e: 2 });
+      const { data: entity2 } = await db.datoms({ e: 2 });
       expect(entity2).toHaveLength(0);
     });
 
@@ -194,7 +194,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
-      const nameResults = await db.query({
+      const { data: nameResults } = await db.query({
         find: { v: ["?v"] },
         where: [{ e: 1, a: "name", v: "?v" }],
       });
@@ -204,7 +204,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const withResult = await db.with([
         { op: "assert", e: 1, a: "age", v: 30 },
       ]);
-      const ageResults = await withResult.dbAfter.query({
+      const { data: ageResults } = await withResult.dbAfter.query({
         find: { v: ["?v"] },
         where: [{ e: 1, a: "age", v: "?v" }],
       });
@@ -232,7 +232,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
-      const nameDatoms = await db.datoms({
+      const { data: nameDatoms } = await db.datoms({
         e: 1,
         a: "name",
         v: "Alice",
@@ -243,7 +243,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       const withResult = await db.with([
         { op: "assert", e: 1, a: "status", v: "active" },
       ]);
-      const statusDatoms = await withResult.dbAfter.datoms({
+      const { data: statusDatoms } = await withResult.dbAfter.datoms({
         e: 1,
         a: "status",
         v: "active",
@@ -268,7 +268,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // Query dbAfter should see speculative change
-      const results = await withResult.dbAfter.query({
+      const { data: results } = await withResult.dbAfter.query({
         find: { name: ["?name"] },
         where: [
           { e: "?e", a: "name", v: "?name" },
@@ -356,12 +356,12 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       ]);
 
       // dbBefore should show current state
-      const before = await withResult.dbBefore.datoms({ e: 1 });
+      const { data: before } = await withResult.dbBefore.datoms({ e: 1 });
       expect(before).toHaveLength(1);
       expect(before[0]!.v).toBe("Alice");
 
       // dbAfter should show speculative state
-      const after = await withResult.dbAfter.datoms({ e: 1 });
+      const { data: after } = await withResult.dbAfter.datoms({ e: 1 });
       expect(after).toHaveLength(2);
       const values = after.map((d) => d.v);
       expect(values).toContain("Alice");

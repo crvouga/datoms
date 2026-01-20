@@ -20,7 +20,7 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
       const { db } = f;
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
-      const results = await db.datoms({
+      const { data: results } = await db.datoms({
         e: 1,
         timeoutMs: 5000,
       });
@@ -54,7 +54,7 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
         { op: "assert", e: 1, a: "age", v: 30 },
       ]);
 
-      const results = await db.datoms({
+      const { data: results } = await db.datoms({
         e: 1,
         a: "name",
         timeoutMs: 1000,
@@ -69,7 +69,7 @@ describe.each(FIXTURES)("Query Timeouts (%s)", (_name, createFixture) => {
         await db.transact([{ op: "assert", e: i, a: "tag", v: `tag-${i}` }]);
       }
 
-      const results = await db.datoms({
+      const { data: results } = await db.datoms({
         a: "tag",
         limit: 3,
         timeoutMs: 1000,

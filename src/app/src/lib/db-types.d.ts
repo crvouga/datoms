@@ -13,7 +13,7 @@ declare global {
    *
    * @example
    * // Query movies
-   * const results = await db.query({
+   * const { data: results } = await db.query({
    *   find: { "movie/title": ["?title"] },
    *   where: [
    *     { e: "?movie/id", a: "tmdb.movie/title", v: "?title" }
@@ -23,7 +23,7 @@ declare global {
    *
    * @example
    * // Get datoms for an entity
-   * const datoms = await db.datoms({ e: 123 });
+   * const { data: datoms } = await db.datoms({ e: 123 });
    *
    * @example
    * // Transact data

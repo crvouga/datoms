@@ -30,7 +30,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "name", v: "?v" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(2);
       const entities = results.map((r) => r["e"]).sort();
       expect(entities).toEqual([1, 2]);
@@ -52,7 +52,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: 1, a: "?attr", v: "?v" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(2);
       const attrs = results.map((r) => r["attr"]).sort();
       expect(attrs).toEqual(["age", "name"]);
@@ -74,7 +74,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "?attr", v: "?v" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(4);
       // Verify we get all entity-attribute-value combinations
       const combinations = results.map((r) => ({
@@ -95,14 +95,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "assert", e: "user-2", a: "name", v: "Bob" },
         { op: "assert", e: "user-1", a: "age", v: 30 },
       ]);
-      const results = await db.queryWithMetadata({
+      const { data: results } = await db.query({
         find: { e: ["?e"], n: ["?n"] },
         where: [
           { e: "?e", a: "name", v: "?n" },
           { e: "?e", a: "age", v: "?a" },
         ],
       });
-      expect(results.data).toEqual([{ e: "user-1", n: "Alice" }]);
+      expect(results).toEqual([{ e: "user-1", n: "Alice" }]);
     });
   });
 });

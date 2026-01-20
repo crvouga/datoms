@@ -30,7 +30,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 20, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
@@ -43,7 +43,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(
         results[0]!["stddev"] === null || results[0]!["stddev"] === undefined
@@ -59,7 +59,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       // Standard deviation of single value should be 0 or null/undefined
       expect(
@@ -82,7 +82,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       // Standard deviation of identical values should be 0
       expect(results[0]!["stddev"]).toBe(0);
@@ -101,7 +101,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 0, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
@@ -120,7 +120,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 20.5, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
@@ -147,7 +147,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 90, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
@@ -168,7 +168,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 3, variance = 2, stddev = sqrt(2) ≈ 1.41
       expect(results[0]!["stddev"]).toBeCloseTo(1.41, 1);

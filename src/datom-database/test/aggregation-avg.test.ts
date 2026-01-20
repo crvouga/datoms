@@ -30,7 +30,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBe(30);
     });
@@ -42,7 +42,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "age", v: "?age" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       // Average of empty set could be null, undefined, or 0 depending on implementation
       expect(
@@ -61,7 +61,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "score", v: "?score" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBe(85);
     });
@@ -79,7 +79,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "price", v: "?price" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBeCloseTo(20.333, 2);
     });
@@ -97,7 +97,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBeCloseTo(6.667, 2);
     });
@@ -121,7 +121,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBe(85);
     });
@@ -139,7 +139,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBe(10);
     });
@@ -157,7 +157,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "value", v: "?value" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!["average"]).toBe(10);
     });
@@ -178,7 +178,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "score", v: "?score" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       // Average of [50, 60, 70, 80] = 65
       expect(results[0]!["average"]).toBeCloseTo(65, 1);

@@ -230,7 +230,7 @@ export class HttpClientDatomDatabaseServerComponent {
       const currentView = this._createView({ type: "current" });
       // Use a large limit to fetch all current datoms for speculative queries
       // This bypasses validation that requires at least one filter or limit
-      const currentDatoms = await currentView.datoms({
+      const { data: currentDatoms } = await currentView.datoms({
         limit: Number.MAX_SAFE_INTEGER,
       });
       const speculativeDatoms = request.viewConfig.datoms;
@@ -278,7 +278,7 @@ export class HttpClientDatomDatabaseServerComponent {
     }
 
     const view = this._createView(request.viewConfig);
-    const datoms = await view.datoms(request.options);
+    const { data: datoms } = await view.datoms(request.options);
     return { datoms };
   }
 
@@ -292,7 +292,7 @@ export class HttpClientDatomDatabaseServerComponent {
       context: request.context ?? request.query.context,
       viewConfig: request.viewConfig,
     };
-    const results = await view.query(queryWithContext);
+    const { data: results } = await view.query(queryWithContext);
     return { results };
   }
 

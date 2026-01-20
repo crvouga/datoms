@@ -25,7 +25,7 @@ describe.each(FIXTURES)(
           await db.transact([{ op: "assert", e: i, a: "tag", v: `tag-${i}` }]);
         }
 
-        const results = await db.datoms({
+        const { data: results } = await db.datoms({
           a: "tag",
           maxResultSize: 10,
         });
@@ -58,7 +58,7 @@ describe.each(FIXTURES)(
         }
 
         // limit should be applied first, then maxResultSize check
-        const results = await db.datoms({
+        const { data: results } = await db.datoms({
           a: "tag",
           limit: 3,
           maxResultSize: 5,
@@ -70,7 +70,7 @@ describe.each(FIXTURES)(
         const { db } = f;
         await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
-        const results = await db.datoms({
+        const { data: results } = await db.datoms({
           e: 1,
           maxResultSize: 10,
         });

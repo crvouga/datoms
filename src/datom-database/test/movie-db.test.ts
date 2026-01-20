@@ -15,7 +15,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
       f = await createFixture();
       const movieDb = new FileSystemDatomDatabase({ filePath: "movie-db.csv" });
       await movieDb.initialize();
-      const movieDatoms = await movieDb.datoms({
+      const { data: movieDatoms } = await movieDb.datoms({
         limit: FAST_TESTS ? 500 : 1_000_000,
       });
       await f.db.transact(movieDatoms);
@@ -27,7 +27,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
     "should return the top movies by popularity",
     async () => {
       const limit = 10;
-      const results = await f.db.query({
+      const { data: results } = await f.db.query({
         find: {
           "movie/id": ["?id"],
           "movie/title": ["?title"],
@@ -68,7 +68,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
     "should return movies sorted by title A to Z",
     async () => {
       const limit = 10;
-      const results = await f.db.query({
+      const { data: results } = await f.db.query({
         find: {
           "movie/id": ["?id"],
           "movie/title": ["?title"],
@@ -101,7 +101,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
       const limit = 10;
       const actionGenreId = 28;
 
-      const results = await f.db.query({
+      const { data: results } = await f.db.query({
         find: {
           "movie/id": ["?id"],
           "movie/title": ["?title"],
@@ -156,7 +156,7 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
     async () => {
       // Get movies sorted by vote_count descending (most voted movies)
       const limit = 10;
-      const results = await f.db.queryWithMetadata({
+      const { data: results } = await f.db.query({
         find: {
           "movie/id": ["?id"],
           "movie/title": ["?title"],
@@ -184,10 +184,10 @@ describe.each(FIXTURES)("Movie DB (%s)", (_name, createFixture) => {
         limit: limit,
       });
       expect(results).toBeDefined();
-      expect(Array.isArray(results.data)).toBe(true);
-      expect(results.data.length).toBe(limit);
-      expectOrderedBy(results.data, "movie/vote_count", "desc", limit);
-      for (const movie of results.data) {
+      expect(Array.isArray(results)).toBe(true);
+      expect(results.length).toBe(limit);
+      expectOrderedBy(results, "movie/vote_count", "desc", limit);
+      for (const movie of results) {
         expect(movie["movie/id"]).toBeDefined();
         expect(movie["movie/title"]).toBeDefined();
         expect(movie["movie/vote_count"]).toBeDefined();

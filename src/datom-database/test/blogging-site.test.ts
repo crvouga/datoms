@@ -50,7 +50,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         })
       );
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], name: ["?name"], email: ["?email"] },
         where: [
           { e: "?e", a: USER_TYPE, v: USER_TYPE_ADMIN },
@@ -76,7 +76,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         })
       );
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], name: ["?name"] },
         where: [
           { e: "?e", a: USER_TYPE, v: USER_TYPE_AUTHOR },
@@ -100,7 +100,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         })
       );
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], name: ["?name"] },
         where: [
           { e: "?e", a: USER_TYPE, v: USER_TYPE_READER },
@@ -139,7 +139,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         })
       );
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], title: ["?title"], status: ["?status"] },
         where: [
           { e: "?e", a: POST_TITLE, v: "?title" },
@@ -186,15 +186,15 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         }),
       ]);
 
-      const results = await db.queryWithMetadata({
+      const { data: results } = await db.query({
         find: { e: ["?e"], status: ["?status"] },
         where: [
           { e: "?e", a: POST_TITLE, v: "My Post" },
           { e: "?e", a: POST_STATUS, v: "?status" },
         ],
       });
-      expect(results.data).toHaveLength(1);
-      expect(results.data[0]?.status).toBe(POST_STATUS_PUBLISHED);
+      expect(results).toHaveLength(1);
+      expect(results[0]?.status).toBe(POST_STATUS_PUBLISHED);
     });
 
     test("should edit a post", async () => {
@@ -233,7 +233,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         }),
       ]);
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], title: ["?title"], content: ["?content"] },
         where: [
           { e: "?e", a: POST_TITLE, v: "?title" },
@@ -276,7 +276,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as the author
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], title: ["?title"], status: ["?status"] },
         where: [
           { e: "?e", a: POST_TITLE, v: "?title" },
@@ -326,7 +326,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should NOT see author 2's draft)
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], title: ["?title"] },
         where: [{ e: "?e", a: POST_TITLE, v: "?title" }],
         context: { userId: author1Id, userType: USER_TYPE_AUTHOR },
@@ -371,7 +371,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should see author 2's published post)
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], title: ["?title"] },
         where: [{ e: "?e", a: POST_TITLE, v: "?title" }],
         context: { userId: author1Id, userType: USER_TYPE_AUTHOR },
@@ -424,7 +424,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as reader (should only see published post)
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], title: ["?title"], status: ["?status"] },
         where: [
           { e: "?e", a: POST_TITLE, v: "?title" },
@@ -481,7 +481,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as admin (should see all posts)
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], title: ["?title"], status: ["?status"] },
         where: [
           { e: "?e", a: POST_TITLE, v: "?title" },
@@ -525,7 +525,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         })
       );
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], title: ["?title"] },
         where: [{ e: "?e", a: POST_TITLE, v: "?title" }],
       });
@@ -568,7 +568,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         })
       );
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], title: ["?title"] },
         where: [{ e: "?e", a: POST_TITLE, v: "?title" }],
       });
@@ -589,7 +589,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         )
       );
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], name: ["?name"] },
         where: [
           { e: "?e", a: TAG_NAME, v: "?name" },
@@ -643,7 +643,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
         }),
       ]);
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: {
           e: ["?e"],
           title: ["?title"],
@@ -704,7 +704,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       );
 
       // Query posts with javascript tag
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], title: ["?title"] },
         where: [
           { e: "?e", a: POST_TITLE, v: "?title" },
@@ -777,7 +777,7 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
       ]);
 
       // Verify final state
-      const results = await db.queryWithMetadata({
+      const { data: results } = await db.query({
         find: {
           e: ["?e"],
           title: ["?title"],
@@ -793,8 +793,8 @@ describe.each(FIXTURES)("Blogging Site (%s)", (_name, createFixture) => {
           { e: "?tag", a: TAG_NAME, v: "?tagName" },
         ],
       });
-      expect(results.data.length).toBeGreaterThanOrEqual(2); // At least 2 results (one per tag)
-      const firstResult = results.data[0]!;
+      expect(results.length).toBeGreaterThanOrEqual(2); // At least 2 results (one per tag)
+      const firstResult = results[0]!;
       expect(firstResult.title).toBe("My Blog Post");
       expect(firstResult.content).toBe("Updated content");
       expect(firstResult.status).toBe(POST_STATUS_PUBLISHED);

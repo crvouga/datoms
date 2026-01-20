@@ -189,14 +189,16 @@ describe.each(FIXTURES)(
         expect(result.error).toBeUndefined();
 
         // Verify current state is preserved
-        const currentDatoms = await f.db.datoms({ e: 1, a: "name" });
+        const { data: currentDatoms } = await f.db.datoms({ e: 1, a: "name" });
         expect(currentDatoms.length).toBeGreaterThan(0);
         // Latest value should still be present
         const latestValue = currentDatoms.find((d) => d.v === "Entity-1-v10");
         expect(latestValue).toBeDefined();
 
         // Verify that only the latest 5 historical datoms are kept for entity 1
-        const historyDatoms = await f.db.history().datoms({ e: 1, a: "name" });
+        const { data: historyDatoms } = await f.db
+          .history()
+          .datoms({ e: 1, a: "name" });
         // Should have at most 5 datoms (or fewer if some were retracted)
         expect(historyDatoms.length).toBeLessThanOrEqual(5);
       });
@@ -230,7 +232,9 @@ describe.each(FIXTURES)(
         expect(result.error).toBeUndefined();
 
         // Verify only latest 5 are kept
-        const historyDatoms = await f.db.history().datoms({ e: 1, a: "value" });
+        const { data: historyDatoms } = await f.db
+          .history()
+          .datoms({ e: 1, a: "value" });
         expect(historyDatoms.length).toBeLessThanOrEqual(5);
       });
     });
@@ -258,7 +262,7 @@ describe.each(FIXTURES)(
         expect(latestTxBefore.txId).toBe(10);
 
         // Get current datoms before execution
-        const currentDatomsBefore = await f.db.datoms({ e: 10 });
+        const { data: currentDatomsBefore } = await f.db.datoms({ e: 10 });
 
         const result = await policy.execute();
 
@@ -266,7 +270,7 @@ describe.each(FIXTURES)(
         expect(result.error).toBeUndefined();
 
         // Verify current datoms are still present
-        const currentDatomsAfter = await f.db.datoms({ e: 10 });
+        const { data: currentDatomsAfter } = await f.db.datoms({ e: 10 });
         expect(currentDatomsAfter.length).toBeGreaterThanOrEqual(
           currentDatomsBefore.length
         );
@@ -311,11 +315,13 @@ describe.each(FIXTURES)(
         expect(result.error).toBeUndefined();
 
         // Verify that exactly 5 historical datoms are kept for entity 1
-        const historyDatoms = await f.db.history().datoms({ e: 1, a: "value" });
+        const { data: historyDatoms } = await f.db
+          .history()
+          .datoms({ e: 1, a: "value" });
         expect(historyDatoms.length).toBe(5);
 
         // Verify the latest value is still present
-        const currentDatoms = await f.db.datoms({ e: 1, a: "value" });
+        const { data: currentDatoms } = await f.db.datoms({ e: 1, a: "value" });
         const latestValue = currentDatoms.find((d) => d.v === "value-10");
         expect(latestValue).toBeDefined();
       });
@@ -349,13 +355,16 @@ describe.each(FIXTURES)(
           expect(result.error).toBeUndefined();
 
           // Verify exactly retentionCount datoms are kept
-          const historyDatoms = await f.db
+          const { data: historyDatoms } = await f.db
             .history()
             .datoms({ e: 1, a: "value" });
           expect(historyDatoms.length).toBeLessThanOrEqual(3);
 
           // Verify latest value is preserved
-          const currentDatoms = await f.db.datoms({ e: 1, a: "value" });
+          const { data: currentDatoms } = await f.db.datoms({
+            e: 1,
+            a: "value",
+          });
           const latestValue = currentDatoms.find(
             (d) => d.v === `value-${numValues}`
           );
@@ -414,9 +423,9 @@ describe.each(FIXTURES)(
         expect(result.error).toBeUndefined();
 
         // Verify all datoms are still present by checking specific entities
-        const datoms1 = await f.db.datoms({ e: 1 });
-        const datoms2 = await f.db.datoms({ e: 2 });
-        const datoms3 = await f.db.datoms({ e: 3 });
+        const { data: datoms1 } = await f.db.datoms({ e: 1 });
+        const { data: datoms2 } = await f.db.datoms({ e: 2 });
+        const { data: datoms3 } = await f.db.datoms({ e: 3 });
         expect(datoms1.length).toBeGreaterThan(0);
         expect(datoms2.length).toBeGreaterThan(0);
         expect(datoms3.length).toBeGreaterThan(0);
@@ -450,7 +459,9 @@ describe.each(FIXTURES)(
         expect(result.error).toBeUndefined();
 
         // Verify all datoms are still present
-        const historyDatoms = await f.db.history().datoms({ e: 1, a: "name" });
+        const { data: historyDatoms } = await f.db
+          .history()
+          .datoms({ e: 1, a: "name" });
         expect(historyDatoms.length).toBe(5);
       });
 
@@ -551,13 +562,15 @@ describe.each(FIXTURES)(
         expect(result.error).toBeUndefined();
 
         // Verify current value is preserved
-        const currentDatoms = await f.db.datoms({ e: 1, a: "name" });
+        const { data: currentDatoms } = await f.db.datoms({ e: 1, a: "name" });
         expect(currentDatoms.length).toBeGreaterThan(0);
         const latestValue = currentDatoms.find((d) => d.v === "Alice Latest");
         expect(latestValue).toBeDefined();
 
         // Verify only 3 historical datoms remain
-        const historyDatoms = await f.db.history().datoms({ e: 1, a: "name" });
+        const { data: historyDatoms } = await f.db
+          .history()
+          .datoms({ e: 1, a: "name" });
         expect(historyDatoms.length).toBe(3);
       });
 
@@ -589,11 +602,13 @@ describe.each(FIXTURES)(
         expect(result.error).toBeUndefined();
 
         // Verify exactly 5 historical datoms remain for entity 1
-        const historyDatoms = await f.db.history().datoms({ e: 1, a: "value" });
+        const { data: historyDatoms } = await f.db
+          .history()
+          .datoms({ e: 1, a: "value" });
         expect(historyDatoms.length).toBe(5);
 
         // Verify latest value is preserved
-        const currentDatoms = await f.db.datoms({ e: 1, a: "value" });
+        const { data: currentDatoms } = await f.db.datoms({ e: 1, a: "value" });
         const latestValue = currentDatoms.find((d) => d.v === "value-20");
         expect(latestValue).toBeDefined();
       });

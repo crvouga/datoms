@@ -34,7 +34,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(2);
       const ages = results.map((r) => r["a"]);
       expect(ages).toContain(30);
@@ -74,7 +74,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(2); // Alice and Charlie are engineers
       const engineers = results.map((r) => r["emp"]).sort();
       expect(engineers).toEqual([1, 3]);
@@ -98,7 +98,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "assert", e: 3, a: "age", v: 30 },
         { op: "assert", e: 3, a: "city", v: "LA" },
       ]);
-      const results = await db.queryWithMetadata({
+      const { data: results } = await db.query({
         find: { name: ["?name"] },
         where: [
           { e: "?e", a: "age", v: 30 },
@@ -106,8 +106,8 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
           { e: "?e", a: "name", v: "?name" },
         ],
       });
-      expect(results.data).toHaveLength(1);
-      expect(results.data[0]!.name).toBe("Alice");
+      expect(results).toHaveLength(1);
+      expect(results[0]!.name).toBe("Alice");
     });
 
     test("should handle complex variable bindings across multiple clauses", async () => {
@@ -134,7 +134,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(2); // 1->2->3 and 2->3->4
       const paths = results.map((r) => [r["a"], r["b"], r["c"]]);
       expect(paths).toContainEqual([1, 2, 3]);
@@ -157,7 +157,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       // Entity 3 has age but no name, entities 1 and 2 have name but no age
       // So no results should match both conditions
       expect(results).toHaveLength(0);
@@ -184,7 +184,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(1);
       expect(results[0]!.e).toBe(3);
     });
@@ -209,7 +209,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(2);
       const alice = results.find((r) => r["name"] === "Alice");
       expect(alice).toBeDefined();
@@ -240,7 +240,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(2);
       const alice = results.find((r) => r["name"] === "Alice");
       expect(alice).toBeDefined();

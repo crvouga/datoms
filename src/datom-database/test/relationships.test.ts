@@ -35,7 +35,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
 
       // Find all friendships: who is friends with whom
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { from: ["?from"], to: ["?to"] },
         where: [
           { e: "?f", a: "from", v: "?from" },
@@ -78,7 +78,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(2);
       const friendOfFriends = results.map((r) => r["friendOfFriend"]).sort();
       expect(friendOfFriends).toEqual([3, 4]);
@@ -109,7 +109,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         ],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(3);
       const relationships = results.map((r) => [
         r["parentName"],
@@ -139,7 +139,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "assert", e: 102, a: "course", v: 10 },
       ]);
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { studentName: ["?studentName"], courseTitle: ["?courseTitle"] },
         where: [
           { e: "?enrollment", a: "student", v: "?student" },
@@ -172,7 +172,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "tag", v: "?tag" }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(4);
       const entity1Tags = results
         .filter((r) => r["e"] === 1)

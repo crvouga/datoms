@@ -30,7 +30,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "active", v: true }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(2);
       const entities = results.map((r) => r["e"]).sort();
       expect(entities).toEqual([1, 3]);
@@ -49,7 +49,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         where: [{ e: "?e", a: "middleName", v: null }],
       };
 
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results).toHaveLength(2);
       const entities = results.map((r) => r["e"]).sort();
       expect(entities).toEqual([1, 3]);
@@ -69,7 +69,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         find: { e: ["?e"], v: ["?v"] },
         where: [{ e: "?e", a: "optional", v: "?v" }],
       };
-      const results = await db.query(query);
+      const { data: results } = await db.query(query);
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Verify undefined values are stored and can be retrieved
       const undefinedEntities = results
@@ -89,7 +89,7 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
         { op: "assert", e: 2, a: "data", v: 100 },
       ]);
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], v: ["?v"] },
         where: [{ e: "?e", a: "data", v: "?v" }],
       });

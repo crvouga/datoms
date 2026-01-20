@@ -20,7 +20,7 @@ import type {
   ReadContext,
   WriteContext,
 } from "../../../../datom-database/hook/hook.js";
-import type { QueryResult } from "../../../../datom-database/views/database-view.js";
+import type { QueryResultEnvelope } from "../../../../datom-database/views/database-view.js";
 import type { TransactionId } from "../../../../datoms.js";
 import type { QueryEditorLog } from "../types.js";
 
@@ -151,7 +151,7 @@ export function createLoggedDatabaseWithHooks(
   >(
     query: DatalogQuery<keyof TFind & string> & { find: TFind },
     context?: Record<string, unknown>
-  ): Promise<QueryResult<TFind>> => {
+  ): Promise<QueryResultEnvelope<TFind>> => {
     const startTime = performance.now();
     const timestamp = Date.now();
     const callId = callIdCounter++;

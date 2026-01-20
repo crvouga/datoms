@@ -138,7 +138,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       };
 
       db.hook(hook);
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { v: ["?v"] },
         where: [{ e: "?e", a: "name", v: "?v" }],
       });
@@ -257,7 +257,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       db.hook(hook);
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"], v: ["?v"] },
         where: [{ e: "?e", a: "name", v: "?v" }],
       });
@@ -289,7 +289,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       db.hook(hook);
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"] },
         where: [{ e: 1, a: "name", v: "?v" }],
       });
@@ -325,7 +325,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hook(hook1);
       db.hook(hook2);
 
-      const results = await db.query({
+      const { data: results } = await db.query({
         find: { e: ["?e"] },
         where: [{ e: "?e", a: "name", v: "?v" }],
       });
@@ -441,7 +441,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
-      const datoms = await db.datoms({ e: 1 });
+      const { data: datoms } = await db.datoms({ e: 1 });
       const hasTimestamp = datoms.some((d) => d.a === "updatedAt");
       expect(hasTimestamp).toBe(true);
     });
@@ -622,7 +622,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
         await new Promise((resolve) => setTimeout(resolve, 10));
 
         // Verify transaction succeeded
-        const datoms = await db.datoms({ e: 1 });
+        const { data: datoms } = await db.datoms({ e: 1 });
         expect(datoms).toHaveLength(1);
       } finally {
         // Restore console.error
@@ -907,7 +907,7 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       await db.transact([{ op: "retract", e: 1, a: "name", v: "Alice" }]);
 
       expect(called).toBe(true);
-      const datoms = await db.datoms({ e: 1 });
+      const { data: datoms } = await db.datoms({ e: 1 });
       expect(datoms).toHaveLength(0);
     });
   });

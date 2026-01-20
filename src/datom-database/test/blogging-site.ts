@@ -93,7 +93,7 @@ export const POST_ACCESS_CONTROL: Hook = {
     for (const postId of postEntities) {
       const data = postData.get(postId) || {};
       if (!(POST_AUTHOR in data) || !(POST_STATUS in data)) {
-        const postEntityDatoms = await db.datoms({ e: postId });
+        const { data: postEntityDatoms } = await db.datoms({ e: postId });
         const existingRecords = records(postEntityDatoms);
         if (existingRecords.length > 0) {
           // Merge existing record data into current data
@@ -175,7 +175,7 @@ export const POST_VALIDATOR: Hook = {
       const hasStatus = POST_STATUS in postRecord;
 
       // Check existing datoms for posts being updated
-      const existingDatoms = await db.datoms({ e: postId });
+      const { data: existingDatoms } = await db.datoms({ e: postId });
       const existingRecord = records(existingDatoms)[0] || {};
       const existingHasTitle = POST_TITLE in existingRecord;
       const existingHasAuthor = POST_AUTHOR in existingRecord;
@@ -228,7 +228,7 @@ export const AUTHOR_VALIDATOR: Hook = {
     for (const datom of tx.datoms) {
       if (datom.a === POST_AUTHOR && datom.op === "assert") {
         const authorId = datom.v as number;
-        const authorDatoms = await db.datoms({ e: authorId });
+        const { data: authorDatoms } = await db.datoms({ e: authorId });
         const authorRecord = records(authorDatoms)[0] || {};
         const userType = authorRecord[USER_TYPE] as string | undefined;
         const isAuthor = userType === USER_TYPE_AUTHOR;

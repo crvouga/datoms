@@ -16,7 +16,6 @@ import type { DatomDatabase, WithResult } from "../datom-database.js";
 import type {
   DatomsQuery,
   DatomsResultEnvelope,
-  QueryResult,
   QueryResultEnvelope,
 } from "../views/database-view.js";
 import type { DatabaseView } from "../views/database-view.js";
@@ -107,17 +106,8 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   /**
    * Query datoms (delegated to memory database)
    */
-  async datoms(options: DatomsQuery): Promise<Datom[]> {
+  async datoms(options: DatomsQuery): Promise<DatomsResultEnvelope> {
     return this._memoryDb.datoms(options);
-  }
-
-  /**
-   * Query datoms with metadata (delegated to memory database)
-   */
-  async datomsWithMetadata(
-    options: DatomsQuery
-  ): Promise<DatomsResultEnvelope> {
-    return this._memoryDb.datomsWithMetadata(options);
   }
 
   /**
@@ -130,22 +120,8 @@ export class FileSystemDatomDatabase implements DatomDatabase {
     >,
   >(
     query: DatalogQuery<keyof TFind & string> & { find: TFind }
-  ): Promise<QueryResult<TFind>> {
-    return this._memoryDb.query(query);
-  }
-
-  /**
-   * Execute a datalog query with metadata (delegated to memory database)
-   */
-  async queryWithMetadata<
-    TFind extends Record<string, DatalogQueryFindVariable> = Record<
-      string,
-      DatalogQueryFindVariable
-    >,
-  >(
-    query: DatalogQuery<keyof TFind & string> & { find: TFind }
   ): Promise<QueryResultEnvelope<TFind>> {
-    return this._memoryDb.queryWithMetadata(query);
+    return this._memoryDb.query(query);
   }
 
   /**
@@ -358,7 +334,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
     try {
       // Get all datoms from the memory database using public API
       // Use a large limit similar to server.ts
-      const allDatoms = await this._memoryDb.datoms({
+      const { data: allDatoms } = await this._memoryDb.datoms({
         limit: 1_000_000,
       });
 

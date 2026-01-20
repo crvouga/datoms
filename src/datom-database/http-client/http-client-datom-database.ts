@@ -306,14 +306,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     };
   }
 
-  async datoms(query: DatomsQuery): Promise<Datom[]> {
-    const envelope = await this.datomsWithMetadata(query);
-    return envelope.data;
-  }
-
-  async datomsWithMetadata(
-    options: DatomsQuery
-  ): Promise<DatomsResultEnvelope> {
+  async datoms(options: DatomsQuery): Promise<DatomsResultEnvelope> {
     // Validate that query has at least one filter or limit to prevent accidental full scans
     validateQueryOptions(options);
 
@@ -354,18 +347,6 @@ export class HttpClientDatomDatabase implements DatomDatabase {
   }
 
   async query<
-    TFind extends Record<string, DatalogQueryFindVariable> = Record<
-      string,
-      DatalogQueryFindVariable
-    >,
-  >(
-    query: DatalogQuery<keyof TFind & string> & { find: TFind }
-  ): Promise<QueryResult<TFind>> {
-    const envelope = await this.queryWithMetadata(query);
-    return envelope.data;
-  }
-
-  async queryWithMetadata<
     TFind extends Record<string, DatalogQueryFindVariable> = Record<
       string,
       DatalogQueryFindVariable
