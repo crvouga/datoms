@@ -1,4 +1,4 @@
-import { QueryPlayground } from './QueryPlayground';
+import {QueryPlayground} from './QueryPlayground';
 
 export function App() {
   return (

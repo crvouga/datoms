@@ -147,6 +147,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
         expect(movie['movie/vote_count']).toBeDefined();
         expect(movie['movie/vote_average']).toBeDefined();
         expect(typeof movie['movie/title']).toBe('string');
+
         expect(typeof Number(movie['movie/vote_count'])).toBe('number');
         expect(Number(movie['movie/vote_count'])).toBeGreaterThanOrEqual(0);
       }
