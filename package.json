@@ -29,7 +29,7 @@
     "docker:ps": "docker-compose ps",
     "docker:up": "docker-compose up -d",
     "format": "bun x sort-package-json && biome format --write .",
-    "format:check": "biome format --write . --check",
+    "format:check": "biome format --diagnostic-level=error .",
     "kp": "bun x kill-port 8080",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",

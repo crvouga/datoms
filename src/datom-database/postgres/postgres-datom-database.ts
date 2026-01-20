@@ -4,6 +4,7 @@
  */
 
 import type {DatalogQuery, DatalogQueryFindVariable, QueryClause} from '../../datalog/datalog.js';
+
 import type {Attribute, Datom, DatomInput, TransactionId, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {SQLDatabase} from '../../sql-database/sql-database.js';
