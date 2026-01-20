@@ -4,7 +4,7 @@
  */
 
 import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
-import type {Attribute, Datom, DatomOperation, TransactionId, Value} from '../../datoms.js';
+import type {Attribute, Datom, TransactionId, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {ViewConfig} from './view-config.js';
 
@@ -105,7 +105,7 @@ export interface DatomsQuery {
   /** Filter by maximum transaction ID (tx <= txMax). Mutually exclusive with tx */
   txMax?: TransactionId;
   /** Filter by operation type */
-  op?: DatomOperation;
+  op?: boolean;
   /** Limit the number of results */
   limit?: number;
   /** Offset for pagination */

@@ -120,8 +120,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     // Flatten ops and convert to datoms for transaction object
     const flatOps = ops.flat();
     const latestTx = await this._getLatestTransaction();
-    // biome-ignore lint/style/noNonNullAssertion: latestTx.txId is guaranteed to exist for latest transaction
-    const txId = latestTx.txId! + 1;
+    const txId = Number(latestTx.txId) + 1;
 
     // Convert ops to datoms for transaction object
     const datoms: Datom[] = flatOps.map(op => ({

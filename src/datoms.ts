@@ -61,11 +61,9 @@ export function value(v: unknown): Value {
 }
 
 /**
- * A transaction ID (monotonically increasing)
+ * A transaction ID
  */
 export type TransactionId = number;
-
-export type DatomOperation = true | false;
 
 /**
  * A datom represents a fact: { e: entity, a: attribute, v: value, tx: transaction, op: true | false }
@@ -74,30 +72,30 @@ export type DatomOperation = true | false;
 export type Datom = {
   /** The entity this datom describes */
   e: EntityId;
-  /** The attribute being trueed */
+  /** The attribute being asserted */
   a: Attribute;
   /** The value of the attribute */
   v: Value;
   /** The transaction ID when this datom was added */
   tx: TransactionId;
   /** The operation type (true or false) */
-  op: DatomOperation;
+  op: boolean;
 };
 
 /**
- * A partial datom for trueing/falseing facts (without tx)
+ * A partial datom for asserting/retracting facts (without tx)
  * Object format: { e: entity, a: attribute, v: value, op: operation }
  * This is more efficient and aligns with the fixed EAV structure
  */
 export type DatomInput = {
   /** The entity this datom describes */
   e: EntityId;
-  /** The attribute being trueed */
+  /** The attribute being asserted */
   a: Attribute;
   /** The value of the attribute */
   v: Value;
   /** The operation type (true or false) */
-  op: DatomOperation;
+  op: boolean;
 };
 
 /**
@@ -186,13 +184,13 @@ export function datoms<T extends Record<string, unknown> & {entityId: EntityId}>
 
 // Overload for template function
 export function datoms<T extends Record<string, unknown>>(
-  datomTemplate: {e: (r: T) => EntityId; op?: DatomOperation},
+  datomTemplate: {e: (r: T) => EntityId; op?: boolean},
   ...records: (T | null | undefined | (T | null | undefined)[] | null | undefined)[]
 ): DatomInput[];
 
 // Implementation
 export function datoms<T extends Record<string, unknown>>(
-  first: T | T[] | {e: (r: T) => EntityId; op?: DatomOperation} | null | undefined,
+  first: T | T[] | {e: (r: T) => EntityId; op?: boolean} | null | undefined,
   ...rest: (T | T[] | null | undefined)[]
 ): DatomInput[] {
   // Check if first argument is a template object
@@ -204,7 +202,7 @@ export function datoms<T extends Record<string, unknown>>(
     typeof first.e === 'function'
   ) {
     // Template function API
-    const template = first as {e: (r: T) => EntityId; op?: DatomOperation};
+    const template = first as {e: (r: T) => EntityId; op?: boolean};
     const records = rest;
     return records.flatMap(r =>
       (Array.isArray(r) ? r : [r]).flatMap(r => {
