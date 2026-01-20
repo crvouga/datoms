@@ -217,14 +217,14 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
       await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
 
       let entity = await db.datoms({ e: 1, op: "assert" });
-      expect(entity).toHaveLength(1);
+      expect(entity.data).toHaveLength(1);
 
       // Use with() to see what adding age would look like
       const withResult = await db.with([
         { op: "assert", e: 1, a: "age", v: 30 },
       ]);
       entity = await withResult.dbAfter.datoms({ e: 1, op: "assert" });
-      expect(entity).toHaveLength(2);
+      expect(entity.data).toHaveLength(2);
     });
 
     test("should handle hasFact with with()", async () => {
