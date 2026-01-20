@@ -23,7 +23,7 @@ playwright-report/
 .playwright/
 playwright/.cache/
 
-test.db
+test.db*
 
 .env
 test.csv
