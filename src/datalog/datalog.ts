@@ -91,10 +91,8 @@ export interface DatalogQuery<
   viewConfig?: ViewConfig;
 }
 
-export const d: DatalogQuery = {
-  find: {
-    id: ['?e'],
-    count: ['count', '?name'],
-  },
-  where: [{e: '?e', a: 'name', v: '?name'}],
-};
+export function datalog<
+    TKey extends keyof Record<string, DatalogQueryFindVariable> = string,
+  >(query: DatalogQuery<TKey>): DatalogQuery<TKey> {
+    return query;
+  }

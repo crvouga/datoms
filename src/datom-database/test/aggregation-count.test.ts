@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
-import type {DatalogQuery} from '../../datalog/datalog.js';
+import {datalog, type DatalogQuery} from '../../datalog/datalog.js';
 import {FIXTURES} from './fixtures/fixtures.js';
 import type {Fixture} from './fixtures/fixture.js';
 
@@ -25,12 +25,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         {op: 'assert', e: 3, a: 'age', v: 35},
       ]);
 
-      const query: DatalogQuery = {
+      const {data: results} = await db.query({
         find: {total: ['count', '?age']},
         where: [{e: '?e', a: 'age', v: '?age'}],
-      };
-
-      const {data: results} = await db.query(query);
+      });
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(3);
     });
