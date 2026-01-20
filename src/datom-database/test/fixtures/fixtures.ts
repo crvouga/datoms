@@ -11,7 +11,7 @@ export const FIXTURES: [string, () => Promise<Fixture>][] = [];
 FIXTURES.push(['InMemory', () => createInMemoryFixture()]);
 FIXTURES.push(['PostgreSQL', () => createPostgresFixture()]);
 if (!FAST_TESTS) {
-  FIXTURES.push(['HTTP Client', () => createHttpClientFixture()]);
   FIXTURES.push(['PGLite', () => createPGLiteFixture()]);
+  FIXTURES.push(['HTTP Client', () => createHttpClientFixture()]);
   FIXTURES.push(['FileSystem', () => createFileSystemFixture('test.csv')]);
 }

@@ -19,8 +19,13 @@ export class PGLiteSQLDatabase implements SQLDatabase {
   private readyPromise: Promise<void>;
 
   constructor(dataDir = 'memory://') {
+    // Use the fastest, most in-memory, least-durable config possible.
+    // In memory, highest debug for fast error visibility, and disable all durability checks.
     this.db = new PGlite(dataDir, {
       relaxedDurability: true,
+      // initialMemory: 128 * 1024 * 1024, // 128MB, can be tuned
+      // debug: 5,
+      // fs, extensions, wasmModule etc. can be passed through more options if needed
     });
     this.readyPromise = this.db.waitReady;
   }
