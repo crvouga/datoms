@@ -1,243 +1,190 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useState, useRef, useCallback} from 'react';
 import {Panel, PanelResizeHandle} from 'react-resizable-panels';
+import Editor from '@monaco-editor/react';
 import {db} from '../lib/db';
-import {DbCallLogList} from './DbCallLogList';
-import {TypeScriptEditor, type TypeDefinition} from './TypeScriptEditor';
 import {ResizablePanels} from './ui/ResizablePanels';
-import {createLoggedDatabaseWithHooks} from './hooks/useDatabaseLogging';
-import type {QueryEditorLog} from './types';
-// Type definitions from db-types.d.ts are automatically included via TypeScript
+import type {DatalogQuery} from '../../../datalog/datalog';
+import type {QueryResultEnvelope} from '../../../datom-database/views/database-view';
 
-// Monaco Editor theme configuration with type safety
-// Available themes: "vs", "vs-dark", "hc-black", "hc-light"
+// Monaco Editor theme configuration
 const MONACO_THEME: 'vs' | 'vs-dark' | 'hc-black' | 'hc-light' = 'hc-black';
 
-// LocalStorage keys for persistence
-const STORAGE_KEY_SAVED_QUERY = 'query-editor-saved-query';
-const STORAGE_KEY_DB_CALL_LOGS = 'query-editor-db-call-logs';
+// LocalStorage key for persistence
+const STORAGE_KEY_QUERY_JSON = 'query-editor-json-query';
 
-// Type definitions for the db instance (used by Monaco IntelliSense)
-const DB_TYPE_DEFINITIONS: TypeDefinition[] = [
+// Default query as JSON string
+const DEFAULT_QUERY_JSON = JSON.stringify(
   {
-    content: `
-declare const db: {
-  query(query: {
-    find: Record<string, string[]>;
-    where: Array<{
-      e: string | number;
-      a: string;
-      v?: string | number | boolean | null;
-      tx?: number;
-    }>;
-    orderBy?: Array<[string, "asc" | "desc"]>;
-    limit?: number;
-  }): Promise<Array<Record<string, unknown>>>;
-  
-  datoms(options: {
-    e?: string | number;
-    a?: string;
-    v?: unknown;
-    tx?: number;
-    op?: "assert" | "retract";
-    limit?: number;
-    offset?: number;
-  }): Promise<Array<{
-    e: string | number;
-    a: string;
-    v: unknown;
-    tx: number;
-    op: "assert" | "retract";
-  }>>;
-  
-  transact(
-    ops: Array<{
-      op: "assert" | "retract";
-      e: string | number;
-      a: string;
-      v: unknown;
-    }>,
-    metadata?: Record<string, unknown>,
-    context?: Record<string, unknown>
-  ): Promise<number>;
-  
-  initialize(): Promise<void>;
-  close(): Promise<void>;
-  getLatestTransaction(): Promise<number>;
-  asOf(txId: number): typeof db;
-  history(): typeof db;
-  since(txId: number): typeof db;
-  with(ops: Array<{
-    op: "assert" | "retract";
-    e: string | number;
-    a: string;
-    v: unknown;
-  }>): Promise<{
-    dbBefore: typeof db;
-    dbAfter: typeof db;
-    txData: Array<unknown>;
-  }>;
-};
-    `,
-    filePath: 'file:///db.d.ts',
+    find: {
+      'movie/id': ['?movie/id'],
+      'movie/title': ['?title'],
+      'movie/popularity': ['?popularity'],
+    },
+    where: [
+      {e: '?movie/id', a: 'tmdb.movie/id', v: '?movie/id'},
+      {e: '?movie/id', a: 'tmdb.movie/title', v: '?title'},
+      {e: '?movie/id', a: 'tmdb.movie/popularity', v: '?popularity'},
+    ],
+    orderBy: [['?popularity', 'desc']],
+    limit: 10,
   },
-];
-
-const DEFAULT_QUERY = `
-await db.query({
-  find: {
-    "movie/id": ["?movie/id"],
-    "movie/title": ["?title"],
-    "movie/popularity": ["?popularity"]
-  },
-  where: [
-    { e: "?movie/id", a: "tmdb.movie/id", v: "?movie/id" },
-    { e: "?movie/id", a: "tmdb.movie/title", v: "?title" },
-    { e: "?movie/id", a: "tmdb.movie/popularity", v: "?popularity" }
-  ],
-  orderBy: [["?popularity", "desc"]],
-  limit: 10
-});
-
-await db.query({
-  find: {
-    "movie/id": ["?movie/id"],
-    "movie/title": ["?title"],
-    "movie/popularity": ["?popularity"]
-  },
-  where: [
-    { e: "?movie/id", a: "tmdb.movie/id", v: "?movie/id" },
-    { e: "?movie/id", a: "tmdb.movie/title", v: "?title" },
-    { e: "?movie/id", a: "tmdb.movie/popularity", v: "?popularity" }
-  ],
-  orderBy: [["?popularity", "desc"]],
-  limit: 10
-});
-`;
+  null,
+  2,
+);
 
 export function QueryPlayground() {
+  const [queryJson, setQueryJson] = useState<string>(DEFAULT_QUERY_JSON);
+  const [result, setResult] = useState<QueryResultEnvelope | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [latency, setLatency] = useState<number | null>(null);
-  const [dbCallLogs, setDbCallLogs] = useState<QueryEditorLog[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorRef = useRef<any>(null);
 
-  // Load logs from localStorage on mount
+  // Load query from localStorage on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_DB_CALL_LOGS);
-      if (saved) {
-        const parsedLogs = JSON.parse(saved) as QueryEditorLog[];
-        setDbCallLogs(parsedLogs);
+      const saved = localStorage.getItem(STORAGE_KEY_QUERY_JSON);
+      if (saved && saved.trim() !== '') {
+        setQueryJson(saved);
       }
     } catch {
       // Ignore localStorage errors
     }
   }, []);
 
-  // Save logs to localStorage whenever dbCallLogs changes
+  // Save query to localStorage whenever it changes
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_DB_CALL_LOGS, JSON.stringify(dbCallLogs));
+      localStorage.setItem(STORAGE_KEY_QUERY_JSON, queryJson);
     } catch {
       // Ignore localStorage errors
     }
-  }, [dbCallLogs]);
+  }, [queryJson]);
 
-  const handleExecuteError = (err: Error) => {
-    const errorMessage = err.message;
-    setError(errorMessage);
-    console.error('Code execution error:', err);
-  };
+  const handleRunQuery = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
 
-  const handleClearLogs = () => {
-    setDbCallLogs([]);
     try {
-      localStorage.removeItem(STORAGE_KEY_DB_CALL_LOGS);
-    } catch {
-      // Ignore localStorage errors
+      // Parse JSON
+      let parsedQuery: DatalogQuery;
+      try {
+        parsedQuery = JSON.parse(queryJson) as DatalogQuery;
+      } catch (parseError) {
+        throw new Error(
+          `Invalid JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+        );
+      }
+
+      // Format the JSON query and update the editor
+      const formattedJson = JSON.stringify(parsedQuery, null, 2);
+      setQueryJson(formattedJson);
+
+      // Basic validation
+      if (!parsedQuery.find || typeof parsedQuery.find !== 'object') {
+        throw new Error('Query must have a "find" property');
+      }
+      if (!Array.isArray(parsedQuery.where)) {
+        throw new Error('Query must have a "where" property that is an array');
+      }
+
+      // Execute query
+      const queryResult = await db.query(parsedQuery);
+      setResult(queryResult);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      console.error('Query execution error:', err);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [queryJson]);
+
+  // Keyboard shortcut: Cmd/Ctrl+Enter to run query
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        void handleRunQuery();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleRunQuery]);
 
   return (
     <div className="h-screen w-screen overflow-hidden">
       <ResizablePanels
         storageKey="query-editor-panel-sizes"
-        defaultSizes={[75, 25]}
+        defaultSizes={[50, 50]}
         direction="horizontal"
       >
         {({panelSizes}) => (
           <>
-            {/* Editor Section */}
+            {/* Query Editor Panel */}
             <Panel defaultSize={panelSizes[0]} minSize={30} className="flex flex-col">
-              <TypeScriptEditor
-                typeDefinitions={DB_TYPE_DEFINITIONS}
-                executionContext={() => {
-                  // Create a logged database using hooks API
-                  const loggedDb = createLoggedDatabaseWithHooks(db, {
-                    onLog: log => {
-                      console.log(`[DB Call] Completed ${log.method} in ${log.duration}ms`);
-                      // Use functional update to ensure we get the latest state
-                      setDbCallLogs(prev => {
-                        const newLogs = [...prev, log];
-                        return newLogs;
-                      });
-                    },
-                    onError: log => {
-                      console.error(`[DB Call] Error in ${log.method}: ${log.error}`);
-                      // Use functional update to ensure we get the latest state
-                      setDbCallLogs(prev => {
-                        const newLogs = [...prev, log];
-                        return newLogs;
-                      });
-                    },
-                  });
-                  return {db: loggedDb};
-                }}
-                defaultValue={DEFAULT_QUERY}
-                storageKey={STORAGE_KEY_SAVED_QUERY}
-                onExecuteStart={() => {
-                  setLoading(true);
-                  setError(null);
-                  setLatency(null);
-                  setDbCallLogs([]);
-                  try {
-                    localStorage.removeItem(STORAGE_KEY_DB_CALL_LOGS);
-                  } catch {
-                    // Ignore localStorage errors
-                  }
-                }}
-                onExecuteComplete={duration => {
-                  setLatency(duration);
-                  setLoading(false);
-                }}
-                onExecuteError={handleExecuteError}
-                title="Datoms"
-                runButtonLabel="Run Code"
-                saveButtonLabel="Save"
-                showShortcutsHelp={true}
-                theme={MONACO_THEME}
-              />
+              <div className="border-b border-gray-700 bg-gray-900">
+                <div className="flex items-center justify-between p-2">
+                  <div className="text-sm font-medium text-gray-300">Datalog Query</div>
+                  <button
+                    onClick={() => void handleRunQuery()}
+                    disabled={loading}
+                    className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded transition-colors"
+                  >
+                    {loading ? 'Running...' : 'Run Query'}
+                  </button>
+                </div>
+                <div className="px-2 pb-1 text-xs text-gray-400">Cmd/Ctrl+Enter to run</div>
+              </div>
+              <div className="flex-1 min-h-0">
+                <Editor
+                  height="100%"
+                  defaultLanguage="json"
+                  value={queryJson}
+                  onChange={value => setQueryJson(value || '')}
+                  theme={MONACO_THEME}
+                  onMount={(editor, monaco) => {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                    editorRef.current = editor;
+                    // Configure JSON validation
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
+                    monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+                      validate: true,
+                      allowComments: false,
+                      schemas: [],
+                    });
+                  }}
+                  options={{
+                    minimap: {enabled: false},
+                    fontSize: 14,
+                    wordWrap: 'on',
+                    automaticLayout: true,
+                    scrollBeyondLastLine: false,
+                    tabSize: 2,
+                    formatOnPaste: true,
+                    formatOnType: true,
+                  }}
+                />
+              </div>
             </Panel>
 
             <PanelResizeHandle className="w-2 bg-gray-800 hover:bg-gray-700 transition-colors cursor-col-resize" />
 
-            <Panel defaultSize={panelSizes[1]} minSize={20} className="flex flex-col">
+            {/* Results Panel */}
+            <Panel defaultSize={panelSizes[1]} minSize={30} className="flex flex-col">
               <div className="border-b border-gray-700 bg-gray-900">
-                <div className="flex items-center justify-between p-2 border-b border-gray-700">
-                  <div className="text-sm font-medium text-gray-300">
-                    DB Calls {dbCallLogs.length > 0 ? `(${dbCallLogs.length})` : ''}
-                  </div>
-                  {latency !== null && (
-                    <div className="text-sm text-gray-400 font-mono">
-                      {latency < 1
-                        ? `${(latency * 1000).toFixed(2)}μs`
-                        : latency < 1000
-                          ? `${latency.toFixed(2)}ms`
-                          : `${(latency / 1000).toFixed(2)}s`}
-                    </div>
-                  )}
+                <div className="flex items-center justify-between p-2">
+                  <div className="text-sm font-medium text-gray-300">Results</div>
                 </div>
               </div>
               <div className="flex-1 overflow-auto">
+                {loading && (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    Running query...
+                  </div>
+                )}
                 {error && (
                   <div className="p-4 bg-red-900/20 border-l-4 border-red-500">
                     <div className="font-semibold text-red-400 mb-1">Error</div>
@@ -246,12 +193,33 @@ export function QueryPlayground() {
                     </div>
                   </div>
                 )}
-                {loading && dbCallLogs.length === 0 && (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    Running code...
+                {!loading && !error && result && (
+                  <div className="h-full">
+                    <Editor
+                      height="100%"
+                      defaultLanguage="json"
+                      value={JSON.stringify(result, null, 2)}
+                      theme={MONACO_THEME}
+                      options={{
+                        minimap: {enabled: false},
+                        fontSize: 14,
+                        wordWrap: 'on',
+                        readOnly: true,
+                        automaticLayout: true,
+                        scrollBeyondLastLine: false,
+                        lineNumbers: 'on',
+                      }}
+                    />
                   </div>
                 )}
-                {!loading && <DbCallLogList logs={dbCallLogs} onClear={handleClearLogs} />}
+                {!loading && !error && !result && (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <div className="text-center">
+                      <div className="text-sm mb-2">No results</div>
+                      <div className="text-xs text-gray-600">Run a query to see results</div>
+                    </div>
+                  </div>
+                )}
               </div>
             </Panel>
           </>

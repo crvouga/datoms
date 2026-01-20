@@ -1,7 +1,7 @@
 import {type DatomDatabase} from '../../datom-database';
 
 export const notepad = async (db: DatomDatabase) => {
-  const {data: results} = await db.query({
+  const results = await db.query({
     find: {
       'movie/id': ['?id'],
       'movie/title': ['?title'],

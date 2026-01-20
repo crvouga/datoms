@@ -35,21 +35,9 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
           'movie/overview': ['?overview'],
         },
         where: [
-          {
-            e: '?id',
-            a: 'tmdb.movie/overview',
-            v: '?overview',
-          },
-          {
-            e: '?id',
-            a: 'tmdb.movie/title',
-            v: '?title',
-          },
-          {
-            e: '?id',
-            a: 'tmdb.movie/popularity',
-            v: '?popularity',
-          },
+          {e: '?id', a: 'tmdb.movie/overview', v: '?overview'},
+          {e: '?id', a: 'tmdb.movie/title', v: '?title'},
+          {e: '?id', a: 'tmdb.movie/popularity', v: '?popularity'},
         ],
         orderBy: [['?popularity', 'desc']],
         limit: limit,
@@ -73,13 +61,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
           'movie/id': ['?id'],
           'movie/title': ['?title'],
         },
-        where: [
-          {
-            e: '?id',
-            a: 'tmdb.movie/title',
-            v: '?title',
-          },
-        ],
+        where: [{e: '?id', a: 'tmdb.movie/title', v: '?title'}],
         orderBy: [['?title', 'asc']],
         limit: limit,
       });
@@ -109,26 +91,10 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
           'movie/vote_count': ['?vote_count'],
         },
         where: [
-          {
-            e: '?id',
-            a: 'tmdb.movie/genre_id',
-            v: actionGenreId,
-          },
-          {
-            e: '?id',
-            a: 'tmdb.movie/title',
-            v: '?title',
-          },
-          {
-            e: '?id',
-            a: 'tmdb.movie/vote_average',
-            v: '?vote_average',
-          },
-          {
-            e: '?id',
-            a: 'tmdb.movie/vote_count',
-            v: '?vote_count',
-          },
+          {e: '?id', a: 'tmdb.movie/genre_id', v: actionGenreId},
+          {e: '?id', a: 'tmdb.movie/title', v: '?title'},
+          {e: '?id', a: 'tmdb.movie/vote_average', v: '?vote_average'},
+          {e: '?id', a: 'tmdb.movie/vote_count', v: '?vote_count'},
         ],
         orderBy: [['?vote_average', 'desc']],
         limit: limit,
