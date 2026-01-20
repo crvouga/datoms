@@ -1,11 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import {describe, expect, test} from 'bun:test';
 
-import type { ConnectionPoolConfig, ConnectionPoolStats } from "../../types.js";
-import type { SQLDatabase } from "../../sql-database/sql-database.js";
+import type {ConnectionPoolConfig, ConnectionPoolStats} from '../../types.js';
+import type {SQLDatabase} from '../../sql-database/sql-database.js';
 
-describe("Connection Pooling Types", () => {
-  describe("ConnectionPoolConfig", () => {
-    test("should accept all optional fields", () => {
+describe('Connection Pooling Types', () => {
+  describe('ConnectionPoolConfig', () => {
+    test('should accept all optional fields', () => {
       const config: ConnectionPoolConfig = {
         maxConnections: 10,
         minConnections: 2,
@@ -21,7 +21,7 @@ describe("Connection Pooling Types", () => {
       expect(config.maxLifetime).toBe(3600000);
     });
 
-    test("should accept partial configuration", () => {
+    test('should accept partial configuration', () => {
       const config: ConnectionPoolConfig = {
         maxConnections: 5,
       };
@@ -30,14 +30,14 @@ describe("Connection Pooling Types", () => {
       expect(config.minConnections).toBeUndefined();
     });
 
-    test("should accept empty configuration", () => {
+    test('should accept empty configuration', () => {
       const config: ConnectionPoolConfig = {};
       expect(config).toBeDefined();
     });
   });
 
-  describe("ConnectionPoolStats", () => {
-    test("should have all required fields", () => {
+  describe('ConnectionPoolStats', () => {
+    test('should have all required fields', () => {
       const stats: ConnectionPoolStats = {
         activeConnections: 3,
         idleConnections: 2,
@@ -51,7 +51,7 @@ describe("Connection Pooling Types", () => {
       expect(stats.waitingRequests).toBe(0);
     });
 
-    test("should allow zero values", () => {
+    test('should allow zero values', () => {
       const stats: ConnectionPoolStats = {
         activeConnections: 0,
         idleConnections: 0,
@@ -64,8 +64,8 @@ describe("Connection Pooling Types", () => {
     });
   });
 
-  describe("SQLDatabase interface", () => {
-    test("getPoolStats() is optional", () => {
+  describe('SQLDatabase interface', () => {
+    test('getPoolStats() is optional', () => {
       // Create a mock SQLDatabase without getPoolStats
       const sqlDb: SQLDatabase = {
         query: async () => [],
@@ -75,7 +75,7 @@ describe("Connection Pooling Types", () => {
       expect(sqlDb.getPoolStats).toBeUndefined();
     });
 
-    test("getPoolStats() can be implemented", async () => {
+    test('getPoolStats() can be implemented', async () => {
       const stats: ConnectionPoolStats = {
         activeConnections: 2,
         idleConnections: 3,
@@ -97,7 +97,7 @@ describe("Connection Pooling Types", () => {
       }
     });
 
-    test("getPoolStats() returns valid ConnectionPoolStats", async () => {
+    test('getPoolStats() returns valid ConnectionPoolStats', async () => {
       const sqlDb: SQLDatabase = {
         query: async () => [],
         execute: async () => {},
@@ -111,24 +111,24 @@ describe("Connection Pooling Types", () => {
 
       if (sqlDb.getPoolStats) {
         const stats = await sqlDb.getPoolStats();
-        expect(stats).toHaveProperty("activeConnections");
-        expect(stats).toHaveProperty("idleConnections");
-        expect(stats).toHaveProperty("totalConnections");
-        expect(stats).toHaveProperty("waitingRequests");
-        expect(typeof stats.activeConnections).toBe("number");
-        expect(typeof stats.idleConnections).toBe("number");
-        expect(typeof stats.totalConnections).toBe("number");
-        expect(typeof stats.waitingRequests).toBe("number");
+        expect(stats).toHaveProperty('activeConnections');
+        expect(stats).toHaveProperty('idleConnections');
+        expect(stats).toHaveProperty('totalConnections');
+        expect(stats).toHaveProperty('waitingRequests');
+        expect(typeof stats.activeConnections).toBe('number');
+        expect(typeof stats.idleConnections).toBe('number');
+        expect(typeof stats.totalConnections).toBe('number');
+        expect(typeof stats.waitingRequests).toBe('number');
       }
     });
   });
 
-  describe("Type validation", () => {
-    test("ConnectionPoolConfig fields are all optional", () => {
+  describe('Type validation', () => {
+    test('ConnectionPoolConfig fields are all optional', () => {
       // This test verifies TypeScript compilation
       // If types are wrong, this won't compile
       const config1: ConnectionPoolConfig = {};
-      const config2: ConnectionPoolConfig = { maxConnections: 10 };
+      const config2: ConnectionPoolConfig = {maxConnections: 10};
       const config3: ConnectionPoolConfig = {
         maxConnections: 10,
         minConnections: 2,
@@ -142,7 +142,7 @@ describe("Connection Pooling Types", () => {
       expect(config3).toBeDefined();
     });
 
-    test("ConnectionPoolStats fields are all required", () => {
+    test('ConnectionPoolStats fields are all required', () => {
       // This test verifies TypeScript compilation
       // Missing fields should cause compilation errors
       const stats: ConnectionPoolStats = {

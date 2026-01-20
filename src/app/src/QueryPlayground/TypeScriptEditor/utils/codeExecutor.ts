@@ -1,6 +1,6 @@
 // @ts-expect-error - @babel/standalone doesn't have complete TypeScript definitions
-import * as Babel from "@babel/standalone";
-import { DEFAULT_EXECUTION_CONTEXT } from "../constants";
+import * as Babel from '@babel/standalone';
+import {DEFAULT_EXECUTION_CONTEXT} from '../constants';
 
 /**
  * Compiles TypeScript code to JavaScript using Babel
@@ -15,20 +15,20 @@ export function compileTypeScript(code: string): string {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
   const result = Babel.transform(wrappedCode, {
     presets: [
-      ["typescript", { isTSX: false, allExtensions: false }],
-      ["env", { targets: { browsers: ["last 2 versions"] } }],
+      ['typescript', {isTSX: false, allExtensions: false}],
+      ['env', {targets: {browsers: ['last 2 versions']}}],
     ],
-    filename: "code.ts",
+    filename: 'code.ts',
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   if (!result.code) {
-    throw new Error("Failed to compile TypeScript code");
+    throw new Error('Failed to compile TypeScript code');
   }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
   const compiledCode = result.code as string;
-  if (typeof compiledCode !== "string") {
-    throw new Error("Compiled code is not a string");
+  if (typeof compiledCode !== 'string') {
+    throw new Error('Compiled code is not a string');
   }
   return compiledCode;
 }
@@ -42,7 +42,7 @@ export function compileTypeScript(code: string): string {
  */
 export async function executeCode(
   compiledCode: string,
-  context: Record<string, unknown>
+  context: Record<string, unknown>,
 ): Promise<void> {
   // Merge default execution context with provided context
   const mergedContext = {
@@ -62,7 +62,7 @@ export async function executeCode(
           console.error('Execution error:', e);
           throw e;
         }
-        `
+        `,
   );
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call

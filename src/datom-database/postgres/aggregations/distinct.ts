@@ -2,10 +2,10 @@
  * Distinct aggregation - PostgreSQL implementation
  */
 
-import { POSTGRES_AGGREGATIONS } from "./registry.js";
-import { escapeColumnName } from "./helpers.js";
+import {POSTGRES_AGGREGATIONS} from './registry.js';
+import {escapeColumnName} from './helpers.js';
 
-POSTGRES_AGGREGATIONS.set("distinct", {
+POSTGRES_AGGREGATIONS.set('distinct', {
   convert: (variableColumn, outputKey, _defaultValue, _isValueColumn) => {
     // PostgreSQL supports ARRAY_AGG(DISTINCT ...)
     return {

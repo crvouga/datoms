@@ -3,21 +3,12 @@
  * Accepts a SqlConnection interface for SQLite-compatible databases
  */
 
-import type {
-  DatalogQuery,
-  DatalogQueryFindVariable,
-} from "../../datalog/datalog.js";
-import type {
-  Attribute,
-  Datom,
-  DatomInput,
-  TransactionId,
-  Value,
-} from "../../datoms.js";
-import type { EntityId } from "../../entity-id.js";
-import type { SQLDatabase } from "../../sql-database/sql-database.js";
-import type { Transaction } from "../../types.js";
-import type { DatomDatabase, WithResult } from "../datom-database.js";
+import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
+import type {Attribute, Datom, DatomInput, TransactionId, Value} from '../../datoms.js';
+import type {EntityId} from '../../entity-id.js';
+import type {SQLDatabase} from '../../sql-database/sql-database.js';
+import type {Transaction} from '../../types.js';
+import type {DatomDatabase, WithResult} from '../datom-database.js';
 import {
   HookEngine,
   QueryError,
@@ -29,22 +20,18 @@ import {
   type ReadContext,
   type WriteContext,
   type WriteResult,
-} from "../hook/hook.js";
-import {
-  isQueryPattern,
-  isVariable,
-  stripQuestionMark,
-} from "../shared/datalog-helpers.js";
-import { joinResults, project } from "../shared/query-results.js";
-import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
+} from '../hook/hook.js';
+import {isQueryPattern, isVariable, stripQuestionMark} from '../shared/datalog-helpers.js';
+import {joinResults, project} from '../shared/query-results.js';
+import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
 import type {
   DatabaseView,
   DatomsQuery,
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
-} from "../views/database-view.js";
-import type { ViewConfig } from "../views/view-config.js";
+} from '../views/database-view.js';
+import type {ViewConfig} from '../views/view-config.js';
 
 /**
  * SQLite database implementation
@@ -56,7 +43,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   private connection: SQLDatabase;
   private tableName: string;
 
-  constructor(connection: SQLDatabase, tableName: string = "datoms") {
+  constructor(connection: SQLDatabase, tableName: string = 'datoms') {
     this.hooks = new HookEngine();
     this.connection = connection;
     this.tableName = tableName;
@@ -134,7 +121,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   async transact(
     ops: (DatomInput | DatomInput[])[],
     metadata?: Record<string, unknown>,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ): Promise<TransactionId> {
     await this._ensureInitialized();
 
@@ -150,9 +137,9 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     const subs: DatomInput[] = [];
 
     for (const op of ops.flat()) {
-      const datom = { e: op.e, a: op.a, v: op.v, op: op.op };
+      const datom = {e: op.e, a: op.a, v: op.v, op: op.op};
 
-      if (op.op === "assert") {
+      if (op.op === 'assert') {
         // Validate add, accounting for subs already processed
         await this._validateDatoms([datom], true, subs);
         adds.push(datom);
@@ -174,7 +161,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         a: sub.a,
         v: sub.v,
         tx: txId,
-        op: "retract",
+        op: 'retract',
       });
     }
 
@@ -184,7 +171,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         a: add.a,
         v: add.v,
         tx: txId,
-        op: "assert",
+        op: 'assert',
       });
     }
 
@@ -199,15 +186,12 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     const beforeResult = await this.hooks.runBeforeWrite(tx, ctx);
 
     if (beforeResult.errors.length > 0) {
-      throw new TransactionError(
-        "Transaction validation failed",
-        beforeResult.errors
-      );
+      throw new TransactionError('Transaction validation failed', beforeResult.errors);
     }
 
     // Combine all datoms from the modified transaction (using the modified transaction from hooks)
     const finalTx = beforeResult.tx;
-    const allFinalDatoms = finalTx.datoms.map((d) => ({
+    const allFinalDatoms = finalTx.datoms.map(d => ({
       e: d.e,
       a: d.a,
       v: d.v,
@@ -221,13 +205,13 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     // Create write result for after-write hooks
     const writeResult: WriteResult = {
       txId: committedTxId,
-      datoms: finalTx.datoms.map((d) => ({ ...d, tx: committedTxId })),
+      datoms: finalTx.datoms.map(d => ({...d, tx: committedTxId})),
       timestamp: Date.now(),
     };
 
     // Run after-write hooks (fire and forget, don't block)
-    this.hooks.runAfterWrite(writeResult, ctx).catch((err) => {
-      console.error("After-write hook failed:", err);
+    this.hooks.runAfterWrite(writeResult, ctx).catch(err => {
+      console.error('After-write hook failed:', err);
     });
 
     return committedTxId;
@@ -236,15 +220,15 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   private async _validateDatoms(
     datoms: DatomInput[],
     _isAdd: boolean,
-    _subsInSameTransaction?: DatomInput[]
+    _subsInSameTransaction?: DatomInput[],
   ): Promise<void> {
     // Basic runtime validation for cases where TypeScript types are bypassed
     for (const datom of datoms) {
       if (datom.e === null || datom.e === undefined) {
-        throw new Error("Datom must have an entity ID");
+        throw new Error('Datom must have an entity ID');
       }
       if (datom.a === null || datom.a === undefined) {
-        throw new Error("Datom must have an attribute");
+        throw new Error('Datom must have an attribute');
       }
     }
   }
@@ -258,9 +242,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   async datoms(options: DatomsQuery): Promise<DatomsResultEnvelope> {
     // Validate that tx and txMax are mutually exclusive
     if (options.tx !== undefined && options.txMax !== undefined) {
-      throw new Error(
-        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
-      );
+      throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
     }
 
     // Validate that query has at least one filter or limit to prevent accidental full scans
@@ -274,12 +256,12 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     if (!hasFilter && !hasLimit) {
       throw new QuerySafetyError(
-        "Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans"
+        'Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans',
       );
     }
 
     // Extract viewConfig from options
-    const viewConfig = options.viewConfig ?? { type: "current" };
+    const viewConfig = options.viewConfig ?? {type: 'current'};
 
     // Execute query with timeout if specified
     let envelope: DatomsResultEnvelope;
@@ -290,40 +272,30 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._datomsWithMetadataInternal(
-        options,
-        viewConfig
-      );
+      const queryPromise = this._datomsWithMetadataInternal(options, viewConfig);
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
       envelope = await this._datomsWithMetadataInternal(options, viewConfig);
     }
 
     // Check result size limit if specified
-    if (
-      options.maxResultSize !== undefined &&
-      envelope.data.length > options.maxResultSize
-    ) {
-      throw new QueryResultSizeError(
-        envelope.data.length,
-        options.maxResultSize,
-        options
-      );
+    if (options.maxResultSize !== undefined && envelope.data.length > options.maxResultSize) {
+      throw new QueryResultSizeError(envelope.data.length, options.maxResultSize, options);
     }
 
     return envelope;
   }
 
   asOf(txId: TransactionId): DatabaseView {
-    return new ConfiguredDatabaseView(this, { type: "asOf", txId });
+    return new ConfiguredDatabaseView(this, {type: 'asOf', txId});
   }
 
   history(): DatabaseView {
-    return new ConfiguredDatabaseView(this, { type: "history" });
+    return new ConfiguredDatabaseView(this, {type: 'history'});
   }
 
   since(txId: TransactionId): DatabaseView {
-    return new ConfiguredDatabaseView(this, { type: "since", txId });
+    return new ConfiguredDatabaseView(this, {type: 'since', txId});
   }
 
   async with(ops: DatomInput[]): Promise<WithResult> {
@@ -348,11 +320,11 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     }
 
     // Create dbBefore view (current state)
-    const dbBefore = new ConfiguredDatabaseView(this, { type: "current" });
+    const dbBefore = new ConfiguredDatabaseView(this, {type: 'current'});
 
     // Create dbAfter view (speculative state)
     const dbAfter = new ConfiguredDatabaseView(this, {
-      type: "speculative",
+      type: 'speculative',
       datoms: speculativeDatoms,
     });
 
@@ -373,47 +345,46 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     const params: unknown[] = [];
 
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
-      conditions.push("v = ?");
+      conditions.push('v = ?');
       let value = options.v;
       if (value === undefined) {
-        value = "__UNDEFINED__";
+        value = '__UNDEFINED__';
       }
       params.push(JSON.stringify(value));
     }
     if (options.tx !== undefined) {
-      conditions.push("tx = ?");
+      conditions.push('tx = ?');
       params.push(options.tx);
     }
     if (options.txMax !== undefined) {
-      conditions.push("tx <= ?");
+      conditions.push('tx <= ?');
       params.push(options.txMax);
     }
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Use SQL-level deduplication with ROW_NUMBER() window function
     // Deduplicate by (e, a, v) to support multi-valued attributes
-    const partitionByColumns = "e, a, v";
+    const partitionByColumns = 'e, a, v';
 
     // Build the op filter
-    let opFilter = "";
-    if (options.op === undefined || options.op === "assert") {
+    let opFilter = '';
+    if (options.op === undefined || options.op === 'assert') {
       opFilter = "AND op = 'assert'";
-    } else if (options.op === "retract") {
+    } else if (options.op === 'retract') {
       opFilter = "AND op = 'retract'";
     }
 
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
     const sql = `
       WITH ranked_datoms AS (
@@ -460,17 +431,12 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     return this._mapRowsToDatoms(rows);
   }
 
-  private async _executeAsOfQuery(
-    options: DatomsQuery,
-    txId: TransactionId
-  ): Promise<Datom[]> {
+  private async _executeAsOfQuery(options: DatomsQuery, txId: TransactionId): Promise<Datom[]> {
     await this._ensureInitialized();
 
     // Validate that tx and txMax are mutually exclusive
     if (options.tx !== undefined && options.txMax !== undefined) {
-      throw new Error(
-        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
-      );
+      throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
     }
 
     const conditions: string[] = [];
@@ -478,18 +444,18 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
-      conditions.push("v = ?");
+      conditions.push('v = ?');
       let value = options.v;
       if (value === undefined) {
-        value = "__UNDEFINED__";
+        value = '__UNDEFINED__';
       }
       params.push(JSON.stringify(value));
     }
@@ -501,14 +467,13 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     } else if (options.txMax !== undefined) {
       maxTx = Math.min(options.txMax, txId);
     }
-    conditions.push("tx <= ?");
+    conditions.push('tx <= ?');
     params.push(maxTx);
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
     // Use ROW_NUMBER() OVER to deduplicate by (e, a)
     // This keeps the latest value per attribute (asOf semantics)
@@ -561,9 +526,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     // Validate that tx and txMax are mutually exclusive
     if (options.tx !== undefined && options.txMax !== undefined) {
-      throw new Error(
-        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
-      );
+      throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
     }
 
     const conditions: string[] = [];
@@ -571,35 +534,34 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
-      conditions.push("v = ?");
+      conditions.push('v = ?');
       let value = options.v;
       if (value === undefined) {
-        value = "__UNDEFINED__";
+        value = '__UNDEFINED__';
       }
       params.push(JSON.stringify(value));
     }
     if (options.tx !== undefined) {
-      conditions.push("tx = ?");
+      conditions.push('tx = ?');
       params.push(options.tx);
     }
     if (options.txMax !== undefined) {
-      conditions.push("tx <= ?");
+      conditions.push('tx <= ?');
       params.push(options.txMax);
     }
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
     // History query: no deduplication, include all datoms including sub
     const sql = `
@@ -627,10 +589,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     return this._mapRowsToDatoms(rows);
   }
 
-  private async _executeSinceQuery(
-    options: DatomsQuery,
-    txId: TransactionId
-  ): Promise<Datom[]> {
+  private async _executeSinceQuery(options: DatomsQuery, txId: TransactionId): Promise<Datom[]> {
     await this._ensureInitialized();
 
     const conditions: string[] = [];
@@ -638,31 +597,30 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
-      conditions.push("v = ?");
+      conditions.push('v = ?');
       let value = options.v;
       if (value === undefined) {
-        value = "__UNDEFINED__";
+        value = '__UNDEFINED__';
       }
       params.push(JSON.stringify(value));
     }
 
     // Filter to only datoms with tx > txId
-    conditions.push("tx > ?");
+    conditions.push('tx > ?');
     params.push(txId);
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
     // Use ROW_NUMBER() OVER to deduplicate by (e, a, v)
     const sql = `
@@ -711,7 +669,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
   private async _executeSpeculativeQuery(
     options: DatomsQuery,
-    speculativeDatoms: Datom[]
+    speculativeDatoms: Datom[],
   ): Promise<Datom[]> {
     await this._ensureInitialized();
 
@@ -729,7 +687,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     // Apply speculative datoms (retracts remove, asserts add/update)
     for (const speculativeDatom of speculativeDatoms) {
       const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-      if (speculativeDatom.op === "retract") {
+      if (speculativeDatom.op === 'retract') {
         baseMap.delete(key);
       } else {
         baseMap.set(key, speculativeDatom);
@@ -742,22 +700,22 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     // Apply filters from options
     let results = mergedDatoms;
     if (options.e !== undefined) {
-      results = results.filter((d) => d.e === options.e);
+      results = results.filter(d => d.e === options.e);
     }
     if (options.a !== undefined) {
-      results = results.filter((d) => d.a === options.a);
+      results = results.filter(d => d.a === options.a);
     }
     if (options.v !== undefined) {
-      results = results.filter((d) => d.v === options.v);
+      results = results.filter(d => d.v === options.v);
     }
     if (options.tx !== undefined) {
-      results = results.filter((d) => d.tx === options.tx);
+      results = results.filter(d => d.tx === options.tx);
     }
     if (options.op !== undefined) {
-      results = results.filter((d) => d.op === options.op);
+      results = results.filter(d => d.op === options.op);
     } else {
       // Default: only assert
-      results = results.filter((d) => d.op === "assert");
+      results = results.filter(d => d.op === 'assert');
     }
 
     // Apply pagination
@@ -773,7 +731,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   private _mapRowsToDatoms(rows: Record<string, unknown>[]): Datom[] {
     return rows.map((row: Record<string, unknown>) => {
       let entity: EntityId = row.e as EntityId;
-      if (typeof entity === "string") {
+      if (typeof entity === 'string') {
         if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
@@ -787,10 +745,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op:
-          typeof row.op === "string" && row.op === "assert"
-            ? "assert"
-            : "retract",
+        op: typeof row.op === 'string' && row.op === 'assert' ? 'assert' : 'retract',
       };
     });
   }
@@ -801,11 +756,11 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       DatalogQueryFindVariable
     >,
   >(
-    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+    query: DatalogQuery<keyof TFind & string> & {find: TFind},
   ): Promise<QueryResultEnvelope<TFind>> {
     // Extract context and viewConfig from query object
     const context = query.context;
-    const viewConfig = query.viewConfig ?? { type: "current" };
+    const viewConfig = query.viewConfig ?? {type: 'current'};
     return this._queryWithMetadataInternal(query, context, viewConfig);
   }
 
@@ -820,20 +775,16 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       if (!isQueryPattern(clause)) {
         continue;
       }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-      const entity = isVariable(entityVal)
-        ? undefined
-        : (entityVal as EntityId);
-      const attribute = isVariable(attributeVal)
-        ? undefined
-        : (attributeVal as string);
+      const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+      const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
       const clauseDatoms = await this._executeCurrentQuery({
         e: entity,
         a: attribute,
         v: value,
-        op: "assert",
+        op: 'assert',
       });
 
       for (const datom of clauseDatoms) {
@@ -854,7 +805,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
    */
   private async _executeDatalogWithSQLAndFilteredDatoms(
     query: DatalogQuery,
-    filteredDatoms: Datom[]
+    filteredDatoms: Datom[],
   ): Promise<QueryResult> {
     // Create a set of allowed datoms for filtering
     const allowedDatomsSet = new Set<string>();
@@ -871,30 +822,26 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     // Execute first clause using filtered datoms
     const firstClause = query.where[0];
     if (!firstClause || !isQueryPattern(firstClause)) {
-      throw new Error("First clause must be a QueryPattern");
+      throw new Error('First clause must be a QueryPattern');
     }
-    const { e: entityVal, a: attributeVal, v: valueVal } = firstClause;
+    const {e: entityVal, a: attributeVal, v: valueVal} = firstClause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
-    const attribute = isVariable(attributeVal)
-      ? undefined
-      : (attributeVal as string);
+    const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
     const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
     // Filter datoms for first clause
     let firstDatoms = filteredDatoms;
     if (entity !== undefined) {
-      firstDatoms = firstDatoms.filter((d) => d.e === entity);
+      firstDatoms = firstDatoms.filter(d => d.e === entity);
     }
     if (attribute !== undefined) {
-      firstDatoms = firstDatoms.filter((d) => d.a === attribute);
+      firstDatoms = firstDatoms.filter(d => d.a === attribute);
     }
     if (value !== undefined) {
-      firstDatoms = firstDatoms.filter(
-        (d) => JSON.stringify(d.v) === JSON.stringify(value)
-      );
+      firstDatoms = firstDatoms.filter(d => JSON.stringify(d.v) === JSON.stringify(value));
     }
 
-    const firstResults = firstDatoms.map((datom) => {
+    const firstResults = firstDatoms.map(datom => {
       const result: Record<string, Value | Attribute> = {};
       if (isVariable(entityVal)) {
         result[entityVal as string] = datom.e;
@@ -913,32 +860,26 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     for (let i = 1; i < query.where.length; i++) {
       const clause = query.where[i];
       if (!clause || !isQueryPattern(clause)) {
-        throw new Error("Only QueryPattern clauses are supported in joins");
+        throw new Error('Only QueryPattern clauses are supported in joins');
       }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-      const entity = isVariable(entityVal)
-        ? undefined
-        : (entityVal as EntityId);
-      const attribute = isVariable(attributeVal)
-        ? undefined
-        : (attributeVal as string);
+      const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+      const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
       // Filter datoms for this clause
       let clauseDatoms = filteredDatoms;
       if (entity !== undefined) {
-        clauseDatoms = clauseDatoms.filter((d) => d.e === entity);
+        clauseDatoms = clauseDatoms.filter(d => d.e === entity);
       }
       if (attribute !== undefined) {
-        clauseDatoms = clauseDatoms.filter((d) => d.a === attribute);
+        clauseDatoms = clauseDatoms.filter(d => d.a === attribute);
       }
       if (value !== undefined) {
-        clauseDatoms = clauseDatoms.filter(
-          (d) => JSON.stringify(d.v) === JSON.stringify(value)
-        );
+        clauseDatoms = clauseDatoms.filter(d => JSON.stringify(d.v) === JSON.stringify(value));
       }
 
-      const clauseResults = clauseDatoms.map((datom) => {
+      const clauseResults = clauseDatoms.map(datom => {
         const result: Record<string, Value | Attribute> = {};
         if (isVariable(entityVal)) {
           result[entityVal as string] = datom.e;
@@ -952,11 +893,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         return result;
       });
 
-      results = joinResults(
-        results,
-        clauseResults,
-        query.where.slice(0, i + 1)
-      );
+      results = joinResults(results, clauseResults, query.where.slice(0, i + 1));
     }
 
     // Project to find variables
@@ -968,13 +905,9 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       const variableToOutputKey = new Map<string, string>();
       for (const [outputKey, expr] of Object.entries(query.find)) {
         let varName: string | undefined;
-        if (
-          Array.isArray(expr) &&
-          expr.length === 1 &&
-          typeof expr[0] === "string"
-        ) {
+        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === 'string') {
           varName = expr[0];
-        } else if (typeof expr === "string") {
+        } else if (typeof expr === 'string') {
           varName = expr;
         }
         if (varName) {
@@ -983,32 +916,28 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       }
 
       projected.sort(
-        (
-          a: Record<string, Value | Attribute>,
-          b: Record<string, Value | Attribute>
-        ) => {
+        (a: Record<string, Value | Attribute>, b: Record<string, Value | Attribute>) => {
           for (const [variable, direction] of query.orderBy!) {
             // Map variable to output key, or fall back to stripped variable name
-            const outputKey =
-              variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
+            const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
             const aVal = a[outputKey];
             const bVal = b[outputKey];
             // Handle null/undefined
             if (aVal == null && bVal == null) continue;
-            if (aVal == null) return direction === "asc" ? -1 : 1;
-            if (bVal == null) return direction === "asc" ? 1 : -1;
+            if (aVal == null) return direction === 'asc' ? -1 : 1;
+            if (bVal == null) return direction === 'asc' ? 1 : -1;
 
             // Ensure proper numeric comparison when both values are numeric
             let comparison: number;
-            const aIsNumber = typeof aVal === "number";
-            const bIsNumber = typeof bVal === "number";
+            const aIsNumber = typeof aVal === 'number';
+            const bIsNumber = typeof bVal === 'number';
 
             let aNum: number | null = null;
             let bNum: number | null = null;
 
             if (aIsNumber) {
               aNum = aVal;
-            } else if (typeof aVal === "string" && aVal !== "") {
+            } else if (typeof aVal === 'string' && aVal !== '') {
               const parsed = Number(aVal);
               if (!isNaN(parsed) && isFinite(parsed)) {
                 aNum = parsed;
@@ -1017,7 +946,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
             if (bIsNumber) {
               bNum = bVal;
-            } else if (typeof bVal === "string" && bVal !== "") {
+            } else if (typeof bVal === 'string' && bVal !== '') {
               const parsed = Number(bVal);
               if (!isNaN(parsed) && isFinite(parsed)) {
                 bNum = parsed;
@@ -1036,11 +965,11 @@ export class SQLiteDatomDatabase implements DatomDatabase {
             }
 
             if (comparison !== 0) {
-              return direction === "asc" ? comparison : -comparison;
+              return direction === 'asc' ? comparison : -comparison;
             }
           }
           return 0;
-        }
+        },
       );
     }
 
@@ -1053,15 +982,12 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   }
 
   private _reviveValue(value: unknown): unknown {
-    if (typeof value === "string") {
-      if (value === "__UNDEFINED__") {
+    if (typeof value === 'string') {
+      if (value === '__UNDEFINED__') {
         return undefined;
       }
       // Try parsing as JSON if it looks like JSON
-      if (
-        (value.startsWith("{") || value.startsWith("[")) &&
-        value.length > 1
-      ) {
+      if ((value.startsWith('{') || value.startsWith('[')) && value.length > 1) {
         try {
           const parsed: unknown = JSON.parse(value);
           return this._reviveValue(parsed);
@@ -1077,9 +1003,9 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       return undefined;
     }
     if (Array.isArray(value)) {
-      return value.map((v) => this._reviveValue(v));
+      return value.map(v => this._reviveValue(v));
     }
-    if (typeof value === "object" && value !== null) {
+    if (typeof value === 'object' && value !== null) {
       const revived: Record<string, unknown> = {};
       const valueObj = value as Record<string, unknown>;
       for (const key in valueObj) {
@@ -1090,22 +1016,15 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     return value;
   }
 
-  private _applyOrderAndLimit(
-    results: QueryResult,
-    query: DatalogQuery
-  ): QueryResult {
+  private _applyOrderAndLimit(results: QueryResult, query: DatalogQuery): QueryResult {
     if (query.orderBy) {
       // Map orderBy variables to output keys from find clause
       const variableToOutputKey = new Map<string, string>();
       for (const [outputKey, expr] of Object.entries(query.find)) {
         let varName: string | undefined;
-        if (
-          Array.isArray(expr) &&
-          expr.length === 1 &&
-          typeof expr[0] === "string"
-        ) {
+        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === 'string') {
           varName = expr[0];
-        } else if (typeof expr === "string") {
+        } else if (typeof expr === 'string') {
           varName = expr;
         }
         if (varName) {
@@ -1116,27 +1035,26 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       results.sort((a, b) => {
         for (const [variable, direction] of query.orderBy!) {
           // Map variable to output key, or fall back to stripped variable name
-          const outputKey =
-            variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
+          const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
           const aVal = a[outputKey];
           const bVal = b[outputKey];
 
           // Handle null/undefined
           if (aVal == null && bVal == null) continue;
-          if (aVal == null) return direction === "asc" ? -1 : 1;
-          if (bVal == null) return direction === "asc" ? 1 : -1;
+          if (aVal == null) return direction === 'asc' ? -1 : 1;
+          if (bVal == null) return direction === 'asc' ? 1 : -1;
 
           // Ensure proper numeric comparison when both values are numeric
           let comparison: number;
-          const aIsNumber = typeof aVal === "number";
-          const bIsNumber = typeof bVal === "number";
+          const aIsNumber = typeof aVal === 'number';
+          const bIsNumber = typeof bVal === 'number';
 
           let aNum: number | null = null;
           let bNum: number | null = null;
 
           if (aIsNumber) {
             aNum = aVal;
-          } else if (typeof aVal === "string" && aVal !== "") {
+          } else if (typeof aVal === 'string' && aVal !== '') {
             const parsed = Number(aVal);
             if (!isNaN(parsed) && isFinite(parsed)) {
               aNum = parsed;
@@ -1145,7 +1063,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
           if (bIsNumber) {
             bNum = bVal;
-          } else if (typeof bVal === "string" && bVal !== "") {
+          } else if (typeof bVal === 'string' && bVal !== '') {
             const parsed = Number(bVal);
             if (!isNaN(parsed) && isFinite(parsed)) {
               bNum = parsed;
@@ -1164,7 +1082,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
           }
 
           if (comparison !== 0) {
-            return direction === "asc" ? comparison : -comparison;
+            return direction === 'asc' ? comparison : -comparison;
           }
         }
         return 0;
@@ -1194,16 +1112,13 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     `;
     const result = await this.connection.query(selectSql);
     if (!result || result.length === 0) {
-      throw new Error("Transaction counter row not found after update");
+      throw new Error('Transaction counter row not found after update');
     }
     const row = result[0] as Record<string, unknown>;
     return Number(row.last_tx);
   }
 
-  private async _writeDatomsInternal(
-    datoms: DatomInput[],
-    tx: TransactionId
-  ): Promise<void> {
+  private async _writeDatomsInternal(datoms: DatomInput[], tx: TransactionId): Promise<void> {
     if (datoms.length === 0) return;
 
     // Batch inserts to avoid SQLite's SQL variable limit (typically 999)
@@ -1212,17 +1127,17 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     for (let i = 0; i < datoms.length; i += BATCH_SIZE) {
       const batch = datoms.slice(i, i + BATCH_SIZE);
-      const placeholders = batch.map(() => "(?, ?, ?, ?, ?)").join(", ");
+      const placeholders = batch.map(() => '(?, ?, ?, ?, ?)').join(', ');
       const sql = `
         INSERT INTO ${this.tableName} (e, a, v, tx, op)
         VALUES ${placeholders}
         ON CONFLICT DO NOTHING
       `;
 
-      const params = batch.flatMap((d) => {
+      const params = batch.flatMap(d => {
         let value = d.v;
         if (value === undefined) {
-          value = "__UNDEFINED__";
+          value = '__UNDEFINED__';
         }
         return [String(d.e), String(d.a), JSON.stringify(value), tx, d.op];
       });
@@ -1237,13 +1152,13 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     const result = await this.connection.query(sql);
     if (!result || result.length === 0) {
       // No transactions yet
-      return { txId: 0, datoms: [], meta: undefined };
+      return {txId: 0, datoms: [], meta: undefined};
     }
     const row = result[0] as Record<string, unknown>;
     const txId = Number(row.last_tx);
 
     // Get all datoms for this transaction using history view
-    const datoms = await this._executeHistoryQuery({ tx: txId });
+    const datoms = await this._executeHistoryQuery({tx: txId});
 
     return {
       txId,
@@ -1252,12 +1167,12 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     };
   }
 
-  async _destroy(config: { retentionCount: number }): Promise<number> {
+  async _destroy(config: {retentionCount: number}): Promise<number> {
     await this._ensureInitialized();
 
     if (config.retentionCount < 1) {
       throw new Error(
-        "retentionCount must be at least 1 to ensure at least one datom is kept per (entity, attribute) pair"
+        'retentionCount must be at least 1 to ensure at least one datom is kept per (entity, attribute) pair',
       );
     }
 
@@ -1287,7 +1202,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
   private async _datomsWithMetadataInternal(
     options: DatomsQuery,
-    viewConfig: ViewConfig
+    viewConfig: ViewConfig,
   ): Promise<DatomsResultEnvelope> {
     await this._ensureInitialized();
 
@@ -1296,22 +1211,20 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     let result: Datom[];
 
-    if (viewConfig.type === "current") {
+    if (viewConfig.type === 'current') {
       result = await this._executeCurrentQuery(options);
-    } else if (viewConfig.type === "asOf") {
+    } else if (viewConfig.type === 'asOf') {
       result = await this._executeAsOfQuery(options, viewConfig.txId);
-    } else if (viewConfig.type === "since") {
+    } else if (viewConfig.type === 'since') {
       result = await this._executeSinceQuery(options, viewConfig.txId);
-    } else if (viewConfig.type === "history") {
+    } else if (viewConfig.type === 'history') {
       result = await this._executeHistoryQuery(options);
-    } else if (viewConfig.type === "speculative") {
+    } else if (viewConfig.type === 'speculative') {
       result = await this._executeSpeculativeQuery(options, viewConfig.datoms);
     } else {
       // TypeScript exhaustiveness check
       const _exhaustive: never = viewConfig;
-      throw new Error(
-        `Unknown view config type: ${(_exhaustive as ViewConfig).type}`
-      );
+      throw new Error(`Unknown view config type: ${(_exhaustive as ViewConfig).type}`);
     }
 
     const executionTime = performance.now() - startTime;
@@ -1324,12 +1237,10 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     };
   }
 
-  private async _queryWithMetadataInternal<
-    TFind extends Record<string, DatalogQueryFindVariable>,
-  >(
-    query: DatalogQuery<keyof TFind & string> & { find: TFind },
+  private async _queryWithMetadataInternal<TFind extends Record<string, DatalogQueryFindVariable>>(
+    query: DatalogQuery<keyof TFind & string> & {find: TFind},
     context: Record<string, unknown> | undefined,
-    viewConfig: ViewConfig
+    viewConfig: ViewConfig,
   ): Promise<QueryResultEnvelope<TFind>> {
     await this._ensureInitialized();
 
@@ -1338,7 +1249,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
     // Create read context
     // Extract context, but ensure db and query fields are not overwritten
-    const { db: _, query: __, ...restContext } = context || {};
+    const {db: _, query: __, ...restContext} = context || {};
     // Merge db into query.context so hooks can access it via query.context.db
     const enhancedQuery = {
       ...query,
@@ -1357,7 +1268,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     const beforeResult = await this.hooks.runBeforeRead(enhancedQuery, ctx);
 
     if (beforeResult.errors.length > 0) {
-      throw new QueryError("Query blocked by hooks", beforeResult.errors);
+      throw new QueryError('Query blocked by hooks', beforeResult.errors);
     }
 
     const modifiedQuery = beforeResult.query;
@@ -1377,15 +1288,11 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     if (modifiedQuery.where.length === 1) {
       const clause = modifiedQuery.where[0];
       if (!clause || !isQueryPattern(clause)) {
-        throw new Error("Only QueryPattern clauses are supported");
+        throw new Error('Only QueryPattern clauses are supported');
       }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-      const entity = isVariable(entityVal)
-        ? undefined
-        : (entityVal as EntityId);
-      const attribute = isVariable(attributeVal)
-        ? undefined
-        : (attributeVal as string);
+      const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+      const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
       const datoms = await this._datomsWithMetadataInternal(
@@ -1393,23 +1300,20 @@ export class SQLiteDatomDatabase implements DatomDatabase {
           e: entity,
           a: attribute,
           v: value,
-          op: "assert",
+          op: 'assert',
           viewConfig,
         },
-        viewConfig
+        viewConfig,
       );
 
       // Run after-read hooks
       const afterResult = await this.hooks.runAfterRead(datoms.data, ctx);
 
       if (afterResult.errors && afterResult.errors.length > 0) {
-        throw new QueryError(
-          "Query blocked by after-read hooks",
-          afterResult.errors
-        );
+        throw new QueryError('Query blocked by after-read hooks', afterResult.errors);
       }
 
-      const results = afterResult.datoms.map((datom) => {
+      const results = afterResult.datoms.map(datom => {
         const result: Record<string, Value | Attribute> = {};
         if (isVariable(entityVal)) {
           result[entityVal as string] = datom.e;
@@ -1423,19 +1327,12 @@ export class SQLiteDatomDatabase implements DatomDatabase {
         return result;
       });
 
-      const projected = project(
-        results,
-        modifiedQuery.find,
-        modifiedQuery.where
-      );
-      const finalResult = this._applyOrderAndLimit(
-        projected,
-        modifiedQuery
-      ) as QueryResult<TFind>;
+      const projected = project(results, modifiedQuery.find, modifiedQuery.where);
+      const finalResult = this._applyOrderAndLimit(projected, modifiedQuery) as QueryResult<TFind>;
       const executionTime = performance.now() - startTime;
       metadata.executionTimeMs = executionTime;
       metadata.resultCount = finalResult.length;
-      metadata.executionStrategy = "single-clause-optimized";
+      metadata.executionStrategy = 'single-clause-optimized';
 
       return {
         data: finalResult,
@@ -1451,13 +1348,9 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       if (!isQueryPattern(clause)) {
         continue;
       }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-      const entity = isVariable(entityVal)
-        ? undefined
-        : (entityVal as EntityId);
-      const attribute = isVariable(attributeVal)
-        ? undefined
-        : (attributeVal as string);
+      const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+      const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
       const clauseDatoms = await this._datomsWithMetadataInternal(
@@ -1465,10 +1358,10 @@ export class SQLiteDatomDatabase implements DatomDatabase {
           e: entity,
           a: attribute,
           v: value,
-          op: "assert",
+          op: 'assert',
           viewConfig,
         },
-        viewConfig
+        viewConfig,
       );
 
       for (const datom of clauseDatoms.data) {
@@ -1484,27 +1377,20 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
 
     if (afterResult.errors && afterResult.errors.length > 0) {
-      throw new QueryError(
-        "Query blocked by after-read hooks",
-        afterResult.errors
-      );
+      throw new QueryError('Query blocked by after-read hooks', afterResult.errors);
     }
 
     // For speculative views, we need to use in-memory join logic
     // For other views, we can use SQL-based joins
-    if (viewConfig.type === "speculative") {
+    if (viewConfig.type === 'speculative') {
       // Use in-memory join logic for speculative queries
       const firstClause = modifiedQuery.where[0];
       if (!firstClause || !isQueryPattern(firstClause)) {
-        throw new Error("First clause must be a QueryPattern");
+        throw new Error('First clause must be a QueryPattern');
       }
-      const { e: entityVal, a: attributeVal, v: valueVal } = firstClause;
-      const entity = isVariable(entityVal)
-        ? undefined
-        : (entityVal as EntityId);
-      const attribute = isVariable(attributeVal)
-        ? undefined
-        : (attributeVal as string);
+      const {e: entityVal, a: attributeVal, v: valueVal} = firstClause;
+      const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
       const firstDatoms = await this._datomsWithMetadataInternal(
@@ -1514,10 +1400,10 @@ export class SQLiteDatomDatabase implements DatomDatabase {
           v: value,
           viewConfig,
         },
-        viewConfig
+        viewConfig,
       );
 
-      const firstResults = firstDatoms.data.map((datom) => {
+      const firstResults = firstDatoms.data.map(datom => {
         const result: Record<string, Value | Attribute> = {};
         if (isVariable(entityVal)) {
           result[entityVal as string] = datom.e;
@@ -1535,15 +1421,11 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       for (let i = 1; i < modifiedQuery.where.length; i++) {
         const clause = modifiedQuery.where[i];
         if (!clause || !isQueryPattern(clause)) {
-          throw new Error("Only QueryPattern clauses are supported in joins");
+          throw new Error('Only QueryPattern clauses are supported in joins');
         }
-        const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-        const entity = isVariable(entityVal)
-          ? undefined
-          : (entityVal as EntityId);
-        const attribute = isVariable(attributeVal)
-          ? undefined
-          : (attributeVal as string);
+        const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+        const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+        const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
         const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
         const clauseDatoms = await this._datomsWithMetadataInternal(
@@ -1552,10 +1434,10 @@ export class SQLiteDatomDatabase implements DatomDatabase {
             a: attribute,
             v: value,
           },
-          viewConfig
+          viewConfig,
         );
 
-        const clauseResults = clauseDatoms.data.map((datom) => {
+        const clauseResults = clauseDatoms.data.map(datom => {
           const result: Record<string, Value | Attribute> = {};
           if (isVariable(entityVal)) {
             result[entityVal as string] = datom.e;
@@ -1569,26 +1451,15 @@ export class SQLiteDatomDatabase implements DatomDatabase {
           return result;
         });
 
-        results = joinResults(
-          results,
-          clauseResults,
-          modifiedQuery.where.slice(0, i + 1)
-        );
+        results = joinResults(results, clauseResults, modifiedQuery.where.slice(0, i + 1));
       }
 
-      const projected = project(
-        results,
-        modifiedQuery.find,
-        modifiedQuery.where
-      );
-      const finalResult = this._applyOrderAndLimit(
-        projected,
-        modifiedQuery
-      ) as QueryResult<TFind>;
+      const projected = project(results, modifiedQuery.find, modifiedQuery.where);
+      const finalResult = this._applyOrderAndLimit(projected, modifiedQuery) as QueryResult<TFind>;
       const executionTime = performance.now() - startTime;
       metadata.executionTimeMs = executionTime;
       metadata.resultCount = finalResult.length;
-      metadata.executionStrategy = "in-memory-speculative";
+      metadata.executionStrategy = 'in-memory-speculative';
 
       return {
         data: finalResult,
@@ -1600,12 +1471,12 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     // Re-execute query with filtered datoms
     const finalResult = (await this._executeDatalogWithSQLAndFilteredDatoms(
       modifiedQuery,
-      afterResult.datoms
+      afterResult.datoms,
     )) as QueryResult<TFind>;
     const executionTime = performance.now() - startTime;
     metadata.executionTimeMs = executionTime;
     metadata.resultCount = finalResult.length;
-    metadata.executionStrategy = "sql-joins";
+    metadata.executionStrategy = 'sql-joins';
 
     return {
       data: finalResult,

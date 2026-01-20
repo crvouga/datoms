@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
-import type { DatalogQuery } from "../../datalog/datalog.js";
-import { FIXTURES } from "./fixtures/fixtures.js";
-import type { Fixture } from "./fixtures/fixture.js";
+import type {DatalogQuery} from '../../datalog/datalog.js';
+import {FIXTURES} from './fixtures/fixtures.js';
+import type {Fixture} from './fixtures/fixture.js';
 
-describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
+describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   let f: Fixture;
 
   beforeEach(async () => {
@@ -16,112 +16,112 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe("Aggregation: count-distinct", () => {
-    test("should count distinct values", async () => {
-      const { db } = f;
+  describe('Aggregation: count-distinct', () => {
+    test('should count distinct values', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "name", v: "Alice" },
-        { op: "assert", e: 2, a: "name", v: "Bob" },
-        { op: "assert", e: 3, a: "name", v: "Alice" },
+        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
+        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
+        {op: 'assert', e: 3, a: 'name', v: 'Alice'},
       ]);
 
       const query: DatalogQuery = {
-        find: { total: ["count-distinct", "?name"] },
-        where: [{ e: "?e", a: "name", v: "?name" }],
+        find: {total: ['count-distinct', '?name']},
+        where: [{e: '?e', a: 'name', v: '?name'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(2);
+      expect(results[0]!['total']).toBe(2);
     });
 
-    test("should return 0 for empty results", async () => {
-      const { db } = f;
+    test('should return 0 for empty results', async () => {
+      const {db} = f;
       const query: DatalogQuery = {
-        find: { total: ["count-distinct", "?name"] },
-        where: [{ e: "?e", a: "name", v: "?name" }],
+        find: {total: ['count-distinct', '?name']},
+        where: [{e: '?e', a: 'name', v: '?name'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(0);
+      expect(results[0]!['total']).toBe(0);
     });
 
-    test("should count distinct single value", async () => {
-      const { db } = f;
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+    test('should count distinct single value', async () => {
+      const {db} = f;
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
       const query: DatalogQuery = {
-        find: { total: ["count-distinct", "?name"] },
-        where: [{ e: "?e", a: "name", v: "?name" }],
+        find: {total: ['count-distinct', '?name']},
+        where: [{e: '?e', a: 'name', v: '?name'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(1);
+      expect(results[0]!['total']).toBe(1);
     });
 
-    test("should count distinct numeric values", async () => {
-      const { db } = f;
+    test('should count distinct numeric values', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "age", v: 25 },
-        { op: "assert", e: 2, a: "age", v: 30 },
-        { op: "assert", e: 3, a: "age", v: 25 },
-        { op: "assert", e: 4, a: "age", v: 30 },
-        { op: "assert", e: 5, a: "age", v: 35 },
+        {op: 'assert', e: 1, a: 'age', v: 25},
+        {op: 'assert', e: 2, a: 'age', v: 30},
+        {op: 'assert', e: 3, a: 'age', v: 25},
+        {op: 'assert', e: 4, a: 'age', v: 30},
+        {op: 'assert', e: 5, a: 'age', v: 35},
       ]);
 
       const query: DatalogQuery = {
-        find: { total: ["count-distinct", "?age"] },
-        where: [{ e: "?e", a: "age", v: "?age" }],
+        find: {total: ['count-distinct', '?age']},
+        where: [{e: '?e', a: 'age', v: '?age'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(3);
+      expect(results[0]!['total']).toBe(3);
     });
 
-    test("should count distinct with filters", async () => {
-      const { db } = f;
+    test('should count distinct with filters', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "type", v: "person" },
-        { op: "assert", e: 1, a: "city", v: "NYC" },
-        { op: "assert", e: 2, a: "type", v: "person" },
-        { op: "assert", e: 2, a: "city", v: "LA" },
-        { op: "assert", e: 3, a: "type", v: "person" },
-        { op: "assert", e: 3, a: "city", v: "NYC" },
+        {op: 'assert', e: 1, a: 'type', v: 'person'},
+        {op: 'assert', e: 1, a: 'city', v: 'NYC'},
+        {op: 'assert', e: 2, a: 'type', v: 'person'},
+        {op: 'assert', e: 2, a: 'city', v: 'LA'},
+        {op: 'assert', e: 3, a: 'type', v: 'person'},
+        {op: 'assert', e: 3, a: 'city', v: 'NYC'},
       ]);
 
       const query: DatalogQuery = {
-        find: { total: ["count-distinct", "?city"] },
+        find: {total: ['count-distinct', '?city']},
         where: [
-          { e: "?e", a: "type", v: "person" },
-          { e: "?e", a: "city", v: "?city" },
+          {e: '?e', a: 'type', v: 'person'},
+          {e: '?e', a: 'city', v: '?city'},
         ],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(2);
+      expect(results[0]!['total']).toBe(2);
     });
 
-    test("should count distinct different data types", async () => {
-      const { db } = f;
+    test('should count distinct different data types', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "value", v: 42 },
-        { op: "assert", e: 2, a: "value", v: "test" },
-        { op: "assert", e: 3, a: "value", v: 42 },
-        { op: "assert", e: 4, a: "value", v: true },
+        {op: 'assert', e: 1, a: 'value', v: 42},
+        {op: 'assert', e: 2, a: 'value', v: 'test'},
+        {op: 'assert', e: 3, a: 'value', v: 42},
+        {op: 'assert', e: 4, a: 'value', v: true},
       ]);
 
       const query: DatalogQuery = {
-        find: { total: ["count-distinct", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {total: ['count-distinct', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(3);
+      expect(results[0]!['total']).toBe(3);
     });
   });
 });

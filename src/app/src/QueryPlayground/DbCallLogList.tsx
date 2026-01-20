@@ -1,16 +1,16 @@
-import { useEffect, useState } from "react";
-import type { QueryEditorLog } from "./types";
-import { DbCallLogItem } from "./DbCallLogItem";
+import {useEffect, useState} from 'react';
+import type {QueryEditorLog} from './types';
+import {DbCallLogItem} from './DbCallLogItem';
 
 // LocalStorage key for persistence
-const STORAGE_KEY_EXPANDED_IDS = "db-call-log-expanded-ids";
+const STORAGE_KEY_EXPANDED_IDS = 'db-call-log-expanded-ids';
 
 interface DbCallLogListProps {
   logs: QueryEditorLog[];
   onClear: () => void;
 }
 
-export function DbCallLogList({ logs, onClear }: DbCallLogListProps) {
+export function DbCallLogList({logs, onClear}: DbCallLogListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
   // Load expanded IDs from localStorage on mount
@@ -37,7 +37,7 @@ export function DbCallLogList({ logs, onClear }: DbCallLogListProps) {
   }, [expandedIds]);
 
   const toggleExpanded = (id: number) => {
-    setExpandedIds((prev) => {
+    setExpandedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -53,9 +53,7 @@ export function DbCallLogList({ logs, onClear }: DbCallLogListProps) {
       <div className="flex items-center justify-center h-full text-gray-500">
         <div className="text-center">
           <div className="text-sm mb-2">No DB calls logged</div>
-          <div className="text-xs text-gray-600">
-            Click "Run Code" to see DB call logs
-          </div>
+          <div className="text-xs text-gray-600">Click "Run Code" to see DB call logs</div>
         </div>
       </div>
     );
@@ -65,7 +63,7 @@ export function DbCallLogList({ logs, onClear }: DbCallLogListProps) {
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between p-2 border-b border-gray-700 bg-gray-900">
         <div className="text-xs text-gray-400">
-          {logs.length} DB call{logs.length !== 1 ? "s" : ""} logged
+          {logs.length} DB call{logs.length !== 1 ? 's' : ''} logged
         </div>
         <button
           onClick={onClear}
@@ -76,7 +74,7 @@ export function DbCallLogList({ logs, onClear }: DbCallLogListProps) {
       </div>
       <div className="flex-1 overflow-auto">
         <div className="divide-y divide-gray-700">
-          {logs.map((log) => (
+          {logs.map(log => (
             <DbCallLogItem
               key={log.id}
               log={log}

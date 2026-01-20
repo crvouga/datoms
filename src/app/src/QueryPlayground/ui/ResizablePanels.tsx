@@ -1,5 +1,5 @@
-import { useMemo, type ReactNode } from "react";
-import { PanelGroup, type PanelGroupProps } from "react-resizable-panels";
+import {useMemo, type ReactNode} from 'react';
+import {PanelGroup, type PanelGroupProps} from 'react-resizable-panels';
 
 export interface ResizablePanelsRenderProps {
   /**
@@ -9,10 +9,7 @@ export interface ResizablePanelsRenderProps {
   panelSizes: number[];
 }
 
-export interface ResizablePanelsProps extends Omit<
-  PanelGroupProps,
-  "onLayout" | "children"
-> {
+export interface ResizablePanelsProps extends Omit<PanelGroupProps, 'onLayout' | 'children'> {
   /**
    * Unique key for localStorage persistence
    */
@@ -61,7 +58,7 @@ export function ResizablePanels({
 }: ResizablePanelsProps) {
   // Validate defaultSizes
   if (defaultSizes.length < 2) {
-    throw new Error("ResizablePanels requires at least 2 default sizes");
+    throw new Error('ResizablePanels requires at least 2 default sizes');
   }
 
   // Load saved panel sizes from localStorage
@@ -73,7 +70,7 @@ export function ResizablePanels({
         if (
           Array.isArray(sizes) &&
           sizes.length === defaultSizes.length &&
-          sizes.every((s) => typeof s === "number" && s > 0 && s < 100)
+          sizes.every(s => typeof s === 'number' && s > 0 && s < 100)
         ) {
           return sizes;
         }
@@ -97,7 +94,7 @@ export function ResizablePanels({
 
   return (
     <PanelGroup {...panelGroupProps} onLayout={handlePanelLayout}>
-      {children({ panelSizes })}
+      {children({panelSizes})}
     </PanelGroup>
   );
 }

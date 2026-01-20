@@ -5,19 +5,19 @@
  * It is included in `src/index.html`.
  */
 
-import { createRoot } from "react-dom/client";
-import { App } from "./App";
+import {createRoot} from 'react-dom/client';
+import {App} from './App';
 
 function start() {
-  console.log("Starting frontend...");
-  const root = createRoot(document.getElementById("root")!);
-  console.log("Root created");
+  console.log('Starting frontend...');
+  const root = createRoot(document.getElementById('root')!);
+  console.log('Root created');
   root.render(<App />);
-  console.log("Frontend started");
+  console.log('Frontend started');
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", start);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', start);
 } else {
   start();
 }

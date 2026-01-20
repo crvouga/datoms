@@ -1,12 +1,12 @@
-import Editor from "@monaco-editor/react";
+import Editor from '@monaco-editor/react';
 
 export interface MonacoEditorWrapperProps {
   code: string;
   onChange: (value: string | undefined) => void;
-  theme: "vs" | "vs-dark" | "hc-black" | "hc-light";
+  theme: 'vs' | 'vs-dark' | 'hc-black' | 'hc-light';
   fontSize: number;
   lineHeight: number;
-  wordWrap: "on" | "off";
+  wordWrap: 'on' | 'off';
   tabSize: number;
   editorOptions: Record<string, unknown>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,19 +34,19 @@ export function MonacoEditorWrapper({
         theme={theme}
         onMount={onMount}
         options={{
-          minimap: { enabled: false },
+          minimap: {enabled: false},
           fontSize,
           wordWrap,
           automaticLayout: true,
           lineHeight,
-          padding: { top: 20, bottom: 20 },
+          padding: {top: 20, bottom: 20},
           scrollBeyondLastLine: false,
-          renderWhitespace: "selection",
+          renderWhitespace: 'selection',
           tabSize,
           suggestOnTriggerCharacters: true,
           quickSuggestions: true,
-          parameterHints: { enabled: true },
-          hover: { enabled: true },
+          parameterHints: {enabled: true},
+          hover: {enabled: true},
           formatOnPaste: true,
           formatOnType: true,
           ...editorOptions,

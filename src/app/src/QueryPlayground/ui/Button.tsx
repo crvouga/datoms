@@ -1,8 +1,8 @@
-import type { ReactNode } from "react";
-import { KeyboardShortcut } from "./KeyboardShortcut";
+import type {ReactNode} from 'react';
+import {KeyboardShortcut} from './KeyboardShortcut';
 
-export type ButtonVariant = "primary" | "secondary" | "danger" | "success";
-export type ButtonSize = "sm" | "md" | "lg";
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'success';
+export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps {
   onClick?: () => void;
@@ -15,35 +15,35 @@ export interface ButtonProps {
   keyboardShortcut?: string[];
   className?: string;
   title?: string;
-  type?: "button" | "submit" | "reset";
+  type?: 'button' | 'submit' | 'reset';
   children: ReactNode;
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: "bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600",
-  secondary: "bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600",
-  danger: "bg-red-600 hover:bg-red-700 disabled:bg-gray-600",
-  success: "bg-green-600 hover:bg-green-700 disabled:bg-gray-600",
+  primary: 'bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600',
+  secondary: 'bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600',
+  danger: 'bg-red-600 hover:bg-red-700 disabled:bg-gray-600',
+  success: 'bg-green-600 hover:bg-green-700 disabled:bg-gray-600',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: "px-3 py-1.5 text-sm",
-  md: "px-4 py-2 text-base",
-  lg: "px-6 py-3 text-lg",
+  sm: 'px-3 py-1.5 text-sm',
+  md: 'px-4 py-2 text-base',
+  lg: 'px-6 py-3 text-lg',
 };
 
 export function Button({
   onClick,
   disabled = false,
   loading = false,
-  loadingText = "Loading...",
-  variant = "primary",
-  size = "md",
+  loadingText = 'Loading...',
+  variant = 'primary',
+  size = 'md',
   icon,
   keyboardShortcut,
-  className = "",
+  className = '',
   title,
-  type = "button",
+  type = 'button',
   children,
 }: ButtonProps) {
   const isDisabled = disabled || loading;

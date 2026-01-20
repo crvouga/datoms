@@ -1,12 +1,10 @@
-import { unlinkSync } from "fs";
-import type { Fixture } from "../fixture.js";
-import { SQLiteSQLDatabase } from "../../../../sql-database/sql-database-sqlite.js";
-import { SQLiteDatomDatabase } from "../../../sqlite/sqlite-datom-database.js";
+import {unlinkSync} from 'fs';
+import type {Fixture} from '../fixture.js';
+import {SQLiteSQLDatabase} from '../../../../sql-database/sql-database-sqlite.js';
+import {SQLiteDatomDatabase} from '../../../sqlite/sqlite-datom-database.js';
 
-export const createSQLiteFixture = async (
-  filename: string
-): Promise<Fixture> => {
-  if (filename !== ":memory:") {
+export const createSQLiteFixture = async (filename: string): Promise<Fixture> => {
+  if (filename !== ':memory:') {
     try {
       unlinkSync(filename);
     } catch {

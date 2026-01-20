@@ -3,8 +3,8 @@
  * Provides a convenient API for building up error lists
  */
 
-import type { Datom } from "../../datoms.js";
-import type { HookError } from "./hook.js";
+import type {Datom} from '../../datoms.js';
+import type {HookError} from './hook.js';
 
 /**
  * Helper class for collecting validation errors in hooks
@@ -27,14 +27,9 @@ export class HookValidator {
    * @param code Optional error code
    * @param datom Optional datom associated with the error
    */
-  assert(
-    condition: boolean,
-    message: string,
-    code?: string,
-    datom?: Datom
-  ): void {
+  assert(condition: boolean, message: string, code?: string, datom?: Datom): void {
     if (!condition) {
-      this.errors.push({ message, code, datom });
+      this.errors.push({message, code, datom});
     }
   }
 

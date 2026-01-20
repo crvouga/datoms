@@ -8,7 +8,7 @@ export interface QueryEditorLog {
   /** Timestamp when the call was made */
   timestamp: number;
   /** Name of the method that was called */
-  method: "query" | "transact";
+  method: 'query' | 'transact';
   /** Arguments passed to the method */
   args: unknown[];
   /** Result of the call (if successful) */

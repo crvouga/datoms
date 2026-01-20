@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import {useEffect, useRef} from 'react';
 
 export interface UseKeyboardShortcutOptions {
   /**
@@ -56,7 +56,7 @@ export function useKeyboardShortcut({
       const isModifierPressed = event.metaKey || event.ctrlKey;
 
       // Check if "mod" is required in keys
-      const requiresMod = keys.includes("mod");
+      const requiresMod = keys.includes('mod');
 
       // If mod is required but not pressed, or mod is not required but pressed, skip
       if (requiresMod !== isModifierPressed) {
@@ -64,12 +64,12 @@ export function useKeyboardShortcut({
       }
 
       // Get the non-modifier key(s) from the keys array
-      const nonModKeys = keys.filter((key) => key !== "mod");
+      const nonModKeys = keys.filter(key => key !== 'mod');
 
       // Check if the pressed key matches any of the non-modifier keys
       // Normalize key comparison (case-insensitive for letter keys)
       const pressedKey = event.key;
-      const keyMatches = nonModKeys.some((key) => {
+      const keyMatches = nonModKeys.some(key => {
         // Case-insensitive comparison for letter keys
         if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
           return pressedKey.toLowerCase() === key.toLowerCase();
@@ -84,10 +84,10 @@ export function useKeyboardShortcut({
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [keys, enabled]);
 }

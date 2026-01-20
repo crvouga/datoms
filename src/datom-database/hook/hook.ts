@@ -3,10 +3,10 @@
  * Supports before-read, after-read, before-write, and after-write hooks
  */
 
-import type { DatalogQuery } from "../../datalog/datalog.js";
-import type { Datom, TransactionId } from "../../datoms.js";
-import type { Transaction } from "../../types.js";
-import type { DatabaseView } from "../views/database-view.js";
+import type {DatalogQuery} from '../../datalog/datalog.js';
+import type {Datom, TransactionId} from '../../datoms.js';
+import type {Transaction} from '../../types.js';
+import type {DatabaseView} from '../views/database-view.js';
 
 /**
  * Error structure returned by hooks
@@ -59,7 +59,7 @@ export type BeforeReadResult = {
  * Runs before query execution, can modify query or return errors
  */
 export type BeforeRead = {
-  type: "beforeRead";
+  type: 'beforeRead';
   name: string;
   execute: (query: DatalogQuery, ctx: ReadContext) => Promise<BeforeReadResult>;
 };
@@ -78,7 +78,7 @@ export type AfterReadResult = {
  * Runs after query execution, can filter/transform results or return errors
  */
 export type AfterRead = {
-  type: "afterRead";
+  type: 'afterRead';
   name: string;
   execute: (datoms: Datom[], ctx: ReadContext) => Promise<AfterReadResult>;
 };
@@ -97,7 +97,7 @@ export type BeforeWriteResult = {
  * Runs before transaction commit, can validate/augment transaction or return errors
  */
 export type BeforeWrite = {
-  type: "beforeWrite";
+  type: 'beforeWrite';
   name: string;
   execute: (tx: Transaction, ctx: WriteContext) => Promise<BeforeWriteResult>;
 };
@@ -118,7 +118,7 @@ export type WriteResult = {
  * Receives WriteResult containing transaction ID and final datoms written
  */
 export type AfterWrite = {
-  type: "afterWrite";
+  type: 'afterWrite';
   name: string;
   execute: (result: WriteResult, ctx: WriteContext) => Promise<void>;
 };
@@ -134,10 +134,10 @@ export type Hook = BeforeRead | AfterRead | BeforeWrite | AfterWrite;
 export class DatomDatabaseError extends Error {
   constructor(
     message: string,
-    public readonly code?: string
+    public readonly code?: string,
   ) {
     super(message);
-    this.name = "DatomDatabaseError";
+    this.name = 'DatomDatabaseError';
     Object.setPrototypeOf(this, DatomDatabaseError.prototype);
   }
 }
@@ -150,10 +150,10 @@ export class TransactionConflictError extends DatomDatabaseError {
   constructor(
     message: string,
     public readonly txId?: number,
-    public readonly conflictingTxId?: number
+    public readonly conflictingTxId?: number,
   ) {
-    super(message, "TRANSACTION_CONFLICT");
-    this.name = "TransactionConflictError";
+    super(message, 'TRANSACTION_CONFLICT');
+    this.name = 'TransactionConflictError';
     Object.setPrototypeOf(this, TransactionConflictError.prototype);
   }
 }
@@ -171,8 +171,8 @@ export class TransactionConflictError extends DatomDatabaseError {
  */
 export class QuerySafetyError extends DatomDatabaseError {
   constructor(message: string) {
-    super(message, "QUERY_SAFETY_VIOLATION");
-    this.name = "QuerySafetyError";
+    super(message, 'QUERY_SAFETY_VIOLATION');
+    this.name = 'QuerySafetyError';
     Object.setPrototypeOf(this, QuerySafetyError.prototype);
   }
 }
@@ -191,10 +191,10 @@ export class QuerySafetyError extends DatomDatabaseError {
 export class QueryTimeoutError extends DatomDatabaseError {
   constructor(
     public readonly timeoutMs: number,
-    public readonly queryOptions?: unknown
+    public readonly queryOptions?: unknown,
   ) {
-    super(`Query exceeded timeout of ${timeoutMs}ms`, "QUERY_TIMEOUT");
-    this.name = "QueryTimeoutError";
+    super(`Query exceeded timeout of ${timeoutMs}ms`, 'QUERY_TIMEOUT');
+    this.name = 'QueryTimeoutError';
     Object.setPrototypeOf(this, QueryTimeoutError.prototype);
   }
 }
@@ -214,13 +214,13 @@ export class QueryResultSizeError extends DatomDatabaseError {
   constructor(
     public readonly resultSize: number,
     public readonly maxResultSize: number,
-    public readonly queryOptions?: unknown
+    public readonly queryOptions?: unknown,
   ) {
     super(
       `Query result size ${resultSize} exceeds maximum allowed size ${maxResultSize}`,
-      "QUERY_RESULT_SIZE_EXCEEDED"
+      'QUERY_RESULT_SIZE_EXCEEDED',
     );
-    this.name = "QueryResultSizeError";
+    this.name = 'QueryResultSizeError';
     Object.setPrototypeOf(this, QueryResultSizeError.prototype);
   }
 }
@@ -239,13 +239,13 @@ export class QueryResultSizeError extends DatomDatabaseError {
 export class ConnectionPoolExhaustedError extends DatomDatabaseError {
   constructor(
     public readonly waitingRequests: number,
-    public readonly maxConnections: number
+    public readonly maxConnections: number,
   ) {
     super(
       `Connection pool exhausted: ${waitingRequests} requests waiting, max connections: ${maxConnections}`,
-      "CONNECTION_POOL_EXHAUSTED"
+      'CONNECTION_POOL_EXHAUSTED',
     );
-    this.name = "ConnectionPoolExhaustedError";
+    this.name = 'ConnectionPoolExhaustedError';
     Object.setPrototypeOf(this, ConnectionPoolExhaustedError.prototype);
   }
 }
@@ -265,10 +265,10 @@ export class ConnectionPoolExhaustedError extends DatomDatabaseError {
 export class QueryError extends DatomDatabaseError {
   constructor(
     message: string,
-    public readonly errors: HookErrorWithName[]
+    public readonly errors: HookErrorWithName[],
   ) {
-    super(message, "QUERY_HOOK_ERROR");
-    this.name = "QueryError";
+    super(message, 'QUERY_HOOK_ERROR');
+    this.name = 'QueryError';
     Object.setPrototypeOf(this, QueryError.prototype);
   }
 }
@@ -288,10 +288,10 @@ export class QueryError extends DatomDatabaseError {
 export class TransactionError extends DatomDatabaseError {
   constructor(
     message: string,
-    public readonly errors: HookErrorWithName[]
+    public readonly errors: HookErrorWithName[],
   ) {
-    super(message, "TRANSACTION_HOOK_ERROR");
-    this.name = "TransactionError";
+    super(message, 'TRANSACTION_HOOK_ERROR');
+    this.name = 'TransactionError';
     Object.setPrototypeOf(this, TransactionError.prototype);
   }
 }
@@ -329,16 +329,16 @@ export class HookEngine {
    */
   register(hook: Hook): void {
     switch (hook.type) {
-      case "beforeRead":
+      case 'beforeRead':
         this.beforeRead.push(hook);
         break;
-      case "afterRead":
+      case 'afterRead':
         this.afterRead.push(hook);
         break;
-      case "beforeWrite":
+      case 'beforeWrite':
         this.beforeWrite.push(hook);
         break;
-      case "afterWrite":
+      case 'afterWrite':
       default:
         this.afterWrite.push(hook);
         break;
@@ -353,7 +353,7 @@ export class HookEngine {
    */
   async runBeforeRead(
     query: DatalogQuery,
-    ctx: ReadContext
+    ctx: ReadContext,
   ): Promise<{
     query: DatalogQuery;
     errors: HookErrorWithName[];
@@ -382,7 +382,7 @@ export class HookEngine {
       }
     }
 
-    return { query: nextQuery, errors: allErrors };
+    return {query: nextQuery, errors: allErrors};
   }
 
   /**
@@ -393,7 +393,7 @@ export class HookEngine {
    */
   async runAfterRead(
     datoms: Datom[],
-    ctx: ReadContext
+    ctx: ReadContext,
   ): Promise<{
     datoms: Datom[];
     errors: HookErrorWithName[];
@@ -422,7 +422,7 @@ export class HookEngine {
       }
     }
 
-    return { datoms: result, errors: allErrors };
+    return {datoms: result, errors: allErrors};
   }
 
   /**
@@ -433,7 +433,7 @@ export class HookEngine {
    */
   async runBeforeWrite(
     tx: Transaction,
-    ctx: WriteContext
+    ctx: WriteContext,
   ): Promise<{
     tx: Transaction;
     errors: HookErrorWithName[];
@@ -462,7 +462,7 @@ export class HookEngine {
       }
     }
 
-    return { tx: result, errors: allErrors };
+    return {tx: result, errors: allErrors};
   }
 
   /**
@@ -473,11 +473,11 @@ export class HookEngine {
    */
   async runAfterWrite(result: WriteResult, ctx: WriteContext): Promise<void> {
     await Promise.allSettled(
-      this.afterWrite.map((hook) =>
-        hook.execute(result, ctx).catch((err) => {
+      this.afterWrite.map(hook =>
+        hook.execute(result, ctx).catch(err => {
           console.error(`After-write hook "${hook.name}" failed:`, err);
-        })
-      )
+        }),
+      ),
     );
   }
 }

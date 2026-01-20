@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { compileTypeScript, executeCode } from "../utils/codeExecutor";
-import type { TypeScriptEditorProps } from "../types";
+import {useState} from 'react';
+import {compileTypeScript, executeCode} from '../utils/codeExecutor';
+import type {TypeScriptEditorProps} from '../types';
 
 export interface UseCodeExecutionReturn {
   handleRun: () => Promise<void>;
@@ -21,11 +21,11 @@ export interface UseCodeExecutionReturn {
  */
 export function useCodeExecution(
   code: string,
-  executionContext: TypeScriptEditorProps["executionContext"],
-  onExecute: TypeScriptEditorProps["onExecute"],
-  onExecuteStart: TypeScriptEditorProps["onExecuteStart"],
-  onExecuteComplete: TypeScriptEditorProps["onExecuteComplete"],
-  onExecuteError: TypeScriptEditorProps["onExecuteError"]
+  executionContext: TypeScriptEditorProps['executionContext'],
+  onExecute: TypeScriptEditorProps['onExecute'],
+  onExecuteStart: TypeScriptEditorProps['onExecuteStart'],
+  onExecuteComplete: TypeScriptEditorProps['onExecuteComplete'],
+  onExecuteError: TypeScriptEditorProps['onExecuteError'],
 ): UseCodeExecutionReturn {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,17 +59,13 @@ export function useCodeExecution(
         compiledCode = compileTypeScript(code);
       } catch (compileError: unknown) {
         const errorMessage =
-          compileError instanceof Error
-            ? compileError.message
-            : String(compileError);
+          compileError instanceof Error ? compileError.message : String(compileError);
         throw new Error(`TypeScript compilation error: ${errorMessage}`);
       }
 
       // Get execution context (call function if needed)
       const contextValue =
-        typeof executionContext === "function"
-          ? executionContext()
-          : executionContext;
+        typeof executionContext === 'function' ? executionContext() : executionContext;
 
       // Execute the compiled code
       await executeCode(compiledCode, contextValue);
@@ -87,7 +83,7 @@ export function useCodeExecution(
       setError(errorMessage);
       setLatency(duration);
       onExecuteError?.(err instanceof Error ? err : new Error(String(err)));
-      console.error("Code execution error:", err);
+      console.error('Code execution error:', err);
     } finally {
       setLoading(false);
     }

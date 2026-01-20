@@ -3,24 +3,24 @@
  * Handles web standard Request/Response objects
  */
 
-import type { DatalogQuery } from "../../datalog/datalog.js";
-import type { Datom, DatomInput, TransactionId } from "../../datoms.js";
-import type { DatomDatabase } from "../datom-database.js";
-import type { Hook } from "../hook/hook.js";
+import type {DatalogQuery} from '../../datalog/datalog.js';
+import type {Datom, DatomInput, TransactionId} from '../../datoms.js';
+import type {DatomDatabase} from '../datom-database.js';
+import type {Hook} from '../hook/hook.js';
 import {
   QueryError,
   QueryResultSizeError,
   QuerySafetyError,
   QueryTimeoutError,
   TransactionError,
-} from "../hook/hook.js";
-import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
-import type { DatomsQuery, QueryResult } from "../views/database-view.js";
-import type { ViewConfig } from "../views/view-config.js";
+} from '../hook/hook.js';
+import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
+import type {DatomsQuery, QueryResult} from '../views/database-view.js';
+import type {ViewConfig} from '../views/view-config.js';
 
 // Request/Response types for HTTP API contract
 interface InitializeRequest {
-  method: "initialize";
+  method: 'initialize';
 }
 
 interface InitializeResponse {
@@ -28,7 +28,7 @@ interface InitializeResponse {
 }
 
 interface DatomsRequest {
-  method: "datoms";
+  method: 'datoms';
   options: DatomsQuery;
   viewConfig: ViewConfig;
 }
@@ -38,7 +38,7 @@ interface DatomsResponse {
 }
 
 interface QueryRequest {
-  method: "query";
+  method: 'query';
   query: DatalogQuery;
   context?: Record<string, unknown>;
   viewConfig: ViewConfig;
@@ -49,7 +49,7 @@ interface QueryResponse {
 }
 
 interface TransactRequest {
-  method: "transact";
+  method: 'transact';
   ops: (DatomInput | DatomInput[])[];
   metadata?: Record<string, unknown>;
   context?: Record<string, unknown>;
@@ -60,7 +60,7 @@ interface TransactResponse {
 }
 
 interface GetLatestTransactionRequest {
-  method: "getLatestTransaction";
+  method: 'getLatestTransaction';
 }
 
 interface GetLatestTransactionResponse {
@@ -70,7 +70,7 @@ interface GetLatestTransactionResponse {
 }
 
 interface RegisterHookRequest {
-  method: "registerHook";
+  method: 'registerHook';
   hook: Hook;
 }
 
@@ -79,8 +79,8 @@ interface RegisterHookResponse {
 }
 
 interface DeleteDatomsRequest {
-  method: "deleteDatoms";
-  config: { retentionCount: number };
+  method: 'deleteDatoms';
+  config: {retentionCount: number};
 }
 
 interface DeleteDatomsResponse {
@@ -122,33 +122,29 @@ export class HttpClientDatomDatabaseServerComponent {
    */
   async handleRequest(request: Request): Promise<Response> {
     // Handle CORS preflight
-    if (request.method === "OPTIONS") {
+    if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
         headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
         },
       });
     }
 
     // Only accept POST requests
-    if (request.method !== "POST") {
-      return this._errorResponse(
-        405,
-        "Method not allowed",
-        "METHOD_NOT_ALLOWED"
-      );
+    if (request.method !== 'POST') {
+      return this._errorResponse(405, 'Method not allowed', 'METHOD_NOT_ALLOWED');
     }
 
     // Validate Content-Type
-    const contentType = request.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
+    const contentType = request.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
       return this._errorResponse(
         400,
-        "Content-Type must be application/json",
-        "INVALID_CONTENT_TYPE"
+        'Content-Type must be application/json',
+        'INVALID_CONTENT_TYPE',
       );
     }
 
@@ -160,44 +156,34 @@ export class HttpClientDatomDatabaseServerComponent {
       // Route based on method
       let response: TransportResponse;
       switch (transportRequest.method) {
-        case "initialize":
-          response = await this._handleInitialize(
-            transportRequest as InitializeRequest
-          );
+        case 'initialize':
+          response = await this._handleInitialize(transportRequest as InitializeRequest);
           break;
-        case "datoms":
-          response = await this._handleDatoms(
-            transportRequest as DatomsRequest
-          );
+        case 'datoms':
+          response = await this._handleDatoms(transportRequest as DatomsRequest);
           break;
-        case "query":
+        case 'query':
           response = await this._handleQuery(transportRequest as QueryRequest);
           break;
-        case "transact":
-          response = await this._handleTransact(
-            transportRequest as TransactRequest
-          );
+        case 'transact':
+          response = await this._handleTransact(transportRequest as TransactRequest);
           break;
-        case "getLatestTransaction":
+        case 'getLatestTransaction':
           response = await this._handleGetLatestTransaction(
-            transportRequest as GetLatestTransactionRequest
+            transportRequest as GetLatestTransactionRequest,
           );
           break;
-        case "registerHook":
-          response = await this._handleRegisterHook(
-            transportRequest as RegisterHookRequest
-          );
+        case 'registerHook':
+          response = await this._handleRegisterHook(transportRequest as RegisterHookRequest);
           break;
-        case "deleteDatoms":
-          response = await this._handleDeleteDatoms(
-            transportRequest as DeleteDatomsRequest
-          );
+        case 'deleteDatoms':
+          response = await this._handleDeleteDatoms(transportRequest as DeleteDatomsRequest);
           break;
         default:
           return this._errorResponse(
             400,
-            `Unknown method: ${(transportRequest as { method?: string }).method}`,
-            "UNKNOWN_METHOD"
+            `Unknown method: ${(transportRequest as {method?: string}).method}`,
+            'UNKNOWN_METHOD',
           );
       }
 
@@ -205,8 +191,8 @@ export class HttpClientDatomDatabaseServerComponent {
       return new Response(JSON.stringify(response), {
         status: 200,
         headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
         },
       });
     } catch (error) {
@@ -214,23 +200,21 @@ export class HttpClientDatomDatabaseServerComponent {
     }
   }
 
-  private async _handleInitialize(
-    _request: InitializeRequest
-  ): Promise<InitializeResponse> {
+  private async _handleInitialize(_request: InitializeRequest): Promise<InitializeResponse> {
     await this.db.initialize();
     this.initialized = true;
-    return { success: true };
+    return {success: true};
   }
 
   private async _handleDatoms(request: DatomsRequest): Promise<DatomsResponse> {
     await this._ensureInitialized();
 
     // Handle speculative queries - need to merge speculative datoms with current state
-    if (request.viewConfig.type === "speculative") {
-      const currentView = this._createView({ type: "current" });
+    if (request.viewConfig.type === 'speculative') {
+      const currentView = this._createView({type: 'current'});
       // Use a large limit to fetch all current datoms for speculative queries
       // This bypasses validation that requires at least one filter or limit
-      const { data: currentDatoms } = await currentView.datoms({
+      const {data: currentDatoms} = await currentView.datoms({
         limit: Number.MAX_SAFE_INTEGER,
       });
       const speculativeDatoms = request.viewConfig.datoms;
@@ -244,7 +228,7 @@ export class HttpClientDatomDatabaseServerComponent {
 
       for (const speculativeDatom of speculativeDatoms) {
         const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-        if (speculativeDatom.op === "retract") {
+        if (speculativeDatom.op === 'retract') {
           mergedMap.delete(key);
         } else {
           mergedMap.set(key, speculativeDatom);
@@ -255,31 +239,31 @@ export class HttpClientDatomDatabaseServerComponent {
       // Apply filters from options
       let filtered = mergedDatoms;
       if (request.options.e !== undefined) {
-        filtered = filtered.filter((d) => d.e === request.options.e);
+        filtered = filtered.filter(d => d.e === request.options.e);
       }
       if (request.options.a !== undefined) {
-        filtered = filtered.filter((d) => d.a === request.options.a);
+        filtered = filtered.filter(d => d.a === request.options.a);
       }
       if (request.options.v !== undefined) {
-        filtered = filtered.filter((d) => d.v === request.options.v);
+        filtered = filtered.filter(d => d.v === request.options.v);
       }
       if (request.options.tx !== undefined) {
-        filtered = filtered.filter((d) => d.tx === request.options.tx);
+        filtered = filtered.filter(d => d.tx === request.options.tx);
       }
       if (request.options.txMax !== undefined) {
         const txMax = request.options.txMax;
-        filtered = filtered.filter((d) => d.tx <= txMax);
+        filtered = filtered.filter(d => d.tx <= txMax);
       }
       if (request.options.op !== undefined) {
-        filtered = filtered.filter((d) => d.op === request.options.op);
+        filtered = filtered.filter(d => d.op === request.options.op);
       }
 
-      return { datoms: filtered };
+      return {datoms: filtered};
     }
 
     const view = this._createView(request.viewConfig);
-    const { data: datoms } = await view.datoms(request.options);
-    return { datoms };
+    const {data: datoms} = await view.datoms(request.options);
+    return {datoms};
   }
 
   private async _handleQuery(request: QueryRequest): Promise<QueryResponse> {
@@ -292,25 +276,19 @@ export class HttpClientDatomDatabaseServerComponent {
       context: request.context ?? request.query.context,
       viewConfig: request.viewConfig,
     };
-    const { data: results } = await view.query(queryWithContext);
-    return { results };
+    const {data: results} = await view.query(queryWithContext);
+    return {results};
   }
 
-  private async _handleTransact(
-    request: TransactRequest
-  ): Promise<TransactResponse> {
+  private async _handleTransact(request: TransactRequest): Promise<TransactResponse> {
     await this._ensureInitialized();
 
-    const txId = await this.db.transact(
-      request.ops,
-      request.metadata,
-      request.context
-    );
-    return { txId };
+    const txId = await this.db.transact(request.ops, request.metadata, request.context);
+    return {txId};
   }
 
   private async _handleGetLatestTransaction(
-    _request: GetLatestTransactionRequest
+    _request: GetLatestTransactionRequest,
   ): Promise<GetLatestTransactionResponse> {
     await this._ensureInitialized();
 
@@ -322,22 +300,18 @@ export class HttpClientDatomDatabaseServerComponent {
     };
   }
 
-  private async _handleRegisterHook(
-    request: RegisterHookRequest
-  ): Promise<RegisterHookResponse> {
+  private async _handleRegisterHook(request: RegisterHookRequest): Promise<RegisterHookResponse> {
     await this._ensureInitialized();
 
     this.db.hook(request.hook);
-    return { success: true };
+    return {success: true};
   }
 
-  private async _handleDeleteDatoms(
-    request: DeleteDatomsRequest
-  ): Promise<DeleteDatomsResponse> {
+  private async _handleDeleteDatoms(request: DeleteDatomsRequest): Promise<DeleteDatomsResponse> {
     await this._ensureInitialized();
 
     const deleted = await this.db._destroy(request.config);
-    return { success: true, deleted };
+    return {success: true, deleted};
   }
 
   private _createView(viewConfig: ViewConfig) {
@@ -356,44 +330,28 @@ export class HttpClientDatomDatabaseServerComponent {
    */
   private _mapErrorToResponse(error: unknown): Response {
     if (error instanceof QueryTimeoutError) {
-      return this._errorResponse(408, error.message, "QUERY_TIMEOUT");
+      return this._errorResponse(408, error.message, 'QUERY_TIMEOUT');
     }
     if (error instanceof QuerySafetyError) {
-      return this._errorResponse(400, error.message, "QUERY_SAFETY_VIOLATION");
+      return this._errorResponse(400, error.message, 'QUERY_SAFETY_VIOLATION');
     }
     if (error instanceof QueryResultSizeError) {
-      return this._errorResponse(
-        400,
-        error.message,
-        "QUERY_RESULT_SIZE_EXCEEDED",
-        undefined,
-        {
-          resultSize: error.resultSize,
-          maxResultSize: error.maxResultSize,
-          queryOptions: error.queryOptions,
-        }
-      );
+      return this._errorResponse(400, error.message, 'QUERY_RESULT_SIZE_EXCEEDED', undefined, {
+        resultSize: error.resultSize,
+        maxResultSize: error.maxResultSize,
+        queryOptions: error.queryOptions,
+      });
     }
     if (error instanceof TransactionError) {
-      return this._errorResponse(
-        400,
-        error.message,
-        "TRANSACTION_HOOK_ERROR",
-        error.errors || []
-      );
+      return this._errorResponse(400, error.message, 'TRANSACTION_HOOK_ERROR', error.errors || []);
     }
     if (error instanceof QueryError) {
-      return this._errorResponse(
-        400,
-        error.message,
-        "QUERY_HOOK_ERROR",
-        error.errors || []
-      );
+      return this._errorResponse(400, error.message, 'QUERY_HOOK_ERROR', error.errors || []);
     }
     if (error instanceof Error) {
-      return this._errorResponse(500, error.message, "DATABASE_ERROR");
+      return this._errorResponse(500, error.message, 'DATABASE_ERROR');
     }
-    return this._errorResponse(500, String(error), "DATABASE_ERROR");
+    return this._errorResponse(500, String(error), 'DATABASE_ERROR');
   }
 
   /**
@@ -403,13 +361,13 @@ export class HttpClientDatomDatabaseServerComponent {
     status: number,
     message: string,
     code: string,
-    errors?: Array<{ hook: string; message: string; code?: string }>,
-    extraData?: Record<string, unknown>
+    errors?: Array<{hook: string; message: string; code?: string}>,
+    extraData?: Record<string, unknown>,
   ): Response {
     const errorBody: {
       error: string;
       code: string;
-      errors?: Array<{ hook: string; message: string; code?: string }>;
+      errors?: Array<{hook: string; message: string; code?: string}>;
       [key: string]: unknown;
     } = {
       error: message,
@@ -427,8 +385,8 @@ export class HttpClientDatomDatabaseServerComponent {
     return new Response(JSON.stringify(errorBody), {
       status,
       headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
       },
     });
   }

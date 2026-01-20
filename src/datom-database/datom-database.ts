@@ -3,11 +3,11 @@
  * Provides a high-level interface for working with datoms and datalog queries
  */
 
-import type { Datom, DatomInput, TransactionId } from "../datoms.js";
-import type { EntityId } from "../entity-id.js";
-import type { Transaction } from "../types.js";
-import type { Hook } from "./hook/hook.js";
-import type { DatabaseView } from "./views/database-view.js";
+import type {Datom, DatomInput, TransactionId} from '../datoms.js';
+import type {EntityId} from '../entity-id.js';
+import type {Transaction} from '../types.js';
+import type {Hook} from './hook/hook.js';
+import type {DatabaseView} from './views/database-view.js';
 
 /**
  * Datom database interface (Datomic-like minimal API)
@@ -139,7 +139,7 @@ export interface DatomDatabase extends DatabaseView {
   transact(
     ops: (DatomInput | DatomInput[] | Datom | Datom[])[],
     metadata?: Record<string, unknown>,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ): Promise<TransactionId>;
 
   /**
@@ -227,7 +227,7 @@ export interface DatomDatabase extends DatabaseView {
    */
   _getLatestTransaction(): Promise<Transaction>;
 
-  _destroy(config: { retentionCount: number }): Promise<number>;
+  _destroy(config: {retentionCount: number}): Promise<number>;
 }
 
 /**

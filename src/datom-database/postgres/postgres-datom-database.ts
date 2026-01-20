@@ -3,24 +3,14 @@
  * Accepts a SqlConnection interface for PostgreSQL-compatible databases
  */
 
-import type {
-  DatalogQuery,
-  DatalogQueryFindVariable,
-  QueryClause,
-} from "../../datalog/datalog.js";
-import type {
-  Attribute,
-  Datom,
-  DatomInput,
-  TransactionId,
-  Value,
-} from "../../datoms.js";
-import type { EntityId } from "../../entity-id.js";
-import type { SQLDatabase } from "../../sql-database/sql-database.js";
-import type { DatabaseRow } from "../../sql-database/types.js";
-import type { Logger, Transaction } from "../../types.js";
+import type {DatalogQuery, DatalogQueryFindVariable, QueryClause} from '../../datalog/datalog.js';
+import type {Attribute, Datom, DatomInput, TransactionId, Value} from '../../datoms.js';
+import type {EntityId} from '../../entity-id.js';
+import type {SQLDatabase} from '../../sql-database/sql-database.js';
+import type {DatabaseRow} from '../../sql-database/types.js';
+import type {Logger, Transaction} from '../../types.js';
 
-import type { DatomDatabase, WithResult } from "../datom-database.js";
+import type {DatomDatabase, WithResult} from '../datom-database.js';
 import {
   HookEngine,
   QueryError,
@@ -32,28 +22,21 @@ import {
   type ReadContext,
   type WriteContext,
   type WriteResult,
-} from "../hook/hook.js";
-import { applyAggregations } from "../in-memory/aggregations/computation.js";
-import { parseAggregation } from "../in-memory/aggregations/parser.js";
-import {
-  isQueryPattern,
-  isVariable,
-  stripQuestionMark,
-} from "../shared/datalog-helpers.js";
-import { joinResults, project } from "../shared/query-results.js";
-import { ConfiguredDatabaseView } from "../views/configured-database-view.js";
+} from '../hook/hook.js';
+import {applyAggregations} from '../in-memory/aggregations/computation.js';
+import {parseAggregation} from '../in-memory/aggregations/parser.js';
+import {isQueryPattern, isVariable, stripQuestionMark} from '../shared/datalog-helpers.js';
+import {joinResults, project} from '../shared/query-results.js';
+import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
 import type {
   DatabaseView,
   DatomsQuery,
   DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
-} from "../views/database-view.js";
-import type { ViewConfig } from "../views/view-config.js";
-import {
-  aggregationToSQL,
-  checkSQLAggregations,
-} from "./aggregations/helpers.js";
+} from '../views/database-view.js';
+import type {ViewConfig} from '../views/view-config.js';
+import {aggregationToSQL, checkSQLAggregations} from './aggregations/helpers.js';
 
 /**
  * Configuration for PostgreSQL maintenance operations
@@ -89,30 +72,30 @@ function formatSQLWithParams(sql: string, params: unknown[]): string {
   let paramIndex = 0;
   return sql.replace(/\?/g, () => {
     if (paramIndex >= params.length) {
-      return "?";
+      return '?';
     }
     const param = params[paramIndex++];
 
     // Handle null/undefined
     if (param === null || param === undefined) {
-      return "NULL";
+      return 'NULL';
     }
 
     // Handle numbers
-    if (typeof param === "number") {
+    if (typeof param === 'number') {
       return String(param);
     }
 
     // Handle booleans
-    if (typeof param === "boolean") {
-      return param ? "TRUE" : "FALSE";
+    if (typeof param === 'boolean') {
+      return param ? 'TRUE' : 'FALSE';
     }
 
     // Handle strings
-    if (typeof param === "string") {
+    if (typeof param === 'string') {
       // Check if it's a JSONB value (used for v column)
       // JSONB values are stringified JSON that need ::jsonb cast
-      if (param.startsWith("{") || param.startsWith("[")) {
+      if (param.startsWith('{') || param.startsWith('[')) {
         try {
           // Validate it's valid JSON
           JSON.parse(param);
@@ -151,7 +134,7 @@ function canUsePivotOptimization(clauses: QueryClause[]): boolean {
   for (const clause of clauses) {
     if (!clause || !isQueryPattern(clause)) return false;
 
-    const { e: entityVal, a: attributeVal } = clause;
+    const {e: entityVal, a: attributeVal} = clause;
 
     // Entity must be a variable (not bound)
     if (!isVariable(entityVal)) return false;
@@ -182,8 +165,8 @@ function canUsePivotOptimization(clauses: QueryClause[]): boolean {
  */
 export function datalogToPostgresSQL(
   query: DatalogQuery,
-  tableName: string = "datoms"
-): { sql: string; params: unknown[] } {
+  tableName: string = 'datoms',
+): {sql: string; params: unknown[]} {
   const clauses = query.where;
   const params: unknown[] = [];
 
@@ -200,11 +183,9 @@ export function datalogToPostgresSQL(
 
     for (const clause of clauses) {
       if (!clause || !isQueryPattern(clause)) {
-        throw new Error(
-          "Only QueryPattern clauses are supported in pivot queries"
-        );
+        throw new Error('Only QueryPattern clauses are supported in pivot queries');
       }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+      const {e: entityVal, a: attributeVal, v: valueVal} = clause;
 
       // Get entity variable (should be same for all clauses)
       if (isVariable(entityVal)) {
@@ -225,7 +206,7 @@ export function datalogToPostgresSQL(
           // Bound value - track it for filtering
           let boundValue = valueVal as Value;
           if (boundValue === undefined) {
-            boundValue = "__UNDEFINED__";
+            boundValue = '__UNDEFINED__';
           }
           attrToBoundValue.set(attr, boundValue);
         }
@@ -259,7 +240,7 @@ export function datalogToPostgresSQL(
         SELECT DISTINCT ON (e, a, v)
           e, a, v, tx, op
         FROM ${tableName}
-        WHERE (${attributeConditions.join(" OR ")})
+        WHERE (${attributeConditions.join(' OR ')})
         ORDER BY e, a, v, tx DESC
       ),
       active_datoms AS (
@@ -282,9 +263,7 @@ export function datalogToPostgresSQL(
     // array_agg[1] will get that single value
     for (const [attr, varName] of attrToVar.entries()) {
       const varColName = stripQuestionMark(varName);
-      pivotSelects.push(
-        `(array_agg(v) FILTER (WHERE a = ?))[1] AS "${varColName}"`
-      );
+      pivotSelects.push(`(array_agg(v) FILTER (WHERE a = ?))[1] AS "${varColName}"`);
       params.push(attr);
     }
 
@@ -324,13 +303,9 @@ export function datalogToPostgresSQL(
       } else {
         // Regular variable
         let varName: string;
-        if (
-          Array.isArray(expr) &&
-          expr.length === 1 &&
-          typeof expr[0] === "string"
-        ) {
+        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === 'string') {
           varName = expr[0];
-        } else if (typeof expr === "string") {
+        } else if (typeof expr === 'string') {
           varName = expr;
         } else {
           continue;
@@ -346,7 +321,7 @@ export function datalogToPostgresSQL(
     }
 
     // Build GROUP BY clause for pivot subquery
-    let groupByClause = "";
+    let groupByClause = '';
     if (entityVarName) {
       groupByClause = `GROUP BY e`;
     }
@@ -365,9 +340,7 @@ export function datalogToPostgresSQL(
       // Repeat the same array_agg expression used in SELECT to check for NULL
       // Add the attribute to params again (will be converted to positional params by adapter)
       params.push(attr);
-      havingConditions.push(
-        `(array_agg(v) FILTER (WHERE a = ?))[1] IS NOT NULL`
-      );
+      havingConditions.push(`(array_agg(v) FILTER (WHERE a = ?))[1] IS NOT NULL`);
     }
 
     // Check that attributes with bound values match the expected values
@@ -375,15 +348,11 @@ export function datalogToPostgresSQL(
       // Verify the pivoted value matches the bound value
       params.push(attr);
       params.push(JSON.stringify(boundValue));
-      havingConditions.push(
-        `(array_agg(v) FILTER (WHERE a = ?))[1] = ?::jsonb`
-      );
+      havingConditions.push(`(array_agg(v) FILTER (WHERE a = ?))[1] = ?::jsonb`);
     }
 
     const havingClause =
-      havingConditions.length > 0
-        ? `HAVING ${havingConditions.join(" AND ")}`
-        : "";
+      havingConditions.length > 0 ? `HAVING ${havingConditions.join(' AND ')}` : '';
 
     // Build ORDER BY clause
     // For JSONB value columns, handle different types appropriately:
@@ -394,7 +363,7 @@ export function datalogToPostgresSQL(
     // 1. Numeric ordering (NULLS LAST for non-numeric values)
     // 2. Text ordering (NULLS LAST for numeric values)
     // This ensures numeric values are sorted numerically and text values alphabetically
-    let orderByClause = "";
+    let orderByClause = '';
     if (query.orderBy && query.orderBy.length > 0) {
       const orderParts: string[] = [];
       for (const [variable, direction] of query.orderBy) {
@@ -407,7 +376,7 @@ export function datalogToPostgresSQL(
             `CASE WHEN jsonb_typeof(${columnRef}::jsonb) = 'number' 
               THEN (${columnRef}::jsonb)::text::numeric
               ELSE NULL
-            END ${dir} NULLS LAST`
+            END ${dir} NULLS LAST`,
           );
           // Second expression: text ordering (NULL for numeric values)
           orderParts.push(
@@ -417,26 +386,26 @@ export function datalogToPostgresSQL(
                 ELSE ${columnRef}::jsonb::text
               END
               ELSE NULL
-            END ${dir} NULLS LAST`
+            END ${dir} NULLS LAST`,
           );
         }
       }
       if (orderParts.length > 0) {
-        orderByClause = `ORDER BY ${orderParts.join(", ")}`;
+        orderByClause = `ORDER BY ${orderParts.join(', ')}`;
       }
     }
 
     // Build LIMIT clause
-    const limitClause = query.limit ? `LIMIT ?` : "";
+    const limitClause = query.limit ? `LIMIT ?` : '';
     if (query.limit) {
       params.push(query.limit);
     }
 
     const sql = `
       WITH ${cte}
-      SELECT ${selectColumns.join(", ")}
+      SELECT ${selectColumns.join(', ')}
       FROM (
-        SELECT ${pivotSelects.join(", ")}
+        SELECT ${pivotSelects.join(', ')}
         FROM active_datoms
         ${groupByClause}
         ${havingClause}
@@ -445,7 +414,7 @@ export function datalogToPostgresSQL(
       ${limitClause}
     `;
 
-    return { sql: sql.trim(), params };
+    return {sql: sql.trim(), params};
   }
 
   // Build SQL using regular joins
@@ -457,9 +426,9 @@ export function datalogToPostgresSQL(
   for (let i = 0; i < clauses.length; i++) {
     const clause = clauses[i];
     if (!clause || !isQueryPattern(clause)) {
-      throw new Error("Only QueryPattern clauses are supported in SQL queries");
+      throw new Error('Only QueryPattern clauses are supported in SQL queries');
     }
-    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+    const {e: entityVal, a: attributeVal, v: valueVal} = clause;
     const alias = `d${i}`;
 
     const conditions: string[] = [];
@@ -476,7 +445,7 @@ export function datalogToPostgresSQL(
     if (!isVariable(valueVal)) {
       let value = valueVal as Value;
       if (value === undefined) {
-        value = "__UNDEFINED__";
+        value = '__UNDEFINED__';
       }
       conditions.push(`v = ?::jsonb`);
       params.push(JSON.stringify(value));
@@ -484,8 +453,7 @@ export function datalogToPostgresSQL(
 
     // We need to include retractions in DISTINCT ON to correctly determine the latest state.
     // We filter by op AFTER DISTINCT ON. This ensures that if a datom was asserted then retracted, the retraction wins.
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // PostgreSQL uses DISTINCT ON for deduplication
     const cte = `
@@ -514,7 +482,7 @@ export function datalogToPostgresSQL(
     if (!clause || !isQueryPattern(clause)) {
       continue;
     }
-    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+    const {e: entityVal, a: attributeVal, v: valueVal} = clause;
     const alias = `d${i}_active`;
     if (isVariable(entityVal)) {
       // Only set if not already mapped (prefer first occurrence)
@@ -537,40 +505,35 @@ export function datalogToPostgresSQL(
   }
 
   // Build JOIN conditions based on shared variables
-  const variableToClause: Map<
-    string,
-    { clauseIndex: number; field: string }[]
-  > = new Map();
+  const variableToClause: Map<string, {clauseIndex: number; field: string}[]> = new Map();
 
   for (let i = 0; i < clauses.length; i++) {
     const clause = clauses[i];
     if (!clause || !isQueryPattern(clause)) {
-      throw new Error(
-        "Only QueryPattern clauses are supported in JOIN conditions"
-      );
+      throw new Error('Only QueryPattern clauses are supported in JOIN conditions');
     }
-    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+    const {e: entityVal, a: attributeVal, v: valueVal} = clause;
 
     if (isVariable(entityVal)) {
       const varName = entityVal as string;
       if (!variableToClause.has(varName)) {
         variableToClause.set(varName, []);
       }
-      variableToClause.get(varName)!.push({ clauseIndex: i, field: "e" });
+      variableToClause.get(varName)!.push({clauseIndex: i, field: 'e'});
     }
     if (isVariable(attributeVal)) {
       const varName = attributeVal as string;
       if (!variableToClause.has(varName)) {
         variableToClause.set(varName, []);
       }
-      variableToClause.get(varName)!.push({ clauseIndex: i, field: "a" });
+      variableToClause.get(varName)!.push({clauseIndex: i, field: 'a'});
     }
     if (isVariable(valueVal)) {
       const varName = valueVal as string;
       if (!variableToClause.has(varName)) {
         variableToClause.set(varName, []);
       }
-      variableToClause.get(varName)!.push({ clauseIndex: i, field: "v" });
+      variableToClause.get(varName)!.push({clauseIndex: i, field: 'v'});
     }
   }
 
@@ -590,16 +553,13 @@ export function datalogToPostgresSQL(
         let prevExpr = `${prevAlias}.${prev.field}`;
         let currExpr = `${currAlias}.${curr.field}`;
 
-        if (prev.field === "v" && (curr.field === "e" || curr.field === "a")) {
+        if (prev.field === 'v' && (curr.field === 'e' || curr.field === 'a')) {
           // v (jsonb) = e/a (text): cast v to text
           prevExpr = `${prevAlias}.v::text`;
-        } else if (
-          (prev.field === "e" || prev.field === "a") &&
-          curr.field === "v"
-        ) {
+        } else if ((prev.field === 'e' || prev.field === 'a') && curr.field === 'v') {
           // e/a (text) = v (jsonb): cast v to text
           currExpr = `${currAlias}.v::text`;
-        } else if (prev.field === "v" && curr.field === "v") {
+        } else if (prev.field === 'v' && curr.field === 'v') {
           // v (jsonb) = v (jsonb): cast both to text for comparison
           prevExpr = `${prevAlias}.v::text`;
           currExpr = `${currAlias}.v::text`;
@@ -612,9 +572,7 @@ export function datalogToPostgresSQL(
 
   // Build aggregation SELECT columns
   // First check if we have any aggregations
-  const hasAggregations = Object.values(query.find).some((expr) =>
-    parseAggregation(expr)
-  );
+  const hasAggregations = Object.values(query.find).some(expr => parseAggregation(expr));
   const groupByColumns: string[] = [];
   const findKeys = Object.keys(query.find);
   for (const outputKey of findKeys) {
@@ -640,13 +598,9 @@ export function datalogToPostgresSQL(
     } else {
       // Regular variable - include in SELECT
       let varName: string;
-      if (
-        Array.isArray(expr) &&
-        expr.length === 1 &&
-        typeof expr[0] === "string"
-      ) {
+      if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === 'string') {
         varName = expr[0];
-      } else if (typeof expr === "string") {
+      } else if (typeof expr === 'string') {
         varName = expr;
       } else {
         continue;
@@ -665,7 +619,7 @@ export function datalogToPostgresSQL(
 
   // Build the final SQL query
   // Use _active CTEs which filter to only assertions after DISTINCT ON
-  const cteClause = ctes.length > 0 ? `WITH ${ctes.join(", ")}` : "";
+  const cteClause = ctes.length > 0 ? `WITH ${ctes.join(', ')}` : '';
   const fromClause = `FROM d0_active`;
 
   // Build JOIN clauses
@@ -675,7 +629,7 @@ export function datalogToPostgresSQL(
     const conditions: string[] = [];
 
     for (const joinCond of joinConditions) {
-      const parts = joinCond.split(" = ");
+      const parts = joinCond.split(' = ');
       if (parts.length === 2 && parts[0] && parts[1]) {
         // Extract table aliases from both sides (handle type casting like ::text)
         // Match alias at the start, which may be followed by field access and type casts
@@ -683,8 +637,7 @@ export function datalogToPostgresSQL(
         const leftMatch = parts[0].trim().match(/^(d\d+)_active\./);
         const rightMatch = parts[1].trim().match(/^(d\d+)_active\./);
 
-        if (!leftMatch || !rightMatch || !leftMatch[1] || !rightMatch[1])
-          continue;
+        if (!leftMatch || !rightMatch || !leftMatch[1] || !rightMatch[1]) continue;
 
         const leftAlias = `${leftMatch[1]}_active`;
         const rightAlias = `${rightMatch[1]}_active`;
@@ -716,7 +669,7 @@ export function datalogToPostgresSQL(
     }
 
     if (conditions.length > 0) {
-      joinClauses.push(`JOIN ${alias} ON ${conditions.join(" AND ")}`);
+      joinClauses.push(`JOIN ${alias} ON ${conditions.join(' AND ')}`);
     } else {
       // If no explicit JOIN conditions found, try to join to the previous table
       // This handles cases where variables might not be properly tracked
@@ -744,7 +697,7 @@ export function datalogToPostgresSQL(
     }
   }
 
-  const joinClause = joinClauses.join(" ");
+  const joinClause = joinClauses.join(' ');
 
   // Build ORDER BY clause
   // Use variableToColumn map to ensure we reference columns from tables that are definitely joined
@@ -755,7 +708,7 @@ export function datalogToPostgresSQL(
   // Use two ORDER BY expressions per variable for JSONB columns:
   // 1. Numeric ordering (NULLS LAST for non-numeric values)
   // 2. Text ordering (NULLS LAST for numeric values)
-  let orderByClause = "";
+  let orderByClause = '';
   if (query.orderBy && query.orderBy.length > 0) {
     const orderParts: string[] = [];
     for (const [variable, direction] of query.orderBy) {
@@ -763,14 +716,14 @@ export function datalogToPostgresSQL(
       if (columnRef) {
         const dir = direction.toUpperCase();
         // Check if this is a value column (JSONB) by checking if it contains .v
-        const isValueColumn = columnRef.includes(".v");
+        const isValueColumn = columnRef.includes('.v');
         if (isValueColumn) {
           // First expression: numeric ordering (NULL for non-numeric values)
           orderParts.push(
             `CASE WHEN jsonb_typeof(${columnRef}::jsonb) = 'number' 
               THEN (${columnRef}::jsonb)::text::numeric
               ELSE NULL
-            END ${dir} NULLS LAST`
+            END ${dir} NULLS LAST`,
           );
           // Second expression: text ordering (NULL for numeric values)
           orderParts.push(
@@ -780,7 +733,7 @@ export function datalogToPostgresSQL(
                 ELSE ${columnRef}::jsonb::text
               END
               ELSE NULL
-            END ${dir} NULLS LAST`
+            END ${dir} NULLS LAST`,
           );
         } else {
           orderParts.push(`${columnRef} ${dir}`);
@@ -788,24 +741,24 @@ export function datalogToPostgresSQL(
       }
     }
     if (orderParts.length > 0) {
-      orderByClause = `ORDER BY ${orderParts.join(", ")}`;
+      orderByClause = `ORDER BY ${orderParts.join(', ')}`;
     }
   }
 
   // Build GROUP BY clause if we have aggregations with non-aggregated columns
-  let groupByClause = "";
+  let groupByClause = '';
   if (groupByColumns.length > 0) {
-    groupByClause = `GROUP BY ${groupByColumns.join(", ")}`;
+    groupByClause = `GROUP BY ${groupByColumns.join(', ')}`;
   }
 
-  const limitClause = query.limit ? `LIMIT ?` : "";
+  const limitClause = query.limit ? `LIMIT ?` : '';
   if (query.limit) {
     params.push(query.limit);
   }
 
   const sql = `
     ${cteClause}
-    SELECT ${selectColumns.join(", ")}
+    SELECT ${selectColumns.join(', ')}
     ${fromClause}
     ${joinClause}
     ${groupByClause}
@@ -813,7 +766,7 @@ export function datalogToPostgresSQL(
     ${limitClause}
   `;
 
-  return { sql: sql.trim(), params };
+  return {sql: sql.trim(), params};
 }
 
 /**
@@ -832,7 +785,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
   constructor({
     sqlDb,
-    tableName = "datoms",
+    tableName = 'datoms',
     maintenanceConfig,
     logger,
   }: {
@@ -843,7 +796,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   }) {
     this.hooks = new HookEngine();
     this.sqlDb = sqlDb;
-    this.tableName = tableName || "datoms";
+    this.tableName = tableName || 'datoms';
     this.maintenanceConfig = maintenanceConfig;
     this.logger = logger;
   }
@@ -953,7 +906,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   async transact(
     ops: (DatomInput | DatomInput[])[],
     metadata?: Record<string, unknown>,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ): Promise<TransactionId> {
     await this._ensureInitialized();
 
@@ -969,9 +922,9 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const subs: DatomInput[] = [];
 
     for (const op of ops.flat()) {
-      const datom = { e: op.e, a: op.a, v: op.v, op: op.op };
+      const datom = {e: op.e, a: op.a, v: op.v, op: op.op};
 
-      if (op.op === "assert") {
+      if (op.op === 'assert') {
         // Validate add, accounting for subs already processed
         await this._validateDatoms([datom], true, subs);
         adds.push(datom);
@@ -993,7 +946,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         a: sub.a,
         v: sub.v,
         tx: txId,
-        op: "retract",
+        op: 'retract',
       });
     }
 
@@ -1003,7 +956,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         a: add.a,
         v: add.v,
         tx: txId,
-        op: "assert",
+        op: 'assert',
       });
     }
 
@@ -1018,15 +971,12 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const beforeResult = await this.hooks.runBeforeWrite(tx, ctx);
 
     if (beforeResult.errors.length > 0) {
-      throw new TransactionError(
-        "Transaction validation failed",
-        beforeResult.errors
-      );
+      throw new TransactionError('Transaction validation failed', beforeResult.errors);
     }
 
     // Combine all datoms from the modified transaction (using the modified transaction from hooks)
     const finalTx = beforeResult.tx;
-    const allFinalDatoms = finalTx.datoms.map((d) => ({
+    const allFinalDatoms = finalTx.datoms.map(d => ({
       e: d.e,
       a: d.a,
       v: d.v,
@@ -1040,13 +990,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Create write result for after-write hooks
     const writeResult: WriteResult = {
       txId: committedTxId,
-      datoms: finalTx.datoms.map((d) => ({ ...d, tx: committedTxId })),
+      datoms: finalTx.datoms.map(d => ({...d, tx: committedTxId})),
       timestamp: Date.now(),
     };
 
     // Run after-write hooks (fire and forget, don't block)
-    this.hooks.runAfterWrite(writeResult, ctx).catch((err) => {
-      console.error("After-write hook failed:", err);
+    this.hooks.runAfterWrite(writeResult, ctx).catch(err => {
+      console.error('After-write hook failed:', err);
     });
 
     return committedTxId;
@@ -1055,15 +1005,15 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   private async _validateDatoms(
     datoms: DatomInput[],
     _isAdd: boolean,
-    _subsInSameTransaction?: DatomInput[]
+    _subsInSameTransaction?: DatomInput[],
   ): Promise<void> {
     // Basic runtime validation for cases where TypeScript types are bypassed
     for (const datom of datoms) {
       if (datom.e === null || datom.e === undefined) {
-        throw new Error("Datom must have an entity ID");
+        throw new Error('Datom must have an entity ID');
       }
       if (datom.a === null || datom.a === undefined) {
-        throw new Error("Datom must have an attribute");
+        throw new Error('Datom must have an attribute');
       }
     }
   }
@@ -1077,10 +1027,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   /**
    * Get query plan for a SQL query using EXPLAIN
    */
-  private async _getQueryPlan(
-    sql: string,
-    params: unknown[]
-  ): Promise<string | undefined> {
+  private async _getQueryPlan(sql: string, params: unknown[]): Promise<string | undefined> {
     try {
       // Use EXPLAIN (FORMAT TEXT) to get a readable query plan
       const explainSql = `EXPLAIN (FORMAT TEXT) ${sql}`;
@@ -1093,18 +1040,18 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
             // PostgreSQL EXPLAIN returns the plan in a column named "QUERY PLAN"
             // but different adapters might return it differently
             const planText =
-              (row as Record<string, unknown>)["QUERY PLAN"] ||
-              (row as Record<string, unknown>)["query plan"] ||
+              (row as Record<string, unknown>)['QUERY PLAN'] ||
+              (row as Record<string, unknown>)['query plan'] ||
               Object.values(row)[0];
             return String(planText);
           })
-          .join("\n");
+          .join('\n');
       }
       return undefined;
     } catch (error) {
       // If EXPLAIN fails, don't break the query - just return undefined
       // This can happen if the SQL is invalid or if EXPLAIN is not supported
-      this.logger?.warn("Failed to get query plan", {
+      this.logger?.warn('Failed to get query plan', {
         error: error instanceof Error ? error.message : String(error),
       });
       return undefined;
@@ -1114,9 +1061,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   async datoms(options: DatomsQuery): Promise<DatomsResultEnvelope> {
     // Validate that tx and txMax are mutually exclusive
     if (options.tx !== undefined && options.txMax !== undefined) {
-      throw new Error(
-        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
-      );
+      throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
     }
 
     // Validate that query has at least one filter or limit to prevent accidental full scans
@@ -1130,12 +1075,12 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     if (!hasFilter && !hasLimit) {
       throw new QuerySafetyError(
-        "Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans"
+        'Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans',
       );
     }
 
     // Extract viewConfig from options
-    const viewConfig = options.viewConfig ?? { type: "current" };
+    const viewConfig = options.viewConfig ?? {type: 'current'};
 
     // Execute query with timeout if specified
     let envelope: DatomsResultEnvelope;
@@ -1146,40 +1091,30 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         }, options.timeoutMs);
       });
 
-      const queryPromise = this._datomsWithMetadataInternal(
-        options,
-        viewConfig
-      );
+      const queryPromise = this._datomsWithMetadataInternal(options, viewConfig);
       envelope = await Promise.race([queryPromise, timeoutPromise]);
     } else {
       envelope = await this._datomsWithMetadataInternal(options, viewConfig);
     }
 
     // Check result size limit if specified
-    if (
-      options.maxResultSize !== undefined &&
-      envelope.data.length > options.maxResultSize
-    ) {
-      throw new QueryResultSizeError(
-        envelope.data.length,
-        options.maxResultSize,
-        options
-      );
+    if (options.maxResultSize !== undefined && envelope.data.length > options.maxResultSize) {
+      throw new QueryResultSizeError(envelope.data.length, options.maxResultSize, options);
     }
 
     return envelope;
   }
 
   asOf(txId: TransactionId): DatabaseView {
-    return new ConfiguredDatabaseView(this, { type: "asOf", txId });
+    return new ConfiguredDatabaseView(this, {type: 'asOf', txId});
   }
 
   history(): DatabaseView {
-    return new ConfiguredDatabaseView(this, { type: "history" });
+    return new ConfiguredDatabaseView(this, {type: 'history'});
   }
 
   since(txId: TransactionId): DatabaseView {
-    return new ConfiguredDatabaseView(this, { type: "since", txId });
+    return new ConfiguredDatabaseView(this, {type: 'since', txId});
   }
 
   async with(ops: DatomInput[]): Promise<WithResult> {
@@ -1205,11 +1140,11 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     }
 
     // Create dbBefore view (current state)
-    const dbBefore = new ConfiguredDatabaseView(this, { type: "current" });
+    const dbBefore = new ConfiguredDatabaseView(this, {type: 'current'});
 
     // Create dbAfter view (speculative state)
     const dbAfter = new ConfiguredDatabaseView(this, {
-      type: "speculative",
+      type: 'speculative',
       datoms: speculativeDatoms,
     });
 
@@ -1226,8 +1161,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
   private async _executeCurrentQuery(
     options: DatomsQuery,
-    sqlQueries?: SQLQueryMetadata[]
-  ): Promise<{ datoms: Datom[]; sql: string }> {
+    sqlQueries?: SQLQueryMetadata[],
+  ): Promise<{datoms: Datom[]; sql: string}> {
     await this._ensureInitialized();
 
     // Note: Validation is handled by the base class query() method
@@ -1237,51 +1172,50 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // Build WHERE conditions - connection adapter converts ? to $1, $2, etc.
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
       let value = options.v;
       if (value === undefined) {
-        value = "__UNDEFINED__";
+        value = '__UNDEFINED__';
       }
-      conditions.push("v = ?::jsonb");
+      conditions.push('v = ?::jsonb');
       params.push(JSON.stringify(value));
     }
     if (options.tx !== undefined) {
-      conditions.push("tx = ?");
+      conditions.push('tx = ?');
       params.push(options.tx);
     }
     if (options.txMax !== undefined) {
-      conditions.push("tx <= ?");
+      conditions.push('tx <= ?');
       params.push(options.txMax);
     }
 
     // Use DISTINCT ON to get latest datom per (e, a, v) in SQL
     // This supports multi-valued attributes (multiple values per attribute)
     // PostgreSQL-specific: DISTINCT ON with ORDER BY for efficient latest-row-per-group
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
     // We need to include retractions in DISTINCT ON to correctly determine the latest state.
     // We filter by op AFTER DISTINCT ON. This ensures that if a datom was asserted then retracted, the retraction wins.
-    const combinedWhereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const combinedWhereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Use DISTINCT ON (e, a, v) to support multi-valued attributes
-    const distinctOnColumns = "e, a, v";
-    const orderByColumns = "e, a, v, tx DESC";
+    const distinctOnColumns = 'e, a, v';
+    const orderByColumns = 'e, a, v, tx DESC';
 
     // Build the op filter for after DISTINCT ON
     // Default behavior: filter to only add datoms (exclude sub)
-    let opFilterAfter = "";
-    if (options.op === undefined || options.op === "assert") {
+    let opFilterAfter = '';
+    if (options.op === undefined || options.op === 'assert') {
       opFilterAfter = "WHERE op = 'assert'";
-    } else if (options.op === "retract") {
+    } else if (options.op === 'retract') {
       opFilterAfter = "WHERE op = 'retract'";
     }
 
@@ -1332,21 +1266,19 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       });
     }
 
-    return { datoms: this._mapRowsToDatoms(rows), sql };
+    return {datoms: this._mapRowsToDatoms(rows), sql};
   }
 
   private async _executeAsOfQuery(
     options: DatomsQuery,
     txId: TransactionId,
-    sqlQueries?: SQLQueryMetadata[]
-  ): Promise<{ datoms: Datom[]; sql: string }> {
+    sqlQueries?: SQLQueryMetadata[],
+  ): Promise<{datoms: Datom[]; sql: string}> {
     await this._ensureInitialized();
 
     // Validate that tx and txMax are mutually exclusive
     if (options.tx !== undefined && options.txMax !== undefined) {
-      throw new Error(
-        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
-      );
+      throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
     }
 
     const conditions: string[] = [];
@@ -1354,19 +1286,19 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
       let value = options.v;
       if (value === undefined) {
-        value = "__UNDEFINED__";
+        value = '__UNDEFINED__';
       }
-      conditions.push("v = ?::jsonb");
+      conditions.push('v = ?::jsonb');
       params.push(JSON.stringify(value));
     }
 
@@ -1377,14 +1309,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     } else if (options.txMax !== undefined) {
       maxTx = Math.min(options.txMax, txId);
     }
-    conditions.push("tx <= ?");
+    conditions.push('tx <= ?');
     params.push(maxTx);
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
     // Use DISTINCT ON (e, a) to deduplicate by entity-attribute pair
     // This keeps the latest value per attribute (asOf semantics)
@@ -1438,20 +1369,18 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       });
     }
 
-    return { datoms: this._mapRowsToDatoms(rows), sql: finalSql };
+    return {datoms: this._mapRowsToDatoms(rows), sql: finalSql};
   }
 
   private async _executeHistoryQuery(
     options: DatomsQuery,
-    sqlQueries?: SQLQueryMetadata[]
-  ): Promise<{ datoms: Datom[]; sql: string }> {
+    sqlQueries?: SQLQueryMetadata[],
+  ): Promise<{datoms: Datom[]; sql: string}> {
     await this._ensureInitialized();
 
     // Validate that tx and txMax are mutually exclusive
     if (options.tx !== undefined && options.txMax !== undefined) {
-      throw new Error(
-        "Cannot specify both tx and txMax parameters - they are mutually exclusive"
-      );
+      throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
     }
 
     const conditions: string[] = [];
@@ -1459,35 +1388,34 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
       let value = options.v;
       if (value === undefined) {
-        value = "__UNDEFINED__";
+        value = '__UNDEFINED__';
       }
-      conditions.push("v = ?::jsonb");
+      conditions.push('v = ?::jsonb');
       params.push(JSON.stringify(value));
     }
     if (options.tx !== undefined) {
-      conditions.push("tx = ?");
+      conditions.push('tx = ?');
       params.push(options.tx);
     }
     if (options.txMax !== undefined) {
-      conditions.push("tx <= ?");
+      conditions.push('tx <= ?');
       params.push(options.txMax);
     }
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
     // History query: no deduplication, include all datoms including sub
     const sql = `
@@ -1525,14 +1453,14 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       });
     }
 
-    return { datoms: this._mapRowsToDatoms(rows), sql };
+    return {datoms: this._mapRowsToDatoms(rows), sql};
   }
 
   private async _executeSinceQuery(
     options: DatomsQuery,
     txId: TransactionId,
-    sqlQueries?: SQLQueryMetadata[]
-  ): Promise<{ datoms: Datom[]; sql: string }> {
+    sqlQueries?: SQLQueryMetadata[],
+  ): Promise<{datoms: Datom[]; sql: string}> {
     await this._ensureInitialized();
 
     const conditions: string[] = [];
@@ -1540,31 +1468,30 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // Build WHERE conditions
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
       let value = options.v;
       if (value === undefined) {
-        value = "__UNDEFINED__";
+        value = '__UNDEFINED__';
       }
-      conditions.push("v = ?::jsonb");
+      conditions.push('v = ?::jsonb');
       params.push(JSON.stringify(value));
     }
 
     // Filter to only datoms with tx > txId
-    conditions.push("tx > ?");
+    conditions.push('tx > ?');
     params.push(txId);
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
     // Use DISTINCT ON (e, a, v) for normal deduplication
     const sql = `
@@ -1617,14 +1544,14 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       });
     }
 
-    return { datoms: this._mapRowsToDatoms(rows), sql: finalSql };
+    return {datoms: this._mapRowsToDatoms(rows), sql: finalSql};
   }
 
   private async _executeSpeculativeQuery(
     options: DatomsQuery,
     speculativeDatoms: Datom[],
-    sqlQueries?: SQLQueryMetadata[]
-  ): Promise<{ datoms: Datom[]; sqlQueries: SQLQueryMetadata[] }> {
+    sqlQueries?: SQLQueryMetadata[],
+  ): Promise<{datoms: Datom[]; sqlQueries: SQLQueryMetadata[]}> {
     await this._ensureInitialized();
 
     const accumulatedSql: SQLQueryMetadata[] = [];
@@ -1644,7 +1571,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Apply speculative datoms (retracts remove, asserts add/update)
     for (const speculativeDatom of speculativeDatoms) {
       const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-      if (speculativeDatom.op === "retract") {
+      if (speculativeDatom.op === 'retract') {
         baseMap.delete(key);
       } else {
         baseMap.set(key, speculativeDatom);
@@ -1657,38 +1584,35 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Apply filters from options
     let results = mergedDatoms;
     if (options.e !== undefined) {
-      results = results.filter((d) => d.e === options.e);
+      results = results.filter(d => d.e === options.e);
     }
     if (options.a !== undefined) {
-      results = results.filter((d) => d.a === options.a);
+      results = results.filter(d => d.a === options.a);
     }
     if (options.v !== undefined) {
-      results = results.filter((d) => d.v === options.v);
+      results = results.filter(d => d.v === options.v);
     }
     if (options.tx !== undefined) {
-      results = results.filter((d) => d.tx === options.tx);
+      results = results.filter(d => d.tx === options.tx);
     }
     if (options.op !== undefined) {
-      results = results.filter((d) => d.op === options.op);
+      results = results.filter(d => d.op === options.op);
     } else {
       // Default: only assert
-      results = results.filter((d) => d.op === "assert");
+      results = results.filter(d => d.op === 'assert');
     }
 
     // Apply pagination
     const offset = options.offset ?? 0;
     const limit = options.limit;
-    const finalResults = results.slice(
-      offset,
-      limit ? offset + limit : undefined
-    );
+    const finalResults = results.slice(offset, limit ? offset + limit : undefined);
 
     // Accumulate SQL queries if provided
     if (sqlQueries) {
       sqlQueries.push(...accumulatedSql);
     }
 
-    return { datoms: finalResults, sqlQueries: accumulatedSql };
+    return {datoms: finalResults, sqlQueries: accumulatedSql};
   }
 
   /**
@@ -1698,7 +1622,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   private _mapRowsToDatoms(rows: DatabaseRow[]): Datom[] {
     return rows.map((row: DatabaseRow) => {
       let entity: EntityId = row.e as EntityId;
-      if (typeof entity === "string") {
+      if (typeof entity === 'string') {
         if (/^-?\d+$/.test(entity)) {
           entity = parseInt(entity, 10);
         }
@@ -1707,7 +1631,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       // PostgreSQL JSONB returns as parsed object, but connection adapter may stringify it
       // Handle both cases: already parsed or string that needs parsing
       let parsedValue: unknown = row.v;
-      if (typeof row.v === "string") {
+      if (typeof row.v === 'string') {
         // Try to parse as JSON, but if it fails, use the string as-is
         // This handles cases where JSONB returns simple strings directly
         try {
@@ -1724,17 +1648,14 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         a: String(row.a),
         v: revivedValue,
         tx: Number(row.tx),
-        op:
-          typeof row.op === "string" && row.op === "assert"
-            ? "assert"
-            : "retract",
+        op: typeof row.op === 'string' && row.op === 'assert' ? 'assert' : 'retract',
       };
     });
   }
 
   private _reviveValue(value: unknown): unknown {
-    if (typeof value === "string") {
-      if (value === "__UNDEFINED__") {
+    if (typeof value === 'string') {
+      if (value === '__UNDEFINED__') {
         return undefined;
       }
     }
@@ -1745,9 +1666,9 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       return undefined;
     }
     if (Array.isArray(value)) {
-      return value.map((v) => this._reviveValue(v));
+      return value.map(v => this._reviveValue(v));
     }
-    if (typeof value === "object" && value !== null) {
+    if (typeof value === 'object' && value !== null) {
       const revived: Record<string, unknown> = {};
       const valueObj = value as Record<string, unknown>;
       for (const key in valueObj) {
@@ -1764,11 +1685,11 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       DatalogQueryFindVariable
     >,
   >(
-    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+    query: DatalogQuery<keyof TFind & string> & {find: TFind},
   ): Promise<QueryResultEnvelope<TFind>> {
     // Extract context and viewConfig from query object
     const context = query.context;
-    const viewConfig = query.viewConfig ?? { type: "current" };
+    const viewConfig = query.viewConfig ?? {type: 'current'};
     return this._queryWithMetadataInternal(query, context, viewConfig);
   }
 
@@ -1777,20 +1698,18 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
    */
   private async _executeClauseAsDatoms(clause: QueryClause): Promise<Datom[]> {
     if (!isQueryPattern(clause)) {
-      throw new Error("Only QueryPattern clauses are supported");
+      throw new Error('Only QueryPattern clauses are supported');
     }
-    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+    const {e: entityVal, a: attributeVal, v: valueVal} = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
-    const attribute = isVariable(attributeVal)
-      ? undefined
-      : (attributeVal as string);
+    const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
     const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
     const result = await this._executeCurrentQuery({
       e: entity,
       a: attribute,
       v: value,
-      op: "assert",
+      op: 'assert',
     });
     return result.datoms;
   }
@@ -1800,34 +1719,30 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
    */
   private async _executeClauseWithFilteredDatoms(
     clause: QueryClause,
-    filteredDatoms: Datom[]
+    filteredDatoms: Datom[],
   ): Promise<Record<string, Value | Attribute>[]> {
     if (!isQueryPattern(clause)) {
-      throw new Error("Only QueryPattern clauses are supported");
+      throw new Error('Only QueryPattern clauses are supported');
     }
-    const { e: entityVal, a: attributeVal, v: valueVal } = clause;
+    const {e: entityVal, a: attributeVal, v: valueVal} = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
-    const attribute = isVariable(attributeVal)
-      ? undefined
-      : (attributeVal as string);
+    const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
     const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
     // Filter datoms based on clause
     let matchingDatoms = filteredDatoms;
     if (entity !== undefined) {
-      matchingDatoms = matchingDatoms.filter((d) => d.e === entity);
+      matchingDatoms = matchingDatoms.filter(d => d.e === entity);
     }
     if (attribute !== undefined) {
-      matchingDatoms = matchingDatoms.filter((d) => d.a === attribute);
+      matchingDatoms = matchingDatoms.filter(d => d.a === attribute);
     }
     if (value !== undefined) {
-      matchingDatoms = matchingDatoms.filter(
-        (d) => JSON.stringify(d.v) === JSON.stringify(value)
-      );
+      matchingDatoms = matchingDatoms.filter(d => JSON.stringify(d.v) === JSON.stringify(value));
     }
 
     // Map datom fields to variable names from the clause
-    return matchingDatoms.map((datom) => {
+    return matchingDatoms.map(datom => {
       const result: Record<string, Value | Attribute> = {};
       if (isVariable(entityVal)) {
         result[entityVal as string] = datom.e;
@@ -1847,10 +1762,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
    */
   private async _executeDatalogWithSQL(
     query: DatalogQuery,
-    sqlQueries?: SQLQueryMetadata[]
-  ): Promise<{ results: QueryResult; sql: string }> {
+    sqlQueries?: SQLQueryMetadata[],
+  ): Promise<{results: QueryResult; sql: string}> {
     // Use the extracted SQL building function
-    const { sql, params } = datalogToPostgresSQL(query, this.tableName);
+    const {sql, params} = datalogToPostgresSQL(query, this.tableName);
 
     const queryStartTime = performance.now();
     const rows = await this.sqlDb.query(sql, params);
@@ -1869,67 +1784,65 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Convert SQL results back to QueryResult format
     // Note: Special handling for aggregation results (numeric strings)
 
-    const results: Record<string, Value | Attribute>[] = rows.map(
-      (row: DatabaseRow) => {
-        const result: Record<string, Value | Attribute> = {};
-        for (const key of Object.keys(row)) {
-          let value: unknown = row[key];
-          // PostgreSQL stores values as JSONB, so parse them
-          // But for aggregation results, they might already be numbers or strings
-          if (typeof value === "string") {
-            // For numeric strings (aggregation results), convert directly
-            if (/^-?\d+$/.test(value)) {
-              const num = parseInt(value, 10);
-              if (!isNaN(num)) {
-                value = num;
-              } else {
-                // Try JSON parse for other string values
-                try {
-                  value = JSON.parse(value);
-                } catch {
-                  // Not valid JSON, keep as string
-                }
-              }
+    const results: Record<string, Value | Attribute>[] = rows.map((row: DatabaseRow) => {
+      const result: Record<string, Value | Attribute> = {};
+      for (const key of Object.keys(row)) {
+        let value: unknown = row[key];
+        // PostgreSQL stores values as JSONB, so parse them
+        // But for aggregation results, they might already be numbers or strings
+        if (typeof value === 'string') {
+          // For numeric strings (aggregation results), convert directly
+          if (/^-?\d+$/.test(value)) {
+            const num = parseInt(value, 10);
+            if (!isNaN(num)) {
+              value = num;
             } else {
-              // Try JSON parse for non-numeric strings
+              // Try JSON parse for other string values
               try {
                 value = JSON.parse(value);
               } catch {
                 // Not valid JSON, keep as string
               }
             }
-          }
-          // For aggregation results, handle numeric strings specially
-          let finalValue = value;
-          if (typeof value === "string") {
-            // For numeric strings (like aggregation results), try to convert to number first
-            if (/^-?\d+$/.test(value)) {
-              const num = parseInt(value, 10);
-              if (!isNaN(num)) {
-                finalValue = num;
-              }
-            } else if (/^-?\d*\.\d+$/.test(value)) {
-              const num = parseFloat(value);
-              if (!isNaN(num)) {
-                finalValue = num;
-              }
+          } else {
+            // Try JSON parse for non-numeric strings
+            try {
+              value = JSON.parse(value);
+            } catch {
+              // Not valid JSON, keep as string
             }
           }
-          result[key] = this._reviveValue(finalValue) as Value | Attribute;
         }
-        return result;
+        // For aggregation results, handle numeric strings specially
+        let finalValue = value;
+        if (typeof value === 'string') {
+          // For numeric strings (like aggregation results), try to convert to number first
+          if (/^-?\d+$/.test(value)) {
+            const num = parseInt(value, 10);
+            if (!isNaN(num)) {
+              finalValue = num;
+            }
+          } else if (/^-?\d*\.\d+$/.test(value)) {
+            const num = parseFloat(value);
+            if (!isNaN(num)) {
+              finalValue = num;
+            }
+          }
+        }
+        result[key] = this._reviveValue(finalValue) as Value | Attribute;
       }
-    );
+      return result;
+    });
 
     // For SQL queries with aggregations, the results already have output keys as column names
     // We just need to map them directly without calling applyAggregations again
     // (The project function would try to re-aggregate, but we've already done it in SQL)
     if (Object.keys(query.find).length === 0) {
-      return { results, sql };
+      return {results, sql};
     }
 
     // Map results - they already have output keys as keys (from SQL aliases)
-    const finalResults = results.map((row) => {
+    const finalResults = results.map(row => {
       const projected: Record<string, Value | Attribute> = {};
       for (const outputKey of Object.keys(query.find)) {
         if (outputKey in row) {
@@ -1938,12 +1851,12 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       }
       return projected;
     });
-    return { results: finalResults, sql };
+    return {results: finalResults, sql};
   }
 
   private async _getNextTransactionId(
-    sqlQueries?: SQLQueryMetadata[]
-  ): Promise<{ txId: TransactionId; sql: string }> {
+    sqlQueries?: SQLQueryMetadata[],
+  ): Promise<{txId: TransactionId; sql: string}> {
     // PostgreSQL-optimized: Use INSERT ... ON CONFLICT ... UPDATE ... RETURNING
     // This combines initialization, update, and retrieval into a single atomic operation
     // The ON CONFLICT ensures thread-safety, and RETURNING gets the new value in one query
@@ -1969,18 +1882,18 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       });
     }
     if (!result || result.length === 0) {
-      throw new Error("Transaction counter row not found after update");
+      throw new Error('Transaction counter row not found after update');
     }
     const row = result[0] as Record<string, unknown>;
-    return { txId: Number(row.last_tx), sql };
+    return {txId: Number(row.last_tx), sql};
   }
 
   private async _writeDatomsInternal(
     datoms: DatomInput[],
     tx: TransactionId,
-    sqlQueries?: SQLQueryMetadata[]
-  ): Promise<{ sql: string }> {
-    if (datoms.length === 0) return { sql: "" };
+    sqlQueries?: SQLQueryMetadata[],
+  ): Promise<{sql: string}> {
+    if (datoms.length === 0) return {sql: ''};
 
     // Batch inserts to avoid PostgreSQL's parameter limit
     // Using batches of 199 datoms (199 * 5 params = 995 variables, safely under limit)
@@ -1989,17 +1902,17 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     for (let i = 0; i < datoms.length; i += BATCH_SIZE) {
       const batch = datoms.slice(i, i + BATCH_SIZE);
-      const placeholders = batch.map(() => "(?, ?, ?, ?, ?)").join(", ");
+      const placeholders = batch.map(() => '(?, ?, ?, ?, ?)').join(', ');
       const sql = `
         INSERT INTO ${this.tableName} (e, a, v, tx, op)
         VALUES ${placeholders}
         ON CONFLICT DO NOTHING
       `.trim();
 
-      const params = batch.flatMap((d) => {
+      const params = batch.flatMap(d => {
         let value = d.v;
         if (value === undefined) {
-          value = "__UNDEFINED__";
+          value = '__UNDEFINED__';
         }
         return [String(d.e), String(d.a), JSON.stringify(value), tx, d.op];
       });
@@ -2023,7 +1936,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       }
     }
 
-    return { sql: sqlStatements.join("; ") };
+    return {sql: sqlStatements.join('; ')};
   }
 
   async _getLatestTransaction(): Promise<Transaction> {
@@ -2032,13 +1945,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const result = await this.sqlDb.query(sql);
     if (!result || result.length === 0) {
       // No transactions yet
-      return { txId: 0, datoms: [], meta: undefined };
+      return {txId: 0, datoms: [], meta: undefined};
     }
     const row = result[0] as Record<string, unknown>;
     const txId = Number(row.last_tx);
 
     // Get all datoms for this transaction using history view
-    const historyResult = await this._executeHistoryQuery({ tx: txId });
+    const historyResult = await this._executeHistoryQuery({tx: txId});
 
     return {
       txId,
@@ -2047,12 +1960,12 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     };
   }
 
-  async _destroy(config: { retentionCount: number }): Promise<number> {
+  async _destroy(config: {retentionCount: number}): Promise<number> {
     await this._ensureInitialized();
 
     if (config.retentionCount < 1) {
       throw new Error(
-        "retentionCount must be at least 1 to ensure at least one datom is kept per (entity, attribute) pair"
+        'retentionCount must be at least 1 to ensure at least one datom is kept per (entity, attribute) pair',
       );
     }
 
@@ -2083,7 +1996,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   private async _datomsWithMetadataInternal(
     options: DatomsQuery,
     viewConfig: ViewConfig,
-    sqlQueries?: SQLQueryMetadata[]
+    sqlQueries?: SQLQueryMetadata[],
   ): Promise<DatomsResultEnvelope> {
     await this._ensureInitialized();
 
@@ -2093,46 +2006,30 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     let result: Datom[];
     const accumulatedSql: SQLQueryMetadata[] = sqlQueries || [];
 
-    if (viewConfig.type === "current") {
-      const execResult = await this._executeCurrentQuery(
-        options,
-        accumulatedSql
-      );
+    if (viewConfig.type === 'current') {
+      const execResult = await this._executeCurrentQuery(options, accumulatedSql);
       result = execResult.datoms;
-    } else if (viewConfig.type === "asOf") {
-      const execResult = await this._executeAsOfQuery(
-        options,
-        viewConfig.txId,
-        accumulatedSql
-      );
+    } else if (viewConfig.type === 'asOf') {
+      const execResult = await this._executeAsOfQuery(options, viewConfig.txId, accumulatedSql);
       result = execResult.datoms;
-    } else if (viewConfig.type === "since") {
-      const execResult = await this._executeSinceQuery(
-        options,
-        viewConfig.txId,
-        accumulatedSql
-      );
+    } else if (viewConfig.type === 'since') {
+      const execResult = await this._executeSinceQuery(options, viewConfig.txId, accumulatedSql);
       result = execResult.datoms;
-    } else if (viewConfig.type === "history") {
-      const execResult = await this._executeHistoryQuery(
-        options,
-        accumulatedSql
-      );
+    } else if (viewConfig.type === 'history') {
+      const execResult = await this._executeHistoryQuery(options, accumulatedSql);
       result = execResult.datoms;
-    } else if (viewConfig.type === "speculative") {
+    } else if (viewConfig.type === 'speculative') {
       const execResult = await this._executeSpeculativeQuery(
         options,
         viewConfig.datoms,
-        accumulatedSql
+        accumulatedSql,
       );
       result = execResult.datoms;
       accumulatedSql.push(...execResult.sqlQueries);
     } else {
       // TypeScript exhaustiveness check
       const _exhaustive: never = viewConfig;
-      throw new Error(
-        `Unknown view config type: ${(_exhaustive as ViewConfig).type}`
-      );
+      throw new Error(`Unknown view config type: ${(_exhaustive as ViewConfig).type}`);
     }
 
     const executionTime = performance.now() - startTime;
@@ -2152,44 +2049,43 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   /**
    * Build SQL string for current query (for metadata tracking)
    */
-  private _buildCurrentQuerySQL(options: DatomsQuery): { sql: string } {
+  private _buildCurrentQuerySQL(options: DatomsQuery): {sql: string} {
     const conditions: string[] = [];
     const params: unknown[] = [];
 
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
       params.push(String(options.e));
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
       params.push(String(options.a));
     }
     if (options.v !== undefined) {
       let value = options.v;
       if (value === undefined) {
-        value = "__UNDEFINED__";
+        value = '__UNDEFINED__';
       }
-      conditions.push("v = ?::jsonb");
+      conditions.push('v = ?::jsonb');
       params.push(JSON.stringify(value));
     }
     if (options.tx !== undefined) {
-      conditions.push("tx = ?");
+      conditions.push('tx = ?');
       params.push(options.tx);
     }
 
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
-    const combinedWhereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const combinedWhereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const distinctOnColumns = "e, a, v";
-    const orderByColumns = "e, a, v, tx DESC";
+    const distinctOnColumns = 'e, a, v';
+    const orderByColumns = 'e, a, v, tx DESC';
 
-    let opFilterAfter = "";
-    if (options.op === undefined || options.op === "assert") {
+    let opFilterAfter = '';
+    if (options.op === undefined || options.op === 'assert') {
       opFilterAfter = "WHERE op = 'assert'";
-    } else if (options.op === "retract") {
+    } else if (options.op === 'retract') {
       opFilterAfter = "WHERE op = 'retract'";
     }
 
@@ -2219,35 +2115,31 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       ${offsetClause}
     `.trim();
 
-    return { sql };
+    return {sql};
   }
 
   /**
    * Build SQL string for asOf query (for metadata tracking)
    */
-  private _buildAsOfQuerySQL(
-    options: DatomsQuery,
-    _txId: TransactionId
-  ): { sql: string } {
+  private _buildAsOfQuerySQL(options: DatomsQuery, _txId: TransactionId): {sql: string} {
     const conditions: string[] = [];
 
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
     }
     if (options.v !== undefined) {
-      conditions.push("v = ?::jsonb");
+      conditions.push('v = ?::jsonb');
     }
 
-    conditions.push("tx <= ?");
+    conditions.push('tx <= ?');
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
     const sql = `
       WITH latest_datoms AS (
@@ -2275,35 +2167,31 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       ${offsetClause}
     `.trim();
 
-    return { sql };
+    return {sql};
   }
 
   /**
    * Build SQL string for since query (for metadata tracking)
    */
-  private _buildSinceQuerySQL(
-    options: DatomsQuery,
-    _txId: TransactionId
-  ): { sql: string } {
+  private _buildSinceQuerySQL(options: DatomsQuery, _txId: TransactionId): {sql: string} {
     const conditions: string[] = [];
 
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
     }
     if (options.v !== undefined) {
-      conditions.push("v = ?::jsonb");
+      conditions.push('v = ?::jsonb');
     }
 
-    conditions.push("tx > ?");
+    conditions.push('tx > ?');
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
     const sql = `
       WITH latest_datoms AS (
@@ -2331,33 +2219,32 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       ${offsetClause}
     `.trim();
 
-    return { sql };
+    return {sql};
   }
 
   /**
    * Build SQL string for history query (for metadata tracking)
    */
-  private _buildHistoryQuerySQL(options: DatomsQuery): { sql: string } {
+  private _buildHistoryQuerySQL(options: DatomsQuery): {sql: string} {
     const conditions: string[] = [];
 
     if (options.e !== undefined) {
-      conditions.push("e = ?");
+      conditions.push('e = ?');
     }
     if (options.a !== undefined) {
-      conditions.push("a = ?");
+      conditions.push('a = ?');
     }
     if (options.v !== undefined) {
-      conditions.push("v = ?::jsonb");
+      conditions.push('v = ?::jsonb');
     }
     if (options.tx !== undefined) {
-      conditions.push("tx = ?");
+      conditions.push('tx = ?');
     }
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const limitClause = options.limit ? "LIMIT ?" : "";
-    const offsetClause = options.offset !== undefined ? "OFFSET ?" : "";
+    const limitClause = options.limit ? 'LIMIT ?' : '';
+    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
 
     const sql = `
       SELECT 
@@ -2373,15 +2260,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       ${offsetClause}
     `.trim();
 
-    return { sql };
+    return {sql};
   }
 
-  private async _queryWithMetadataInternal<
-    TFind extends Record<string, DatalogQueryFindVariable>,
-  >(
-    query: DatalogQuery<keyof TFind & string> & { find: TFind },
+  private async _queryWithMetadataInternal<TFind extends Record<string, DatalogQueryFindVariable>>(
+    query: DatalogQuery<keyof TFind & string> & {find: TFind},
     context: Record<string, unknown> | undefined,
-    viewConfig: ViewConfig
+    viewConfig: ViewConfig,
   ): Promise<QueryResultEnvelope<TFind>> {
     await this._ensureInitialized();
 
@@ -2391,7 +2276,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // Create read context
     // Extract context, but ensure db and query fields are not overwritten
-    const { db: _, query: __, ...restContext } = context || {};
+    const {db: _, query: __, ...restContext} = context || {};
     // Merge db into query.context so hooks can access it via query.context.db
     const enhancedQuery = {
       ...query,
@@ -2410,7 +2295,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const beforeResult = await this.hooks.runBeforeRead(enhancedQuery, ctx);
 
     if (beforeResult.errors.length > 0) {
-      throw new QueryError("Query blocked by hooks", beforeResult.errors);
+      throw new QueryError('Query blocked by hooks', beforeResult.errors);
     }
 
     const modifiedQuery = beforeResult.query;
@@ -2434,13 +2319,9 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       if (!isQueryPattern(clause)) {
         continue;
       }
-      const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-      const entity = isVariable(entityVal)
-        ? undefined
-        : (entityVal as EntityId);
-      const attribute = isVariable(attributeVal)
-        ? undefined
-        : (attributeVal as string);
+      const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+      const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
       const clauseDatoms = await this._datomsWithMetadataInternal(
@@ -2451,7 +2332,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           viewConfig,
         },
         viewConfig,
-        sqlQueries
+        sqlQueries,
       );
 
       for (const datom of clauseDatoms.data) {
@@ -2467,10 +2348,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
 
     if (afterResult.errors && afterResult.errors.length > 0) {
-      throw new QueryError(
-        "Query blocked by after-read hooks",
-        afterResult.errors
-      );
+      throw new QueryError('Query blocked by after-read hooks', afterResult.errors);
     }
 
     // Check if we have aggregations - if so, use SQL query building
@@ -2479,19 +2357,15 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const allAggsSupported = aggCheck.allSupported;
 
     // For speculative views, always use in-memory approach
-    if (viewConfig.type === "speculative") {
+    if (viewConfig.type === 'speculative') {
       // Use in-memory join logic for speculative queries
       const firstClause = modifiedQuery.where[0];
       if (!firstClause || !isQueryPattern(firstClause)) {
-        throw new Error("First clause must be a QueryPattern");
+        throw new Error('First clause must be a QueryPattern');
       }
-      const { e: entityVal, a: attributeVal, v: valueVal } = firstClause;
-      const entity = isVariable(entityVal)
-        ? undefined
-        : (entityVal as EntityId);
-      const attribute = isVariable(attributeVal)
-        ? undefined
-        : (attributeVal as string);
+      const {e: entityVal, a: attributeVal, v: valueVal} = firstClause;
+      const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+      const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
       const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
       const firstDatoms = await this._datomsWithMetadataInternal(
@@ -2502,10 +2376,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           viewConfig,
         },
         viewConfig,
-        sqlQueries
+        sqlQueries,
       );
 
-      const firstResults = firstDatoms.data.map((datom) => {
+      const firstResults = firstDatoms.data.map(datom => {
         const result: Record<string, Value | Attribute> = {};
         if (isVariable(entityVal)) {
           result[entityVal as string] = datom.e;
@@ -2523,15 +2397,11 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       for (let i = 1; i < modifiedQuery.where.length; i++) {
         const clause = modifiedQuery.where[i];
         if (!clause || !isQueryPattern(clause)) {
-          throw new Error("Only QueryPattern clauses are supported in joins");
+          throw new Error('Only QueryPattern clauses are supported in joins');
         }
-        const { e: entityVal, a: attributeVal, v: valueVal } = clause;
-        const entity = isVariable(entityVal)
-          ? undefined
-          : (entityVal as EntityId);
-        const attribute = isVariable(attributeVal)
-          ? undefined
-          : (attributeVal as string);
+        const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+        const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+        const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
         const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
         const clauseDatoms = await this._datomsWithMetadataInternal(
@@ -2541,10 +2411,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
             v: value,
           },
           viewConfig,
-          sqlQueries
+          sqlQueries,
         );
 
-        const clauseResults = clauseDatoms.data.map((datom) => {
+        const clauseResults = clauseDatoms.data.map(datom => {
           const result: Record<string, Value | Attribute> = {};
           if (isVariable(entityVal)) {
             result[entityVal as string] = datom.e;
@@ -2558,26 +2428,15 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           return result;
         });
 
-        results = joinResults(
-          results,
-          clauseResults,
-          modifiedQuery.where.slice(0, i + 1)
-        );
+        results = joinResults(results, clauseResults, modifiedQuery.where.slice(0, i + 1));
       }
 
-      const projected = project(
-        results,
-        modifiedQuery.find,
-        modifiedQuery.where
-      );
+      const projected = project(results, modifiedQuery.find, modifiedQuery.where);
 
       // Apply aggregations if needed
       let finalResult: QueryResult<TFind>;
       if (hasAggs) {
-        finalResult = applyAggregations(
-          projected,
-          modifiedQuery.find
-        ) as QueryResult<TFind>;
+        finalResult = applyAggregations(projected, modifiedQuery.find) as QueryResult<TFind>;
       } else {
         finalResult = projected as QueryResult<TFind>;
       }
@@ -2590,12 +2449,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
             const aVal = a[key];
             const bVal = b[key];
             if (aVal === undefined && bVal === undefined) return 0;
-            if (aVal === undefined || aVal === null)
-              return direction === "asc" ? 1 : -1;
-            if (bVal === undefined || bVal === null)
-              return direction === "asc" ? -1 : 1;
-            if (aVal < bVal) return direction === "asc" ? -1 : 1;
-            if (aVal > bVal) return direction === "asc" ? 1 : -1;
+            if (aVal === undefined || aVal === null) return direction === 'asc' ? 1 : -1;
+            if (bVal === undefined || bVal === null) return direction === 'asc' ? -1 : 1;
+            if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return direction === 'asc' ? 1 : -1;
           }
           return 0;
         });
@@ -2609,7 +2466,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       const executionTime = performance.now() - startTime;
       metadata.executionTimeMs = executionTime;
       metadata.resultCount = finalResult.length;
-      metadata.executionStrategy = "in-memory-speculative";
+      metadata.executionStrategy = 'in-memory-speculative';
       if (sqlQueries.length > 0) {
         metadata.sql = sqlQueries;
       }
@@ -2632,13 +2489,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           metadata: {
             executionTimeMs: executionTime,
             resultCount: 0,
-            executionStrategy: "in-memory-unsupported-aggregations",
+            executionStrategy: 'in-memory-unsupported-aggregations',
           },
         };
       }
       const firstResults = await this._executeClauseWithFilteredDatoms(
         firstClause,
-        afterResult.datoms
+        afterResult.datoms,
       );
 
       let results = firstResults;
@@ -2647,22 +2504,14 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         if (!clause) continue;
         const clauseResults = await this._executeClauseWithFilteredDatoms(
           clause,
-          afterResult.datoms
+          afterResult.datoms,
         );
-        results = joinResults(
-          results,
-          clauseResults,
-          modifiedQuery.where.slice(0, i + 1)
-        );
+        results = joinResults(results, clauseResults, modifiedQuery.where.slice(0, i + 1));
       }
 
       // Apply aggregations in-memory
       const aggregated = applyAggregations(results, modifiedQuery.find);
-      const projected = project(
-        aggregated,
-        modifiedQuery.find,
-        modifiedQuery.where
-      );
+      const projected = project(aggregated, modifiedQuery.find, modifiedQuery.where);
 
       if (modifiedQuery.orderBy) {
         projected.sort((a, b) => {
@@ -2672,11 +2521,11 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
             const bVal = b[key];
 
             if (aVal == null && bVal == null) continue;
-            if (aVal == null) return direction === "asc" ? -1 : 1;
-            if (bVal == null) return direction === "asc" ? 1 : -1;
+            if (aVal == null) return direction === 'asc' ? -1 : 1;
+            if (bVal == null) return direction === 'asc' ? 1 : -1;
 
-            if (aVal < bVal) return direction === "asc" ? -1 : 1;
-            if (aVal > bVal) return direction === "asc" ? 1 : -1;
+            if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return direction === 'asc' ? 1 : -1;
           }
           return 0;
         });
@@ -2684,16 +2533,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
       let finalResult: QueryResult<TFind> = projected as QueryResult<TFind>;
       if (modifiedQuery.limit) {
-        finalResult = finalResult.slice(
-          0,
-          modifiedQuery.limit
-        ) as QueryResult<TFind>;
+        finalResult = finalResult.slice(0, modifiedQuery.limit) as QueryResult<TFind>;
       }
 
       const executionTime = performance.now() - startTime;
       metadata.executionTimeMs = executionTime;
       metadata.resultCount = finalResult.length;
-      metadata.executionStrategy = "in-memory-unsupported-aggregations";
+      metadata.executionStrategy = 'in-memory-unsupported-aggregations';
       if (sqlQueries.length > 0) {
         metadata.sql = sqlQueries;
       }
@@ -2706,15 +2552,12 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // For multi-clause queries with all aggregations supported, use SQL query building
     if (modifiedQuery.where.length > 1 && hasAggs && allAggsSupported) {
-      const sqlResult = await this._executeDatalogWithSQL(
-        modifiedQuery,
-        sqlQueries
-      );
+      const sqlResult = await this._executeDatalogWithSQL(modifiedQuery, sqlQueries);
 
       const executionTime = performance.now() - startTime;
       metadata.executionTimeMs = executionTime;
       metadata.resultCount = sqlResult.results.length;
-      metadata.executionStrategy = "sql-aggregations";
+      metadata.executionStrategy = 'sql-aggregations';
       if (sqlQueries.length > 0) {
         metadata.sql = sqlQueries;
       }
@@ -2739,15 +2582,12 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       const usePivot = canUsePivotOptimization(modifiedQuery.where);
 
       // Use SQL execution for pivot-optimized queries or regular multi-clause joins
-      const sqlResult = await this._executeDatalogWithSQL(
-        modifiedQuery,
-        sqlQueries
-      );
+      const sqlResult = await this._executeDatalogWithSQL(modifiedQuery, sqlQueries);
 
       const executionTime = performance.now() - startTime;
       metadata.executionTimeMs = executionTime;
       metadata.resultCount = sqlResult.results.length;
-      metadata.executionStrategy = usePivot ? "sql-pivot" : "sql-joins";
+      metadata.executionStrategy = usePivot ? 'sql-pivot' : 'sql-joins';
       if (sqlQueries.length > 0) {
         metadata.sql = sqlQueries;
       }
@@ -2767,28 +2607,21 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         metadata: {
           executionTimeMs: executionTime,
           resultCount: 0,
-          executionStrategy: "in-memory-filtered-datoms",
+          executionStrategy: 'in-memory-filtered-datoms',
         },
       };
     }
     const firstResults = await this._executeClauseWithFilteredDatoms(
       firstClause,
-      afterResult.datoms
+      afterResult.datoms,
     );
 
     let results = firstResults;
     for (let i = 1; i < modifiedQuery.where.length; i++) {
       const clause = modifiedQuery.where[i];
       if (!clause) continue;
-      const clauseResults = await this._executeClauseWithFilteredDatoms(
-        clause,
-        afterResult.datoms
-      );
-      results = joinResults(
-        results,
-        clauseResults,
-        modifiedQuery.where.slice(0, i + 1)
-      );
+      const clauseResults = await this._executeClauseWithFilteredDatoms(clause, afterResult.datoms);
+      results = joinResults(results, clauseResults, modifiedQuery.where.slice(0, i + 1));
     }
 
     const projected = project(results, modifiedQuery.find, modifiedQuery.where);
@@ -2798,13 +2631,9 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       const variableToOutputKey = new Map<string, string>();
       for (const [outputKey, expr] of Object.entries(modifiedQuery.find)) {
         let varName: string | undefined;
-        if (
-          Array.isArray(expr) &&
-          expr.length === 1 &&
-          typeof expr[0] === "string"
-        ) {
+        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === 'string') {
           varName = expr[0];
-        } else if (typeof expr === "string") {
+        } else if (typeof expr === 'string') {
           varName = expr;
         }
         if (varName) {
@@ -2815,26 +2644,25 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       projected.sort((a, b) => {
         for (const [variable, direction] of modifiedQuery.orderBy!) {
           // Map variable to output key, or fall back to stripped variable name
-          const outputKey =
-            variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
+          const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
           const aVal = a[outputKey];
           const bVal = b[outputKey];
 
           if (aVal == null && bVal == null) continue;
-          if (aVal == null) return direction === "asc" ? -1 : 1;
-          if (bVal == null) return direction === "asc" ? 1 : -1;
+          if (aVal == null) return direction === 'asc' ? -1 : 1;
+          if (bVal == null) return direction === 'asc' ? 1 : -1;
 
           // Ensure proper numeric comparison when both values are numeric
           let comparison: number;
-          const aIsNumber = typeof aVal === "number";
-          const bIsNumber = typeof bVal === "number";
+          const aIsNumber = typeof aVal === 'number';
+          const bIsNumber = typeof bVal === 'number';
 
           let aNum: number | null = null;
           let bNum: number | null = null;
 
           if (aIsNumber) {
             aNum = aVal;
-          } else if (typeof aVal === "string" && aVal !== "") {
+          } else if (typeof aVal === 'string' && aVal !== '') {
             const parsed = Number(aVal);
             if (!isNaN(parsed) && isFinite(parsed)) {
               aNum = parsed;
@@ -2843,7 +2671,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
           if (bIsNumber) {
             bNum = bVal;
-          } else if (typeof bVal === "string" && bVal !== "") {
+          } else if (typeof bVal === 'string' && bVal !== '') {
             const parsed = Number(bVal);
             if (!isNaN(parsed) && isFinite(parsed)) {
               bNum = parsed;
@@ -2862,7 +2690,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           }
 
           if (comparison !== 0) {
-            return direction === "asc" ? comparison : -comparison;
+            return direction === 'asc' ? comparison : -comparison;
           }
         }
         return 0;
@@ -2871,16 +2699,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     let finalResult: QueryResult<TFind> = projected as QueryResult<TFind>;
     if (modifiedQuery.limit) {
-      finalResult = finalResult.slice(
-        0,
-        modifiedQuery.limit
-      ) as QueryResult<TFind>;
+      finalResult = finalResult.slice(0, modifiedQuery.limit) as QueryResult<TFind>;
     }
 
     const executionTime = performance.now() - startTime;
     metadata.executionTimeMs = executionTime;
     metadata.resultCount = finalResult.length;
-    metadata.executionStrategy = "in-memory-filtered-datoms";
+    metadata.executionStrategy = 'in-memory-filtered-datoms';
     if (sqlQueries.length > 0) {
       metadata.sql = sqlQueries;
     }
@@ -2901,33 +2726,33 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     }
 
     if (this.maintenanceRunning) {
-      this.logger?.warn("Maintenance already running", {
-        event: "postgres_maintenance_already_running",
+      this.logger?.warn('Maintenance already running', {
+        event: 'postgres_maintenance_already_running',
       });
       return;
     }
 
     if (!this.maintenanceConfig.intervalMs) {
-      this.logger?.warn("Maintenance enabled but intervalMs not provided", {
-        event: "postgres_maintenance_config_error",
+      this.logger?.warn('Maintenance enabled but intervalMs not provided', {
+        event: 'postgres_maintenance_config_error',
       });
       return;
     }
 
     this.maintenanceRunning = true;
 
-    this.logger?.info("Starting PostgreSQL maintenance", {
-      event: "postgres_maintenance_starting",
+    this.logger?.info('Starting PostgreSQL maintenance', {
+      event: 'postgres_maintenance_starting',
       intervalMs: this.maintenanceConfig.intervalMs,
       runImmediately: this.maintenanceConfig.runImmediately ?? true,
     });
 
     // Run immediately if configured
     if (this.maintenanceConfig.runImmediately !== false) {
-      this.runMaintenance().catch((err) => {
+      this.runMaintenance().catch(err => {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        this.logger?.error("Initial maintenance run failed", {
-          event: "postgres_maintenance_error",
+        this.logger?.error('Initial maintenance run failed', {
+          event: 'postgres_maintenance_error',
           error: errorMessage,
         });
       });
@@ -2935,10 +2760,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // Set up interval
     this.maintenanceIntervalId = setInterval(() => {
-      this.runMaintenance().catch((err) => {
+      this.runMaintenance().catch(err => {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        this.logger?.error("Periodic maintenance execution failed", {
-          event: "postgres_maintenance_error",
+        this.logger?.error('Periodic maintenance execution failed', {
+          event: 'postgres_maintenance_error',
           error: errorMessage,
         });
       });
@@ -2960,8 +2785,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       this.maintenanceIntervalId = null;
     }
 
-    this.logger?.info("Stopped PostgreSQL maintenance", {
-      event: "postgres_maintenance_stopped",
+    this.logger?.info('Stopped PostgreSQL maintenance', {
+      event: 'postgres_maintenance_stopped',
     });
   }
 
@@ -2986,8 +2811,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
    */
   private async _executeVacuumAnalyze(): Promise<void> {
     try {
-      this.logger?.info("Running PostgreSQL maintenance...", {
-        event: "postgres_maintenance_start",
+      this.logger?.info('Running PostgreSQL maintenance...', {
+        event: 'postgres_maintenance_start',
         tableName: this.tableName,
       });
 
@@ -2996,14 +2821,14 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       await this.sqlDb.execute(`VACUUM ANALYZE ${this.tableName}`);
       await this.sqlDb.execute(`VACUUM ANALYZE ${this.tableName}_tx`);
 
-      this.logger?.info("PostgreSQL maintenance completed", {
-        event: "postgres_maintenance_complete",
+      this.logger?.info('PostgreSQL maintenance completed', {
+        event: 'postgres_maintenance_complete',
         tableName: this.tableName,
       });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      this.logger?.error("PostgreSQL maintenance error", {
-        event: "postgres_maintenance_error",
+      this.logger?.error('PostgreSQL maintenance error', {
+        event: 'postgres_maintenance_error',
         error: errorMessage,
         tableName: this.tableName,
       });

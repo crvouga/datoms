@@ -2,8 +2,8 @@
  * Shared query validation utilities
  */
 
-import type { DatomsQuery } from "../views/database-view.js";
-import { QuerySafetyError } from "../hook/hook.js";
+import type {DatomsQuery} from '../views/database-view.js';
+import {QuerySafetyError} from '../hook/hook.js';
 
 /**
  * Validate that query has at least one filter or limit to prevent accidental full scans
@@ -19,7 +19,7 @@ export function validateQueryOptions(options: DatomsQuery): void {
 
   if (!hasFilter && !hasLimit) {
     throw new QuerySafetyError(
-      "Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans"
+      'Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans',
     );
   }
 }

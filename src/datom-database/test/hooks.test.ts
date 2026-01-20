@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
-import { FIXTURES } from "./fixtures/fixtures.js";
-import type { Fixture } from "./fixtures/fixture.js";
+import {FIXTURES} from './fixtures/fixtures.js';
+import type {Fixture} from './fixtures/fixture.js';
 import {
   QueryError,
   TransactionError,
@@ -9,10 +9,10 @@ import {
   type AfterWrite,
   type BeforeRead,
   type BeforeWrite,
-} from "../hook/hook.js";
-import { HookValidator } from "../hook/validator.js";
+} from '../hook/hook.js';
+import {HookValidator} from '../hook/validator.js';
 
-describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
+describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
   let f: Fixture;
 
   beforeEach(async () => {
@@ -24,139 +24,139 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe("Hook Registration", () => {
-    test("should register before-read hook", async () => {
-      const { db } = f;
+  describe('Hook Registration', () => {
+    test('should register before-read hook', async () => {
+      const {db} = f;
 
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
       let called = false;
       const hook: BeforeRead = {
-        type: "beforeRead",
-        name: "test-hook",
-        execute: async (query) => {
+        type: 'beforeRead',
+        name: 'test-hook',
+        execute: async query => {
           called = true;
-          return { query };
+          return {query};
         },
       };
 
       db.hook(hook);
       await db.query({
-        find: { e: ["?e"] },
-        where: [{ e: "?e", a: "name", v: "Alice" }],
+        find: {e: ['?e']},
+        where: [{e: '?e', a: 'name', v: 'Alice'}],
       });
 
       expect(called).toBe(true);
     });
 
-    test("should register after-read hook", async () => {
-      const { db } = f;
+    test('should register after-read hook', async () => {
+      const {db} = f;
 
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
       let called = false;
       const hook: AfterRead = {
-        type: "afterRead",
-        name: "test-hook",
-        execute: async (datoms) => {
+        type: 'afterRead',
+        name: 'test-hook',
+        execute: async datoms => {
           called = true;
-          return { datoms };
+          return {datoms};
         },
       };
 
       db.hook(hook);
       await db.query({
-        find: { e: ["?e"] },
-        where: [{ e: 1, a: "name", v: "?v" }],
+        find: {e: ['?e']},
+        where: [{e: 1, a: 'name', v: '?v'}],
       });
 
       expect(called).toBe(true);
     });
 
-    test("should register before-write hook", async () => {
-      const { db } = f;
+    test('should register before-write hook', async () => {
+      const {db} = f;
 
       let called = false;
       const hook: BeforeWrite = {
-        type: "beforeWrite",
-        name: "test-hook",
-        execute: async (tx) => {
+        type: 'beforeWrite',
+        name: 'test-hook',
+        execute: async tx => {
           called = true;
-          return { tx };
+          return {tx};
         },
       };
 
       db.hook(hook);
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
       expect(called).toBe(true);
     });
 
-    test("should register after-write hook", async () => {
-      const { db } = f;
+    test('should register after-write hook', async () => {
+      const {db} = f;
 
       let called = false;
       const hook: AfterWrite = {
-        type: "afterWrite",
-        name: "test-hook",
+        type: 'afterWrite',
+        name: 'test-hook',
         execute: async () => {
           called = true;
         },
       };
 
       db.hook(hook);
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
       // Wait a bit for async after-write hooks
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(called).toBe(true);
     });
   });
 
-  describe("Before-Read Hooks", () => {
-    test("should modify query before execution", async () => {
-      const { db } = f;
+  describe('Before-Read Hooks', () => {
+    test('should modify query before execution', async () => {
+      const {db} = f;
 
       await db.transact([
-        { op: "assert", e: 1, a: "name", v: "Alice" },
-        { op: "assert", e: 2, a: "name", v: "Bob" },
+        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
+        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
       ]);
 
       const hook: BeforeRead = {
-        type: "beforeRead",
-        name: "modify-query",
-        execute: async (query) => {
+        type: 'beforeRead',
+        name: 'modify-query',
+        execute: async query => {
           // Modify query to only find entity 1
           return {
             query: {
               ...query,
-              where: [{ e: 1, a: "name", v: "?v" }],
+              where: [{e: 1, a: 'name', v: '?v'}],
             },
           };
         },
       };
 
       db.hook(hook);
-      const { data: results } = await db.query({
-        find: { v: ["?v"] },
-        where: [{ e: "?e", a: "name", v: "?v" }],
+      const {data: results} = await db.query({
+        find: {v: ['?v']},
+        where: [{e: '?e', a: 'name', v: '?v'}],
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.v).toBe("Alice");
+      expect(results[0]!.v).toBe('Alice');
     });
 
-    test("should block query with errors", async () => {
-      const { db } = f;
+    test('should block query with errors', async () => {
+      const {db} = f;
 
       const hook: BeforeRead = {
-        type: "beforeRead",
-        name: "block-query",
+        type: 'beforeRead',
+        name: 'block-query',
         execute: async () => {
           return {
-            query: { find: {}, where: [] },
-            errors: [{ message: "Query not allowed", code: "BLOCKED" }],
+            query: {find: {}, where: []},
+            errors: [{message: 'Query not allowed', code: 'BLOCKED'}],
           };
         },
       };
@@ -165,33 +165,33 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       await expect(
         db.query({
-          find: { e: ["?e"] },
-          where: [{ e: "?e", a: "name", v: "Alice" }],
-        })
+          find: {e: ['?e']},
+          where: [{e: '?e', a: 'name', v: 'Alice'}],
+        }),
       ).rejects.toThrow(QueryError);
     });
 
-    test("should stop processing on stopProcessing flag", async () => {
-      const { db } = f;
+    test('should stop processing on stopProcessing flag', async () => {
+      const {db} = f;
 
       let firstCalled = false;
       let secondCalled = false;
 
       const hook1: BeforeRead = {
-        type: "beforeRead",
-        name: "first",
-        execute: async (query) => {
+        type: 'beforeRead',
+        name: 'first',
+        execute: async query => {
           firstCalled = true;
-          return { query, stopProcessing: true };
+          return {query, stopProcessing: true};
         },
       };
 
       const hook2: BeforeRead = {
-        type: "beforeRead",
-        name: "second",
-        execute: async (query) => {
+        type: 'beforeRead',
+        name: 'second',
+        execute: async query => {
           secondCalled = true;
-          return { query };
+          return {query};
         },
       };
 
@@ -199,86 +199,86 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hook(hook2);
 
       await db.query({
-        find: { e: ["?e"] },
-        where: [{ e: "?e", a: "name", v: "Alice" }],
+        find: {e: ['?e']},
+        where: [{e: '?e', a: 'name', v: 'Alice'}],
       });
 
       expect(firstCalled).toBe(true);
       expect(secondCalled).toBe(false);
     });
 
-    test("should pass context to before-read hook", async () => {
-      const { db } = f;
+    test('should pass context to before-read hook', async () => {
+      const {db} = f;
 
       let receivedContext: Record<string, unknown> | undefined;
 
       const hook: BeforeRead = {
-        type: "beforeRead",
-        name: "context-test",
+        type: 'beforeRead',
+        name: 'context-test',
         execute: async (query, _ctx) => {
           receivedContext = query.context;
-          return { query };
+          return {query};
         },
       };
 
       db.hook(hook);
 
       await db.query({
-        find: { e: ["?e"] },
-        where: [{ e: "?e", a: "name", v: "Alice" }],
-        context: { userId: "alice", source: "test" },
+        find: {e: ['?e']},
+        where: [{e: '?e', a: 'name', v: 'Alice'}],
+        context: {userId: 'alice', source: 'test'},
       });
 
       expect(receivedContext).toBeDefined();
-      expect(receivedContext?.userId).toBe("alice");
-      expect(receivedContext?.source).toBe("test");
+      expect(receivedContext?.userId).toBe('alice');
+      expect(receivedContext?.source).toBe('test');
       expect(receivedContext?.db).toBeDefined();
     });
   });
 
-  describe("After-Read Hooks", () => {
-    test("should filter results", async () => {
-      const { db } = f;
+  describe('After-Read Hooks', () => {
+    test('should filter results', async () => {
+      const {db} = f;
 
       await db.transact([
-        { op: "assert", e: 1, a: "name", v: "Alice" },
-        { op: "assert", e: 2, a: "name", v: "Bob" },
-        { op: "assert", e: 3, a: "name", v: "Alice" },
+        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
+        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
+        {op: 'assert', e: 3, a: 'name', v: 'Alice'},
       ]);
 
       const hook: AfterRead = {
-        type: "afterRead",
-        name: "filter-results",
-        execute: async (datoms) => {
+        type: 'afterRead',
+        name: 'filter-results',
+        execute: async datoms => {
           // Filter to only return datoms with value "Alice"
-          return { datoms: datoms.filter((d) => d.v === "Alice") };
+          return {datoms: datoms.filter(d => d.v === 'Alice')};
         },
       };
 
       db.hook(hook);
 
-      const { data: results } = await db.query({
-        find: { e: ["?e"], v: ["?v"] },
-        where: [{ e: "?e", a: "name", v: "?v" }],
+      const {data: results} = await db.query({
+        find: {e: ['?e'], v: ['?v']},
+        where: [{e: '?e', a: 'name', v: '?v'}],
       });
 
       expect(results).toHaveLength(2);
-      expect(results.every((r) => r.v === "Alice")).toBe(true);
+      expect(results.every(r => r.v === 'Alice')).toBe(true);
     });
 
-    test("should transform results", async () => {
-      const { db } = f;
+    test('should transform results', async () => {
+      const {db} = f;
 
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
       const hook: AfterRead = {
-        type: "afterRead",
-        name: "transform-results",
-        execute: async (datoms) => {
+        type: 'afterRead',
+        name: 'transform-results',
+        execute: async datoms => {
           // Add a transformed attribute (though this won't affect query results directly)
           // This demonstrates the hook can modify the datoms array
           return {
-            datoms: datoms.map((d) => ({
+            datoms: datoms.map(d => ({
               ...d,
               // Note: This transformation happens before projection, so it affects
               // the datoms used for projection
@@ -289,132 +289,125 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       db.hook(hook);
 
-      const { data: results } = await db.query({
-        find: { e: ["?e"] },
-        where: [{ e: 1, a: "name", v: "?v" }],
+      const {data: results} = await db.query({
+        find: {e: ['?e']},
+        where: [{e: 1, a: 'name', v: '?v'}],
       });
 
       expect(results).toHaveLength(1);
     });
 
-    test("should chain multiple after-read hooks", async () => {
-      const { db } = f;
+    test('should chain multiple after-read hooks', async () => {
+      const {db} = f;
 
       await db.transact([
-        { op: "assert", e: 1, a: "name", v: "Alice" },
-        { op: "assert", e: 2, a: "name", v: "Bob" },
-        { op: "assert", e: 3, a: "name", v: "Charlie" },
+        {op: 'assert', e: 1, a: 'name', v: 'Alice'},
+        {op: 'assert', e: 2, a: 'name', v: 'Bob'},
+        {op: 'assert', e: 3, a: 'name', v: 'Charlie'},
       ]);
 
       const hook1: AfterRead = {
-        type: "afterRead",
-        name: "filter-1",
-        execute: async (datoms) => {
-          return { datoms: datoms.filter((d) => d.e !== 3) };
+        type: 'afterRead',
+        name: 'filter-1',
+        execute: async datoms => {
+          return {datoms: datoms.filter(d => d.e !== 3)};
         },
       };
 
       const hook2: AfterRead = {
-        type: "afterRead",
-        name: "filter-2",
-        execute: async (datoms) => {
-          return { datoms: datoms.filter((d) => d.v !== "Bob") };
+        type: 'afterRead',
+        name: 'filter-2',
+        execute: async datoms => {
+          return {datoms: datoms.filter(d => d.v !== 'Bob')};
         },
       };
 
       db.hook(hook1);
       db.hook(hook2);
 
-      const { data: results } = await db.query({
-        find: { e: ["?e"] },
-        where: [{ e: "?e", a: "name", v: "?v" }],
+      const {data: results} = await db.query({
+        find: {e: ['?e']},
+        where: [{e: '?e', a: 'name', v: '?v'}],
       });
 
       expect(results).toHaveLength(1);
       expect(results[0]!.e).toBe(1);
     });
 
-    test("should pass context to after-read hook", async () => {
-      const { db } = f;
+    test('should pass context to after-read hook', async () => {
+      const {db} = f;
 
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
       let receivedContext: Record<string, unknown> | undefined;
 
       const hook: AfterRead = {
-        type: "afterRead",
-        name: "context-test",
+        type: 'afterRead',
+        name: 'context-test',
         execute: async (datoms, ctx) => {
           receivedContext = ctx.query.context;
-          return { datoms };
+          return {datoms};
         },
       };
 
       db.hook(hook);
 
       await db.query({
-        find: { e: ["?e"] },
-        where: [{ e: 1, a: "name", v: "?v" }],
-        context: { userId: "alice", source: "test" },
+        find: {e: ['?e']},
+        where: [{e: 1, a: 'name', v: '?v'}],
+        context: {userId: 'alice', source: 'test'},
       });
 
       expect(receivedContext).toBeDefined();
-      expect(receivedContext?.userId).toBe("alice");
-      expect(receivedContext?.source).toBe("test");
+      expect(receivedContext?.userId).toBe('alice');
+      expect(receivedContext?.source).toBe('test');
       expect(receivedContext?.db).toBeDefined();
     });
   });
 
-  describe("Before-Write Hooks", () => {
-    test("should validate transaction", async () => {
-      const { db } = f;
+  describe('Before-Write Hooks', () => {
+    test('should validate transaction', async () => {
+      const {db} = f;
 
       const hook: BeforeWrite = {
-        type: "beforeWrite",
-        name: "validate-email",
-        execute: async (tx) => {
+        type: 'beforeWrite',
+        name: 'validate-email',
+        execute: async tx => {
           const validator = new HookValidator();
           for (const datom of tx.datoms) {
-            if (datom.a === "email") {
+            if (datom.a === 'email') {
               const email = String(datom.v);
-              validator.assert(
-                email.includes("@"),
-                "Invalid email format",
-                "INVALID_EMAIL",
-                datom
-              );
+              validator.assert(email.includes('@'), 'Invalid email format', 'INVALID_EMAIL', datom);
             }
           }
 
           if (validator.hasErrors()) {
-            return { tx, errors: validator.getErrors() };
+            return {tx, errors: validator.getErrors()};
           }
-          return { tx };
+          return {tx};
         },
       };
 
       db.hook(hook);
 
       // Valid email should succeed
-      await db.transact([
-        { op: "assert", e: 1, a: "email", v: "alice@example.com" },
-      ]);
+      await db.transact([{op: 'assert', e: 1, a: 'email', v: 'alice@example.com'}]);
 
       // Invalid email should fail
       await expect(
-        db.transact([{ op: "assert", e: 2, a: "email", v: "invalid-email" }])
+        db.transact([{op: 'assert', e: 2, a: 'email', v: 'invalid-email'}]),
       ).rejects.toThrow(TransactionError);
     });
 
-    test("should modify transaction", async () => {
-      const { db } = f;
+    test('should modify transaction', async () => {
+      const {db} = f;
 
       const hook: BeforeWrite = {
-        type: "beforeWrite",
-        name: "add-timestamp",
-        execute: async (tx) => {
+        type: 'beforeWrite',
+        name: 'add-timestamp',
+        execute: async tx => {
           // Add a timestamp to all datoms
-          const modifiedDatoms = tx.datoms.map((d) => ({
+          const modifiedDatoms = tx.datoms.map(d => ({
             ...d,
             // Note: We can't modify tx directly, but we can add new datoms
           }));
@@ -422,10 +415,10 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
           // Add a new datom for timestamp
           modifiedDatoms.push({
             e: tx.datoms[0]?.e || 0,
-            a: "updatedAt",
+            a: 'updatedAt',
             v: new Date().toISOString(),
             tx: tx.datoms[0]?.tx || 0,
-            op: "assert",
+            op: 'assert',
           });
 
           return {
@@ -439,113 +432,105 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       db.hook(hook);
 
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
-      const { data: datoms } = await db.datoms({ e: 1 });
-      const hasTimestamp = datoms.some((d) => d.a === "updatedAt");
+      const {data: datoms} = await db.datoms({e: 1});
+      const hasTimestamp = datoms.some(d => d.a === 'updatedAt');
       expect(hasTimestamp).toBe(true);
     });
 
-    test("should stop processing on stopProcessing flag", async () => {
-      const { db } = f;
+    test('should stop processing on stopProcessing flag', async () => {
+      const {db} = f;
 
       let firstCalled = false;
       let secondCalled = false;
 
       const hook1: BeforeWrite = {
-        type: "beforeWrite",
-        name: "first",
-        execute: async (tx) => {
+        type: 'beforeWrite',
+        name: 'first',
+        execute: async tx => {
           firstCalled = true;
-          return { tx, stopProcessing: true };
+          return {tx, stopProcessing: true};
         },
       };
 
       const hook2: BeforeWrite = {
-        type: "beforeWrite",
-        name: "second",
-        execute: async (tx) => {
+        type: 'beforeWrite',
+        name: 'second',
+        execute: async tx => {
           secondCalled = true;
-          return { tx };
+          return {tx};
         },
       };
 
       db.hook(hook1);
       db.hook(hook2);
 
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
       expect(firstCalled).toBe(true);
       expect(secondCalled).toBe(false);
     });
 
-    test("should pass context and metadata to before-write hook", async () => {
-      const { db } = f;
+    test('should pass context and metadata to before-write hook', async () => {
+      const {db} = f;
 
       let receivedContext: Record<string, unknown> | undefined;
 
       const hook: BeforeWrite = {
-        type: "beforeWrite",
-        name: "context-test",
+        type: 'beforeWrite',
+        name: 'context-test',
         execute: async (tx, ctx) => {
           receivedContext = ctx as Record<string, unknown>;
-          return { tx };
+          return {tx};
         },
       };
 
       db.hook(hook);
 
       await db.transact(
-        [{ op: "assert", e: 1, a: "name", v: "Alice" }],
-        { userId: "alice", reason: "test" },
-        { source: "client", ip: "127.0.0.1" }
+        [{op: 'assert', e: 1, a: 'name', v: 'Alice'}],
+        {userId: 'alice', reason: 'test'},
+        {source: 'client', ip: '127.0.0.1'},
       );
 
       expect(receivedContext).toBeDefined();
-      expect((receivedContext?.txMeta as { userId?: string })?.userId).toBe(
-        "alice"
-      );
-      expect((receivedContext?.txMeta as { reason?: string })?.reason).toBe(
-        "test"
-      );
-      expect(receivedContext?.source).toBe("client");
-      expect(receivedContext?.ip).toBe("127.0.0.1");
+      expect((receivedContext?.txMeta as {userId?: string})?.userId).toBe('alice');
+      expect((receivedContext?.txMeta as {reason?: string})?.reason).toBe('test');
+      expect(receivedContext?.source).toBe('client');
+      expect(receivedContext?.ip).toBe('127.0.0.1');
       expect(receivedContext?.db).toBeDefined();
     });
 
-    test("should collect multiple errors from hooks", async () => {
-      const { db } = f;
+    test('should collect multiple errors from hooks', async () => {
+      const {db} = f;
 
       const hook1: BeforeWrite = {
-        type: "beforeWrite",
-        name: "validator-1",
-        execute: async (tx) => {
+        type: 'beforeWrite',
+        name: 'validator-1',
+        execute: async tx => {
           const validator = new HookValidator();
-          validator.assert(
-            tx.datoms.length > 0,
-            "No datoms in transaction",
-            "EMPTY_TX"
-          );
-          return { tx, errors: validator.getErrors() };
+          validator.assert(tx.datoms.length > 0, 'No datoms in transaction', 'EMPTY_TX');
+          return {tx, errors: validator.getErrors()};
         },
       };
 
       const hook2: BeforeWrite = {
-        type: "beforeWrite",
-        name: "validator-2",
-        execute: async (tx) => {
+        type: 'beforeWrite',
+        name: 'validator-2',
+        execute: async tx => {
           const validator = new HookValidator();
           for (const datom of tx.datoms) {
-            if (datom.a === "age") {
+            if (datom.a === 'age') {
               validator.assert(
-                typeof datom.v === "number" && datom.v > 0,
-                "Age must be positive",
-                "INVALID_AGE",
-                datom
+                typeof datom.v === 'number' && datom.v > 0,
+                'Age must be positive',
+                'INVALID_AGE',
+                datom,
               );
             }
           }
-          return { tx, errors: validator.getErrors() };
+          return {tx, errors: validator.getErrors()};
         },
       };
 
@@ -553,26 +538,26 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hook(hook2);
 
       // This should pass (no errors)
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
       // This should fail with age validation error
-      await expect(
-        db.transact([{ op: "assert", e: 2, a: "age", v: -5 }])
-      ).rejects.toThrow(TransactionError);
+      await expect(db.transact([{op: 'assert', e: 2, a: 'age', v: -5}])).rejects.toThrow(
+        TransactionError,
+      );
     });
   });
 
-  describe("After-Write Hooks", () => {
-    test("should execute after successful transaction", async () => {
-      const { db } = f;
+  describe('After-Write Hooks', () => {
+    test('should execute after successful transaction', async () => {
+      const {db} = f;
 
       let called = false;
       let receivedTx: unknown;
 
       const hook: AfterWrite = {
-        type: "afterWrite",
-        name: "side-effect",
-        execute: async (result) => {
+        type: 'afterWrite',
+        name: 'side-effect',
+        execute: async result => {
           called = true;
           receivedTx = result;
         },
@@ -580,27 +565,25 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       db.hook(hook);
 
-      void (await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]));
+      void (await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]));
 
       // Wait for async after-write hooks
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(called).toBe(true);
       expect(receivedTx).toBeDefined();
-      expect(
-        (receivedTx as { datoms: unknown[]; txId: unknown }).datoms
-      ).toBeDefined();
-      expect((receivedTx as { txId: unknown }).txId).toBeDefined();
+      expect((receivedTx as {datoms: unknown[]; txId: unknown}).datoms).toBeDefined();
+      expect((receivedTx as {txId: unknown}).txId).toBeDefined();
     });
 
-    test("should not block transaction on failure", async () => {
-      const { db } = f;
+    test('should not block transaction on failure', async () => {
+      const {db} = f;
 
       const hook: AfterWrite = {
-        type: "afterWrite",
-        name: "failing-hook",
+        type: 'afterWrite',
+        name: 'failing-hook',
         execute: async () => {
-          throw new Error("Side effect failed");
+          throw new Error('Side effect failed');
         },
       };
 
@@ -614,15 +597,13 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
 
       try {
         // Transaction should succeed even if after-write hook fails
-        void (await db.transact([
-          { op: "assert", e: 1, a: "name", v: "Alice" },
-        ]));
+        void (await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]));
 
         // Wait for async after-write hooks to complete
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 10));
 
         // Verify transaction succeeded
-        const { data: datoms } = await db.datoms({ e: 1 });
+        const {data: datoms} = await db.datoms({e: 1});
         expect(datoms).toHaveLength(1);
       } finally {
         // Restore console.error
@@ -630,46 +611,46 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       }
     });
 
-    test("should execute multiple after-write hooks", async () => {
-      const { db } = f;
+    test('should execute multiple after-write hooks', async () => {
+      const {db} = f;
 
       const executionOrder: string[] = [];
 
       const hook1: AfterWrite = {
-        type: "afterWrite",
-        name: "first",
+        type: 'afterWrite',
+        name: 'first',
         execute: async () => {
-          executionOrder.push("first");
+          executionOrder.push('first');
         },
       };
 
       const hook2: AfterWrite = {
-        type: "afterWrite",
-        name: "second",
+        type: 'afterWrite',
+        name: 'second',
         execute: async () => {
-          executionOrder.push("second");
+          executionOrder.push('second');
         },
       };
 
       db.hook(hook1);
       db.hook(hook2);
 
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
       // Wait for async after-write hooks
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(executionOrder.length).toBeGreaterThanOrEqual(2);
     });
 
-    test("should pass context and metadata to after-write hook", async () => {
-      const { db } = f;
+    test('should pass context and metadata to after-write hook', async () => {
+      const {db} = f;
 
       let receivedContext: Record<string, unknown> | undefined;
 
       const hook: AfterWrite = {
-        type: "afterWrite",
-        name: "context-test",
+        type: 'afterWrite',
+        name: 'context-test',
         execute: async (_result, ctx) => {
           receivedContext = ctx as Record<string, unknown>;
         },
@@ -678,127 +659,123 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hook(hook);
 
       await db.transact(
-        [{ op: "assert", e: 1, a: "name", v: "Alice" }],
-        { userId: "alice", reason: "test" },
-        { source: "client", ip: "127.0.0.1" }
+        [{op: 'assert', e: 1, a: 'name', v: 'Alice'}],
+        {userId: 'alice', reason: 'test'},
+        {source: 'client', ip: '127.0.0.1'},
       );
 
       // Wait for async after-write hooks
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(receivedContext).toBeDefined();
-      expect((receivedContext?.txMeta as { userId?: string })?.userId).toBe(
-        "alice"
-      );
-      expect((receivedContext?.txMeta as { reason?: string })?.reason).toBe(
-        "test"
-      );
-      expect(receivedContext?.source).toBe("client");
-      expect(receivedContext?.ip).toBe("127.0.0.1");
+      expect((receivedContext?.txMeta as {userId?: string})?.userId).toBe('alice');
+      expect((receivedContext?.txMeta as {reason?: string})?.reason).toBe('test');
+      expect(receivedContext?.source).toBe('client');
+      expect(receivedContext?.ip).toBe('127.0.0.1');
       expect(receivedContext?.db).toBeDefined();
     });
   });
 
-  describe("HookValidator", () => {
-    test("should collect errors", () => {
+  describe('HookValidator', () => {
+    test('should collect errors', () => {
       const validator = new HookValidator();
 
-      validator.assert(false, "Error 1", "CODE1");
-      validator.assert(true, "Error 2", "CODE2");
-      validator.assert(false, "Error 3", "CODE3");
+      validator.assert(false, 'Error 1', 'CODE1');
+      validator.assert(true, 'Error 2', 'CODE2');
+      validator.assert(false, 'Error 3', 'CODE3');
 
       expect(validator.hasErrors()).toBe(true);
       const errors = validator.getErrors();
       expect(errors).toHaveLength(2);
-      expect(errors?.[0]?.message).toBe("Error 1");
-      expect(errors?.[0]?.code).toBe("CODE1");
-      expect(errors?.[1]?.message).toBe("Error 3");
-      expect(errors?.[1]?.code).toBe("CODE3");
+      expect(errors?.[0]?.message).toBe('Error 1');
+      expect(errors?.[0]?.code).toBe('CODE1');
+      expect(errors?.[1]?.message).toBe('Error 3');
+      expect(errors?.[1]?.code).toBe('CODE3');
     });
 
-    test("should return undefined when no errors", () => {
+    test('should return undefined when no errors', () => {
       const validator = new HookValidator();
 
-      validator.assert(true, "Error 1", "CODE1");
-      validator.assert(true, "Error 2", "CODE2");
+      validator.assert(true, 'Error 1', 'CODE1');
+      validator.assert(true, 'Error 2', 'CODE2');
 
       expect(validator.hasErrors()).toBe(false);
       expect(validator.getErrors()).toBeUndefined();
     });
 
-    test("should associate errors with datoms", () => {
+    test('should associate errors with datoms', () => {
       const validator = new HookValidator();
       const datom = {
         e: 1,
-        a: "email",
-        v: "invalid",
+        a: 'email',
+        v: 'invalid',
         tx: 1,
-        op: "assert" as const,
+        op: 'assert' as const,
       };
 
-      validator.assert(false, "Invalid email", "INVALID_EMAIL", datom);
+      validator.assert(false, 'Invalid email', 'INVALID_EMAIL', datom);
 
       const errors = validator.getErrors();
       expect(errors?.[0]?.datom).toBe(datom);
     });
   });
 
-  describe("Complex Hook Scenarios", () => {
-    test("should handle read and write hooks together", async () => {
-      const { db } = f;
+  describe('Complex Hook Scenarios', () => {
+    test('should handle read and write hooks together', async () => {
+      const {db} = f;
 
       let readCalled = false;
       let writeCalled = false;
 
       const readHook: BeforeRead = {
-        type: "beforeRead",
-        name: "read-logger",
-        execute: async (query) => {
+        type: 'beforeRead',
+        name: 'read-logger',
+        execute: async query => {
           readCalled = true;
-          return { query };
+          return {query};
         },
       };
 
       const writeHook: BeforeWrite = {
-        type: "beforeWrite",
-        name: "write-logger",
-        execute: async (tx) => {
+        type: 'beforeWrite',
+        name: 'write-logger',
+        execute: async tx => {
           writeCalled = true;
-          return { tx };
+          return {tx};
         },
       };
 
       db.hook(readHook);
       db.hook(writeHook);
 
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
       expect(writeCalled).toBe(true);
 
       await db.query({
-        find: { e: ["?e"] },
-        where: [{ e: 1, a: "name", v: "?v" }],
+        find: {e: ['?e']},
+        where: [{e: 1, a: 'name', v: '?v'}],
       });
       expect(readCalled).toBe(true);
     });
 
-    test("should handle hook errors with proper error structure", async () => {
-      const { db } = f;
+    test('should handle hook errors with proper error structure', async () => {
+      const {db} = f;
 
       const hook: BeforeWrite = {
-        type: "beforeWrite",
-        name: "error-test",
-        execute: async (tx) => {
+        type: 'beforeWrite',
+        name: 'error-test',
+        execute: async tx => {
           return {
             tx,
             errors: [
               {
-                message: "Validation failed",
-                code: "VALIDATION_ERROR",
+                message: 'Validation failed',
+                code: 'VALIDATION_ERROR',
                 datom: tx.datoms[0],
               },
               {
-                message: "Another error",
-                code: "ANOTHER_ERROR",
+                message: 'Another error',
+                code: 'ANOTHER_ERROR',
               },
             ],
           };
@@ -808,49 +785,49 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hook(hook);
 
       try {
-        await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
-        throw new Error("Should have thrown TransactionError");
+        await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
+        throw new Error('Should have thrown TransactionError');
       } catch (error: unknown) {
         expect(error).toBeInstanceOf(TransactionError);
         if (error instanceof TransactionError) {
           expect(error.errors).toHaveLength(2);
-          expect(error.errors[0]!.hook).toBe("error-test");
-          expect(error.errors[0]!.message).toBe("Validation failed");
-          expect(error.errors[0]!.code).toBe("VALIDATION_ERROR");
-          expect(error.errors[1]!.message).toBe("Another error");
+          expect(error.errors[0]!.hook).toBe('error-test');
+          expect(error.errors[0]!.message).toBe('Validation failed');
+          expect(error.errors[0]!.code).toBe('VALIDATION_ERROR');
+          expect(error.errors[1]!.message).toBe('Another error');
         }
       }
     });
 
-    test("should execute hooks in registration order", async () => {
-      const { db } = f;
+    test('should execute hooks in registration order', async () => {
+      const {db} = f;
 
       const executionOrder: string[] = [];
 
       const hook1: BeforeWrite = {
-        type: "beforeWrite",
-        name: "first",
-        execute: async (tx) => {
-          executionOrder.push("first");
-          return { tx };
+        type: 'beforeWrite',
+        name: 'first',
+        execute: async tx => {
+          executionOrder.push('first');
+          return {tx};
         },
       };
 
       const hook2: BeforeWrite = {
-        type: "beforeWrite",
-        name: "second",
-        execute: async (tx) => {
-          executionOrder.push("second");
-          return { tx };
+        type: 'beforeWrite',
+        name: 'second',
+        execute: async tx => {
+          executionOrder.push('second');
+          return {tx};
         },
       };
 
       const hook3: BeforeWrite = {
-        type: "beforeWrite",
-        name: "third",
-        execute: async (tx) => {
-          executionOrder.push("third");
-          return { tx };
+        type: 'beforeWrite',
+        name: 'third',
+        execute: async tx => {
+          executionOrder.push('third');
+          return {tx};
         },
       };
 
@@ -858,22 +835,22 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       db.hook(hook2);
       db.hook(hook3);
 
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
-      expect(executionOrder).toEqual(["first", "second", "third"]);
+      expect(executionOrder).toEqual(['first', 'second', 'third']);
     });
 
-    test("should handle empty transaction with hooks", async () => {
-      const { db } = f;
+    test('should handle empty transaction with hooks', async () => {
+      const {db} = f;
 
       let called = false;
       const hook: BeforeWrite = {
-        type: "beforeWrite",
-        name: "empty-tx-handler",
-        execute: async (tx) => {
+        type: 'beforeWrite',
+        name: 'empty-tx-handler',
+        execute: async tx => {
           called = true;
           expect(tx.datoms).toHaveLength(0);
-          return { tx };
+          return {tx};
         },
       };
 
@@ -885,29 +862,29 @@ describe.each(FIXTURES)("Hook Functionality (%s)", (_name, createFixture) => {
       expect(called).toBe(true);
     });
 
-    test("should handle sub operations with hooks", async () => {
-      const { db } = f;
+    test('should handle sub operations with hooks', async () => {
+      const {db} = f;
 
-      await db.transact([{ op: "assert", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
 
       let called = false;
       const hook: BeforeWrite = {
-        type: "beforeWrite",
-        name: "sub-handler",
-        execute: async (tx) => {
+        type: 'beforeWrite',
+        name: 'sub-handler',
+        execute: async tx => {
           called = true;
-          const subs = tx.datoms.filter((d) => d.op === "retract");
+          const subs = tx.datoms.filter(d => d.op === 'retract');
           expect(subs.length).toBeGreaterThan(0);
-          return { tx };
+          return {tx};
         },
       };
 
       db.hook(hook);
 
-      await db.transact([{ op: "retract", e: 1, a: "name", v: "Alice" }]);
+      await db.transact([{op: 'retract', e: 1, a: 'name', v: 'Alice'}]);
 
       expect(called).toBe(true);
-      const { data: datoms } = await db.datoms({ e: 1 });
+      const {data: datoms} = await db.datoms({e: 1});
       expect(datoms).toHaveLength(0);
     });
   });

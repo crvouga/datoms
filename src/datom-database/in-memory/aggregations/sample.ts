@@ -3,10 +3,10 @@
  * Returns N random values without replacement (no duplicates)
  */
 
-import type { Value } from "../../../datoms.js";
-import { IN_MEMORY_AGGREGATIONS } from "./registry.js";
+import type {Value} from '../../../datoms.js';
+import {IN_MEMORY_AGGREGATIONS} from './registry.js';
 
-IN_MEMORY_AGGREGATIONS.set("sample", {
+IN_MEMORY_AGGREGATIONS.set('sample', {
   compute: (values, countStr) => {
     if (values.length === 0) {
       return null;

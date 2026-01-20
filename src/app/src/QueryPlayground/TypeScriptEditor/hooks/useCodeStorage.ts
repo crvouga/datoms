@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import type { RefObject } from "react";
+import {useCallback, useState} from 'react';
+import type {RefObject} from 'react';
 
 export interface UseCodeStorageReturn {
   handleSave: () => Promise<void>;
@@ -15,13 +15,13 @@ export interface UseCodeStorageReturn {
  */
 function aggressivelyCleanWhitespace(code: string): string {
   return code
-    .split("\n")
-    .map((line) => line.replace(/\s+$/, "")) // Remove trailing whitespace from each line
-    .join("\n")
-    .replace(/\n{2,}/g, "\n") // Replace 2+ consecutive newlines with single newline (very aggressive)
-    .replace(/^\n+/, "") // Remove leading blank lines
-    .replace(/\n+$/, "") // Remove trailing blank lines
-    .concat("\n"); // Ensure single newline at end
+    .split('\n')
+    .map(line => line.replace(/\s+$/, '')) // Remove trailing whitespace from each line
+    .join('\n')
+    .replace(/\n{2,}/g, '\n') // Replace 2+ consecutive newlines with single newline (very aggressive)
+    .replace(/^\n+/, '') // Remove leading blank lines
+    .replace(/\n+$/, '') // Remove trailing blank lines
+    .concat('\n'); // Ensure single newline at end
 }
 
 /**
@@ -39,7 +39,7 @@ export function useCodeStorage(
   _defaultValue: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   editorRef: RefObject<any>,
-  setCode: (code: string) => void
+  setCode: (code: string) => void,
 ): UseCodeStorageReturn {
   const [saveNotification, setSaveNotification] = useState<string | null>(null);
 
@@ -65,19 +65,15 @@ export function useCodeStorage(
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
           const currentValue = editor.getValue();
           const currentValueStr =
-            typeof currentValue === "string"
-              ? currentValue
-              : String(currentValue);
+            typeof currentValue === 'string' ? currentValue : String(currentValue);
           let cursorOffset = 0;
           if (position) {
             // Calculate offset: sum of characters in previous lines + column
-            const lines = currentValueStr.split("\n");
+            const lines = currentValueStr.split('\n');
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             const lineNumberRaw = position.lineNumber;
             const lineNumber =
-              typeof lineNumberRaw === "number"
-                ? lineNumberRaw
-                : Number(lineNumberRaw) || 1;
+              typeof lineNumberRaw === 'number' ? lineNumberRaw : Number(lineNumberRaw) || 1;
             for (let i = 0; i < lineNumber - 1 && i < lines.length; i++) {
               const line = lines[i];
               if (line) {
@@ -86,16 +82,13 @@ export function useCodeStorage(
             }
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             const columnRaw = position.column;
-            const column =
-              typeof columnRaw === "number"
-                ? columnRaw
-                : Number(columnRaw) || 1;
+            const column = typeof columnRaw === 'number' ? columnRaw : Number(columnRaw) || 1;
             cursorOffset += column - 1;
           }
 
           // Format using Monaco's formatter with aggressive options
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
-          const formatAction = editor.getAction("editor.action.formatDocument");
+          const formatAction = editor.getAction('editor.action.formatDocument');
           if (formatAction) {
             // Run formatting
             // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -115,7 +108,7 @@ export function useCodeStorage(
             // Restore cursor position
             if (position) {
               // Try to restore to similar position in formatted code
-              const formattedLines = codeToSave.split("\n");
+              const formattedLines = codeToSave.split('\n');
               let restoredLine = 1;
               let restoredColumn = 1;
               let currentOffset = 0;
@@ -128,10 +121,7 @@ export function useCodeStorage(
                 if (currentOffset + lineLength >= cursorOffset) {
                   restoredLine = i + 1;
                   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-                  restoredColumn = Math.min(
-                    cursorOffset - currentOffset + 1,
-                    lineLength + 1
-                  );
+                  restoredColumn = Math.min(cursorOffset - currentOffset + 1, lineLength + 1);
                   break;
                 }
                 currentOffset += lineLength + 1; // +1 for newline
@@ -142,10 +132,7 @@ export function useCodeStorage(
               if (restoredLine > 0) {
                 const targetLine = formattedLines[restoredLine - 1];
                 if (targetLine) {
-                  restoredColumn = Math.min(
-                    restoredColumn,
-                    targetLine.length + 1
-                  );
+                  restoredColumn = Math.min(restoredColumn, targetLine.length + 1);
                 }
               }
 
@@ -157,15 +144,11 @@ export function useCodeStorage(
               });
 
               // Restore selection if there was one
-              if (
-                selection &&
-                typeof selection === "object" &&
-                "isEmpty" in selection
-              ) {
+              if (selection && typeof selection === 'object' && 'isEmpty' in selection) {
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
                 const isEmptyFn = selection.isEmpty;
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-                if (typeof isEmptyFn === "function" && !isEmptyFn()) {
+                if (typeof isEmptyFn === 'function' && !isEmptyFn()) {
                   // Try to preserve selection bounds
                   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
                   editor.setSelection(selection);
@@ -182,7 +165,7 @@ export function useCodeStorage(
           }
         } catch (formatError) {
           // If formatting fails, still try to clean whitespace
-          console.warn("Failed to format code:", formatError);
+          console.warn('Failed to format code:', formatError);
           codeToSave = aggressivelyCleanWhitespace(codeToSave);
           setCode(codeToSave);
         }
@@ -193,13 +176,13 @@ export function useCodeStorage(
       }
 
       localStorage.setItem(storageKey, codeToSave);
-      setSaveNotification("Saved");
+      setSaveNotification('Saved');
       // Clear notification after 2 seconds
       setTimeout(() => {
         setSaveNotification(null);
       }, 2000);
     } catch {
-      setSaveNotification("Failed to save");
+      setSaveNotification('Failed to save');
       setTimeout(() => {
         setSaveNotification(null);
       }, 2000);

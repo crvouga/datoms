@@ -1,6 +1,6 @@
-import { type HttpClient } from "../../lib/http-client";
+import {type HttpClient} from '../../lib/http-client';
 
-const BASE_URL = "https://api.themoviedb.org/3";
+const BASE_URL = 'https://api.themoviedb.org/3';
 
 /**
  * Movie data structure from TMDB API.
@@ -55,7 +55,7 @@ export class TmdbClient {
    */
   constructor(httpClient: HttpClient, tmdbApiReadAccessToken: string) {
     // Ensure baseURL ends with / for proper path resolution
-    const baseURL = BASE_URL.endsWith("/") ? BASE_URL : `${BASE_URL}/`;
+    const baseURL = BASE_URL.endsWith('/') ? BASE_URL : `${BASE_URL}/`;
     this.httpClient = httpClient.init(baseURL, {
       headers: {
         Authorization: `Bearer ${tmdbApiReadAccessToken}`,
@@ -81,8 +81,8 @@ export class TmdbClient {
     sort_by?: string;
     with_genres?: string;
     primary_release_year?: number;
-    "primary_release_date.gte"?: string;
-    "primary_release_date.lte"?: string;
+    'primary_release_date.gte'?: string;
+    'primary_release_date.lte'?: string;
     [key: string]: string | number | undefined;
   }): Promise<Nullish<DiscoverMoviesResponse>> {
     const searchParams = new URLSearchParams();
@@ -92,7 +92,7 @@ export class TmdbClient {
     }
     const queryString = searchParams.toString();
     // Pass relative path (baseURL ends with / so this will be appended correctly)
-    const path = `discover/movie${queryString ? `?${queryString}` : ""}`;
+    const path = `discover/movie${queryString ? `?${queryString}` : ''}`;
     return this.httpClient.get<Nullish<DiscoverMoviesResponse>>(path);
   }
 }
@@ -106,7 +106,7 @@ export class TmdbClient {
  */
 export function createTmdbClient(httpClient: HttpClient): TmdbClient {
   const tmdbApiReadAccessToken = process.env.TMDB_API_READ_ACCESS_TOKEN;
-  if (!tmdbApiReadAccessToken || tmdbApiReadAccessToken.trim() === "")
-    throw new Error("TMDB_API_READ_ACCESS_TOKEN is not set");
+  if (!tmdbApiReadAccessToken || tmdbApiReadAccessToken.trim() === '')
+    throw new Error('TMDB_API_READ_ACCESS_TOKEN is not set');
   return new TmdbClient(httpClient, tmdbApiReadAccessToken);
 }

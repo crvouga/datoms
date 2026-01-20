@@ -5,9 +5,9 @@
  * and should not be included in the main library bundle.
  */
 
-import { Database as BunDatabase } from "bun:sqlite";
-import type { SQLDatabase } from "./sql-database.js";
-import type { DatabaseRow, SQLParams } from "./types.js";
+import {Database as BunDatabase} from 'bun:sqlite';
+import type {SQLDatabase} from './sql-database.js';
+import type {DatabaseRow, SQLParams} from './types.js';
 
 /**
  * SQLite connection wrapper that implements SqlConnection interface
@@ -16,7 +16,7 @@ export class SQLiteSQLDatabase implements SQLDatabase {
   private db: BunDatabase;
   private inTransaction: boolean = false;
 
-  constructor(filename: string = ":memory:") {
+  constructor(filename: string = ':memory:') {
     this.db = new BunDatabase(filename);
   }
 
@@ -41,25 +41,25 @@ export class SQLiteSQLDatabase implements SQLDatabase {
 
   async beginTransaction(): Promise<void> {
     if (this.inTransaction) {
-      throw new Error("Transaction already in progress");
+      throw new Error('Transaction already in progress');
     }
-    await this.execute("BEGIN TRANSACTION");
+    await this.execute('BEGIN TRANSACTION');
     this.inTransaction = true;
   }
 
   async commitTransaction(): Promise<void> {
     if (!this.inTransaction) {
-      throw new Error("No transaction in progress");
+      throw new Error('No transaction in progress');
     }
-    await this.execute("COMMIT");
+    await this.execute('COMMIT');
     this.inTransaction = false;
   }
 
   async rollbackTransaction(): Promise<void> {
     if (!this.inTransaction) {
-      throw new Error("No transaction in progress");
+      throw new Error('No transaction in progress');
     }
-    await this.execute("ROLLBACK");
+    await this.execute('ROLLBACK');
     this.inTransaction = false;
   }
 

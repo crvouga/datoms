@@ -7,11 +7,8 @@
  * minimally to capture actual results while using hooks for the logging infrastructure.
  */
 
-import type {
-  DatalogQuery,
-  DatalogQueryFindVariable,
-} from "../../../../datalog/datalog.js";
-import type { DatomDatabase } from "../../../../datom-database/datom-database.js";
+import type {DatalogQuery, DatalogQueryFindVariable} from '../../../../datalog/datalog.js';
+import type {DatomDatabase} from '../../../../datom-database/datom-database.js';
 import type {
   AfterRead,
   AfterWrite,
@@ -19,10 +16,10 @@ import type {
   BeforeWrite,
   ReadContext,
   WriteContext,
-} from "../../../../datom-database/hook/hook.js";
-import type { QueryResultEnvelope } from "../../../../datom-database/views/database-view.js";
-import type { TransactionId } from "../../../../datoms.js";
-import type { QueryEditorLog } from "../types.js";
+} from '../../../../datom-database/hook/hook.js';
+import type {QueryResultEnvelope} from '../../../../datom-database/views/database-view.js';
+import type {TransactionId} from '../../../../datoms.js';
+import type {QueryEditorLog} from '../types.js';
 
 /**
  * Options for database logging hooks
@@ -42,7 +39,7 @@ interface OperationMetadata {
   timestamp: number;
   startTime: number;
   args: unknown[];
-  method: "query" | "transact";
+  method: 'query' | 'transact';
 }
 
 const operationMetadata = new Map<number, OperationMetadata>();
@@ -57,15 +54,15 @@ const operationMetadata = new Map<number, OperationMetadata>();
  */
 export function createLoggedDatabaseWithHooks(
   db: DatomDatabase,
-  options: DatabaseLoggingOptions
+  options: DatabaseLoggingOptions,
 ): DatomDatabase {
-  const { onLog, onError } = options;
+  const {onLog, onError} = options;
   let callIdCounter = 0;
 
   // Register hooks for timing (though we'll also wrap methods to capture results)
   const beforeReadHook: BeforeRead = {
-    type: "beforeRead",
-    name: "query-editor-logging-before-read",
+    type: 'beforeRead',
+    name: 'query-editor-logging-before-read',
     execute: async (query, ctx) => {
       const startTime = performance.now();
       const timestamp = Date.now();
@@ -77,30 +74,29 @@ export function createLoggedDatabaseWithHooks(
         timestamp,
         startTime,
         args: [query],
-        method: "query",
+        method: 'query',
       };
       operationMetadata.set(callId, metadata);
 
       // Store operation ID in context
-      (ctx as ReadContext & { __logOperationId?: number }).__logOperationId =
-        callId;
+      (ctx as ReadContext & {__logOperationId?: number}).__logOperationId = callId;
 
-      return { query };
+      return {query};
     },
   };
 
   const afterReadHook: AfterRead = {
-    type: "afterRead",
-    name: "query-editor-logging-after-read",
+    type: 'afterRead',
+    name: 'query-editor-logging-after-read',
     execute: async (datoms, _ctx) => {
       // Hook timing is tracked, but actual results captured in wrapped method
-      return { datoms };
+      return {datoms};
     },
   };
 
   const beforeWriteHook: BeforeWrite = {
-    type: "beforeWrite",
-    name: "query-editor-logging-before-write",
+    type: 'beforeWrite',
+    name: 'query-editor-logging-before-write',
     execute: async (tx, ctx) => {
       const startTime = performance.now();
       const timestamp = Date.now();
@@ -113,20 +109,19 @@ export function createLoggedDatabaseWithHooks(
         timestamp,
         startTime,
         args: [ops],
-        method: "transact",
+        method: 'transact',
       };
       operationMetadata.set(callId, metadata);
 
-      (ctx as WriteContext & { __logOperationId?: number }).__logOperationId =
-        callId;
+      (ctx as WriteContext & {__logOperationId?: number}).__logOperationId = callId;
 
-      return { tx };
+      return {tx};
     },
   };
 
   const afterWriteHook: AfterWrite = {
-    type: "afterWrite",
-    name: "query-editor-logging-after-write",
+    type: 'afterWrite',
+    name: 'query-editor-logging-after-write',
     execute: async (_writeResult, _ctx) => {
       // Transaction logging handled in wrapped method
       return;
@@ -149,8 +144,8 @@ export function createLoggedDatabaseWithHooks(
       DatalogQueryFindVariable
     >,
   >(
-    query: DatalogQuery<keyof TFind & string> & { find: TFind },
-    context?: Record<string, unknown>
+    query: DatalogQuery<keyof TFind & string> & {find: TFind},
+    context?: Record<string, unknown>,
   ): Promise<QueryResultEnvelope<TFind>> => {
     const startTime = performance.now();
     const timestamp = Date.now();
@@ -174,7 +169,7 @@ export function createLoggedDatabaseWithHooks(
       const log: QueryEditorLog = {
         id: callId,
         timestamp,
-        method: "query",
+        method: 'query',
         args: [query],
         result,
         duration,
@@ -190,7 +185,7 @@ export function createLoggedDatabaseWithHooks(
       const log: QueryEditorLog = {
         id: callId,
         timestamp,
-        method: "query",
+        method: 'query',
         args: [query],
         error: errorMessage,
         duration,
@@ -204,7 +199,7 @@ export function createLoggedDatabaseWithHooks(
   db.transact = async (
     ops: Parameters<typeof originalTransact>[0],
     metadata?: Record<string, unknown>,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ): Promise<TransactionId> => {
     const startTime = performance.now();
     const timestamp = Date.now();
@@ -222,7 +217,7 @@ export function createLoggedDatabaseWithHooks(
       const log: QueryEditorLog = {
         id: callId,
         timestamp,
-        method: "transact",
+        method: 'transact',
         args: [ops],
         result,
         duration,
@@ -238,7 +233,7 @@ export function createLoggedDatabaseWithHooks(
       const log: QueryEditorLog = {
         id: callId,
         timestamp,
-        method: "transact",
+        method: 'transact',
         args: [ops],
         error: errorMessage,
         duration,

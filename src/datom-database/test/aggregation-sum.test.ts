@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
-import type { DatalogQuery } from "../../datalog/datalog.js";
-import { FIXTURES } from "./fixtures/fixtures.js";
-import type { Fixture } from "./fixtures/fixture.js";
+import type {DatalogQuery} from '../../datalog/datalog.js';
+import {FIXTURES} from './fixtures/fixtures.js';
+import type {Fixture} from './fixtures/fixture.js';
 
-describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
+describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   let f: Fixture;
 
   beforeEach(async () => {
@@ -16,184 +16,184 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe("Aggregation: sum", () => {
-    test("should sum numeric values", async () => {
-      const { db } = f;
+  describe('Aggregation: sum', () => {
+    test('should sum numeric values', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "age", v: 25 },
-        { op: "assert", e: 2, a: "age", v: 30 },
-        { op: "assert", e: 3, a: "age", v: 35 },
+        {op: 'assert', e: 1, a: 'age', v: 25},
+        {op: 'assert', e: 2, a: 'age', v: 30},
+        {op: 'assert', e: 3, a: 'age', v: 35},
       ]);
 
       const query: DatalogQuery = {
-        find: { total: ["sum", "?age"] },
-        where: [{ e: "?e", a: "age", v: "?age" }],
+        find: {total: ['sum', '?age']},
+        where: [{e: '?e', a: 'age', v: '?age'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(90);
+      expect(results[0]!['total']).toBe(90);
     });
 
-    test("should return 0 for empty results", async () => {
-      const { db } = f;
+    test('should return 0 for empty results', async () => {
+      const {db} = f;
       const query: DatalogQuery = {
-        find: { total: ["sum", "?age"] },
-        where: [{ e: "?e", a: "age", v: "?age" }],
+        find: {total: ['sum', '?age']},
+        where: [{e: '?e', a: 'age', v: '?age'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(0);
+      expect(results[0]!['total']).toBe(0);
     });
 
-    test("should sum single value", async () => {
-      const { db } = f;
-      await db.transact([{ op: "assert", e: 1, a: "price", v: 100 }]);
+    test('should sum single value', async () => {
+      const {db} = f;
+      await db.transact([{op: 'assert', e: 1, a: 'price', v: 100}]);
 
       const query: DatalogQuery = {
-        find: { total: ["sum", "?price"] },
-        where: [{ e: "?e", a: "price", v: "?price" }],
+        find: {total: ['sum', '?price']},
+        where: [{e: '?e', a: 'price', v: '?price'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(100);
+      expect(results[0]!['total']).toBe(100);
     });
 
-    test("should sum negative numbers", async () => {
-      const { db } = f;
+    test('should sum negative numbers', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "value", v: 10 },
-        { op: "assert", e: 2, a: "value", v: -5 },
-        { op: "assert", e: 3, a: "value", v: 3 },
+        {op: 'assert', e: 1, a: 'value', v: 10},
+        {op: 'assert', e: 2, a: 'value', v: -5},
+        {op: 'assert', e: 3, a: 'value', v: 3},
       ]);
 
       const query: DatalogQuery = {
-        find: { total: ["sum", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {total: ['sum', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(8);
+      expect(results[0]!['total']).toBe(8);
     });
 
-    test("should sum decimal numbers", async () => {
-      const { db } = f;
+    test('should sum decimal numbers', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "price", v: 10.5 },
-        { op: "assert", e: 2, a: "price", v: 20.25 },
-        { op: "assert", e: 3, a: "price", v: 5.75 },
+        {op: 'assert', e: 1, a: 'price', v: 10.5},
+        {op: 'assert', e: 2, a: 'price', v: 20.25},
+        {op: 'assert', e: 3, a: 'price', v: 5.75},
       ]);
 
       const query: DatalogQuery = {
-        find: { total: ["sum", "?price"] },
-        where: [{ e: "?e", a: "price", v: "?price" }],
+        find: {total: ['sum', '?price']},
+        where: [{e: '?e', a: 'price', v: '?price'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBeCloseTo(36.5, 2);
+      expect(results[0]!['total']).toBeCloseTo(36.5, 2);
     });
 
-    test("should sum with filters", async () => {
-      const { db } = f;
+    test('should sum with filters', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "type", v: "product" },
-        { op: "assert", e: 1, a: "price", v: 100 },
-        { op: "assert", e: 2, a: "type", v: "product" },
-        { op: "assert", e: 2, a: "price", v: 200 },
-        { op: "assert", e: 3, a: "type", v: "service" },
-        { op: "assert", e: 3, a: "price", v: 50 },
+        {op: 'assert', e: 1, a: 'type', v: 'product'},
+        {op: 'assert', e: 1, a: 'price', v: 100},
+        {op: 'assert', e: 2, a: 'type', v: 'product'},
+        {op: 'assert', e: 2, a: 'price', v: 200},
+        {op: 'assert', e: 3, a: 'type', v: 'service'},
+        {op: 'assert', e: 3, a: 'price', v: 50},
       ]);
 
       const query: DatalogQuery = {
-        find: { total: ["sum", "?price"] },
+        find: {total: ['sum', '?price']},
         where: [
-          { e: "?e", a: "type", v: "product" },
-          { e: "?e", a: "price", v: "?price" },
+          {e: '?e', a: 'type', v: 'product'},
+          {e: '?e', a: 'price', v: '?price'},
         ],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(300);
+      expect(results[0]!['total']).toBe(300);
     });
 
-    test("should sum large numbers", async () => {
-      const { db } = f;
+    test('should sum large numbers', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "value", v: 1000000 },
-        { op: "assert", e: 2, a: "value", v: 2000000 },
-        { op: "assert", e: 3, a: "value", v: 3000000 },
+        {op: 'assert', e: 1, a: 'value', v: 1000000},
+        {op: 'assert', e: 2, a: 'value', v: 2000000},
+        {op: 'assert', e: 3, a: 'value', v: 3000000},
       ]);
 
       const query: DatalogQuery = {
-        find: { total: ["sum", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {total: ['sum', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(6000000);
+      expect(results[0]!['total']).toBe(6000000);
     });
 
-    test("should sum zero values", async () => {
-      const { db } = f;
+    test('should sum zero values', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "value", v: 0 },
-        { op: "assert", e: 2, a: "value", v: 0 },
-        { op: "assert", e: 3, a: "value", v: 10 },
+        {op: 'assert', e: 1, a: 'value', v: 0},
+        {op: 'assert', e: 2, a: 'value', v: 0},
+        {op: 'assert', e: 3, a: 'value', v: 10},
       ]);
 
       const query: DatalogQuery = {
-        find: { total: ["sum", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {total: ['sum', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(10);
+      expect(results[0]!['total']).toBe(10);
     });
 
-    test("should sum values after retraction", async () => {
-      const { db } = f;
+    test('should sum values after retraction', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "price", v: 100 },
-        { op: "assert", e: 2, a: "price", v: 200 },
-        { op: "assert", e: 3, a: "price", v: 300 },
+        {op: 'assert', e: 1, a: 'price', v: 100},
+        {op: 'assert', e: 2, a: 'price', v: 200},
+        {op: 'assert', e: 3, a: 'price', v: 300},
       ]);
 
       // Retract one value
-      await db.transact([{ op: "retract", e: 2, a: "price", v: 200 }]);
+      await db.transact([{op: 'retract', e: 2, a: 'price', v: 200}]);
 
       const query: DatalogQuery = {
-        find: { total: ["sum", "?price"] },
-        where: [{ e: "?e", a: "price", v: "?price" }],
+        find: {total: ['sum', '?price']},
+        where: [{e: '?e', a: 'price', v: '?price'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBe(400);
+      expect(results[0]!['total']).toBe(400);
     });
 
-    test("should sum with very small decimal numbers", async () => {
-      const { db } = f;
+    test('should sum with very small decimal numbers', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "value", v: 0.0001 },
-        { op: "assert", e: 2, a: "value", v: 0.0002 },
-        { op: "assert", e: 3, a: "value", v: 0.0003 },
+        {op: 'assert', e: 1, a: 'value', v: 0.0001},
+        {op: 'assert', e: 2, a: 'value', v: 0.0002},
+        {op: 'assert', e: 3, a: 'value', v: 0.0003},
       ]);
 
       const query: DatalogQuery = {
-        find: { total: ["sum", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {total: ['sum', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!["total"]).toBeCloseTo(0.0006, 4);
+      expect(results[0]!['total']).toBeCloseTo(0.0006, 4);
     });
   });
 });

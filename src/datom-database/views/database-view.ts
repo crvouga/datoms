@@ -3,19 +3,10 @@
  * Provides a high-level interface for working with datoms and datalog queries
  */
 
-import type {
-  DatalogQuery,
-  DatalogQueryFindVariable,
-} from "../../datalog/datalog.js";
-import type {
-  Attribute,
-  Datom,
-  DatomOperation,
-  TransactionId,
-  Value,
-} from "../../datoms.js";
-import type { EntityId } from "../../entity-id.js";
-import type { ViewConfig } from "./view-config.js";
+import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
+import type {Attribute, Datom, DatomOperation, TransactionId, Value} from '../../datoms.js';
+import type {EntityId} from '../../entity-id.js';
+import type {ViewConfig} from './view-config.js';
 
 export type DatomsResult = Array<Datom>;
 
@@ -24,9 +15,7 @@ export type DatomsResult = Array<Datom>;
  * Extracts the keys from the find clause and creates a record type where each key
  * maps to Value | Attribute | EntityId
  */
-export type QueryResultFromFind<
-  TFind extends Record<string, DatalogQueryFindVariable>,
-> = Array<{
+export type QueryResultFromFind<TFind extends Record<string, DatalogQueryFindVariable>> = Array<{
   [K in keyof TFind]: Value | Attribute | EntityId;
 }>;
 
@@ -35,10 +24,7 @@ export type QueryResultFromFind<
  * @template TFind The find clause from the DatalogQuery
  */
 export type QueryResult<
-  TFind extends Record<string, DatalogQueryFindVariable> = Record<
-    string,
-    DatalogQueryFindVariable
-  >,
+  TFind extends Record<string, DatalogQueryFindVariable> = Record<string, DatalogQueryFindVariable>,
 > = QueryResultFromFind<TFind>;
 
 /**
@@ -54,10 +40,7 @@ export type DatomsResultEnvelope = {
  * @template TFind The find clause from the DatalogQuery
  */
 export type QueryResultEnvelope<
-  TFind extends Record<string, DatalogQueryFindVariable> = Record<
-    string,
-    DatalogQueryFindVariable
-  >,
+  TFind extends Record<string, DatalogQueryFindVariable> = Record<string, DatalogQueryFindVariable>,
 > = {
   data: QueryResult<TFind>;
   metadata?: Record<string, unknown>;
@@ -105,7 +88,7 @@ export interface DatabaseView {
       DatalogQueryFindVariable
     >,
   >(
-    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+    query: DatalogQuery<keyof TFind & string> & {find: TFind},
   ): Promise<QueryResultEnvelope<TFind>>;
 }
 

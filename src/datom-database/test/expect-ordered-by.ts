@@ -1,4 +1,4 @@
-import { expect } from "bun:test";
+import {expect} from 'bun:test';
 
 /**
  * Asserts that an array of objects is ordered by a specified field,
@@ -16,8 +16,8 @@ import { expect } from "bun:test";
 export function expectOrderedBy<T extends Record<string, unknown>>(
   results: T[],
   field: keyof T,
-  direction: "asc" | "desc",
-  limit?: number
+  direction: 'asc' | 'desc',
+  limit?: number,
 ): void {
   const checkLength = Math.min(limit ?? results.length, results.length);
   for (let i = 1; i < checkLength; i++) {
@@ -28,10 +28,10 @@ export function expectOrderedBy<T extends Record<string, unknown>>(
 
     // Helper to check if a value can be treated as a valid number
     const getNumericValue = (val: unknown): number | null => {
-      if (typeof val === "number") {
+      if (typeof val === 'number') {
         return val;
       }
-      if (typeof val === "string" && val !== "") {
+      if (typeof val === 'string' && val !== '') {
         const parsed = Number(val);
         if (!isNaN(parsed) && isFinite(parsed)) {
           return parsed;
@@ -45,7 +45,7 @@ export function expectOrderedBy<T extends Record<string, unknown>>(
 
     // If both are numeric, compare as numbers
     if (prevNum !== null && currNum !== null) {
-      if (direction === "desc") {
+      if (direction === 'desc') {
         expect(prevNum).toBeGreaterThanOrEqual(currNum);
       } else {
         expect(prevNum).toBeLessThanOrEqual(currNum);
@@ -57,7 +57,7 @@ export function expectOrderedBy<T extends Record<string, unknown>>(
       const currStr = String(currValue);
       const comparison = prevStr.localeCompare(currStr);
 
-      if (direction === "desc") {
+      if (direction === 'desc') {
         expect(comparison).toBeGreaterThanOrEqual(0);
       } else {
         expect(comparison).toBeLessThanOrEqual(0);

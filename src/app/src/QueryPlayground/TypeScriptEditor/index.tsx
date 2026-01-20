@@ -1,35 +1,35 @@
-import { useRef, useState } from "react";
-import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
-import { useMonacoConfig } from "./hooks/useMonacoConfig";
-import { useCodeStorage } from "./hooks/useCodeStorage";
-import { useCodeExecution } from "./hooks/useCodeExecution";
-import { useFontSize } from "./hooks/useFontSize";
-import { EditorHeader } from "./components/EditorHeader";
-import { ShortcutsHelp } from "./components/ShortcutsHelp";
-import { ErrorDisplay } from "./components/ErrorDisplay";
-import { LatencyDisplay } from "./components/LatencyDisplay";
-import { MonacoEditorWrapper } from "./components/MonacoEditorWrapper";
-import type { TypeDefinition, TypeScriptEditorProps } from "./types";
+import {useRef, useState} from 'react';
+import {useKeyboardShortcut} from '../hooks/useKeyboardShortcut';
+import {useMonacoConfig} from './hooks/useMonacoConfig';
+import {useCodeStorage} from './hooks/useCodeStorage';
+import {useCodeExecution} from './hooks/useCodeExecution';
+import {useFontSize} from './hooks/useFontSize';
+import {EditorHeader} from './components/EditorHeader';
+import {ShortcutsHelp} from './components/ShortcutsHelp';
+import {ErrorDisplay} from './components/ErrorDisplay';
+import {LatencyDisplay} from './components/LatencyDisplay';
+import {MonacoEditorWrapper} from './components/MonacoEditorWrapper';
+import type {TypeDefinition, TypeScriptEditorProps} from './types';
 
-export type { TypeDefinition, TypeScriptEditorProps };
+export type {TypeDefinition, TypeScriptEditorProps};
 
 export function TypeScriptEditor({
   typeDefinitions,
   executionContext,
-  defaultValue = "",
+  defaultValue = '',
   storageKey,
   onExecute,
   onExecuteStart,
   onExecuteComplete,
   onExecuteError,
-  title = "TypeScript Editor",
-  runButtonLabel = "Run Code",
-  saveButtonLabel = "Save",
+  title = 'TypeScript Editor',
+  runButtonLabel = 'Run Code',
+  saveButtonLabel = 'Save',
   showShortcutsHelp = true,
-  theme = "hc-black",
+  theme = 'hc-black',
   fontSize: initialFontSize = 18,
   lineHeight: _lineHeight = 26,
-  wordWrap = "off",
+  wordWrap = 'off',
   tabSize = 2,
   editorOptions = {},
 }: TypeScriptEditorProps) {
@@ -43,7 +43,7 @@ export function TypeScriptEditor({
     if (!storageKey) return defaultValue;
     try {
       const saved = localStorage.getItem(storageKey);
-      if (saved && saved.trim() !== "") {
+      if (saved && saved.trim() !== '') {
         return saved;
       }
     } catch {
@@ -53,17 +53,17 @@ export function TypeScriptEditor({
   });
 
   // Handle code storage
-  const { handleSave, saveNotification } = useCodeStorage(
+  const {handleSave, saveNotification} = useCodeStorage(
     storageKey,
     code,
     defaultValue,
     editorRef,
-    setCode
+    setCode,
   );
   const [showShortcuts, setShowShortcuts] = useState<boolean>(false);
 
   // Handle font size with localStorage persistence and keyboard shortcuts
-  const { fontSize, calculatedLineHeight } = useFontSize({
+  const {fontSize, calculatedLineHeight} = useFontSize({
     storageKey,
     initialFontSize,
     editorRef,
@@ -79,13 +79,13 @@ export function TypeScriptEditor({
     onExecute,
     onExecuteStart,
     onExecuteComplete,
-    onExecuteError
+    onExecuteError,
   );
-  const { handleRun, loading, error, latency } = executionResult;
+  const {handleRun, loading, error, latency} = executionResult;
 
   // Keyboard shortcuts
   useKeyboardShortcut({
-    keys: ["mod", "Enter"],
+    keys: ['mod', 'Enter'],
     callback: () => {
       void handleRun();
     },
@@ -93,7 +93,7 @@ export function TypeScriptEditor({
   });
 
   useKeyboardShortcut({
-    keys: ["mod", "S"],
+    keys: ['mod', 'S'],
     callback: () => {
       void handleSave();
     },
@@ -114,14 +114,12 @@ export function TypeScriptEditor({
         loading={loading}
         runButtonLabel={runButtonLabel}
       />
-      {showShortcuts && showShortcutsHelp && (
-        <ShortcutsHelp storageKey={storageKey} />
-      )}
+      {showShortcuts && showShortcutsHelp && <ShortcutsHelp storageKey={storageKey} />}
       <ErrorDisplay error={error} />
       <LatencyDisplay latency={latency} />
       <MonacoEditorWrapper
         code={code}
-        onChange={(value) => setCode(value || "")}
+        onChange={value => setCode(value || '')}
         theme={theme}
         fontSize={fontSize}
         lineHeight={calculatedLineHeight}

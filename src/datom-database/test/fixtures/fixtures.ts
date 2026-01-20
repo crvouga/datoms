@@ -1,20 +1,20 @@
-import type { Fixture } from "./fixture.js";
-import { createFileSystemFixture } from "./fixture/filesystem.js";
-import { createHttpClientFixture } from "./fixture/http-client.js";
-import { createInMemoryFixture } from "./fixture/in-memory.js";
-import { createPGLiteFixture } from "./fixture/pglite.js";
-import { createPostgresFixture } from "./fixture/postgres.js";
-import { createSQLiteFixture } from "./fixture/sqlite.js";
+import type {Fixture} from './fixture.js';
+import {createFileSystemFixture} from './fixture/filesystem.js';
+import {createHttpClientFixture} from './fixture/http-client.js';
+import {createInMemoryFixture} from './fixture/in-memory.js';
+import {createPGLiteFixture} from './fixture/pglite.js';
+import {createPostgresFixture} from './fixture/postgres.js';
+import {createSQLiteFixture} from './fixture/sqlite.js';
 
-export const FAST_TESTS = process.env["FAST_TESTS"] === "true";
+export const FAST_TESTS = process.env['FAST_TESTS'] === 'true';
 
 export const FIXTURES: [string, () => Promise<Fixture>][] = [];
-FIXTURES.push(["InMemory", () => createInMemoryFixture()]);
-FIXTURES.push(["SQLite (memory)", () => createSQLiteFixture(":memory:")]);
-FIXTURES.push(["PostgreSQL", () => createPostgresFixture()]);
+FIXTURES.push(['InMemory', () => createInMemoryFixture()]);
+FIXTURES.push(['SQLite (memory)', () => createSQLiteFixture(':memory:')]);
+FIXTURES.push(['PostgreSQL', () => createPostgresFixture()]);
 if (!FAST_TESTS) {
-  FIXTURES.push(["HTTP Client", () => createHttpClientFixture()]);
-  FIXTURES.push(["SQLite (file)", () => createSQLiteFixture("test.db")]);
-  FIXTURES.push(["PGLite", () => createPGLiteFixture()]);
-  FIXTURES.push(["FileSystem", () => createFileSystemFixture("test.csv")]);
+  FIXTURES.push(['HTTP Client', () => createHttpClientFixture()]);
+  FIXTURES.push(['SQLite (file)', () => createSQLiteFixture('test.db')]);
+  FIXTURES.push(['PGLite', () => createPGLiteFixture()]);
+  FIXTURES.push(['FileSystem', () => createFileSystemFixture('test.csv')]);
 }

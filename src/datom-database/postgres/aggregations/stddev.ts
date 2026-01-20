@@ -2,10 +2,10 @@
  * Standard deviation aggregation - PostgreSQL implementation
  */
 
-import { POSTGRES_AGGREGATIONS } from "./registry.js";
-import { escapeColumnName, getValueExtraction } from "./helpers.js";
+import {POSTGRES_AGGREGATIONS} from './registry.js';
+import {escapeColumnName, getValueExtraction} from './helpers.js';
 
-POSTGRES_AGGREGATIONS.set("stddev", {
+POSTGRES_AGGREGATIONS.set('stddev', {
   convert: (variableColumn, outputKey, _defaultValue, isValueColumn) => {
     const sql = isValueColumn
       ? `STDDEV_POP(${getValueExtraction(variableColumn, isValueColumn)}) AS ${escapeColumnName(outputKey)}`

@@ -1,13 +1,13 @@
-import { expect, test } from "@playwright/test";
+import {expect, test} from '@playwright/test';
 
-test.describe("Moviefinder App", () => {
-  test("should mount and load correctly", async ({ page }) => {
+test.describe('Moviefinder App', () => {
+  test('should mount and load correctly', async ({page}) => {
     // Navigate to the app
-    await page.goto("/");
+    await page.goto('/');
     // Wait for the page to load
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState('networkidle');
     // Verify root element exists and has content
-    const root = page.locator("#root");
+    const root = page.locator('#root');
     await expect(root).toBeVisible();
   });
 });

@@ -4,22 +4,19 @@
  * Loads datoms from a CSV file on initialize() and persists after every transaction
  */
 
-import type {
-  DatalogQuery,
-  DatalogQueryFindVariable,
-} from "../../datalog/datalog.js";
-import type { Datom, DatomInput, TransactionId, Value } from "../../datoms.js";
-import type { EntityId } from "../../entity-id.js";
-import type { Transaction } from "../../types.js";
-import type { Hook } from "../hook/hook.js";
-import type { DatomDatabase, WithResult } from "../datom-database.js";
+import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
+import type {Datom, DatomInput, TransactionId, Value} from '../../datoms.js';
+import type {EntityId} from '../../entity-id.js';
+import type {Transaction} from '../../types.js';
+import type {Hook} from '../hook/hook.js';
+import type {DatomDatabase, WithResult} from '../datom-database.js';
 import type {
   DatomsQuery,
   DatomsResultEnvelope,
   QueryResultEnvelope,
-} from "../views/database-view.js";
-import type { DatabaseView } from "../views/database-view.js";
-import { InMemoryDatomDatabase } from "../in-memory/in-memory-datom-database.js";
+} from '../views/database-view.js';
+import type {DatabaseView} from '../views/database-view.js';
+import {InMemoryDatomDatabase} from '../in-memory/in-memory-datom-database.js';
 
 export interface FileSystemDatomDatabaseOptions {
   /** Path to the CSV file for persistence (default: "datoms.csv") */
@@ -58,7 +55,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
     const exists = await file.exists();
     if (!exists) {
       // Create file with CSV header
-      const header = "e,a,v,tx,op\n";
+      const header = 'e,a,v,tx,op\n';
       await Bun.write(this.filePath, header);
     }
 
@@ -92,7 +89,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   async transact(
     ops: (DatomInput | DatomInput[] | Datom | Datom[])[],
     metadata?: Record<string, unknown>,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ): Promise<TransactionId> {
     // Delegate to memory database
     const txId = await this._memoryDb.transact(ops, metadata, context);
@@ -119,7 +116,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
       DatalogQueryFindVariable
     >,
   >(
-    query: DatalogQuery<keyof TFind & string> & { find: TFind }
+    query: DatalogQuery<keyof TFind & string> & {find: TFind},
   ): Promise<QueryResultEnvelope<TFind>> {
     return this._memoryDb.query(query);
   }
@@ -162,7 +159,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   /**
    * Destroy old datoms (delegated to memory database)
    */
-  async _destroy(config: { retentionCount: number }): Promise<number> {
+  async _destroy(config: {retentionCount: number}): Promise<number> {
     const result = await this._memoryDb._destroy(config);
     // Persist after destruction
     await this._persist();
@@ -184,7 +181,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
 
       // Read CSV content
       const content = await file.text();
-      const lines = content.split("\n").filter((line) => line.trim() !== "");
+      const lines = content.split('\n').filter(line => line.trim() !== '');
 
       if (lines.length === 0) {
         return [];
@@ -210,7 +207,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
         const v = this._parseValue(vStr);
         const tx = Number.parseInt(txStr, 10);
 
-        if (isNaN(tx) || (op !== "assert" && op !== "retract")) {
+        if (isNaN(tx) || (op !== 'assert' && op !== 'retract')) {
           continue; // Skip invalid rows
         }
 
@@ -228,15 +225,14 @@ export class FileSystemDatomDatabase implements DatomDatabase {
       // If file doesn't exist or is empty, start fresh
       if (
         error instanceof Error &&
-        (error.message.includes("ENOENT") ||
-          error.message.includes("Unexpected end"))
+        (error.message.includes('ENOENT') || error.message.includes('Unexpected end'))
       ) {
         return [];
       }
 
       // For parse errors, throw to prevent corrupted data
       throw new Error(
-        `Failed to load datoms from ${this.filePath}: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to load datoms from ${this.filePath}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -246,7 +242,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
    */
   private _parseCsvLine(line: string): string[] {
     const fields: string[] = [];
-    let currentField = "";
+    let currentField = '';
     let inQuotes = false;
 
     for (let i = 0; i < line.length; i++) {
@@ -262,10 +258,10 @@ export class FileSystemDatomDatabase implements DatomDatabase {
           // Toggle quote state
           inQuotes = !inQuotes;
         }
-      } else if (char === "," && !inQuotes) {
+      } else if (char === ',' && !inQuotes) {
         // Field separator
         fields.push(currentField);
-        currentField = "";
+        currentField = '';
       } else {
         currentField += char;
       }
@@ -291,7 +287,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
    * Parse value from string, handling JSON-encoded values
    */
   private _parseValue(str: string): Value {
-    if (str === "") {
+    if (str === '') {
       return undefined;
     }
 
@@ -300,9 +296,9 @@ export class FileSystemDatomDatabase implements DatomDatabase {
       const parsed: unknown = JSON.parse(str);
       // Validate it's a valid Value type
       if (
-        typeof parsed === "string" ||
-        typeof parsed === "number" ||
-        typeof parsed === "boolean" ||
+        typeof parsed === 'string' ||
+        typeof parsed === 'number' ||
+        typeof parsed === 'boolean' ||
         parsed === null ||
         parsed === undefined
       ) {
@@ -319,8 +315,8 @@ export class FileSystemDatomDatabase implements DatomDatabase {
     }
 
     // Try to parse as boolean
-    if (str === "true") return true;
-    if (str === "false") return false;
+    if (str === 'true') return true;
+    if (str === 'false') return false;
 
     // Return as string
     return str;
@@ -334,7 +330,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
     try {
       // Get all datoms from the memory database using public API
       // Use a large limit similar to server.ts
-      const { data: allDatoms } = await this._memoryDb.datoms({
+      const {data: allDatoms} = await this._memoryDb.datoms({
         limit: 1_000_000,
       });
 
@@ -346,26 +342,26 @@ export class FileSystemDatomDatabase implements DatomDatabase {
       });
 
       // CSV header
-      const header = "e,a,v,tx,op";
+      const header = 'e,a,v,tx,op';
 
       // Convert datoms to CSV rows, escaping quotes and commas properly
-      const rows = allDatoms.map((datom) => {
+      const rows = allDatoms.map(datom => {
         return [
           this._csvEscape(datom.e),
           this._csvEscape(datom.a),
           this._csvEscape(datom.v),
           this._csvEscape(datom.tx),
           this._csvEscape(datom.op),
-        ].join(",");
+        ].join(',');
       });
 
-      const csvContent = [header, ...rows].join("\n") + "\n";
+      const csvContent = [header, ...rows].join('\n') + '\n';
       await Bun.write(this.filePath, csvContent);
     } catch (error) {
       // Log error but don't throw to avoid breaking transactions
       console.error(
         `Failed to persist datoms to ${this.filePath}:`,
-        error instanceof Error ? error.message : String(error)
+        error instanceof Error ? error.message : String(error),
       );
     }
   }
@@ -376,14 +372,14 @@ export class FileSystemDatomDatabase implements DatomDatabase {
    */
   private _csvEscape(val: unknown): string {
     if (val === null || val === undefined) {
-      return "";
+      return '';
     }
 
     // For complex values, stringify as JSON
     if (
-      typeof val === "object" ||
-      typeof val === "boolean" ||
-      (typeof val === "number" && !Number.isFinite(val))
+      typeof val === 'object' ||
+      typeof val === 'boolean' ||
+      (typeof val === 'number' && !Number.isFinite(val))
     ) {
       val = JSON.stringify(val);
     }

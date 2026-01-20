@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import type { RefObject } from "react";
-import type { TypeDefinition } from "../types";
+import {useEffect} from 'react';
+import type {RefObject} from 'react';
+import type {TypeDefinition} from '../types';
 
 /**
  * Hook to configure Monaco Editor with TypeScript types and compiler options
@@ -10,7 +10,7 @@ import type { TypeDefinition } from "../types";
 export function useMonacoConfig(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   monacoRef: RefObject<any>,
-  typeDefinitions: TypeDefinition[]
+  typeDefinitions: TypeDefinition[],
 ): void {
   useEffect(() => {
     if (monacoRef.current) {
@@ -33,18 +33,18 @@ export function useMonacoConfig(
         esModuleInterop: true,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
         jsx: monaco.languages.typescript.JsxEmit.React,
-        reactNamespace: "React",
+        reactNamespace: 'React',
         allowJs: true,
-        typeRoots: ["node_modules/@types"],
+        typeRoots: ['node_modules/@types'],
       });
 
       // Add extra libs for better IntelliSense
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
       monaco.languages.typescript.typescriptDefaults.setExtraLibs(
-        typeDefinitions.map((def) => ({
+        typeDefinitions.map(def => ({
           content: def.content,
           filePath: def.filePath,
-        }))
+        })),
       );
 
       // Note: Formatting options are handled via the format action in useCodeStorage

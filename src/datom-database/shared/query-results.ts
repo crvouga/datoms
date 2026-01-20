@@ -2,17 +2,14 @@
  * Query result operations - joining and projecting results
  */
 
-import type { QueryClause } from "../../datalog/datalog.js";
-import type { Attribute, Value } from "../../datoms.js";
+import type {QueryClause} from '../../datalog/datalog.js';
+import type {Attribute, Value} from '../../datoms.js';
 // Import aggregations to ensure they're registered
-import "../in-memory/aggregations/index.js";
-import {
-  applyAggregations,
-  hasAggregations,
-} from "../in-memory/aggregations/computation.js";
-import { parseAggregation } from "../in-memory/aggregations/parser.js";
-import { stripQuestionMark } from "./datalog-helpers.js";
-import type { QueryResult } from "../views/database-view.js";
+import '../in-memory/aggregations/index.js';
+import {applyAggregations, hasAggregations} from '../in-memory/aggregations/computation.js';
+import {parseAggregation} from '../in-memory/aggregations/parser.js';
+import {stripQuestionMark} from './datalog-helpers.js';
+import type {QueryResult} from '../views/database-view.js';
 
 /**
  * Join two result sets based on common variables
@@ -25,7 +22,7 @@ import type { QueryResult } from "../views/database-view.js";
 export function joinResults(
   left: Record<string, Value | Attribute>[],
   right: Record<string, Value | Attribute>[],
-  _clauses: QueryClause[]
+  _clauses: QueryClause[],
 ): Record<string, Value | Attribute>[] {
   const joined: Record<string, Value | Attribute>[] = [];
 
@@ -41,7 +38,7 @@ export function joinResults(
       }
 
       if (compatible) {
-        joined.push({ ...leftRow, ...rightRow });
+        joined.push({...leftRow, ...rightRow});
       }
     }
   }
@@ -60,8 +57,8 @@ export function joinResults(
  */
 export function project(
   results: Record<string, Value | Attribute>[],
-  find: { [key: string]: unknown },
-  _clauses: QueryClause[]
+  find: {[key: string]: unknown},
+  _clauses: QueryClause[],
 ): QueryResult {
   const findKeys = Object.keys(find);
 
@@ -69,7 +66,7 @@ export function project(
   // This happens when applyAggregations was called before project
   const isAlreadyAggregated =
     results.length > 0 &&
-    findKeys.some((outputKey) => {
+    findKeys.some(outputKey => {
       const expr = find[outputKey];
       const agg = parseAggregation(expr);
       return agg && results[0] && outputKey in results[0];
@@ -89,13 +86,9 @@ export function project(
       } else {
         // Regular variable projection - extract variable from tuple or string
         let varName: string;
-        if (
-          Array.isArray(expr) &&
-          expr.length === 1 &&
-          typeof expr[0] === "string"
-        ) {
+        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === 'string') {
           varName = expr[0];
-        } else if (typeof expr === "string") {
+        } else if (typeof expr === 'string') {
           varName = expr;
         } else {
           continue;
@@ -110,7 +103,7 @@ export function project(
 
   // Handle empty find clause - strip ? from all keys
   if (findKeys.length === 0) {
-    return results.map((row) => {
+    return results.map(row => {
       const projected: Record<string, Value | Attribute> = {};
       for (const key of Object.keys(row)) {
         projected[stripQuestionMark(key)] = row[key];

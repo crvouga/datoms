@@ -2,7 +2,7 @@
  * PostgreSQL aggregation registry - registration system for PostgreSQL SQL aggregations
  */
 
-import type { SQLAggregationResult } from "./types.js";
+import type {SQLAggregationResult} from './types.js';
 
 /**
  * SQL aggregation converter function
@@ -11,7 +11,7 @@ export type SQLAggregationConverter = (
   variableColumn: string,
   outputKey: string,
   defaultValue: string | undefined,
-  isValueColumn: boolean
+  isValueColumn: boolean,
 ) => SQLAggregationResult | null;
 
 /**
@@ -22,5 +22,4 @@ export interface SQLAggregationDefinition {
 }
 
 // PostgreSQL registry
-export const POSTGRES_AGGREGATIONS: Map<string, SQLAggregationDefinition> =
-  new Map();
+export const POSTGRES_AGGREGATIONS: Map<string, SQLAggregationDefinition> = new Map();

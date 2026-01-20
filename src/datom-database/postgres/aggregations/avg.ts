@@ -2,10 +2,10 @@
  * Average aggregation - PostgreSQL implementation
  */
 
-import { POSTGRES_AGGREGATIONS } from "./registry.js";
-import { escapeColumnName, getValueExtraction } from "./helpers.js";
+import {POSTGRES_AGGREGATIONS} from './registry.js';
+import {escapeColumnName, getValueExtraction} from './helpers.js';
 
-POSTGRES_AGGREGATIONS.set("avg", {
+POSTGRES_AGGREGATIONS.set('avg', {
   convert: (variableColumn, outputKey, _defaultValue, isValueColumn) => {
     const sql = isValueColumn
       ? `AVG(${getValueExtraction(variableColumn, isValueColumn)}) AS ${escapeColumnName(outputKey)}`

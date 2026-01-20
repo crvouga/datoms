@@ -30,10 +30,10 @@ export interface TypeScriptEditorProps {
   showShortcutsHelp?: boolean;
 
   // Editor options
-  theme?: "vs" | "vs-dark" | "hc-black" | "hc-light";
+  theme?: 'vs' | 'vs-dark' | 'hc-black' | 'hc-light';
   fontSize?: number;
   lineHeight?: number;
-  wordWrap?: "on" | "off";
+  wordWrap?: 'on' | 'off';
   tabSize?: number;
 
   // Additional Monaco editor options

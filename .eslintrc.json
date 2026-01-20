@@ -25,11 +25,5 @@
     ],
     "no-unused-vars": "off"
   },
-  "ignorePatterns": [
-    "dist",
-    "node_modules",
-    "**/*.js",
-    "**/__tests__/**",
-    "**/tests/**"
-  ]
+  "ignorePatterns": ["dist", "node_modules", "**/*.js", "**/__tests__/**", "**/tests/**"]
 }

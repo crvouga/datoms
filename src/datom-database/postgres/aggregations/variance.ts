@@ -2,10 +2,10 @@
  * Variance aggregation - PostgreSQL implementation
  */
 
-import { POSTGRES_AGGREGATIONS } from "./registry.js";
-import { escapeColumnName, getValueExtraction } from "./helpers.js";
+import {POSTGRES_AGGREGATIONS} from './registry.js';
+import {escapeColumnName, getValueExtraction} from './helpers.js';
 
-POSTGRES_AGGREGATIONS.set("variance", {
+POSTGRES_AGGREGATIONS.set('variance', {
   convert: (variableColumn, outputKey, _defaultValue, isValueColumn) => {
     const sql = isValueColumn
       ? `VAR_POP(${getValueExtraction(variableColumn, isValueColumn)}) AS ${escapeColumnName(outputKey)}`

@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
-import type { DatalogQuery } from "../../datalog/datalog.js";
-import { FIXTURES } from "./fixtures/fixtures.js";
-import type { Fixture } from "./fixtures/fixture.js";
+import type {DatalogQuery} from '../../datalog/datalog.js';
+import {FIXTURES} from './fixtures/fixtures.js';
+import type {Fixture} from './fixtures/fixture.js';
 
-describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
+describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   let f: Fixture;
 
   beforeEach(async () => {
@@ -16,162 +16,160 @@ describe.each(FIXTURES)("DatomDatabase (%s)", (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe("Aggregation: stddev", () => {
-    test("should calculate standard deviation of numeric values", async () => {
-      const { db } = f;
+  describe('Aggregation: stddev', () => {
+    test('should calculate standard deviation of numeric values', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "value", v: 10 },
-        { op: "assert", e: 2, a: "value", v: 20 },
-        { op: "assert", e: 3, a: "value", v: 30 },
+        {op: 'assert', e: 1, a: 'value', v: 10},
+        {op: 'assert', e: 2, a: 'value', v: 20},
+        {op: 'assert', e: 3, a: 'value', v: 30},
       ]);
 
       const query: DatalogQuery = {
-        find: { stddev: ["stddev", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {stddev: ['stddev', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 20, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
-      expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
+      expect(results[0]!['stddev']).toBeCloseTo(8.16, 1);
     });
 
-    test("should return null or undefined for empty results", async () => {
-      const { db } = f;
+    test('should return null or undefined for empty results', async () => {
+      const {db} = f;
       const query: DatalogQuery = {
-        find: { stddev: ["stddev", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {stddev: ['stddev', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(
-        results[0]!["stddev"] === null || results[0]!["stddev"] === undefined
-      ).toBe(true);
+      expect(results[0]!['stddev'] === null || results[0]!['stddev'] === undefined).toBe(true);
     });
 
-    test("should return 0 or null for single value", async () => {
-      const { db } = f;
-      await db.transact([{ op: "assert", e: 1, a: "value", v: 10 }]);
+    test('should return 0 or null for single value', async () => {
+      const {db} = f;
+      await db.transact([{op: 'assert', e: 1, a: 'value', v: 10}]);
 
       const query: DatalogQuery = {
-        find: { stddev: ["stddev", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {stddev: ['stddev', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Standard deviation of single value should be 0 or null/undefined
       expect(
-        results[0]!["stddev"] === 0 ||
-          results[0]!["stddev"] === null ||
-          results[0]!["stddev"] === undefined
+        results[0]!['stddev'] === 0 ||
+          results[0]!['stddev'] === null ||
+          results[0]!['stddev'] === undefined,
       ).toBe(true);
     });
 
-    test("should calculate standard deviation with identical values", async () => {
-      const { db } = f;
+    test('should calculate standard deviation with identical values', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "value", v: 10 },
-        { op: "assert", e: 2, a: "value", v: 10 },
-        { op: "assert", e: 3, a: "value", v: 10 },
+        {op: 'assert', e: 1, a: 'value', v: 10},
+        {op: 'assert', e: 2, a: 'value', v: 10},
+        {op: 'assert', e: 3, a: 'value', v: 10},
       ]);
 
       const query: DatalogQuery = {
-        find: { stddev: ["stddev", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {stddev: ['stddev', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Standard deviation of identical values should be 0
-      expect(results[0]!["stddev"]).toBe(0);
+      expect(results[0]!['stddev']).toBe(0);
     });
 
-    test("should calculate standard deviation with negative numbers", async () => {
-      const { db } = f;
+    test('should calculate standard deviation with negative numbers', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "value", v: -10 },
-        { op: "assert", e: 2, a: "value", v: 0 },
-        { op: "assert", e: 3, a: "value", v: 10 },
+        {op: 'assert', e: 1, a: 'value', v: -10},
+        {op: 'assert', e: 2, a: 'value', v: 0},
+        {op: 'assert', e: 3, a: 'value', v: 10},
       ]);
 
       const query: DatalogQuery = {
-        find: { stddev: ["stddev", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {stddev: ['stddev', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 0, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
-      expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
+      expect(results[0]!['stddev']).toBeCloseTo(8.16, 1);
     });
 
-    test("should calculate standard deviation with decimal numbers", async () => {
-      const { db } = f;
+    test('should calculate standard deviation with decimal numbers', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "value", v: 10.5 },
-        { op: "assert", e: 2, a: "value", v: 20.5 },
-        { op: "assert", e: 3, a: "value", v: 30.5 },
+        {op: 'assert', e: 1, a: 'value', v: 10.5},
+        {op: 'assert', e: 2, a: 'value', v: 20.5},
+        {op: 'assert', e: 3, a: 'value', v: 30.5},
       ]);
 
       const query: DatalogQuery = {
-        find: { stddev: ["stddev", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {stddev: ['stddev', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 20.5, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
-      expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
+      expect(results[0]!['stddev']).toBeCloseTo(8.16, 1);
     });
 
-    test("should calculate standard deviation with filters", async () => {
-      const { db } = f;
+    test('should calculate standard deviation with filters', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "type", v: "group1" },
-        { op: "assert", e: 1, a: "score", v: 80 },
-        { op: "assert", e: 2, a: "type", v: "group1" },
-        { op: "assert", e: 2, a: "score", v: 90 },
-        { op: "assert", e: 3, a: "type", v: "group1" },
-        { op: "assert", e: 3, a: "score", v: 100 },
-        { op: "assert", e: 4, a: "type", v: "group2" },
-        { op: "assert", e: 4, a: "score", v: 50 },
+        {op: 'assert', e: 1, a: 'type', v: 'group1'},
+        {op: 'assert', e: 1, a: 'score', v: 80},
+        {op: 'assert', e: 2, a: 'type', v: 'group1'},
+        {op: 'assert', e: 2, a: 'score', v: 90},
+        {op: 'assert', e: 3, a: 'type', v: 'group1'},
+        {op: 'assert', e: 3, a: 'score', v: 100},
+        {op: 'assert', e: 4, a: 'type', v: 'group2'},
+        {op: 'assert', e: 4, a: 'score', v: 50},
       ]);
 
       const query: DatalogQuery = {
-        find: { stddev: ["stddev", "?score"] },
+        find: {stddev: ['stddev', '?score']},
         where: [
-          { e: "?e", a: "type", v: "group1" },
-          { e: "?e", a: "score", v: "?score" },
+          {e: '?e', a: 'type', v: 'group1'},
+          {e: '?e', a: 'score', v: '?score'},
         ],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 90, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
-      expect(results[0]!["stddev"]).toBeCloseTo(8.16, 1);
+      expect(results[0]!['stddev']).toBeCloseTo(8.16, 1);
     });
 
-    test("should calculate standard deviation with larger dataset", async () => {
-      const { db } = f;
+    test('should calculate standard deviation with larger dataset', async () => {
+      const {db} = f;
       await db.transact([
-        { op: "assert", e: 1, a: "value", v: 1 },
-        { op: "assert", e: 2, a: "value", v: 2 },
-        { op: "assert", e: 3, a: "value", v: 3 },
-        { op: "assert", e: 4, a: "value", v: 4 },
-        { op: "assert", e: 5, a: "value", v: 5 },
+        {op: 'assert', e: 1, a: 'value', v: 1},
+        {op: 'assert', e: 2, a: 'value', v: 2},
+        {op: 'assert', e: 3, a: 'value', v: 3},
+        {op: 'assert', e: 4, a: 'value', v: 4},
+        {op: 'assert', e: 5, a: 'value', v: 5},
       ]);
 
       const query: DatalogQuery = {
-        find: { stddev: ["stddev", "?value"] },
-        where: [{ e: "?e", a: "value", v: "?value" }],
+        find: {stddev: ['stddev', '?value']},
+        where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
-      const { data: results } = await db.query(query);
+      const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Mean = 3, variance = 2, stddev = sqrt(2) ≈ 1.41
-      expect(results[0]!["stddev"]).toBeCloseTo(1.41, 1);
+      expect(results[0]!['stddev']).toBeCloseTo(1.41, 1);
     });
   });
 });

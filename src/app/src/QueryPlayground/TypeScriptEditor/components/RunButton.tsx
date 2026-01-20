@@ -1,5 +1,5 @@
-import { PlayIcon } from "../../ui/icons";
-import { Button } from "../../ui/Button";
+import {PlayIcon} from '../../ui/icons';
+import {Button} from '../../ui/Button';
 
 export interface RunButtonProps {
   onClick: () => void;
@@ -7,7 +7,7 @@ export interface RunButtonProps {
   label: string;
 }
 
-export function RunButton({ onClick, loading, label }: RunButtonProps) {
+export function RunButton({onClick, loading, label}: RunButtonProps) {
   return (
     <Button
       onClick={onClick}
@@ -15,7 +15,7 @@ export function RunButton({ onClick, loading, label }: RunButtonProps) {
       loadingText="Running..."
       variant="primary"
       icon={<PlayIcon className="w-4 h-4" />}
-      keyboardShortcut={["mod", "Enter"]}
+      keyboardShortcut={['mod', 'Enter']}
       title="Run code"
     >
       {label}

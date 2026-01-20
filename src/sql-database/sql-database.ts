@@ -2,8 +2,8 @@
  * SQL connection adapter interface for SQL database implementations
  */
 
-import type { ConnectionPoolStats } from "../types.js";
-import type { DatabaseRow, SQLParams } from "./types.js";
+import type {ConnectionPoolStats} from '../types.js';
+import type {DatabaseRow, SQLParams} from './types.js';
 
 /**
  * SQL connection interface that abstracts different SQL libraries

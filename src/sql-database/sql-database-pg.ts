@@ -5,10 +5,10 @@
  * and should not be included in the main library bundle.
  */
 
-import { Pool } from "pg";
-import type { PoolClient } from "pg";
-import type { SQLDatabase } from "./sql-database.js";
-import type { DatabaseRow, SQLParams } from "./types.js";
+import {Pool} from 'pg';
+import type {PoolClient} from 'pg';
+import type {SQLDatabase} from './sql-database.js';
+import type {DatabaseRow, SQLParams} from './types.js';
 
 /**
  * SSL configuration for PostgreSQL connection
@@ -33,27 +33,23 @@ interface ParsedConnectionConfig {
  */
 function parseSSLConfig(connectionString: string): ParsedConnectionConfig {
   const url = new URL(connectionString);
-  const sslMode = url.searchParams.get("sslmode");
-  const sslRootCert = url.searchParams.get("sslrootcert");
+  const sslMode = url.searchParams.get('sslmode');
+  const sslRootCert = url.searchParams.get('sslrootcert');
 
   // Remove SSL params from URL as we'll handle them in Pool config
-  url.searchParams.delete("sslmode");
-  url.searchParams.delete("sslrootcert");
+  url.searchParams.delete('sslmode');
+  url.searchParams.delete('sslrootcert');
   const cleanConnectionString = url.toString();
 
   // Configure SSL based on parameters
-  if (
-    sslMode === "require" ||
-    sslMode === "verify-full" ||
-    sslMode === "verify-ca"
-  ) {
+  if (sslMode === 'require' || sslMode === 'verify-full' || sslMode === 'verify-ca') {
     const sslConfig: SSLConfig = {
-      rejectUnauthorized: sslMode === "verify-full" || sslMode === "verify-ca",
+      rejectUnauthorized: sslMode === 'verify-full' || sslMode === 'verify-ca',
     };
 
     // Handle sslrootcert=system - use Node's default CA certificates
     // When sslrootcert is "system" or not provided, use default CA store
-    if (sslRootCert && sslRootCert !== "system") {
+    if (sslRootCert && sslRootCert !== 'system') {
       // If a specific cert file is provided, use it
       sslConfig.ca = sslRootCert;
     }
@@ -67,7 +63,7 @@ function parseSSLConfig(connectionString: string): ParsedConnectionConfig {
   }
 
   // No SSL or disable SSL
-  if (sslMode === "disable") {
+  if (sslMode === 'disable') {
     return {
       connectionString: cleanConnectionString,
       ssl: false,
@@ -131,7 +127,7 @@ export class PgSQLDatabase implements SQLDatabase {
     // We need to convert ALL values to JSON strings for consistency with SQLite
     // This ensures that the query method can always JSON.parse them
     return result.rows.map((row: DatabaseRow): DatabaseRow => {
-      const convertedRow: DatabaseRow = { ...row };
+      const convertedRow: DatabaseRow = {...row};
       // Convert value to JSON string if it exists
       const value = convertedRow.value;
       if (value !== null && value !== undefined) {
@@ -143,17 +139,17 @@ export class PgSQLDatabase implements SQLDatabase {
       // Convert to number for consistency
       const tx = convertedRow.tx;
       if (tx !== undefined) {
-        if (typeof tx === "bigint") {
+        if (typeof tx === 'bigint') {
           convertedRow.tx = Number(tx);
-        } else if (typeof tx === "string") {
+        } else if (typeof tx === 'string') {
           convertedRow.tx = parseInt(tx, 10);
         }
       }
       const lastTx = convertedRow.last_tx;
       if (lastTx !== undefined) {
-        if (typeof lastTx === "bigint") {
+        if (typeof lastTx === 'bigint') {
           convertedRow.last_tx = Number(lastTx);
-        } else if (typeof lastTx === "string") {
+        } else if (typeof lastTx === 'string') {
           convertedRow.last_tx = parseInt(lastTx, 10);
         }
       }
@@ -175,13 +171,13 @@ export class PgSQLDatabase implements SQLDatabase {
     if (!this.client) {
       this.client = await this.pool.connect();
     }
-    await this.client.query("BEGIN");
+    await this.client.query('BEGIN');
     this.inTransaction = true;
   }
 
   async commitTransaction(): Promise<void> {
     if (this.client && this.inTransaction) {
-      await this.client.query("COMMIT");
+      await this.client.query('COMMIT');
       this.inTransaction = false;
       this.client.release();
       this.client = undefined;
@@ -190,7 +186,7 @@ export class PgSQLDatabase implements SQLDatabase {
 
   async rollbackTransaction(): Promise<void> {
     if (this.client && this.inTransaction) {
-      await this.client.query("ROLLBACK");
+      await this.client.query('ROLLBACK');
       this.inTransaction = false;
       this.client.release();
       this.client = undefined;

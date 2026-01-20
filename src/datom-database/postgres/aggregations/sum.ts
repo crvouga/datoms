@@ -2,10 +2,10 @@
  * Sum aggregation - PostgreSQL implementation
  */
 
-import { POSTGRES_AGGREGATIONS } from "./registry.js";
-import { escapeColumnName, getValueExtraction } from "./helpers.js";
+import {POSTGRES_AGGREGATIONS} from './registry.js';
+import {escapeColumnName, getValueExtraction} from './helpers.js';
 
-POSTGRES_AGGREGATIONS.set("sum", {
+POSTGRES_AGGREGATIONS.set('sum', {
   convert: (variableColumn, outputKey, _defaultValue, isValueColumn) => {
     const sql = isValueColumn
       ? `SUM(${getValueExtraction(variableColumn, isValueColumn)}) AS ${escapeColumnName(outputKey)}`

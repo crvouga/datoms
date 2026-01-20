@@ -2,13 +2,11 @@
  * Median aggregation - in-memory implementation
  */
 
-import { IN_MEMORY_AGGREGATIONS } from "./registry.js";
+import {IN_MEMORY_AGGREGATIONS} from './registry.js';
 
-IN_MEMORY_AGGREGATIONS.set("median", {
-  compute: (values) => {
-    const numericValues = values.filter(
-      (v) => typeof v === "number"
-    ) as number[];
+IN_MEMORY_AGGREGATIONS.set('median', {
+  compute: values => {
+    const numericValues = values.filter(v => typeof v === 'number') as number[];
     if (numericValues.length === 0) {
       return null;
     }

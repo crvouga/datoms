@@ -2,16 +2,16 @@
  * PostgreSQL SQL helper functions
  */
 
-import { parseAggregation } from "../../in-memory/aggregations/parser.js";
-import { POSTGRES_AGGREGATIONS } from "./registry.js";
-import type { SQLAggregationResult } from "./types.js";
+import {parseAggregation} from '../../in-memory/aggregations/parser.js';
+import {POSTGRES_AGGREGATIONS} from './registry.js';
+import type {SQLAggregationResult} from './types.js';
 
 /**
  * Escape a column name for PostgreSQL SQL
  */
 export function escapeColumnName(name: string): string {
   // Remove question mark prefix if present
-  const cleanName = name.startsWith("?") ? name.slice(1) : name;
+  const cleanName = name.startsWith('?') ? name.slice(1) : name;
   // PostgreSQL uses double quotes for identifiers
   return `"${cleanName.replace(/"/g, '""')}"`;
 }
@@ -20,7 +20,7 @@ export function escapeColumnName(name: string): string {
  * Escape a value for SQL (for default values)
  */
 export function escapeValue(value: string | number): string {
-  if (typeof value === "number") {
+  if (typeof value === 'number') {
     return String(value);
   }
   // String values need to be quoted and escaped
@@ -32,7 +32,7 @@ export function escapeValue(value: string | number): string {
  */
 export function getPostgresJSONBTextExtraction(
   variableColumn: string,
-  isValueColumn: boolean
+  isValueColumn: boolean,
 ): string {
   if (!isValueColumn) {
     return variableColumn;
@@ -47,10 +47,7 @@ export function getPostgresJSONBTextExtraction(
 /**
  * Get value extraction expression for numeric operations
  */
-export function getValueExtraction(
-  variableColumn: string,
-  isValueColumn: boolean
-): string {
+export function getValueExtraction(variableColumn: string, isValueColumn: boolean): string {
   if (!isValueColumn) {
     return variableColumn;
   }
@@ -67,7 +64,7 @@ export function getValueExtraction(
 export function aggregationToSQL(
   expr: unknown,
   variableColumn: string,
-  outputKey: string
+  outputKey: string,
 ): SQLAggregationResult | null {
   const agg = parseAggregation(expr);
   if (!agg) {
@@ -79,13 +76,8 @@ export function aggregationToSQL(
     return null; // Aggregation not supported for this database type
   }
 
-  const isValueColumn = variableColumn.includes(".v");
-  return def.convert(
-    variableColumn,
-    outputKey,
-    agg.defaultValue,
-    isValueColumn
-  );
+  const isValueColumn = variableColumn.includes('.v');
+  return def.convert(variableColumn, outputKey, agg.defaultValue, isValueColumn);
 }
 
 /**
@@ -93,7 +85,7 @@ export function aggregationToSQL(
  * @param find Find clause object
  * @returns Object with hasAggregations flag and whether all aggregations are SQL-supported
  */
-export function checkSQLAggregations(find: { [key: string]: unknown }): {
+export function checkSQLAggregations(find: {[key: string]: unknown}): {
   hasAggregations: boolean;
   allSupported: boolean;
   hasUnsupported: boolean;
@@ -108,7 +100,7 @@ export function checkSQLAggregations(find: { [key: string]: unknown }): {
     if (agg) {
       hasAggregations = true;
       // Check if this aggregation is supported
-      const result = aggregationToSQL(expr, "dummy", outputKey);
+      const result = aggregationToSQL(expr, 'dummy', outputKey);
       if (result === null || result.sql === null) {
         hasUnsupported = true;
       }

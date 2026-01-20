@@ -2,23 +2,19 @@
  * Variance aggregation - in-memory implementation
  */
 
-import { IN_MEMORY_AGGREGATIONS } from "./registry.js";
+import {IN_MEMORY_AGGREGATIONS} from './registry.js';
 
-IN_MEMORY_AGGREGATIONS.set("variance", {
-  compute: (values) => {
-    const numericValues = values.filter(
-      (v) => typeof v === "number"
-    ) as number[];
+IN_MEMORY_AGGREGATIONS.set('variance', {
+  compute: values => {
+    const numericValues = values.filter(v => typeof v === 'number') as number[];
     if (numericValues.length === 0) {
       return null;
     }
     // Calculate mean
-    const mean =
-      numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
+    const mean = numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
     // Calculate variance: average of squared differences from mean
     const variance =
-      numericValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
-      numericValues.length;
+      numericValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / numericValues.length;
     return variance;
   },
   supportsDefault: false,

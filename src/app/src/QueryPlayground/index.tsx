@@ -1,20 +1,20 @@
-import { useEffect, useState } from "react";
-import { Panel, PanelResizeHandle } from "react-resizable-panels";
-import { db } from "../lib/db";
-import { DbCallLogList } from "./DbCallLogList";
-import { TypeScriptEditor, type TypeDefinition } from "./TypeScriptEditor";
-import { ResizablePanels } from "./ui/ResizablePanels";
-import { createLoggedDatabaseWithHooks } from "./hooks/useDatabaseLogging";
-import type { QueryEditorLog } from "./types";
+import {useEffect, useState} from 'react';
+import {Panel, PanelResizeHandle} from 'react-resizable-panels';
+import {db} from '../lib/db';
+import {DbCallLogList} from './DbCallLogList';
+import {TypeScriptEditor, type TypeDefinition} from './TypeScriptEditor';
+import {ResizablePanels} from './ui/ResizablePanels';
+import {createLoggedDatabaseWithHooks} from './hooks/useDatabaseLogging';
+import type {QueryEditorLog} from './types';
 // Type definitions from db-types.d.ts are automatically included via TypeScript
 
 // Monaco Editor theme configuration with type safety
 // Available themes: "vs", "vs-dark", "hc-black", "hc-light"
-const MONACO_THEME: "vs" | "vs-dark" | "hc-black" | "hc-light" = "hc-black";
+const MONACO_THEME: 'vs' | 'vs-dark' | 'hc-black' | 'hc-light' = 'hc-black';
 
 // LocalStorage keys for persistence
-const STORAGE_KEY_SAVED_QUERY = "query-editor-saved-query";
-const STORAGE_KEY_DB_CALL_LOGS = "query-editor-db-call-logs";
+const STORAGE_KEY_SAVED_QUERY = 'query-editor-saved-query';
+const STORAGE_KEY_DB_CALL_LOGS = 'query-editor-db-call-logs';
 
 // Type definitions for the db instance (used by Monaco IntelliSense)
 const DB_TYPE_DEFINITIONS: TypeDefinition[] = [
@@ -78,7 +78,7 @@ declare const db: {
   }>;
 };
     `,
-    filePath: "file:///db.d.ts",
+    filePath: 'file:///db.d.ts',
   },
 ];
 
@@ -136,10 +136,7 @@ export function QueryPlayground() {
   // Save logs to localStorage whenever dbCallLogs changes
   useEffect(() => {
     try {
-      localStorage.setItem(
-        STORAGE_KEY_DB_CALL_LOGS,
-        JSON.stringify(dbCallLogs)
-      );
+      localStorage.setItem(STORAGE_KEY_DB_CALL_LOGS, JSON.stringify(dbCallLogs));
     } catch {
       // Ignore localStorage errors
     }
@@ -148,7 +145,7 @@ export function QueryPlayground() {
   const handleExecuteError = (err: Error) => {
     const errorMessage = err.message;
     setError(errorMessage);
-    console.error("Code execution error:", err);
+    console.error('Code execution error:', err);
   };
 
   const handleClearLogs = () => {
@@ -167,41 +164,33 @@ export function QueryPlayground() {
         defaultSizes={[75, 25]}
         direction="horizontal"
       >
-        {({ panelSizes }) => (
+        {({panelSizes}) => (
           <>
             {/* Editor Section */}
-            <Panel
-              defaultSize={panelSizes[0]}
-              minSize={30}
-              className="flex flex-col"
-            >
+            <Panel defaultSize={panelSizes[0]} minSize={30} className="flex flex-col">
               <TypeScriptEditor
                 typeDefinitions={DB_TYPE_DEFINITIONS}
                 executionContext={() => {
                   // Create a logged database using hooks API
                   const loggedDb = createLoggedDatabaseWithHooks(db, {
-                    onLog: (log) => {
-                      console.log(
-                        `[DB Call] Completed ${log.method} in ${log.duration}ms`
-                      );
+                    onLog: log => {
+                      console.log(`[DB Call] Completed ${log.method} in ${log.duration}ms`);
                       // Use functional update to ensure we get the latest state
-                      setDbCallLogs((prev) => {
+                      setDbCallLogs(prev => {
                         const newLogs = [...prev, log];
                         return newLogs;
                       });
                     },
-                    onError: (log) => {
-                      console.error(
-                        `[DB Call] Error in ${log.method}: ${log.error}`
-                      );
+                    onError: log => {
+                      console.error(`[DB Call] Error in ${log.method}: ${log.error}`);
                       // Use functional update to ensure we get the latest state
-                      setDbCallLogs((prev) => {
+                      setDbCallLogs(prev => {
                         const newLogs = [...prev, log];
                         return newLogs;
                       });
                     },
                   });
-                  return { db: loggedDb };
+                  return {db: loggedDb};
                 }}
                 defaultValue={DEFAULT_QUERY}
                 storageKey={STORAGE_KEY_SAVED_QUERY}
@@ -216,7 +205,7 @@ export function QueryPlayground() {
                     // Ignore localStorage errors
                   }
                 }}
-                onExecuteComplete={(duration) => {
+                onExecuteComplete={duration => {
                   setLatency(duration);
                   setLoading(false);
                 }}
@@ -231,16 +220,11 @@ export function QueryPlayground() {
 
             <PanelResizeHandle className="w-2 bg-gray-800 hover:bg-gray-700 transition-colors cursor-col-resize" />
 
-            <Panel
-              defaultSize={panelSizes[1]}
-              minSize={20}
-              className="flex flex-col"
-            >
+            <Panel defaultSize={panelSizes[1]} minSize={20} className="flex flex-col">
               <div className="border-b border-gray-700 bg-gray-900">
                 <div className="flex items-center justify-between p-2 border-b border-gray-700">
                   <div className="text-sm font-medium text-gray-300">
-                    DB Calls{" "}
-                    {dbCallLogs.length > 0 ? `(${dbCallLogs.length})` : ""}
+                    DB Calls {dbCallLogs.length > 0 ? `(${dbCallLogs.length})` : ''}
                   </div>
                   {latency !== null && (
                     <div className="text-sm text-gray-400 font-mono">
@@ -267,9 +251,7 @@ export function QueryPlayground() {
                     Running code...
                   </div>
                 )}
-                {!loading && (
-                  <DbCallLogList logs={dbCallLogs} onClear={handleClearLogs} />
-                )}
+                {!loading && <DbCallLogList logs={dbCallLogs} onClear={handleClearLogs} />}
               </div>
             </Panel>
           </>

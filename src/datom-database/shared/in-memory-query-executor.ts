@@ -3,42 +3,37 @@
  * Extracted to avoid circular dependencies between InMemoryDatomDatabase and SpeculativeDatabaseView
  */
 
-import type { Datom } from "../../datoms.js";
-import type { DatomsQuery } from "../views/database-view.js";
+import type {Datom} from '../../datoms.js';
+import type {DatomsQuery} from '../views/database-view.js';
 
 /**
  * Execute a query on an array of datoms
  * Filters, deduplicates, and paginates results according to query options
  */
-export function executeQueryOnDatoms(
-  datoms: Datom[],
-  options: DatomsQuery
-): Datom[] {
+export function executeQueryOnDatoms(datoms: Datom[], options: DatomsQuery): Datom[] {
   // Validate that tx and txMax are mutually exclusive
   if (options.tx !== undefined && options.txMax !== undefined) {
-    throw new Error(
-      "Cannot specify both tx and txMax parameters - they are mutually exclusive"
-    );
+    throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
   }
 
   let results = datoms;
 
   // Apply filters
   if (options.e !== undefined) {
-    results = results.filter((d) => d.e === options.e);
+    results = results.filter(d => d.e === options.e);
   }
   if (options.a !== undefined) {
-    results = results.filter((d) => d.a === options.a);
+    results = results.filter(d => d.a === options.a);
   }
   if (options.v !== undefined) {
-    results = results.filter((d) => d.v === options.v);
+    results = results.filter(d => d.v === options.v);
   }
   if (options.tx !== undefined) {
-    results = results.filter((d) => d.tx === options.tx);
+    results = results.filter(d => d.tx === options.tx);
   }
   if (options.txMax !== undefined) {
     const txMax = options.txMax;
-    results = results.filter((d) => d.tx <= txMax);
+    results = results.filter(d => d.tx <= txMax);
   }
 
   // Handle subions: for each unique (entity, attribute, value) combination,
@@ -52,9 +47,7 @@ export function executeQueryOnDatoms(
   const latestDatoms = new Map<string, Datom>();
   for (const datom of results) {
     // Use (entity, attribute, value) key for regular queries to support multi-valued attributes
-    const key = `${String(datom.e)}|${String(
-      datom.a
-    )}|${JSON.stringify(datom.v)}`;
+    const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
     const existing = latestDatoms.get(key);
     if (!existing || datom.tx > existing.tx) {
       latestDatoms.set(key, datom);
@@ -64,11 +57,11 @@ export function executeQueryOnDatoms(
 
   // Apply op filter after deduplication
   // Default behavior: filter to only added datoms (exclude subed)
-  if (options.op === undefined || options.op === "assert") {
-    results = results.filter((d) => d.op === "assert");
-  } else if (options.op === "retract") {
+  if (options.op === undefined || options.op === 'assert') {
+    results = results.filter(d => d.op === 'assert');
+  } else if (options.op === 'retract') {
     // If explicitly requesting subions, filter by op: "retract"
-    results = results.filter((d) => d.op === "retract");
+    results = results.filter(d => d.op === 'retract');
   }
 
   // Apply pagination

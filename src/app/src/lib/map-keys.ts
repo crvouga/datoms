@@ -17,34 +17,34 @@
  */
 export function mapKeys<T extends Record<string, unknown>>(
   input: T,
-  mapper: (key: string) => string
+  mapper: (key: string) => string,
 ): T;
 export function mapKeys<T extends Record<string, unknown>>(
   input: T | null | undefined,
-  mapper: (key: string) => string
+  mapper: (key: string) => string,
 ): T | null | undefined;
 export function mapKeys<T extends Record<string, unknown>>(
   input: T[],
-  mapper: (key: string) => string
+  mapper: (key: string) => string,
 ): T[];
 export function mapKeys<T extends Record<string, unknown>>(
   input: T | T[] | null | undefined,
-  mapper: (key: string) => string
+  mapper: (key: string) => string,
 ): T | T[] | null | undefined {
   if (input == null) {
     return input;
   }
 
   if (Array.isArray(input)) {
-    return input.map((item) => {
-      if (item == null || typeof item !== "object") {
+    return input.map(item => {
+      if (item == null || typeof item !== 'object') {
         return item;
       }
       return mapKeys(item as T, mapper) as T;
     });
   }
 
-  if (typeof input !== "object") {
+  if (typeof input !== 'object') {
     return input;
   }
 

@@ -2,14 +2,10 @@
  * Max aggregation - PostgreSQL implementation
  */
 
-import { POSTGRES_AGGREGATIONS } from "./registry.js";
-import {
-  escapeColumnName,
-  escapeValue,
-  getValueExtraction,
-} from "./helpers.js";
+import {POSTGRES_AGGREGATIONS} from './registry.js';
+import {escapeColumnName, escapeValue, getValueExtraction} from './helpers.js';
 
-POSTGRES_AGGREGATIONS.set("max", {
+POSTGRES_AGGREGATIONS.set('max', {
   convert: (variableColumn, outputKey, defaultValue, isValueColumn) => {
     // For min/max on value columns, extract as numeric for proper numeric comparison
     const maxColumn = isValueColumn

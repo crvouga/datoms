@@ -3,7 +3,7 @@
  * These utilities are used across all database implementations
  */
 
-import type { QueryClause, QueryPattern } from "../../datalog/datalog.js";
+import type {QueryClause, QueryPattern} from '../../datalog/datalog.js';
 
 /**
  * Check if a value is a variable (starts with ?)
@@ -11,7 +11,7 @@ import type { QueryClause, QueryPattern } from "../../datalog/datalog.js";
  * @returns True if the value is a Datalog variable
  */
 export function isVariable(value: unknown): boolean {
-  return typeof value === "string" && value.startsWith("?");
+  return typeof value === 'string' && value.startsWith('?');
 }
 
 /**
@@ -21,11 +21,11 @@ export function isVariable(value: unknown): boolean {
  */
 export function isQueryPattern(clause: QueryClause): clause is QueryPattern {
   return (
-    typeof clause === "object" &&
+    typeof clause === 'object' &&
     clause !== null &&
-    "e" in clause &&
-    !("or" in clause) &&
-    !("not" in clause)
+    'e' in clause &&
+    !('or' in clause) &&
+    !('not' in clause)
   );
 }
 
@@ -35,5 +35,5 @@ export function isQueryPattern(clause: QueryClause): clause is QueryPattern {
  * @returns Variable name without the question mark prefix (e.g., "x")
  */
 export function stripQuestionMark(key: string): string {
-  return key.startsWith("?") ? key.slice(1) : key;
+  return key.startsWith('?') ? key.slice(1) : key;
 }

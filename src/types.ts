@@ -3,7 +3,7 @@
  */
 
 // Import types for use in this file
-import type { Datom, TransactionId } from "./datoms.js";
+import type {Datom, TransactionId} from './datoms.js';
 
 /**
  * Database statistics for observability
@@ -32,18 +32,13 @@ export interface DatabaseStats {
 /**
  * Event types emitted by the database
  */
-export type DatabaseEventType =
-  | "transaction"
-  | "error"
-  | "query"
-  | "backup"
-  | "restore";
+export type DatabaseEventType = 'transaction' | 'error' | 'query' | 'backup' | 'restore';
 
 /**
  * Event payload for transaction events
  */
 export interface TransactionEvent {
-  type: "transaction";
+  type: 'transaction';
   txId: TransactionId;
   addCount: number;
   subCount: number;
@@ -54,7 +49,7 @@ export interface TransactionEvent {
  * Event payload for error events
  */
 export interface ErrorEvent {
-  type: "error";
+  type: 'error';
   error: Error;
   context?: Record<string, unknown>;
 }
@@ -63,7 +58,7 @@ export interface ErrorEvent {
  * Event payload for query events
  */
 export interface QueryEvent {
-  type: "query";
+  type: 'query';
   options: Record<string, unknown>;
   resultCount: number;
   duration?: number;
@@ -73,7 +68,7 @@ export interface QueryEvent {
  * Event payload for backup/restore events
  */
 export interface BackupEvent {
-  type: "backup" | "restore";
+  type: 'backup' | 'restore';
   datomCount: number;
   success: boolean;
   error?: Error;
@@ -82,28 +77,22 @@ export interface BackupEvent {
 /**
  * Union type for all database events
  */
-export type DatabaseEvent =
-  | TransactionEvent
-  | ErrorEvent
-  | QueryEvent
-  | BackupEvent;
+export type DatabaseEvent = TransactionEvent | ErrorEvent | QueryEvent | BackupEvent;
 
 /**
  * Event listener callback type
  */
-export type DatabaseEventListener = (
-  event: DatabaseEvent
-) => void | Promise<void>;
+export type DatabaseEventListener = (event: DatabaseEvent) => void | Promise<void>;
 
 /**
  * Transaction isolation levels following SQL standard
  * Controls how concurrent transactions interact with each other
  */
 export type TransactionIsolationLevel =
-  | "READ_UNCOMMITTED" // Lowest isolation, allows dirty reads
-  | "READ_COMMITTED" // Default: prevents dirty reads, allows non-repeatable reads
-  | "REPEATABLE_READ" // Prevents non-repeatable reads, allows phantom reads
-  | "SERIALIZABLE"; // Highest isolation, prevents all anomalies
+  | 'READ_UNCOMMITTED' // Lowest isolation, allows dirty reads
+  | 'READ_COMMITTED' // Default: prevents dirty reads, allows non-repeatable reads
+  | 'REPEATABLE_READ' // Prevents non-repeatable reads, allows phantom reads
+  | 'SERIALIZABLE'; // Highest isolation, prevents all anomalies
 
 /**
  * Options for optimistic locking
@@ -142,7 +131,7 @@ export interface QueryExplainResult {
   /** Indexes that will be used for this query */
   indexesUsed?: string[];
   /** Type of scan that will be performed */
-  scanType?: "index" | "full-table" | "index-only" | "unknown";
+  scanType?: 'index' | 'full-table' | 'index-only' | 'unknown';
   /** Optimization warnings or suggestions */
   warnings?: string[];
   /** Backend-specific raw explain output (e.g., SQL EXPLAIN result) */
@@ -185,7 +174,7 @@ export interface ConnectionPoolStats {
  * Database health status
  * Used for monitoring and operational health checks
  */
-export type DatabaseHealthStatus = "healthy" | "degraded" | "unhealthy";
+export type DatabaseHealthStatus = 'healthy' | 'degraded' | 'unhealthy';
 
 /**
  * Database health check result
@@ -241,33 +230,33 @@ export interface Logger {
  */
 export class TestLogger implements Logger {
   public logs: Array<{
-    level: "debug" | "info" | "warn" | "error";
+    level: 'debug' | 'info' | 'warn' | 'error';
     message: string;
     meta?: Record<string, unknown>;
   }> = [];
 
   debug(message: string, meta?: Record<string, unknown>): void {
-    this.logs.push({ level: "debug", message, meta });
+    this.logs.push({level: 'debug', message, meta});
   }
 
   info(message: string, meta?: Record<string, unknown>): void {
-    this.logs.push({ level: "info", message, meta });
+    this.logs.push({level: 'info', message, meta});
   }
 
   warn(message: string, meta?: Record<string, unknown>): void {
-    this.logs.push({ level: "warn", message, meta });
+    this.logs.push({level: 'warn', message, meta});
   }
 
   error(message: string, meta?: Record<string, unknown>): void {
-    this.logs.push({ level: "error", message, meta });
+    this.logs.push({level: 'error', message, meta});
   }
 
   reset(): void {
     this.logs = [];
   }
 
-  getLogsByLevel(level: "debug" | "info" | "warn" | "error") {
-    return this.logs.filter((log) => log.level === level);
+  getLogsByLevel(level: 'debug' | 'info' | 'warn' | 'error') {
+    return this.logs.filter(log => log.level === level);
   }
 }
 

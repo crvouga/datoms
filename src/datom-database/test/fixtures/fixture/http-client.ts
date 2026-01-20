@@ -1,20 +1,18 @@
-import { serve } from "bun";
-import type { Fixture } from "../fixture.js";
-import { FetchHttpClient } from "../../../../http-client/http-client.js";
-import { HttpClientDatomDatabaseServerComponent } from "../../../http-client/http-client-datom-database-server-component.js";
-import { HttpClientDatomDatabase } from "../../../http-client/http-client-datom-database.js";
-import { InMemoryDatomDatabase } from "../../../in-memory/in-memory-datom-database.js";
+import {serve} from 'bun';
+import type {Fixture} from '../fixture.js';
+import {FetchHttpClient} from '../../../../http-client/http-client.js';
+import {HttpClientDatomDatabaseServerComponent} from '../../../http-client/http-client-datom-database-server-component.js';
+import {HttpClientDatomDatabase} from '../../../http-client/http-client-datom-database.js';
+import {InMemoryDatomDatabase} from '../../../in-memory/in-memory-datom-database.js';
 
 export const createHttpClientFixture = async (): Promise<Fixture> => {
   const serverDb = new InMemoryDatomDatabase();
-  const transportServerComponent = new HttpClientDatomDatabaseServerComponent(
-    serverDb
-  );
+  const transportServerComponent = new HttpClientDatomDatabaseServerComponent(serverDb);
   const endpoint = `/api/datom-database`;
   const server = serve({
     port: 0, // Let OS assign an available port
     routes: {
-      [endpoint]: (request) => transportServerComponent.handleRequest(request),
+      [endpoint]: request => transportServerComponent.handleRequest(request),
     },
   });
   // Extract the actual port from the server URL

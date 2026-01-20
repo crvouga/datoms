@@ -1,6 +1,6 @@
 // Simple icon components using SVG
 
-export const PlayIcon = ({ className }: { className?: string }) => (
+export const PlayIcon = ({className}: {className?: string}) => (
   <svg
     className={className}
     fill="none"
@@ -23,7 +23,7 @@ export const PlayIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export const SaveIcon = ({ className }: { className?: string }) => (
+export const SaveIcon = ({className}: {className?: string}) => (
   <svg
     className={className}
     fill="none"
@@ -40,7 +40,7 @@ export const SaveIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export const HelpIcon = ({ className }: { className?: string }) => (
+export const HelpIcon = ({className}: {className?: string}) => (
   <svg
     className={className}
     fill="none"

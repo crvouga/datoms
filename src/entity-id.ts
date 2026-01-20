@@ -21,12 +21,10 @@ export type EntityId = number | string;
  * validateEntityId(null); // Throws error
  */
 export function validateEntityId(entityId: unknown): entityId is EntityId {
-  if (typeof entityId === "number" || typeof entityId === "string") {
+  if (typeof entityId === 'number' || typeof entityId === 'string') {
     return true;
   }
-  throw new Error(
-    `Invalid EntityId type: expected number or string, got ${typeof entityId}`
-  );
+  throw new Error(`Invalid EntityId type: expected number or string, got ${typeof entityId}`);
 }
 
 /**

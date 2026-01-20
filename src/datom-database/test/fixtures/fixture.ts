@@ -1,4 +1,4 @@
-import type { DatomDatabase } from "../../datom-database.js";
+import type {DatomDatabase} from '../../datom-database.js';
 
 export type Fixture = {
   db: DatomDatabase;

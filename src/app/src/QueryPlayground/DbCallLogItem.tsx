@@ -1,12 +1,9 @@
-import Editor from "@monaco-editor/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  datalogToPostgresSQL,
-  type DatalogQuery,
-} from "../../../datom-database/index";
-import type { QueryEditorLog } from "./types";
+import Editor from '@monaco-editor/react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {datalogToPostgresSQL, type DatalogQuery} from '../../../datom-database/index';
+import type {QueryEditorLog} from './types';
 
-const MONACO_THEME: "vs" | "vs-dark" | "hc-black" | "hc-light" = "hc-black";
+const MONACO_THEME: 'vs' | 'vs-dark' | 'hc-black' | 'hc-light' = 'hc-black';
 
 interface DbCallLogItemProps {
   log: QueryEditorLog;
@@ -14,17 +11,13 @@ interface DbCallLogItemProps {
   onToggle: () => void;
 }
 
-type TabType = "datalog" | "sql" | "result" | "error" | "args";
+type TabType = 'datalog' | 'sql' | 'result' | 'error' | 'args';
 
 const DEFAULT_HEIGHT = 256;
-const STORAGE_KEY_PREFIX_HEIGHT = "db-call-log-panel-height";
-const STORAGE_KEY_PREFIX_TAB = "db-call-log-panel-tab";
+const STORAGE_KEY_PREFIX_HEIGHT = 'db-call-log-panel-height';
+const STORAGE_KEY_PREFIX_TAB = 'db-call-log-panel-tab';
 
-export function DbCallLogItem({
-  log,
-  isExpanded,
-  onToggle,
-}: DbCallLogItemProps) {
+export function DbCallLogItem({log, isExpanded, onToggle}: DbCallLogItemProps) {
   const heightStorageKey = `${STORAGE_KEY_PREFIX_HEIGHT}-${log.id}`;
   const tabStorageKey = `${STORAGE_KEY_PREFIX_TAB}-${log.id}`;
 
@@ -61,25 +54,20 @@ export function DbCallLogItem({
   };
 
   const formatTimestamp = (timestamp: number): string => {
-    return new Date(timestamp).toLocaleTimeString("en-US", {
+    return new Date(timestamp).toLocaleTimeString('en-US', {
       hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
       fractionalSecondDigits: 3,
     });
   };
 
   // Extract datalog query from args
   const datalogQuery = useMemo(() => {
-    if (log.method === "query" && log.args.length > 0) {
+    if (log.method === 'query' && log.args.length > 0) {
       const query = log.args[0];
-      if (
-        query &&
-        typeof query === "object" &&
-        "find" in query &&
-        "where" in query
-      ) {
+      if (query && typeof query === 'object' && 'find' in query && 'where' in query) {
         return query as DatalogQuery;
       }
     }
@@ -90,28 +78,24 @@ export function DbCallLogItem({
   const sqlQuery = useMemo(() => {
     if (!datalogQuery) return null;
     try {
-      const { sql, params } = datalogToPostgresSQL(datalogQuery, "datoms");
+      const {sql, params} = datalogToPostgresSQL(datalogQuery, 'datoms');
       // Replace ? placeholders with actual parameter values for display
       // Process in reverse order to avoid replacing already-replaced placeholders
       let displaySql = sql;
       for (let i = params.length - 1; i >= 0; i--) {
         const param = params[i];
         const paramStr =
-          typeof param === "string"
-            ? `'${param.replace(/'/g, "''")}'`
-            : String(param);
+          typeof param === 'string' ? `'${param.replace(/'/g, "''")}'` : String(param);
         // Find the last ? and replace it (working backwards)
-        const lastIndex = displaySql.lastIndexOf("?");
+        const lastIndex = displaySql.lastIndexOf('?');
         if (lastIndex !== -1) {
           displaySql =
-            displaySql.substring(0, lastIndex) +
-            paramStr +
-            displaySql.substring(lastIndex + 1);
+            displaySql.substring(0, lastIndex) + paramStr + displaySql.substring(lastIndex + 1);
         }
       }
-      return { sql: displaySql, originalSql: sql, params };
+      return {sql: displaySql, originalSql: sql, params};
     } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) };
+      return {error: err instanceof Error ? err.message : String(err)};
     }
   }, [datalogQuery]);
 
@@ -128,20 +112,20 @@ export function DbCallLogItem({
   const availableTabs = useMemo(() => {
     const tabs: TabType[] = [];
     if (datalogQuery) {
-      tabs.push("datalog");
-      if (sqlQuery && !("error" in sqlQuery)) {
-        tabs.push("sql");
+      tabs.push('datalog');
+      if (sqlQuery && !('error' in sqlQuery)) {
+        tabs.push('sql');
       }
     } else if (log.args.length > 0) {
-      tabs.push("args");
+      tabs.push('args');
     }
     if (log.result !== undefined) {
-      tabs.push("result");
+      tabs.push('result');
     }
     if (log.error) {
-      tabs.push("error");
+      tabs.push('error');
     }
-    return tabs.length > 0 ? tabs : ["args"];
+    return tabs.length > 0 ? tabs : ['args'];
   }, [datalogQuery, sqlQuery, log.args, log.result, log.error]);
 
   // Initialize activeTab from localStorage, validating against available tabs
@@ -151,13 +135,7 @@ export function DbCallLogItem({
       if (saved) {
         const savedTab = saved as TabType;
         // Validate that the saved tab is a valid tab type
-        const validTabs: TabType[] = [
-          "datalog",
-          "sql",
-          "result",
-          "error",
-          "args",
-        ];
+        const validTabs: TabType[] = ['datalog', 'sql', 'result', 'error', 'args'];
         if (validTabs.includes(savedTab)) {
           return savedTab;
         }
@@ -165,13 +143,13 @@ export function DbCallLogItem({
     } catch {
       // Ignore errors, use default
     }
-    return "datalog";
+    return 'datalog';
   });
 
   // Set default tab when expanded or when saved tab is not available
   useEffect(() => {
     if (isExpanded && !availableTabs.includes(activeTab)) {
-      const defaultTab = (availableTabs[0] || "args") as TabType;
+      const defaultTab = (availableTabs[0] || 'args') as TabType;
       setActiveTab(defaultTab);
     }
   }, [isExpanded, availableTabs, activeTab]);
@@ -206,8 +184,8 @@ export function DbCallLogItem({
       isResizingRef.current = true;
       startYRef.current = e.clientY;
       startHeightRef.current = height;
-      document.body.style.cursor = "ns-resize";
-      document.body.style.userSelect = "none";
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!isResizingRef.current) return;
@@ -223,22 +201,22 @@ export function DbCallLogItem({
       const handleMouseUp = () => {
         if (isResizingRef.current) {
           isResizingRef.current = false;
-          document.body.style.cursor = "";
-          document.body.style.userSelect = "";
-          document.removeEventListener("mousemove", handleMouseMove);
-          document.removeEventListener("mouseup", handleMouseUp);
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
         }
       };
 
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
     },
-    [height]
+    [height],
   );
 
   const statusColor = log.error
-    ? "bg-red-900/30 text-red-400 border-red-700"
-    : "bg-green-900/30 text-green-400 border-green-700";
+    ? 'bg-red-900/30 text-red-400 border-red-700'
+    : 'bg-green-900/30 text-green-400 border-green-700';
 
   return (
     <div className="border-b border-gray-700">
@@ -248,10 +226,8 @@ export function DbCallLogItem({
         className="w-full text-left p-3 hover:bg-gray-800/50 transition-colors flex items-center justify-between gap-3"
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div
-            className={`px-2 py-1 rounded text-xs font-medium border ${statusColor} shrink-0`}
-          >
-            {log.error ? "Error" : "Success"}
+          <div className={`px-2 py-1 rounded text-xs font-medium border ${statusColor} shrink-0`}>
+            {log.error ? 'Error' : 'Success'}
           </div>
           <div className="px-2 py-1 rounded text-xs font-mono bg-gray-800 text-gray-300 shrink-0">
             {log.method}
@@ -263,7 +239,7 @@ export function DbCallLogItem({
             {formatDuration(log.duration)}
           </div>
         </div>
-        <div className="text-gray-500 shrink-0">{isExpanded ? "▼" : "▶"}</div>
+        <div className="text-gray-500 shrink-0">{isExpanded ? '▼' : '▶'}</div>
       </button>
 
       {/* Expanded Content */}
@@ -271,55 +247,55 @@ export function DbCallLogItem({
         <div className="border-t border-gray-700 bg-gray-900/50">
           {/* Tabs */}
           <div className="flex border-b border-gray-700 overflow-x-auto">
-            {availableTabs.map((tab) => (
+            {availableTabs.map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as TabType)}
                 className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
                   activeTab === tab
-                    ? "border-blue-500 text-blue-400 bg-gray-800/50"
-                    : "border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/30"
+                    ? 'border-blue-500 text-blue-400 bg-gray-800/50'
+                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/30'
                 }`}
               >
-                {tab === "datalog"
-                  ? "Datalog Query"
-                  : tab === "sql"
-                    ? "SQL Query"
-                    : tab === "result"
-                      ? `Result${resultCount !== null ? ` (${resultCount})` : ""}`
-                      : tab === "error"
-                        ? "Error"
-                        : "Arguments"}
+                {tab === 'datalog'
+                  ? 'Datalog Query'
+                  : tab === 'sql'
+                    ? 'SQL Query'
+                    : tab === 'result'
+                      ? `Result${resultCount !== null ? ` (${resultCount})` : ''}`
+                      : tab === 'error'
+                        ? 'Error'
+                        : 'Arguments'}
               </button>
             ))}
           </div>
 
           {/* Tab Content Container */}
-          <div className="relative" style={{ height: `${height + 3}px` }}>
+          <div className="relative" style={{height: `${height + 3}px`}}>
             <div
               ref={contentRef}
-              style={{ height: `${height}px` }}
+              style={{height: `${height}px`}}
               className="min-h-[200px] max-h-[800px] overflow-hidden"
             >
-              {activeTab === "datalog" && datalogQuery && (
+              {activeTab === 'datalog' && datalogQuery && (
                 <Editor
                   height="100%"
                   defaultLanguage="json"
                   value={JSON.stringify(datalogQuery, null, 2)}
                   theme={MONACO_THEME}
                   options={{
-                    minimap: { enabled: false },
+                    minimap: {enabled: false},
                     fontSize: 12,
-                    wordWrap: "on",
+                    wordWrap: 'on',
                     readOnly: true,
                     scrollBeyondLastLine: false,
-                    lineNumbers: "off",
+                    lineNumbers: 'off',
                     folding: true,
                   }}
                 />
               )}
 
-              {activeTab === "sql" && sqlQuery && !("error" in sqlQuery) && (
+              {activeTab === 'sql' && sqlQuery && !('error' in sqlQuery) && (
                 <div className="h-full flex flex-col">
                   <Editor
                     height="100%"
@@ -327,12 +303,12 @@ export function DbCallLogItem({
                     value={sqlQuery.sql}
                     theme={MONACO_THEME}
                     options={{
-                      minimap: { enabled: false },
+                      minimap: {enabled: false},
                       fontSize: 12,
-                      wordWrap: "on",
+                      wordWrap: 'on',
                       readOnly: true,
                       scrollBeyondLastLine: false,
-                      lineNumbers: "on",
+                      lineNumbers: 'on',
                       folding: true,
                     }}
                   />
@@ -344,38 +320,34 @@ export function DbCallLogItem({
                 </div>
               )}
 
-              {activeTab === "sql" && sqlQuery && "error" in sqlQuery && (
+              {activeTab === 'sql' && sqlQuery && 'error' in sqlQuery && (
                 <div className="h-full p-4 bg-red-900/20 text-red-300 font-mono text-sm">
-                  <div className="font-semibold mb-2">
-                    SQL Generation Error:
-                  </div>
+                  <div className="font-semibold mb-2">SQL Generation Error:</div>
                   <div>{sqlQuery.error}</div>
                 </div>
               )}
 
-              {activeTab === "result" && (
+              {activeTab === 'result' && (
                 <Editor
                   height="100%"
                   defaultLanguage="json"
                   value={
-                    log.result === undefined
-                      ? "undefined"
-                      : JSON.stringify(log.result, null, 2)
+                    log.result === undefined ? 'undefined' : JSON.stringify(log.result, null, 2)
                   }
                   theme={MONACO_THEME}
                   options={{
-                    minimap: { enabled: false },
+                    minimap: {enabled: false},
                     fontSize: 12,
-                    wordWrap: "on",
+                    wordWrap: 'on',
                     readOnly: true,
                     scrollBeyondLastLine: false,
-                    lineNumbers: "off",
+                    lineNumbers: 'off',
                     folding: true,
                   }}
                 />
               )}
 
-              {activeTab === "error" && log.error && (
+              {activeTab === 'error' && log.error && (
                 <div className="h-full p-4 bg-red-900/20">
                   <div className="font-semibold text-red-400 mb-2">Error:</div>
                   <div className="text-red-300 font-mono text-sm whitespace-pre-wrap">
@@ -384,23 +356,19 @@ export function DbCallLogItem({
                 </div>
               )}
 
-              {activeTab === "args" && (
+              {activeTab === 'args' && (
                 <Editor
                   height="100%"
                   defaultLanguage="json"
-                  value={
-                    log.args.length === 0
-                      ? "[]"
-                      : JSON.stringify(log.args, null, 2)
-                  }
+                  value={log.args.length === 0 ? '[]' : JSON.stringify(log.args, null, 2)}
                   theme={MONACO_THEME}
                   options={{
-                    minimap: { enabled: false },
+                    minimap: {enabled: false},
                     fontSize: 12,
-                    wordWrap: "on",
+                    wordWrap: 'on',
                     readOnly: true,
                     scrollBeyondLastLine: false,
-                    lineNumbers: "off",
+                    lineNumbers: 'off',
                     folding: true,
                   }}
                 />
@@ -411,7 +379,7 @@ export function DbCallLogItem({
               ref={resizeHandleRef}
               onMouseDown={handleMouseDown}
               className="absolute bottom-0 left-0 right-0 h-3 bg-gray-700 hover:bg-blue-600 cursor-ns-resize transition-colors group z-20 flex items-center justify-center pointer-events-auto"
-              style={{ top: `${height}px` }}
+              style={{top: `${height}px`}}
               title="Drag to resize"
             >
               <div className="w-12 h-0.5 bg-gray-500 opacity-50 group-hover:opacity-100 transition-opacity" />

@@ -2,7 +2,7 @@
  * Parser for aggregation expressions
  */
 
-import { IN_MEMORY_AGGREGATIONS } from "./registry.js";
+import {IN_MEMORY_AGGREGATIONS} from './registry.js';
 
 /**
  * Parse an aggregation expression - accepts both tuple format and string format for backward compatibility
@@ -10,36 +10,28 @@ import { IN_MEMORY_AGGREGATIONS } from "./registry.js";
  * @returns Object with aggregation type, variable name, and optional default value, or null if not an aggregation
  */
 export function parseAggregation(
-  expr: unknown
-): { type: string; variable: string; defaultValue?: string } | null {
+  expr: unknown,
+): {type: string; variable: string; defaultValue?: string} | null {
   // Handle tuple format: ["avg", "?age"] or ["max", "0", "?age"]
   if (Array.isArray(expr)) {
-    if (
-      expr.length === 1 &&
-      typeof expr[0] === "string" &&
-      expr[0].startsWith("?")
-    ) {
+    if (expr.length === 1 && typeof expr[0] === 'string' && expr[0].startsWith('?')) {
       // Just a variable: ["?age"]
       return null; // Not an aggregation
     }
-    if (
-      expr.length === 2 &&
-      typeof expr[0] === "string" &&
-      typeof expr[1] === "string"
-    ) {
+    if (expr.length === 2 && typeof expr[0] === 'string' && typeof expr[1] === 'string') {
       // Aggregation with one arg: ["count", "?age"] or ["min", "?age"] or ["max", "?age"]
       const funcName = expr[0] as string;
       const variable = expr[1] as string;
       const def = IN_MEMORY_AGGREGATIONS.get(funcName);
-      if (def && variable.startsWith("?")) {
+      if (def && variable.startsWith('?')) {
         // Check if this aggregation requires a seed (should be 3-element array)
         if (def.requiresSeed) {
           return null; // Missing required seed
         }
-        return { type: funcName, variable };
+        return {type: funcName, variable};
       }
     }
-    if (expr.length === 3 && typeof expr[0] === "string") {
+    if (expr.length === 3 && typeof expr[0] === 'string') {
       // Aggregation with default/seed: ["max", "0", "?age"] or ["rand", "seed123", "?value"]
       const funcName = expr[0] as string;
       const defaultValue = expr[1] as string | number;
@@ -48,8 +40,8 @@ export function parseAggregation(
       if (
         def &&
         (def.supportsDefault || def.requiresSeed) &&
-        typeof variable === "string" &&
-        variable.startsWith("?")
+        typeof variable === 'string' &&
+        variable.startsWith('?')
       ) {
         return {
           type: funcName,
@@ -62,7 +54,7 @@ export function parseAggregation(
   }
 
   // Handle string format for backward compatibility: "avg(?age)" or "sum(?price)"
-  if (typeof expr !== "string") {
+  if (typeof expr !== 'string') {
     return null;
   }
 
@@ -95,7 +87,7 @@ export function parseAggregation(
     const varMatch = args.match(/^(\?[\w]+)$/);
     if (varMatch && varMatch[1]) {
       if (!def.requiresSeed) {
-        return { type: funcName, variable: varMatch[1] };
+        return {type: funcName, variable: varMatch[1]};
       }
     }
   }

@@ -36,11 +36,6 @@
     "noImplicitAny": true,
     "outDir": "./dist"
   },
-  "include": [
-    "src/**/*",
-    "src/app/**/*",
-    "bun-env.d.ts",
-    "playwright.config.ts"
-  ],
+  "include": ["src/**/*", "src/app/**/*", "bun-env.d.ts", "playwright.config.ts"],
   "exclude": ["node_modules", "dist", "**/__tests__/**", "**/__test__/**"]
 }

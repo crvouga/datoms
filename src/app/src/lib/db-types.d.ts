@@ -3,8 +3,8 @@
  * These types are used by Monaco Editor for IntelliSense
  */
 
-import type { QueryResult } from "../../../datalog/datalog";
-import type { DatomDatabase } from "../../../datom-database/datom-database";
+import type {QueryResult} from '../../../datalog/datalog';
+import type {DatomDatabase} from '../../../datom-database/datom-database';
 
 declare global {
   /**

@@ -1,5 +1,5 @@
-import pino from "pino";
-import type { Logger } from "../../../types";
+import pino from 'pino';
+import type {Logger} from '../../../types';
 
 /**
  * Creates a Pino-based logger that implements the Logger interface.
@@ -10,7 +10,7 @@ import type { Logger } from "../../../types";
  */
 export function createLogger(options?: pino.LoggerOptions): Logger {
   const pinoLogger = pino({
-    level: process.env.LOG_LEVEL || "info",
+    level: process.env.LOG_LEVEL || 'info',
     ...options,
   });
 

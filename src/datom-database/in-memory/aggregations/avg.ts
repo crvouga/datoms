@@ -2,16 +2,14 @@
  * Average aggregation - in-memory implementation
  */
 
-import { IN_MEMORY_AGGREGATIONS } from "./registry.js";
+import {IN_MEMORY_AGGREGATIONS} from './registry.js';
 
-IN_MEMORY_AGGREGATIONS.set("avg", {
-  compute: (values) => {
+IN_MEMORY_AGGREGATIONS.set('avg', {
+  compute: values => {
     if (values.length === 0) {
       return null;
     }
-    const numericValues = values.filter(
-      (v) => typeof v === "number"
-    ) as number[];
+    const numericValues = values.filter(v => typeof v === 'number') as number[];
     if (numericValues.length === 0) {
       return null;
     }

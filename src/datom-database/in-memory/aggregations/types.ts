@@ -2,14 +2,14 @@
  * Types and interfaces for in-memory aggregation functions
  */
 
-import type { Attribute, Value } from "../../../datoms.js";
+import type {Attribute, Value} from '../../../datoms.js';
 
 /**
  * Aggregation function that computes a value from an array of values
  */
 export type AggregationFunction = (
   values: (Value | Attribute)[],
-  defaultValue?: string
+  defaultValue?: string,
 ) => Value | Attribute | null;
 
 /**

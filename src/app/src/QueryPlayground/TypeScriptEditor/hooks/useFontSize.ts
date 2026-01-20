@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useKeyboardShortcut } from "../../hooks/useKeyboardShortcut";
+import {useEffect, useState} from 'react';
+import {useKeyboardShortcut} from '../../hooks/useKeyboardShortcut';
 
 const MIN_FONT_SIZE = 8;
 const MAX_FONT_SIZE = 48;
@@ -60,11 +60,7 @@ export function useFontSize({
       const saved = localStorage.getItem(`${storageKey}_fontSize`);
       if (saved) {
         const parsed = parseInt(saved, 10);
-        if (
-          !isNaN(parsed) &&
-          parsed >= MIN_FONT_SIZE &&
-          parsed <= MAX_FONT_SIZE
-        ) {
+        if (!isNaN(parsed) && parsed >= MIN_FONT_SIZE && parsed <= MAX_FONT_SIZE) {
           return parsed;
         }
       }
@@ -79,7 +75,7 @@ export function useFontSize({
 
   // Font size adjustment functions
   const increaseFontSize = () => {
-    setFontSize((prev) => {
+    setFontSize(prev => {
       const newSize = Math.min(prev + FONT_SIZE_STEP, MAX_FONT_SIZE);
       if (storageKey) {
         try {
@@ -93,7 +89,7 @@ export function useFontSize({
   };
 
   const decreaseFontSize = () => {
-    setFontSize((prev) => {
+    setFontSize(prev => {
       const newSize = Math.max(prev - FONT_SIZE_STEP, MIN_FONT_SIZE);
       if (storageKey) {
         try {
@@ -120,17 +116,17 @@ export function useFontSize({
   // Font size keyboard shortcuts
   // Handle both "=" and "+" for increase (Plus is Shift+= on most keyboards)
   useKeyboardShortcut({
-    keys: ["mod", "="],
+    keys: ['mod', '='],
     callback: increaseFontSize,
   });
 
   useKeyboardShortcut({
-    keys: ["mod", "+"],
+    keys: ['mod', '+'],
     callback: increaseFontSize,
   });
 
   useKeyboardShortcut({
-    keys: ["mod", "-"],
+    keys: ['mod', '-'],
     callback: decreaseFontSize,
   });
 

@@ -2,7 +2,7 @@ export interface LatencyDisplayProps {
   latency: number | null;
 }
 
-export function LatencyDisplay({ latency }: LatencyDisplayProps) {
+export function LatencyDisplay({latency}: LatencyDisplayProps) {
   if (latency === null) return null;
 
   const formattedLatency =

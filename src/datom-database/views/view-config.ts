@@ -3,7 +3,7 @@
  * Provides a high-level interface for working with datoms and datalog queries
  */
 
-import type { Datom, TransactionId } from "../../datoms.js";
+import type {Datom, TransactionId} from '../../datoms.js';
 
 /**
  * Configuration for database views
@@ -11,8 +11,8 @@ import type { Datom, TransactionId } from "../../datoms.js";
  * @internal
  */
 export type ViewConfig =
-  | { type: "current" }
-  | { type: "asOf"; txId: TransactionId }
-  | { type: "since"; txId: TransactionId }
-  | { type: "history" }
-  | { type: "speculative"; datoms: Datom[] };
+  | {type: 'current'}
+  | {type: 'asOf'; txId: TransactionId}
+  | {type: 'since'; txId: TransactionId}
+  | {type: 'history'}
+  | {type: 'speculative'; datoms: Datom[]};

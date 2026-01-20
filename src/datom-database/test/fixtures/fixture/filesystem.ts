@@ -1,9 +1,7 @@
-import type { Fixture } from "../fixture.js";
-import { FileSystemDatomDatabase } from "../../../filesystem/filesystem-datom-database.js";
+import type {Fixture} from '../fixture.js';
+import {FileSystemDatomDatabase} from '../../../filesystem/filesystem-datom-database.js';
 
-export const createFileSystemFixture = async (
-  filePath: string
-): Promise<Fixture> => {
+export const createFileSystemFixture = async (filePath: string): Promise<Fixture> => {
   // Ensure a clean state before database initialization
   try {
     await Bun.file(filePath).delete();
@@ -11,7 +9,7 @@ export const createFileSystemFixture = async (
     // File might not exist; ignore
   }
 
-  const db = new FileSystemDatomDatabase({ filePath });
+  const db = new FileSystemDatomDatabase({filePath});
   await db.initialize();
 
   return {

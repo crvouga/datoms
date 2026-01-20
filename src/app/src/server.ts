@@ -1,28 +1,28 @@
-import { serve } from "bun";
-import { HttpClientDatomDatabaseServerComponent } from "../../datom-database/http-client/http-client-datom-database-server-component";
-import { PostgreSQLDatomDatabase } from "../../datom-database/index";
-import { DestroyRetentionPolicy } from "../../datom-database/retention-policy";
-import { PgSQLDatabase } from "../../sql-database/sql-database-pg";
-import type { Logger } from "../../types";
-import index from "./index.html";
-import { FetchHttpClient } from "./lib/http-client";
-import { createLogger } from "./lib/logger";
-import { notepad } from "./notepad";
-import { DATOMS_API_ENDPOINT } from "./shared/api";
-import { createTmdbClient } from "./tmdb/tmdb-client";
-import { TmdbLoader } from "./tmdb/tmdb-loader";
+import {serve} from 'bun';
+import {HttpClientDatomDatabaseServerComponent} from '../../datom-database/http-client/http-client-datom-database-server-component';
+import {PostgreSQLDatomDatabase} from '../../datom-database/index';
+import {DestroyRetentionPolicy} from '../../datom-database/retention-policy';
+import {PgSQLDatabase} from '../../sql-database/sql-database-pg';
+import type {Logger} from '../../types';
+import index from './index.html';
+import {FetchHttpClient} from './lib/http-client';
+import {createLogger} from './lib/logger';
+import {notepad} from './notepad';
+import {DATOMS_API_ENDPOINT} from './shared/api';
+import {createTmdbClient} from './tmdb/tmdb-client';
+import {TmdbLoader} from './tmdb/tmdb-loader';
 
 async function main() {
   const logger = createLogger();
-  const port = parseInt(process.env.PORT || "3000", 10);
+  const port = parseInt(process.env.PORT || '3000', 10);
 
   const databaseUrl = process.env.DATABASE_URL?.trim();
-  if (!databaseUrl) throw new Error("DATABASE_URL is not set");
+  if (!databaseUrl) throw new Error('DATABASE_URL is not set');
 
   const sqlDb = new PgSQLDatabase(databaseUrl);
   const db = new PostgreSQLDatomDatabase({
     sqlDb: sqlDb,
-    tableName: "datoms",
+    tableName: 'datoms',
     maintenanceConfig: {
       enabled: true,
       intervalMs: 60_000,
@@ -54,8 +54,8 @@ async function main() {
   const server = serve({
     port,
     routes: {
-      "/*": index,
-      "/notepad": {
+      '/*': index,
+      '/notepad': {
         async GET() {
           return Response.json(await notepad(db));
         },
@@ -66,7 +66,7 @@ async function main() {
         },
       },
     },
-    development: process.env.NODE_ENV !== "production" && {
+    development: process.env.NODE_ENV !== 'production' && {
       hmr: true,
       console: true,
     },
@@ -74,14 +74,14 @@ async function main() {
 
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}, shutting down...`);
-    await safeStop(logger, "retention policy", () => retentionPolicy.stop());
-    await safeStop(logger, "TMDB loader", () => tmdbLoader.stop());
-    await safeStop(logger, "database", () => sqlDb.close());
-    logger.info("Shutdown complete");
+    await safeStop(logger, 'retention policy', () => retentionPolicy.stop());
+    await safeStop(logger, 'TMDB loader', () => tmdbLoader.stop());
+    await safeStop(logger, 'database', () => sqlDb.close());
+    logger.info('Shutdown complete');
     process.exit(0);
   };
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 
   logger.info(`🚀 Server running at ${server.url}`);
 }
@@ -93,17 +93,17 @@ function getErrorMsg(err: unknown): string {
 async function safeStop(
   logger: Logger,
   name: string,
-  fn: () => void | Promise<void>
+  fn: () => void | Promise<void>,
 ): Promise<void> {
   try {
     await fn();
   } catch (err) {
-    logger.error(`Error stopping ${name}`, { error: getErrorMsg(err) });
+    logger.error(`Error stopping ${name}`, {error: getErrorMsg(err)});
     throw err;
   }
 }
 
-main().catch((err) => {
-  createLogger().error("Uncaught error", { error: getErrorMsg(err) });
+main().catch(err => {
+  createLogger().error('Uncaught error', {error: getErrorMsg(err)});
   process.exit(1);
 });

@@ -9,9 +9,9 @@
  * - Uses database-native operations to avoid loading data into memory
  */
 
-import type { Logger } from "../../types.js";
-import type { DatomDatabase } from "../datom-database.js";
-import type { RetentionPolicy } from "./retention-policy.js";
+import type {Logger} from '../../types.js';
+import type {DatomDatabase} from '../datom-database.js';
+import type {RetentionPolicy} from './retention-policy.js';
 
 export type DestroyRetentionPolicyConfig = {
   retentionCount: number;
@@ -46,27 +46,27 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
     // This prevents accidentally deleting all history
     if (config.retentionCount < 1) {
       throw new Error(
-        "retentionCount must be at least 1 to ensure at least one historical datom is kept per (entity, attribute) pair"
+        'retentionCount must be at least 1 to ensure at least one historical datom is kept per (entity, attribute) pair',
       );
     }
     if (!config.intervalMs) {
-      throw new Error("intervalMs must be provided");
+      throw new Error('intervalMs must be provided');
     }
   }
 
   start(): void {
     if (this.running) {
-      this.logger?.warn("Retention policy already running", {
-        event: "retention_policy_already_running",
-        policy: "destroy",
+      this.logger?.warn('Retention policy already running', {
+        event: 'retention_policy_already_running',
+        policy: 'destroy',
       });
       return;
     }
 
     this.running = true;
-    this.logger?.info("Starting destroy retention policy", {
-      event: "retention_policy_starting",
-      policy: "destroy",
+    this.logger?.info('Starting destroy retention policy', {
+      event: 'retention_policy_starting',
+      policy: 'destroy',
       retentionCount: this.config.retentionCount,
       intervalMs: this.config.intervalMs,
     });
@@ -74,11 +74,11 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
     if (this.config.intervalMs) {
       // Use interval-based scheduling
       this.intervalId = setInterval(() => {
-        this.execute().catch((err) => {
+        this.execute().catch(err => {
           const errorMessage = err instanceof Error ? err.message : String(err);
-          this.logger?.error("Destroy retention policy execution failed", {
-            event: "retention_policy_execution_error",
-            policy: "destroy",
+          this.logger?.error('Destroy retention policy execution failed', {
+            event: 'retention_policy_execution_error',
+            policy: 'destroy',
             error: errorMessage,
             errorType: err instanceof Error ? err.constructor.name : typeof err,
           });
@@ -89,9 +89,9 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
 
   stop(): void {
     if (!this.running) {
-      this.logger?.warn("Retention policy not running", {
-        event: "retention_policy_not_running",
-        policy: "destroy",
+      this.logger?.warn('Retention policy not running', {
+        event: 'retention_policy_not_running',
+        policy: 'destroy',
       });
       return;
     }
@@ -101,9 +101,9 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    this.logger?.info("Stopped destroy retention policy", {
-      event: "retention_policy_stopped",
-      policy: "destroy",
+    this.logger?.info('Stopped destroy retention policy', {
+      event: 'retention_policy_stopped',
+      policy: 'destroy',
     });
   }
 
@@ -113,15 +113,15 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
 
   async execute(): Promise<Record<string, unknown>> {
     const startTime = Date.now();
-    this.logger?.debug("Starting retention policy execution", {
-      event: "retention_policy_execution_start",
-      policy: "destroy",
+    this.logger?.debug('Starting retention policy execution', {
+      event: 'retention_policy_execution_start',
+      policy: 'destroy',
       retentionCount: this.config.retentionCount,
     });
 
-    this.logger?.info("Starting per-entity-attribute retention cleanup", {
-      event: "retention_policy_deletion_start",
-      policy: "destroy",
+    this.logger?.info('Starting per-entity-attribute retention cleanup', {
+      event: 'retention_policy_deletion_start',
+      policy: 'destroy',
       retentionCount: this.config.retentionCount,
     });
 
@@ -136,9 +136,9 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
         datomsDeleted: deleted,
       };
 
-      this.logger?.info("Retention policy execution completed", {
-        event: "retention_policy_execution_complete",
-        policy: "destroy",
+      this.logger?.info('Retention policy execution completed', {
+        event: 'retention_policy_execution_complete',
+        policy: 'destroy',
         ...result,
         durationMs: duration,
         retentionCount: this.config.retentionCount,
@@ -154,9 +154,9 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
         error: errorMessage,
       };
 
-      this.logger?.error("Destroy retention policy execution failed", {
-        event: "retention_policy_execution_error",
-        policy: "destroy",
+      this.logger?.error('Destroy retention policy execution failed', {
+        event: 'retention_policy_execution_error',
+        policy: 'destroy',
         error: errorMessage,
         errorType: err instanceof Error ? err.constructor.name : typeof err,
         durationMs: duration,

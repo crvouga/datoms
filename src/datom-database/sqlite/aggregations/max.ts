@@ -2,14 +2,10 @@
  * Max aggregation - SQLite implementation
  */
 
-import { SQLITE_AGGREGATIONS } from "./registry.js";
-import {
-  escapeColumnName,
-  escapeValue,
-  getValueExtraction,
-} from "./helpers.js";
+import {SQLITE_AGGREGATIONS} from './registry.js';
+import {escapeColumnName, escapeValue, getValueExtraction} from './helpers.js';
 
-SQLITE_AGGREGATIONS.set("max", {
+SQLITE_AGGREGATIONS.set('max', {
   convert: (variableColumn, outputKey, defaultValue, isValueColumn) => {
     // For min/max on value columns, extract as numeric for proper numeric comparison
     const maxColumn = isValueColumn

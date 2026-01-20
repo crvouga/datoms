@@ -1,6 +1,6 @@
-import { HelpIcon } from "../../ui/icons";
-import { RunButton } from "./RunButton";
-import { SaveButton } from "./SaveButton";
+import {HelpIcon} from '../../ui/icons';
+import {RunButton} from './RunButton';
+import {SaveButton} from './SaveButton';
 
 export interface EditorHeaderProps {
   title: string;
