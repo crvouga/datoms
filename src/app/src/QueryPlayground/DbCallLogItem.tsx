@@ -1,6 +1,6 @@
 import Editor from '@monaco-editor/react';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {datalogToPostgresSQL, type DatalogQuery} from '../../../datom-database/index';
+import type {DatalogQuery} from '../../../datom-database/index';
 import type {QueryEditorLog} from './types';
 
 const MONACO_THEME: 'vs' | 'vs-dark' | 'hc-black' | 'hc-light' = 'hc-black';
@@ -74,31 +74,6 @@ export function DbCallLogItem({log, isExpanded, onToggle}: DbCallLogItemProps) {
     return null;
   }, [log.method, log.args]);
 
-  // Generate SQL query
-  const sqlQuery = useMemo(() => {
-    if (!datalogQuery) return null;
-    try {
-      const {sql, params} = datalogToPostgresSQL(datalogQuery, 'datoms');
-      // Replace ? placeholders with actual parameter values for display
-      // Process in reverse order to avoid replacing already-replaced placeholders
-      let displaySql = sql;
-      for (let i = params.length - 1; i >= 0; i--) {
-        const param = params[i];
-        const paramStr =
-          typeof param === 'string' ? `'${param.replace(/'/g, "''")}'` : String(param);
-        // Find the last ? and replace it (working backwards)
-        const lastIndex = displaySql.lastIndexOf('?');
-        if (lastIndex !== -1) {
-          displaySql =
-            displaySql.substring(0, lastIndex) + paramStr + displaySql.substring(lastIndex + 1);
-        }
-      }
-      return {sql: displaySql, originalSql: sql, params};
-    } catch (err) {
-      return {error: err instanceof Error ? err.message : String(err)};
-    }
-  }, [datalogQuery]);
-
   // Calculate result count
   const resultCount = useMemo(() => {
     if (log.result === undefined) return null;
@@ -113,9 +88,6 @@ export function DbCallLogItem({log, isExpanded, onToggle}: DbCallLogItemProps) {
     const tabs: TabType[] = [];
     if (datalogQuery) {
       tabs.push('datalog');
-      if (sqlQuery && !('error' in sqlQuery)) {
-        tabs.push('sql');
-      }
     } else if (log.args.length > 0) {
       tabs.push('args');
     }
@@ -126,7 +98,7 @@ export function DbCallLogItem({log, isExpanded, onToggle}: DbCallLogItemProps) {
       tabs.push('error');
     }
     return tabs.length > 0 ? tabs : ['args'];
-  }, [datalogQuery, sqlQuery, log.args, log.result, log.error]);
+  }, [datalogQuery, log.args, log.result, log.error]);
 
   // Initialize activeTab from localStorage, validating against available tabs
   const [activeTab, setActiveTab] = useState<TabType>(() => {
@@ -295,38 +267,6 @@ export function DbCallLogItem({log, isExpanded, onToggle}: DbCallLogItemProps) {
                     folding: true,
                   }}
                 />
-              )}
-
-              {activeTab === 'sql' && sqlQuery && !('error' in sqlQuery) && (
-                <div className="h-full flex flex-col">
-                  <Editor
-                    height="100%"
-                    defaultLanguage="sql"
-                    value={sqlQuery.sql}
-                    theme={MONACO_THEME}
-                    options={{
-                      minimap: {enabled: false},
-                      fontSize: 12,
-                      wordWrap: 'on',
-                      readOnly: true,
-                      scrollBeyondLastLine: false,
-                      lineNumbers: 'on',
-                      folding: true,
-                    }}
-                  />
-                  {sqlQuery.params.length > 0 && (
-                    <div className="p-2 bg-gray-800/50 border-t border-gray-700 text-xs text-gray-400">
-                      Parameters: {sqlQuery.params.length}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'sql' && sqlQuery && 'error' in sqlQuery && (
-                <div className="h-full p-4 bg-red-900/20 text-red-300 font-mono text-sm">
-                  <div className="font-semibold mb-2">SQL Generation Error:</div>
-                  <div>{sqlQuery.error}</div>
-                </div>
               )}
 
               {activeTab === 'result' && (

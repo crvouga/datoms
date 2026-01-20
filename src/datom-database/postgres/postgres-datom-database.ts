@@ -163,7 +163,7 @@ function canUsePivotOptimization(clauses: QueryClause[]): boolean {
  * Convert a DatalogQuery to PostgreSQL SQL
  * Returns the SQL string and parameter array
  */
-export function datalogToPostgresSQL(
+function datalogToPostgresSQL(
   query: DatalogQuery,
   tableName = 'datoms',
 ): {sql: string; params: unknown[]} {

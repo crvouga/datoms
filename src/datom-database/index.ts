@@ -23,14 +23,13 @@ export type {
 
 // DatomDatabase classes
 export type {DatomDatabase} from './datom-database.js';
-export {HttpClientDatomDatabase} from './http-client/http-client-datom-database.js';
-export {InMemoryDatomDatabase} from './in-memory/in-memory-datom-database.js';
 export {
   FileSystemDatomDatabase,
   type FileSystemDatomDatabaseOptions,
 } from './filesystem/filesystem-datom-database.js';
+export {HttpClientDatomDatabase} from './http-client/http-client-datom-database.js';
+export {InMemoryDatomDatabase} from './in-memory/in-memory-datom-database.js';
 export {
-  datalogToPostgresSQL,
   PostgreSQLDatomDatabase,
   type PostgreSQLMaintenanceConfig,
 } from './postgres/postgres-datom-database.js';

@@ -26,8 +26,8 @@
     "untuple",
     "upserts"
   ],
-  "editor.formatOnPaste": true,
-  "editor.formatOnSave": true,
-  "editor.formatOnType": true,
-  "typescript.experimental.useTsgo": true
+  "editor.formatOnPaste": false,
+  "editor.formatOnSave": false,
+  "editor.formatOnType": false,
+  "typescript.experimental.useTsgo": false
 }
