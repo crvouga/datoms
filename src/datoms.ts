@@ -65,6 +65,11 @@ export function value(v: unknown): Value {
  */
 export type TransactionId = number;
 
+export type Transaction = {
+  tx: TransactionId;
+  txSeq: number
+}
+
 /**
  * A datom represents a fact: { e: entity, a: attribute, v: value, tx: transaction, op: true | false }
  * This is the fundamental unit of data in a datalog database
