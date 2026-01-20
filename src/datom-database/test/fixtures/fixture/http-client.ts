@@ -8,7 +8,7 @@ import {InMemoryDatomDatabase} from '../../../in-memory/in-memory-datom-database
 export const createHttpClientFixture = async (): Promise<Fixture> => {
   const serverDb = new InMemoryDatomDatabase();
   const transportServerComponent = new HttpClientDatomDatabaseServerComponent(serverDb);
-  const endpoint = `/api/datom-database`;
+  const endpoint = '/api/datom-database';
   const server = serve({
     port: 0, // Let OS assign an available port
     routes: {
@@ -16,7 +16,7 @@ export const createHttpClientFixture = async (): Promise<Fixture> => {
     },
   });
   // Extract the actual port from the server URL
-  const port = parseInt(server.url.port, 10);
+  const port = Number.parseInt(server.url.port, 10);
   const httpClient = new FetchHttpClient(`http://localhost:${port}`);
   const db = new HttpClientDatomDatabase(httpClient, endpoint);
   await db.initialize();

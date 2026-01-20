@@ -14,7 +14,7 @@ import {TmdbLoader} from './tmdb/tmdb-loader';
 
 async function main() {
   const logger = createLogger();
-  const port = parseInt(process.env.PORT || '3000', 10);
+  const port = Number.parseInt(process.env.PORT || '3000', 10);
 
   const databaseUrl = process.env.DATABASE_URL?.trim();
   if (!databaseUrl) throw new Error('DATABASE_URL is not set');

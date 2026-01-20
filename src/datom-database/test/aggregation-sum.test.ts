@@ -32,7 +32,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(90);
+      expect(results[0]?.total).toBe(90);
     });
 
     test('should return 0 for empty results', async () => {
@@ -44,7 +44,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(0);
+      expect(results[0]?.total).toBe(0);
     });
 
     test('should sum single value', async () => {
@@ -58,7 +58,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(100);
+      expect(results[0]?.total).toBe(100);
     });
 
     test('should sum negative numbers', async () => {
@@ -76,7 +76,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(8);
+      expect(results[0]?.total).toBe(8);
     });
 
     test('should sum decimal numbers', async () => {
@@ -94,7 +94,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBeCloseTo(36.5, 2);
+      expect(results[0]?.total).toBeCloseTo(36.5, 2);
     });
 
     test('should sum with filters', async () => {
@@ -118,7 +118,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(300);
+      expect(results[0]?.total).toBe(300);
     });
 
     test('should sum large numbers', async () => {
@@ -136,7 +136,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(6000000);
+      expect(results[0]?.total).toBe(6000000);
     });
 
     test('should sum zero values', async () => {
@@ -154,7 +154,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(10);
+      expect(results[0]?.total).toBe(10);
     });
 
     test('should sum values after retraction', async () => {
@@ -175,7 +175,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(400);
+      expect(results[0]?.total).toBe(400);
     });
 
     test('should sum with very small decimal numbers', async () => {
@@ -193,7 +193,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBeCloseTo(0.0006, 4);
+      expect(results[0]?.total).toBeCloseTo(0.0006, 4);
     });
   });
 });

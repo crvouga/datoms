@@ -222,30 +222,29 @@ export function datoms<T extends Record<string, unknown>>(
         return datoms;
       }),
     );
-  } else {
-    // entityId API - first argument is a record or array
-    const records = [first, ...rest];
-    return records.flatMap(r =>
-      (Array.isArray(r) ? r : [r]).flatMap(r => {
-        if (r == null) return [];
-        if (typeof r !== 'object') return [];
-        if (!('entityId' in r)) {
-          throw new Error("Record must have an 'entityId' property or use template function API");
-        }
-        const entityId = r.entityId as EntityId;
-        const datoms: DatomInput[] = [];
-        for (const [key, value] of Object.entries(r)) {
-          datoms.push({
-            e: entityId,
-            a: key,
-            v: value as Value,
-            op: 'assert',
-          });
-        }
-        return datoms;
-      }),
-    );
   }
+  // entityId API - first argument is a record or array
+  const records = [first, ...rest];
+  return records.flatMap(r =>
+    (Array.isArray(r) ? r : [r]).flatMap(r => {
+      if (r == null) return [];
+      if (typeof r !== 'object') return [];
+      if (!('entityId' in r)) {
+        throw new Error("Record must have an 'entityId' property or use template function API");
+      }
+      const entityId = r.entityId as EntityId;
+      const datoms: DatomInput[] = [];
+      for (const [key, value] of Object.entries(r)) {
+        datoms.push({
+          e: entityId,
+          a: key,
+          v: value as Value,
+          op: 'assert',
+        });
+      }
+      return datoms;
+    }),
+  );
 }
 
 /**
@@ -330,6 +329,7 @@ export const records = (...datoms: (DatomInput | DatomInput[])[]): Record<Attrib
     if (!entityMap.has(datom.e)) {
       entityMap.set(datom.e, {});
     }
+    // biome-ignore lint/style/noNonNullAssertion: entityMap.get is guaranteed to return a value after set
     const record = entityMap.get(datom.e)!;
     record[datom.a] = datom.v;
   }

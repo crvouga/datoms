@@ -338,7 +338,6 @@ export class HookEngine {
       case 'beforeWrite':
         this.beforeWrite.push(hook);
         break;
-      case 'afterWrite':
       default:
         this.afterWrite.push(hook);
         break;

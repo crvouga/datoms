@@ -294,6 +294,7 @@ export class HttpClientDatomDatabaseServerComponent {
 
     const transaction = await this.db._getLatestTransaction();
     return {
+      // biome-ignore lint/style/noNonNullAssertion: transaction.txId is guaranteed to exist for latest transaction
       txId: transaction.txId!,
       datoms: transaction.datoms,
       meta: transaction.meta,

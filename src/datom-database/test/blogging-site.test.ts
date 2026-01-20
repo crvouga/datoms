@@ -780,11 +780,11 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         ],
       });
       expect(results.length).toBeGreaterThanOrEqual(2); // At least 2 results (one per tag)
-      const firstResult = results[0]!;
-      expect(firstResult.title).toBe('My Blog Post');
-      expect(firstResult.content).toBe('Updated content');
-      expect(firstResult.status).toBe(POST_STATUS_PUBLISHED);
-      const tagName = firstResult.tagName as string | undefined;
+      const firstResult = results[0];
+      expect(firstResult?.title).toBe('My Blog Post');
+      expect(firstResult?.content).toBe('Updated content');
+      expect(firstResult?.status).toBe(POST_STATUS_PUBLISHED);
+      const tagName = firstResult?.tagName as string | undefined;
       expect(tagName).toBeDefined();
       if (tagName) {
         expect(['javascript', 'tutorial']).toContain(tagName);

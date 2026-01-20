@@ -74,6 +74,7 @@ export const POST_ACCESS_CONTROL: Hook = {
       const entityDatoms = postDatoms.filter(d => d.e === postId);
       const entityRecords = records(entityDatoms);
       if (entityRecords.length > 0) {
+        // biome-ignore lint/style/noNonNullAssertion: length check guarantees element exists
         postData.set(postId, entityRecords[0]!);
       }
     }

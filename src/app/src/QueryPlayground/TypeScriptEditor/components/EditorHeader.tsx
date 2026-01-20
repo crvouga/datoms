@@ -33,6 +33,7 @@ export function EditorHeader({
         <h2 className="text-lg font-semibold">{title}</h2>
         {showShortcutsHelp && (
           <button
+            type="button"
             onClick={onToggleShortcuts}
             className="p-1.5 text-gray-400 hover:text-gray-300 hover:bg-gray-800 rounded transition-colors"
             title="Show keyboard shortcuts"

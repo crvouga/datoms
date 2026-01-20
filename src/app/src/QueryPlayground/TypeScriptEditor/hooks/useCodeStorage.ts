@@ -26,6 +26,7 @@ function aggressivelyCleanWhitespace(code: string): string {
 
 /**
  * Hook for managing code persistence in localStorage
+ * Note: Type safety is intentionally relaxed here due to Monaco editor's lack of proper TypeScript types
  * @param storageKey - localStorage key for persistence (optional)
  * @param code - Current code value
  * @param defaultValue - Default code value if nothing is saved
@@ -37,7 +38,7 @@ export function useCodeStorage(
   storageKey: string | undefined,
   code: string,
   _defaultValue: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are not available
   editorRef: RefObject<any>,
   setCode: (code: string) => void,
 ): UseCodeStorageReturn {
@@ -48,7 +49,6 @@ export function useCodeStorage(
     if (!storageKey) return;
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const editor = editorRef.current;
       let codeToSave = code;
 
@@ -56,13 +56,10 @@ export function useCodeStorage(
       if (editor) {
         try {
           // Save cursor position before formatting
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
           const position = editor.getPosition();
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
           const selection = editor.getSelection();
 
           // Calculate character offset for better position preservation
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
           const currentValue = editor.getValue();
           const currentValueStr =
             typeof currentValue === 'string' ? currentValue : String(currentValue);
@@ -70,7 +67,6 @@ export function useCodeStorage(
           if (position) {
             // Calculate offset: sum of characters in previous lines + column
             const lines = currentValueStr.split('\n');
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             const lineNumberRaw = position.lineNumber;
             const lineNumber =
               typeof lineNumberRaw === 'number' ? lineNumberRaw : Number(lineNumberRaw) || 1;
@@ -80,29 +76,24 @@ export function useCodeStorage(
                 cursorOffset += line.length + 1; // +1 for newline
               }
             }
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             const columnRaw = position.column;
             const column = typeof columnRaw === 'number' ? columnRaw : Number(columnRaw) || 1;
             cursorOffset += column - 1;
           }
 
           // Format using Monaco's formatter with aggressive options
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
           const formatAction = editor.getAction('editor.action.formatDocument');
           if (formatAction) {
             // Run formatting
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
             await formatAction.run();
 
             // Get the formatted code from the editor
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
             codeToSave = editor.getValue();
 
             // Apply aggressive whitespace cleanup
             codeToSave = aggressivelyCleanWhitespace(codeToSave);
 
             // Set the cleaned code back to editor
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
             editor.setValue(codeToSave);
 
             // Restore cursor position
@@ -120,7 +111,6 @@ export function useCodeStorage(
                 const lineLength = line.length;
                 if (currentOffset + lineLength >= cursorOffset) {
                   restoredLine = i + 1;
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                   restoredColumn = Math.min(cursorOffset - currentOffset + 1, lineLength + 1);
                   break;
                 }
@@ -137,7 +127,6 @@ export function useCodeStorage(
               }
 
               // Restore position
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
               editor.setPosition({
                 lineNumber: restoredLine,
                 column: restoredColumn,
@@ -145,18 +134,14 @@ export function useCodeStorage(
 
               // Restore selection if there was one
               if (selection && typeof selection === 'object' && 'isEmpty' in selection) {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
                 const isEmptyFn = selection.isEmpty;
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-call
                 if (typeof isEmptyFn === 'function' && !isEmptyFn()) {
                   // Try to preserve selection bounds
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
                   editor.setSelection(selection);
                 }
               }
 
               // Focus the editor to ensure cursor is visible
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
               editor.focus();
             }
 

@@ -33,9 +33,9 @@ export function TypeScriptEditor({
   tabSize = 2,
   editorOptions = {},
 }: TypeScriptEditorProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are not available
   const editorRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are not available
   const monacoRef = useRef<any>(null);
 
   // Initialize code from localStorage if available
@@ -127,9 +127,7 @@ export function TypeScriptEditor({
         tabSize={tabSize}
         editorOptions={editorOptions}
         onMount={(editor, monaco) => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           editorRef.current = editor;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           monacoRef.current = monaco;
         }}
       />

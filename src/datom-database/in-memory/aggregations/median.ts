@@ -15,10 +15,9 @@ IN_MEMORY_AGGREGATIONS.set('median', {
     if (sorted.length % 2 === 0) {
       // Even number of values: average of two middle values
       return ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
-    } else {
-      // Odd number of values: middle value
-      return sorted[mid];
     }
+    // Odd number of values: middle value
+    return sorted[mid];
   },
   supportsDefault: false,
   requiresSeed: false,

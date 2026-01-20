@@ -43,7 +43,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
   private connection: SQLDatabase;
   private tableName: string;
 
-  constructor(connection: SQLDatabase, tableName: string = 'datoms') {
+  constructor(connection: SQLDatabase, tableName = 'datoms') {
     this.hooks = new HookEngine();
     this.connection = connection;
     this.tableName = tableName;
@@ -153,6 +153,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     // Convert to datoms for transaction object
     const allDatoms: Datom[] = [];
     const latestTx = await this._getLatestTransaction();
+    // biome-ignore lint/style/noNonNullAssertion: latestTx.txId is guaranteed to exist for latest transaction
     const txId = latestTx.txId! + 1;
 
     for (const sub of subs) {
@@ -268,6 +269,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
+          // biome-ignore lint/style/noNonNullAssertion: timeoutMs is required when timeoutPromise is created
           reject(new QueryTimeoutError(options.timeoutMs!, options));
         }, options.timeoutMs);
       });
@@ -302,7 +304,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
-    const speculativeTxId = (await this._getLatestTransaction()).txId! + 1;
+    const speculativeTxId = (await this._getLatestTransaction()).txId + 1;
 
     // Process operations in sequence, creating speculative datoms directly
     const speculativeDatoms: Datom[] = [];
@@ -733,7 +735,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       let entity: EntityId = row.e as EntityId;
       if (typeof entity === 'string') {
         if (/^-?\d+$/.test(entity)) {
-          entity = parseInt(entity, 10);
+          entity = Number.parseInt(entity, 10);
         }
       }
 
@@ -917,6 +919,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
 
       projected.sort(
         (a: Record<string, Value | Attribute>, b: Record<string, Value | Attribute>) => {
+          // biome-ignore lint/style/noNonNullAssertion: orderBy is guaranteed to exist when sorting
           for (const [variable, direction] of query.orderBy!) {
             // Map variable to output key, or fall back to stripped variable name
             const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
@@ -939,7 +942,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
               aNum = aVal;
             } else if (typeof aVal === 'string' && aVal !== '') {
               const parsed = Number(aVal);
-              if (!isNaN(parsed) && isFinite(parsed)) {
+              if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
                 aNum = parsed;
               }
             }
@@ -948,7 +951,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
               bNum = bVal;
             } else if (typeof bVal === 'string' && bVal !== '') {
               const parsed = Number(bVal);
-              if (!isNaN(parsed) && isFinite(parsed)) {
+              if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
                 bNum = parsed;
               }
             }
@@ -1033,6 +1036,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
       }
 
       results.sort((a, b) => {
+        // biome-ignore lint/style/noNonNullAssertion: orderBy is guaranteed to exist when sorting
         for (const [variable, direction] of query.orderBy!) {
           // Map variable to output key, or fall back to stripped variable name
           const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
@@ -1056,7 +1060,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
             aNum = aVal;
           } else if (typeof aVal === 'string' && aVal !== '') {
             const parsed = Number(aVal);
-            if (!isNaN(parsed) && isFinite(parsed)) {
+            if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
               aNum = parsed;
             }
           }
@@ -1065,7 +1069,7 @@ export class SQLiteDatomDatabase implements DatomDatabase {
             bNum = bVal;
           } else if (typeof bVal === 'string' && bVal !== '') {
             const parsed = Number(bVal);
-            if (!isNaN(parsed) && isFinite(parsed)) {
+            if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
               bNum = parsed;
             }
           }

@@ -41,7 +41,7 @@ export class TmdbLoader {
     this.logger.info('Starting movie discovery');
     let page = 1;
     let totalMoviesProcessed = 0;
-    let totalPages = Infinity;
+    let totalPages = Number.POSITIVE_INFINITY;
     while (!this.shouldStop && page < totalPages) {
       page++;
       await this.delay(0);

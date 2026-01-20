@@ -318,7 +318,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Should return the value with highest tx
       const {data: datoms} = await db.datoms({e: 1, a: 'tag'});
       const sorted = datoms.sort((a, b) => b.tx - a.tx);
-      expect(sorted[0]!.v).toBe('green');
+      expect(sorted[0]?.v).toBe('green');
     });
 
     test('should return most recent value after subion', async () => {
@@ -332,7 +332,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Latest should be "red" since "blue" was sub
       const {data: datoms} = await db.datoms({e: 1, a: 'tag'});
       const sorted = datoms.sort((a, b) => b.tx - a.tx);
-      expect(sorted[0]!.v).toBe('red');
+      expect(sorted[0]?.v).toBe('red');
     });
 
     test('should work within transactions', async () => {
@@ -348,7 +348,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         a: 'tag',
       });
       const sorted = datoms.sort((a, b) => b.tx - a.tx);
-      expect(sorted[0]!.v).toBe('blue');
+      expect(sorted[0]?.v).toBe('blue');
 
       // Now commit the change
       await db.transact([{op: 'assert', e: 1, a: 'tag', v: 'blue'}]);
@@ -356,7 +356,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // After commit, should still be blue
       const {data: finalDatoms} = await db.datoms({e: 1, a: 'tag'});
       const finalSorted = finalDatoms.sort((a, b) => b.tx - a.tx);
-      expect(finalSorted[0]!.v).toBe('blue');
+      expect(finalSorted[0]?.v).toBe('blue');
     });
 
     test('should handle time-travel queries correctly', async () => {
@@ -368,17 +368,17 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Current latest should be green
       const {data: currentDatoms} = await db.datoms({e: 1, a: 'tag'});
       const currentSorted = currentDatoms.sort((a, b) => b.tx - a.tx);
-      expect(currentSorted[0]!.v).toBe('green');
+      expect(currentSorted[0]?.v).toBe('green');
 
       // At tx2, latest should be blue
       const {data: atTx2Datoms} = await db.asOf(tx2).datoms({e: 1, a: 'tag'});
       const atTx2Sorted = atTx2Datoms.sort((a, b) => b.tx - a.tx);
-      expect(atTx2Sorted[0]!.v).toBe('blue');
+      expect(atTx2Sorted[0]?.v).toBe('blue');
 
       // At tx1, latest should be red
       const {data: atTx1Datoms} = await db.asOf(tx1).datoms({e: 1, a: 'tag'});
       const atTx1Sorted = atTx1Datoms.sort((a, b) => b.tx - a.tx);
-      expect(atTx1Sorted[0]!.v).toBe('red');
+      expect(atTx1Sorted[0]?.v).toBe('red');
     });
 
     test('should be equivalent to getValue', async () => {
@@ -397,7 +397,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: tagDatoms} = await db.datoms({e: 1, a: 'tag'});
       const tagSorted = tagDatoms.sort((a, b) => b.tx - a.tx);
       // Should return the latest value (blue, add last)
-      expect(tagSorted[0]!.v).toBe('blue');
+      expect(tagSorted[0]?.v).toBe('blue');
     });
   });
 
@@ -519,6 +519,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const initialTx = await db._getLatestTransaction();
 
       const tx1 = await db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice'}]);
+      // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
       expect(tx1).toBeGreaterThan(initialTx.txId!);
 
       const {data: nameDatoms} = await db.datoms({e: 1, a: 'name'});

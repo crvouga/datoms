@@ -34,8 +34,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2);
-      expect(results[0]!['x']).toBe(1);
-      expect(results[1]!['x']).toBe(2);
+      expect(results[0]?.x).toBe(1);
+      expect(results[1]?.x).toBe(2);
     });
 
     test('should return empty if where is empty', async () => {
@@ -64,7 +64,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       };
 
       const {data: results} = await db.query(query);
-      expect(results.map(r => r['x']).sort()).toEqual([1, 3]);
+      expect(results.map(r => r.x).sort()).toEqual([1, 3]);
     });
 
     test('should handle empty find clause', async () => {
@@ -82,6 +82,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2);
       // Empty find should return all variables from where clause
+      // biome-ignore lint/style/noNonNullAssertion: results[0] is guaranteed to exist after length check
       expect(Object.keys(results[0]!).length).toBeGreaterThan(0);
     });
 
@@ -100,10 +101,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2);
       // Missing variable should be undefined
-      expect(results[0]!['x']).toBeDefined();
-      expect(results[0]!['missing']).toBeUndefined();
-      expect(results[1]?.['x']).toBeDefined();
-      expect(results[1]?.['missing']).toBeUndefined();
+      expect(results[0]?.x).toBeDefined();
+      expect(results[0]?.missing).toBeUndefined();
+      expect(results[1]?.x).toBeDefined();
+      expect(results[1]?.missing).toBeUndefined();
     });
   });
 });

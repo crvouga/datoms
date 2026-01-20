@@ -32,7 +32,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(20);
+      expect(results[0]?.minimum).toBe(20);
     });
 
     test('should return null or undefined for empty results', async () => {
@@ -44,7 +44,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum'] === null || results[0]!['minimum'] === undefined).toBe(true);
+      expect(results[0]?.minimum === null || results[0]?.minimum === undefined).toBe(true);
     });
 
     test('should find minimum of single value', async () => {
@@ -58,7 +58,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(100);
+      expect(results[0]?.minimum).toBe(100);
     });
 
     test('should find minimum with negative numbers', async () => {
@@ -76,7 +76,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(-5);
+      expect(results[0]?.minimum).toBe(-5);
     });
 
     test('should find minimum decimal numbers', async () => {
@@ -94,7 +94,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(5.25);
+      expect(results[0]?.minimum).toBe(5.25);
     });
 
     test('should find minimum string values', async () => {
@@ -112,7 +112,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe('Alice');
+      expect(results[0]?.minimum).toBe('Alice');
     });
 
     test('should find minimum with filters', async () => {
@@ -136,7 +136,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(50);
+      expect(results[0]?.minimum).toBe(50);
     });
 
     test('should find minimum with duplicate values', async () => {
@@ -154,7 +154,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(10);
+      expect(results[0]?.minimum).toBe(10);
     });
 
     test('should find minimum with zero values', async () => {
@@ -172,7 +172,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(0);
+      expect(results[0]?.minimum).toBe(0);
     });
 
     test('should find minimum after updates', async () => {
@@ -192,7 +192,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(50);
+      expect(results[0]?.minimum).toBe(50);
     });
   });
 });

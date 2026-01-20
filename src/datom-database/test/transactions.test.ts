@@ -55,7 +55,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // But actual database should not be changed (with() doesn't commit)
       const {data: final} = await db.datoms({e: 1});
       expect(final).toHaveLength(1);
-      expect(final[0]!.v).toBe('Alice');
+      expect(final[0]?.v).toBe('Alice');
     });
 
     test('should see speculative changes with with()', async () => {
@@ -92,7 +92,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Query dbAfter should not see sub datom
       const {data: result} = await withResult.dbAfter.datoms({e: 1});
       expect(result).toHaveLength(1);
-      expect(result[0]!.v).toBe('Alice');
+      expect(result[0]?.v).toBe('Alice');
 
       // Now commit the subion
       await db.transact([{op: 'retract', e: 1, a: 'age', v: 30}]);
@@ -100,7 +100,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Verify subion is committed
       const {data: final} = await db.datoms({e: 1});
       expect(final).toHaveLength(1);
-      expect(final[0]!.v).toBe('Alice');
+      expect(final[0]?.v).toBe('Alice');
     });
 
     test('should handle query with with()', async () => {
@@ -121,7 +121,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(3);
-      const entities = results.map(r => r['x']).sort();
+      const entities = results.map(r => r.x).sort();
       expect(entities).toEqual([1, 2, 3]);
     });
 
@@ -151,7 +151,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: bob} = await db.datoms({e: 2});
       expect(bob).toHaveLength(1);
-      expect(bob[0]!.v).toBe('Bob');
+      expect(bob[0]?.v).toBe('Bob');
     });
 
     test('should not commit changes when using with()', async () => {
@@ -173,7 +173,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // But actual database should not be changed (with() doesn't commit)
       const {data: result} = await db.datoms({e: 1});
       expect(result).toHaveLength(1);
-      expect(result[0]!.v).toBe('Initial');
+      expect(result[0]?.v).toBe('Initial');
 
       const {data: entity2} = await db.datoms({e: 2});
       expect(entity2).toHaveLength(0);
@@ -261,7 +261,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(2);
-      const names = results.map(r => r['name']).sort();
+      const names = results.map(r => r.name).sort();
       expect(names).toEqual(['Alice', 'Charlie']);
     });
   });
@@ -284,6 +284,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const tx2 = await db.transact([{op: 'assert', e: 2, a: 'name', v: 'Bob'}]);
       const latestTx2 = await db._getLatestTransaction();
       expect(latestTx2.txId).toBe(tx2);
+      // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
       expect(latestTx2.txId!).toBeGreaterThan(tx1);
     });
 
@@ -313,11 +314,16 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Use transact() to commit changes
       const txId = await db.transact([{op: 'assert', e: 2, a: 'name', v: 'Bob'}]);
+      // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
       expect(txId).toBeGreaterThan(beforeTx.txId!);
 
       // After commit, latest should be updated
       const afterTx = await db._getLatestTransaction();
-      expect(afterTx.txId!).toBeGreaterThan(beforeTx.txId!);
+      // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
+      expect(afterTx.txId!).toBeGreaterThan(
+        // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
+        beforeTx.txId!,
+      );
       expect(afterTx.txId).toBe(txId);
     });
   });
@@ -332,7 +338,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // dbBefore should show current state
       const {data: before} = await withResult.dbBefore.datoms({e: 1});
       expect(before).toHaveLength(1);
-      expect(before[0]!.v).toBe('Alice');
+      expect(before[0]?.v).toBe('Alice');
 
       // dbAfter should show speculative state
       const {data: after} = await withResult.dbAfter.datoms({e: 1});

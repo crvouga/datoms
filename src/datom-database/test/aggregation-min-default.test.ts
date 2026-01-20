@@ -32,7 +32,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(20);
+      expect(results[0]?.minimum).toBe(20);
     });
 
     test('should return default value for empty results', async () => {
@@ -45,7 +45,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Should return the default value when no results
-      expect(results[0]!['minimum']).toBe(100);
+      expect(results[0]?.minimum).toBe(100);
     });
 
     test('should find minimum of single value', async () => {
@@ -59,7 +59,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(100);
+      expect(results[0]?.minimum).toBe(100);
     });
 
     test('should find minimum with numeric default', async () => {
@@ -76,7 +76,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(10);
+      expect(results[0]?.minimum).toBe(10);
     });
 
     test('should use default when all values are filtered out', async () => {
@@ -96,7 +96,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe(50);
+      expect(results[0]?.minimum).toBe(50);
     });
 
     test('should find minimum with string default', async () => {
@@ -114,7 +114,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['minimum']).toBe('Alice');
+      expect(results[0]?.minimum).toBe('Alice');
     });
 
     test('should handle default with different data types', async () => {
@@ -132,7 +132,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Should return the minimum value (10) when values exist
-      expect(results[0]!['minimum']).toBe(10);
+      expect(results[0]?.minimum).toBe(10);
     });
   });
 });

@@ -74,7 +74,7 @@ export function parseAggregation(
   // Handle functions with default values like "max(\"0\", ?age)"
   if (args) {
     const defaultMatch = args.match(/^"([^"]+)",\s*(\?[\w]+)$/);
-    if (defaultMatch && defaultMatch[1] && defaultMatch[2]) {
+    if (defaultMatch?.[1] && defaultMatch[2]) {
       if (def.supportsDefault || def.requiresSeed) {
         return {
           type: funcName,
@@ -85,7 +85,7 @@ export function parseAggregation(
     }
     // Handle functions with single argument like "avg(?age)"
     const varMatch = args.match(/^(\?[\w]+)$/);
-    if (varMatch && varMatch[1]) {
+    if (varMatch?.[1]) {
       if (!def.requiresSeed) {
         return {type: funcName, variable: varMatch[1]};
       }

@@ -222,6 +222,7 @@ export function DbCallLogItem({log, isExpanded, onToggle}: DbCallLogItemProps) {
     <div className="border-b border-gray-700">
       {/* Collapsed Header */}
       <button
+        type="button"
         onClick={onToggle}
         className="w-full text-left p-3 hover:bg-gray-800/50 transition-colors flex items-center justify-between gap-3"
       >
@@ -249,6 +250,7 @@ export function DbCallLogItem({log, isExpanded, onToggle}: DbCallLogItemProps) {
           <div className="flex border-b border-gray-700 overflow-x-auto">
             {availableTabs.map(tab => (
               <button
+                type="button"
                 key={tab}
                 onClick={() => setActiveTab(tab as TabType)}
                 className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${

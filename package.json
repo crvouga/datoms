@@ -14,9 +14,7 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsc",
     "check": "bun run check:quick && bun test --bail && bun test:e2e && echo '✅ Checks passed'",
@@ -30,27 +28,27 @@
     "docker:logs": "docker-compose logs -f",
     "docker:ps": "docker-compose ps",
     "docker:up": "docker-compose up -d",
-    "format": "bun x sort-package-json && prettier --config .prettierrc.json --write \"**/*.{ts,tsx,json}\"",
-    "format:check": "prettier --config .prettierrc.json --check \"**/*.{ts,tsx,json}\"",
+    "format": "bun x sort-package-json && biome format --write .",
+    "format:check": "biome format --write . --check",
     "kp": "bun x kill-port 8080",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
     "prepare": "husky",
     "prepublishOnly": "npm run build",
     "preview": "docker build --no-cache -t datoms-preview -f Dockerfile . && docker run --name datoms-preview --rm --env-file .env -p 8080:8080 datoms-preview",
     "psql": "psql postgresql://postgres:postgres@localhost:5434/postgres",
     "server": "bun --watch src/app/src/server.ts",
-    "tc": "bun typecheck -- --watch",
     "test": "bun test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:fast": "FAST_TESTS=true bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bun x tsgo --noEmit"
   },
   "dependencies": {
     "@babel/standalone": "^7.25.0",
     "@electric-sql/pglite": "^0.2.0",
     "@monaco-editor/react": "^4.6.0",
+    "@typescript/native-preview": "^7.0.0-dev.20260119.1",
     "bun-plugin-tailwind": "^0.1.2",
     "pg": "^8.11.3",
     "pino": "^9.0.0",
@@ -61,6 +59,7 @@
     "tailwindcss": "^4.1.11"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@playwright/test": "^1.48.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
@@ -70,13 +69,9 @@
     "@types/pg": "^8.10.9",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
-    "eslint": "^8.57.0",
     "husky": "^9.0.0",
     "madge": "^8.0.0",
     "playwright": "^1.48.0",
-    "prettier": "^3.0.0",
     "semantic-release": "^23.0.0",
     "typescript": "^5.3.0"
   },

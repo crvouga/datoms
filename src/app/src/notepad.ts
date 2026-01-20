@@ -1,4 +1,4 @@
-import {type DatomDatabase} from '../../datom-database';
+import type {DatomDatabase} from '../../datom-database';
 
 export const notepad = async (db: DatomDatabase) => {
   const results = await db.query({

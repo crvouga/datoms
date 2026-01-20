@@ -7,6 +7,8 @@ export const PlayIcon = ({className}: {className?: string}) => (
     stroke="currentColor"
     viewBox="0 0 24 24"
     xmlns="http://www.w3.org/2000/svg"
+    aria-label="Play"
+    role="img"
   >
     <path
       strokeLinecap="round"
@@ -30,6 +32,8 @@ export const SaveIcon = ({className}: {className?: string}) => (
     stroke="currentColor"
     viewBox="0 0 24 24"
     xmlns="http://www.w3.org/2000/svg"
+    aria-label="Save"
+    role="img"
   >
     <path
       strokeLinecap="round"
@@ -47,6 +51,8 @@ export const HelpIcon = ({className}: {className?: string}) => (
     stroke="currentColor"
     viewBox="0 0 24 24"
     xmlns="http://www.w3.org/2000/svg"
+    aria-label="Help"
+    role="img"
   >
     <path
       strokeLinecap="round"

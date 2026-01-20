@@ -27,8 +27,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Query at tx1 - should only see name
       const {data: atTx1} = await db.asOf(tx1).datoms({e: 1});
       expect(atTx1).toHaveLength(1);
-      expect(atTx1[0]!.a).toBe('name');
-      expect(atTx1[0]!.v).toBe('Alice');
+      expect(atTx1[0]?.a).toBe('name');
+      expect(atTx1[0]?.v).toBe('Alice');
 
       // Query at tx2 - should see name and age
       const {data: atTx2} = await db.asOf(tx2).datoms({e: 1});
@@ -57,7 +57,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Query at tx3 - should only see name (age was sub)
       const {data: atTx3} = await db.asOf(tx3).datoms({e: 1});
       expect(atTx3).toHaveLength(1);
-      expect(atTx3[0]!.a).toBe('name');
+      expect(atTx3[0]?.a).toBe('name');
     });
 
     test('should query full history of changes', async () => {
@@ -85,7 +85,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: entityAtTx1} = await db.asOf(tx1).datoms({e: 1});
       expect(entityAtTx1).toHaveLength(1);
-      expect(entityAtTx1[0]!.a).toBe('name');
+      expect(entityAtTx1[0]?.a).toBe('name');
 
       const {data: entityAtTx2} = await db.asOf(tx2).datoms({e: 1});
       expect(entityAtTx2).toHaveLength(2);
@@ -118,7 +118,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       };
       const {data: resultsAtTx1} = await db.asOf(tx1).query(queryAtTx1);
       expect(resultsAtTx1).toHaveLength(2);
-      const namesAtTx1 = resultsAtTx1.map(r => r['name']).sort();
+      const namesAtTx1 = resultsAtTx1.map(r => r.name).sort();
       expect(namesAtTx1).toEqual(['Alice', 'Bob']);
 
       // Query at tx2 - should see all three
@@ -128,7 +128,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       };
       const {data: resultsAtTx2} = await db.asOf(tx2).query(queryAtTx2);
       expect(resultsAtTx2).toHaveLength(3);
-      const namesAtTx2 = resultsAtTx2.map(r => r['name']).sort();
+      const namesAtTx2 = resultsAtTx2.map(r => r.name).sort();
       expect(namesAtTx2).toEqual(['Alice', 'Bob', 'Charlie']);
     });
 
@@ -146,7 +146,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Query at tx1 - should only see committed name (not speculative age)
       const {data: atTx1} = await db.asOf(tx1).datoms({e: 1});
       expect(atTx1).toHaveLength(1);
-      expect(atTx1[0]!.a).toBe('name');
+      expect(atTx1[0]?.a).toBe('name');
     });
 
     test('should handle complex time-travel scenario', async () => {
@@ -278,11 +278,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: alice} = await db.datoms({e: 1, op: 'assert'});
       expect(alice).toHaveLength(1);
-      expect(alice[0]!.v).toBe('Alice');
+      expect(alice[0]?.v).toBe('Alice');
 
       const {data: bob} = await db.datoms({e: 2, op: 'assert'});
       expect(bob).toHaveLength(1);
-      expect(bob[0]!.v).toBe('Bob');
+      expect(bob[0]?.v).toBe('Bob');
 
       // Charlie should not exist (or was sub if existed)
       const {data: charlie} = await db.datoms({e: 3, op: 'assert'});
@@ -372,8 +372,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Query changes since tx3 - should only see updated name
       const {data: sinceTx3} = await db.since(tx3).datoms({e: 1});
       expect(sinceTx3).toHaveLength(1);
-      expect(sinceTx3[0]!.a).toBe('name');
-      expect(sinceTx3[0]!.v).toBe('Alice Updated');
+      expect(sinceTx3[0]?.a).toBe('name');
+      expect(sinceTx3[0]?.v).toBe('Alice Updated');
     });
 
     test('should handle subions in since queries', async () => {
@@ -408,7 +408,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       };
       const {data: resultsSinceTx1} = await db.since(tx1).query(querySinceTx1);
       expect(resultsSinceTx1.length).toBeGreaterThanOrEqual(2);
-      const namesSinceTx1 = resultsSinceTx1.map(r => r['name']).sort();
+      const namesSinceTx1 = resultsSinceTx1.map(r => r.name).sort();
       expect(namesSinceTx1).toContain('Charlie');
       expect(namesSinceTx1).toContain('David');
       // Should not include Alice or Bob (they were add before tx1)
@@ -417,7 +417,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Query changes since tx2
       const {data: resultsSinceTx2} = await db.since(tx2).query(querySinceTx1);
-      const namesSinceTx2 = resultsSinceTx2.map(r => r['name']).sort();
+      const namesSinceTx2 = resultsSinceTx2.map(r => r.name).sort();
       expect(namesSinceTx2).toContain('David');
       expect(namesSinceTx2).not.toContain('Charlie');
     });
@@ -442,7 +442,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         a: 'name',
       });
       expect(sinceTx2Name).toHaveLength(1);
-      expect(sinceTx2Name[0]!.v).toBe('Alice Updated');
+      expect(sinceTx2Name[0]?.v).toBe('Alice Updated');
     });
 
     test('should handle since queries with no changes', async () => {
@@ -503,7 +503,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         limit: 2,
       });
       expect(limited).toHaveLength(2);
-      expect(limited[0]!.v).toBe('Alice'); // First change
+      expect(limited[0]?.v).toBe('Alice'); // First change
 
       // Test offset
       const {data: offset} = await db.history().datoms({
@@ -582,7 +582,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         // If implementation picks subion during deduplication, verify green at tx3
         const {data: atTx3Check} = await db.asOf(tx3).datoms({e: 1, a: 'tag'});
         expect(atTx3Check.length).toBeGreaterThanOrEqual(1);
-        expect(atTx3Check[0]!.v).toBe('green');
+        expect(atTx3Check[0]?.v).toBe('green');
       }
 
       // Query changes since tx2 - should see green (add after tx2)
@@ -625,7 +625,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         a: 'parent',
       });
       expect(sinceTx1.length).toBeGreaterThanOrEqual(1);
-      expect(sinceTx1[0]!.v).toBe(20);
+      expect(sinceTx1[0]?.v).toBe(20);
 
       // Query changes since tx1 for all entities
       const {data: allSinceTx1} = await db.since(tx1).datoms({a: 'parent'});
@@ -651,7 +651,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Query changes since tx1 - should see age
       const {data: sinceTx1} = await db.since(tx1).datoms({e: 1});
       expect(sinceTx1.length).toBeGreaterThanOrEqual(1);
-      expect(sinceTx1[0]!.a).toBe('age');
+      expect(sinceTx1[0]?.a).toBe('age');
     });
 
     test('should handle complex since query scenario', async () => {
@@ -694,7 +694,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Get the latest transaction ID
       const latestTx = await db._getLatestTransaction();
-      expect(latestTx.txId!).toBeGreaterThanOrEqual(tx3);
+      expect(latestTx.txId).toBeGreaterThanOrEqual(tx3);
 
       // Query at current state (should match asOf with latestTx)
       const {data: current} = await db.datoms({e: 1});

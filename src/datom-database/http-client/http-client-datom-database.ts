@@ -120,6 +120,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     // Flatten ops and convert to datoms for transaction object
     const flatOps = ops.flat();
     const latestTx = await this._getLatestTransaction();
+    // biome-ignore lint/style/noNonNullAssertion: latestTx.txId is guaranteed to exist for latest transaction
     const txId = latestTx.txId! + 1;
 
     // Convert ops to datoms for transaction object
@@ -240,6 +241,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
+    // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
     const speculativeTxId = (await this._getLatestTransaction()).txId! + 1;
 
     // Process operations in sequence, creating speculative datoms directly
@@ -289,6 +291,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
+          // biome-ignore lint/style/noNonNullAssertion: timeoutMs is required when timeoutPromise is created
           reject(new QueryTimeoutError(options.timeoutMs!, options));
         }, options.timeoutMs);
       });
@@ -466,6 +469,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
       }
 
       projected.sort((a, b) => {
+        // biome-ignore lint/style/noNonNullAssertion: orderBy is guaranteed to exist when sorting
         for (const [variable, direction] of modifiedQuery.orderBy!) {
           // Map variable to output key, or fall back to stripped variable name
           const outputKey = variableToOutputKey.get(variable) ?? variable.replace(/^\?/, '');
@@ -486,13 +490,13 @@ export class HttpClientDatomDatabase implements DatomDatabase {
 
           if (aIsNumber) {
             aNum = aVal as number;
-          } else if (typeof aVal === 'string' && !isNaN(Number(aVal))) {
+          } else if (typeof aVal === 'string' && !Number.isNaN(Number(aVal))) {
             aNum = Number(aVal);
           }
 
           if (bIsNumber) {
             bNum = bVal as number;
-          } else if (typeof bVal === 'string' && !isNaN(Number(bVal))) {
+          } else if (typeof bVal === 'string' && !Number.isNaN(Number(bVal))) {
             bNum = Number(bVal);
           }
 
@@ -676,7 +680,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
           }
         }
         if (currentStateDatoms.length === 0) {
-          console.warn(`Failed to fetch all current state:`, error);
+          console.warn('Failed to fetch all current state:', error);
         }
       }
     } else {
@@ -747,7 +751,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
       // Try to extract error details from HTTP error message
       // HttpClient throws errors with "HTTP error! status: {status}" format
       const statusMatch = error.message.match(/status: (\d+)/);
-      const status = statusMatch && statusMatch[1] ? parseInt(statusMatch[1], 10) : undefined;
+      const status = statusMatch?.[1] ? Number.parseInt(statusMatch[1], 10) : undefined;
 
       // Try to extract error response body if available
       let errorData: unknown = error;

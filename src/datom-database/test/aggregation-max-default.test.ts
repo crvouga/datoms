@@ -32,7 +32,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['maximum']).toBe(30);
+      expect(results[0]?.maximum).toBe(30);
     });
 
     test('should return default value for empty results', async () => {
@@ -45,7 +45,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Should return the default value when no results
-      expect(results[0]!['maximum']).toBe(0);
+      expect(results[0]?.maximum).toBe(0);
     });
 
     test('should find maximum of single value', async () => {
@@ -59,7 +59,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['maximum']).toBe(100);
+      expect(results[0]?.maximum).toBe(100);
     });
 
     test('should find maximum with numeric default', async () => {
@@ -76,7 +76,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['maximum']).toBe(20);
+      expect(results[0]?.maximum).toBe(20);
     });
 
     test('should use default when all values are filtered out', async () => {
@@ -96,7 +96,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['maximum']).toBe(0);
+      expect(results[0]?.maximum).toBe(0);
     });
 
     test('should find maximum with string default', async () => {
@@ -114,7 +114,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['maximum']).toBe('Charlie');
+      expect(results[0]?.maximum).toBe('Charlie');
     });
 
     test('should handle default with different data types', async () => {
@@ -132,7 +132,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Should return the maximum value (20) when values exist
-      expect(results[0]!['maximum']).toBe(20);
+      expect(results[0]?.maximum).toBe(20);
     });
   });
 });

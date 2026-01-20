@@ -66,6 +66,7 @@ export function DbCallLogList({logs, onClear}: DbCallLogListProps) {
           {logs.length} DB call{logs.length !== 1 ? 's' : ''} logged
         </div>
         <button
+          type="button"
           onClick={onClear}
           className="px-2 py-1 text-xs text-gray-400 hover:text-gray-300 hover:bg-gray-800 rounded transition-colors"
         >

@@ -42,9 +42,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(600);
-      expect(results[0]!['average']).toBe(200);
-      expect(results[0]!['count']).toBe(3);
+      expect(results[0]?.total).toBe(600);
+      expect(results[0]?.average).toBe(200);
+      expect(results[0]?.count).toBe(3);
     });
 
     test('should aggregate with relationship joins', async () => {
@@ -73,8 +73,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['orderCount']).toBe(3);
-      expect(results[0]!['customerCount']).toBe(2);
+      expect(results[0]?.orderCount).toBe(3);
+      expect(results[0]?.customerCount).toBe(2);
     });
 
     test('should aggregate with multiple join conditions', async () => {
@@ -106,9 +106,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(300);
-      expect(results[0]!['average']).toBe(150);
-      expect(results[0]!['maxPrice']).toBe(200);
+      expect(results[0]?.total).toBe(300);
+      expect(results[0]?.average).toBe(150);
+      expect(results[0]?.maxPrice).toBe(200);
     });
 
     test('should aggregate with self-joins', async () => {
@@ -139,9 +139,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['childCount']).toBe(2);
-      expect(results[0]!['childTotal']).toBe(125);
-      expect(results[0]!['childAvg']).toBe(62.5);
+      expect(results[0]?.childCount).toBe(2);
+      expect(results[0]?.childTotal).toBe(125);
+      expect(results[0]?.childAvg).toBe(62.5);
     });
 
     test('should handle aggregations with empty joins', async () => {
@@ -165,8 +165,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(0);
-      expect(results[0]!['count']).toBe(0);
+      expect(results[0]?.total).toBe(0);
+      expect(results[0]?.count).toBe(0);
     });
   });
 });

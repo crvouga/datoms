@@ -32,7 +32,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2);
-      const entities = results.map(r => r['e']).sort();
+      const entities = results.map(r => r.e).sort();
       expect(entities).toEqual([1, 3]);
     });
 
@@ -51,7 +51,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2);
-      const entities = results.map(r => r['e']).sort();
+      const entities = results.map(r => r.e).sort();
       expect(entities).toEqual([1, 3]);
     });
 
@@ -73,8 +73,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Verify undefined values are stored and can be retrieved
       const undefinedEntities = results
-        .filter(r => r['v'] === undefined)
-        .map(r => r['e'])
+        .filter(r => r.v === undefined)
+        .map(r => r.e)
         .sort();
       expect(undefinedEntities.length).toBeGreaterThanOrEqual(2);
     });
@@ -95,7 +95,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Verify we can query across different types
-      const values = results.map(r => r['v']);
+      const values = results.map(r => r.v);
       expect(values).toContain('string');
       expect(values).toContain(42);
       expect(values).toContain(true);

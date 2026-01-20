@@ -37,7 +37,7 @@ export function QueryPlayground() {
   const [result, setResult] = useState<QueryResultEnvelope | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are not available
   const editorRef = useRef<any>(null);
 
   // Load query from localStorage on mount
@@ -129,6 +129,7 @@ export function QueryPlayground() {
                 <div className="flex items-center justify-between p-2">
                   <div className="text-sm font-medium text-gray-300">Datalog Query</div>
                   <button
+                    type="button"
                     onClick={() => void handleRunQuery()}
                     disabled={loading}
                     className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded transition-colors"
@@ -146,10 +147,8 @@ export function QueryPlayground() {
                   onChange={value => setQueryJson(value || '')}
                   theme={MONACO_THEME}
                   onMount={(editor, monaco) => {
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     editorRef.current = editor;
                     // Configure JSON validation
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
                     monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
                       validate: true,
                       allowComments: false,

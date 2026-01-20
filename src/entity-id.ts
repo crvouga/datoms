@@ -47,7 +47,7 @@ export function serializeEntityId(entityId: EntityId): string {
 export function deserializeEntityId(serialized: string): EntityId {
   // Try to parse as number first
   const num = Number(serialized);
-  if (!isNaN(num) && isFinite(num) && String(num) === serialized) {
+  if (!Number.isNaN(num) && Number.isFinite(num) && String(num) === serialized) {
     return num;
   }
   return serialized;

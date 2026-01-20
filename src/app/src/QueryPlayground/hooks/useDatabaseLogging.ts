@@ -158,7 +158,6 @@ export function createLoggedDatabaseWithHooks(
           ...query.context,
           ...context,
         },
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
         __logOperationId: callId,
       });

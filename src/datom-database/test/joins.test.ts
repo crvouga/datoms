@@ -36,7 +36,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2);
-      const ages = results.map(r => r['a']);
+      const ages = results.map(r => r.a);
       expect(ages).toContain(30);
       expect(ages).toContain(40);
     });
@@ -76,13 +76,13 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2); // Alice and Charlie are engineers
-      const engineers = results.map(r => r['emp']).sort();
+      const engineers = results.map(r => r.emp).sort();
       expect(engineers).toEqual([1, 3]);
       // Both should be in Engineering with budget 100000
-      results.forEach(r => {
-        expect(r['dept']).toBe(10);
-        expect(r['budget']).toBe('100_000');
-      });
+      for (const r of results) {
+        expect(r.dept).toBe(10);
+        expect(r.budget).toBe('100_000');
+      }
     });
 
     test('should handle queries with multiple constraints on same entity', async () => {
@@ -107,7 +107,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       });
       expect(results).toHaveLength(1);
-      expect(results[0]!.name).toBe('Alice');
+      expect(results[0]?.name).toBe('Alice');
     });
 
     test('should handle complex variable bindings across multiple clauses', async () => {
@@ -136,7 +136,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2); // 1->2->3 and 2->3->4
-      const paths = results.map(r => [r['a'], r['b'], r['c']]);
+      const paths = results.map(r => [r.a, r.b, r.c]);
       expect(paths).toContainEqual([1, 2, 3]);
       expect(paths).toContainEqual([2, 3, 4]);
     });
@@ -186,7 +186,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!.e).toBe(3);
+      expect(results[0]?.e).toBe(3);
     });
 
     test('should handle join with multiple common variables', async () => {
@@ -211,10 +211,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2);
-      const alice = results.find(r => r['name'] === 'Alice');
+      const alice = results.find(r => r.name === 'Alice');
       expect(alice).toBeDefined();
-      expect(alice?.['age']).toBe(30);
-      expect(alice?.['city']).toBe('NYC');
+      expect(alice?.age).toBe(30);
+      expect(alice?.city).toBe('NYC');
     });
 
     test('should handle variable binding across disconnected clauses', async () => {
@@ -242,9 +242,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2);
-      const alice = results.find(r => r['name'] === 'Alice');
+      const alice = results.find(r => r.name === 'Alice');
       expect(alice).toBeDefined();
-      expect(alice?.['dept']).toBe('Engineering');
+      expect(alice?.dept).toBe('Engineering');
     });
   });
 });

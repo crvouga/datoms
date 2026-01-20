@@ -4,6 +4,7 @@ import {DEFAULT_EXECUTION_CONTEXT} from '../constants';
 
 /**
  * Compiles TypeScript code to JavaScript using Babel
+ * Note: Type safety is intentionally relaxed here due to @babel/standalone's incomplete TypeScript definitions
  * @param code - TypeScript source code
  * @returns Compiled JavaScript code
  * @throws Error if compilation fails
@@ -12,7 +13,6 @@ export function compileTypeScript(code: string): string {
   // Wrap user code in an async function to handle top-level await
   const wrappedCode = `(async () => {\n${code}\n})()`;
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
   const result = Babel.transform(wrappedCode, {
     presets: [
       ['typescript', {isTSX: false, allExtensions: false}],
@@ -21,11 +21,9 @@ export function compileTypeScript(code: string): string {
     filename: 'code.ts',
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   if (!result.code) {
     throw new Error('Failed to compile TypeScript code');
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
   const compiledCode = result.code as string;
   if (typeof compiledCode !== 'string') {
     throw new Error('Compiled code is not a string');
@@ -51,7 +49,7 @@ export async function executeCode(
   };
 
   // Execute the compiled code (wrapped in async IIFE, so it returns a Promise)
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-assignment
+  // Note: Dynamic code execution is required for the code playground
   const executeCode = new Function(
     ...Object.keys(mergedContext),
     `
@@ -65,10 +63,8 @@ export async function executeCode(
         `,
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const executionResult = executeCode(...Object.values(mergedContext));
 
   // The wrapped code always returns a Promise, so await it
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   await executionResult;
 }

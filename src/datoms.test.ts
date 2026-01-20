@@ -27,8 +27,8 @@ describe('datoms', () => {
       });
 
       expect(result).toHaveLength(2);
-      expect(result[0]!.e).toBe('user-123');
-      expect(result[1]!.e).toBe('user-123');
+      expect(result[0]?.e).toBe('user-123');
+      expect(result[1]?.e).toBe('user-123');
     });
 
     test('should handle all value types', () => {
@@ -194,6 +194,7 @@ describe('datoms', () => {
   describe('type safety', () => {
     test('should return DatomInput[] type', () => {
       const result = datoms({e: r => r.entityId}, {entityId: 1, name: 'Alice'});
+      // biome-ignore lint/style/noNonNullAssertion: result is guaranteed to have at least one element
       const first: DatomInput = result[0]!;
       expect(first).toBeDefined();
       expect(first.e).toBeDefined();

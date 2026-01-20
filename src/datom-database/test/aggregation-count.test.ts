@@ -32,7 +32,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(3);
+      expect(results[0]?.total).toBe(3);
     });
 
     test('should return 0 for empty results', async () => {
@@ -44,7 +44,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(0);
+      expect(results[0]?.total).toBe(0);
     });
 
     test('should count single value', async () => {
@@ -58,7 +58,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(1);
+      expect(results[0]?.total).toBe(1);
     });
 
     test('should count with filters', async () => {
@@ -76,7 +76,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(2);
+      expect(results[0]?.total).toBe(2);
     });
 
     test('should count with multiple clauses', async () => {
@@ -98,7 +98,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(2);
+      expect(results[0]?.total).toBe(2);
     });
 
     test('should count different data types', async () => {
@@ -116,7 +116,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(3);
+      expect(results[0]?.total).toBe(3);
     });
 
     test('should count after retractions', async () => {
@@ -141,7 +141,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(2);
+      expect(results[0]?.total).toBe(2);
     });
 
     test('should count with complex joins', async () => {
@@ -165,7 +165,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['total']).toBe(3);
+      expect(results[0]?.total).toBe(3);
     });
   });
 });

@@ -165,7 +165,7 @@ function canUsePivotOptimization(clauses: QueryClause[]): boolean {
  */
 export function datalogToPostgresSQL(
   query: DatalogQuery,
-  tableName: string = 'datoms',
+  tableName = 'datoms',
 ): {sql: string; params: unknown[]} {
   const clauses = query.where;
   const params: unknown[] = [];
@@ -223,13 +223,14 @@ export function datalogToPostgresSQL(
       if (attrToBoundValue.has(attr)) {
         // Bound value - filter by both attribute and value
         params.push(attr);
+        // biome-ignore lint/style/noNonNullAssertion: boundValue is guaranteed to exist when attr is in map
         const boundValue = attrToBoundValue.get(attr)!;
         params.push(JSON.stringify(boundValue));
-        attributeConditions.push(`(a = ? AND v = ?::jsonb)`);
+        attributeConditions.push('(a = ? AND v = ?::jsonb)');
       } else {
         // Variable value - just filter by attribute
         params.push(attr);
-        attributeConditions.push(`a = ?`);
+        attributeConditions.push('a = ?');
       }
     }
 
@@ -292,7 +293,7 @@ export function datalogToPostgresSQL(
         if (colName) {
           const columnRef = `"${colName}"`;
           const sqlAgg = aggregationToSQL(expr, columnRef, outputKey);
-          if (sqlAgg && sqlAgg.sql) {
+          if (sqlAgg?.sql) {
             selectColumns.push(sqlAgg.sql);
           } else {
             selectColumns.push(`NULL AS "${outputKey}"`);
@@ -323,7 +324,7 @@ export function datalogToPostgresSQL(
     // Build GROUP BY clause for pivot subquery
     let groupByClause = '';
     if (entityVarName) {
-      groupByClause = `GROUP BY e`;
+      groupByClause = 'GROUP BY e';
     }
 
     // Build HAVING clause to ensure we have ALL required attributes
@@ -340,7 +341,7 @@ export function datalogToPostgresSQL(
       // Repeat the same array_agg expression used in SELECT to check for NULL
       // Add the attribute to params again (will be converted to positional params by adapter)
       params.push(attr);
-      havingConditions.push(`(array_agg(v) FILTER (WHERE a = ?))[1] IS NOT NULL`);
+      havingConditions.push('(array_agg(v) FILTER (WHERE a = ?))[1] IS NOT NULL');
     }
 
     // Check that attributes with bound values match the expected values
@@ -348,7 +349,7 @@ export function datalogToPostgresSQL(
       // Verify the pivoted value matches the bound value
       params.push(attr);
       params.push(JSON.stringify(boundValue));
-      havingConditions.push(`(array_agg(v) FILTER (WHERE a = ?))[1] = ?::jsonb`);
+      havingConditions.push('(array_agg(v) FILTER (WHERE a = ?))[1] = ?::jsonb');
     }
 
     const havingClause =
@@ -396,7 +397,7 @@ export function datalogToPostgresSQL(
     }
 
     // Build LIMIT clause
-    const limitClause = query.limit ? `LIMIT ?` : '';
+    const limitClause = query.limit ? 'LIMIT ?' : '';
     if (query.limit) {
       params.push(query.limit);
     }
@@ -435,11 +436,11 @@ export function datalogToPostgresSQL(
 
     // Add filters for bound values
     if (!isVariable(entityVal)) {
-      conditions.push(`e = ?`);
+      conditions.push('e = ?');
       params.push(String(entityVal));
     }
     if (!isVariable(attributeVal)) {
-      conditions.push(`a = ?`);
+      conditions.push('a = ?');
       params.push(String(attributeVal));
     }
     if (!isVariable(valueVal)) {
@@ -447,7 +448,7 @@ export function datalogToPostgresSQL(
       if (value === undefined) {
         value = '__UNDEFINED__';
       }
-      conditions.push(`v = ?::jsonb`);
+      conditions.push('v = ?::jsonb');
       params.push(JSON.stringify(value));
     }
 
@@ -519,21 +520,21 @@ export function datalogToPostgresSQL(
       if (!variableToClause.has(varName)) {
         variableToClause.set(varName, []);
       }
-      variableToClause.get(varName)!.push({clauseIndex: i, field: 'e'});
+      variableToClause.get(varName)?.push({clauseIndex: i, field: 'e'});
     }
     if (isVariable(attributeVal)) {
       const varName = attributeVal as string;
       if (!variableToClause.has(varName)) {
         variableToClause.set(varName, []);
       }
-      variableToClause.get(varName)!.push({clauseIndex: i, field: 'a'});
+      variableToClause.get(varName)?.push({clauseIndex: i, field: 'a'});
     }
     if (isVariable(valueVal)) {
       const varName = valueVal as string;
       if (!variableToClause.has(varName)) {
         variableToClause.set(varName, []);
       }
-      variableToClause.get(varName)!.push({clauseIndex: i, field: 'v'});
+      variableToClause.get(varName)?.push({clauseIndex: i, field: 'v'});
     }
   }
 
@@ -585,7 +586,7 @@ export function datalogToPostgresSQL(
       const columnRef = variableToColumn.get(varName);
       if (columnRef) {
         const sqlAgg = aggregationToSQL(expr, columnRef, outputKey);
-        if (sqlAgg && sqlAgg.sql) {
+        if (sqlAgg?.sql) {
           selectColumns.push(sqlAgg.sql);
         } else {
           // Unsupported aggregation - return null
@@ -620,7 +621,7 @@ export function datalogToPostgresSQL(
   // Build the final SQL query
   // Use _active CTEs which filter to only assertions after DISTINCT ON
   const cteClause = ctes.length > 0 ? `WITH ${ctes.join(', ')}` : '';
-  const fromClause = `FROM d0_active`;
+  const fromClause = 'FROM d0_active';
 
   // Build JOIN clauses
   const joinClauses: string[] = [];
@@ -655,7 +656,8 @@ export function datalogToPostgresSQL(
         // (i.e., has a lower index than the current table)
         // Extract index from alias like "d0_active" -> 0
         const otherIndexMatch = otherAlias.match(/^d(\d+)_active$/);
-        const otherIndex = otherIndexMatch ? parseInt(otherIndexMatch[1]!) : -1;
+        // biome-ignore lint/style/noNonNullAssertion: match[1] is guaranteed to exist when match succeeds
+        const otherIndex = otherIndexMatch ? Number.parseInt(otherIndexMatch[1]!) : -1;
         if (otherIndex < i) {
           // Other table is already joined, include this condition
           // Join conditions already use _active aliases, so use as-is
@@ -751,7 +753,7 @@ export function datalogToPostgresSQL(
     groupByClause = `GROUP BY ${groupByColumns.join(', ')}`;
   }
 
-  const limitClause = query.limit ? `LIMIT ?` : '';
+  const limitClause = query.limit ? 'LIMIT ?' : '';
   if (query.limit) {
     params.push(query.limit);
   }
@@ -779,7 +781,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   private sqlDb: SQLDatabase;
   private tableName: string;
   private maintenanceIntervalId: ReturnType<typeof setInterval> | null = null;
-  private maintenanceRunning: boolean = false;
+  private maintenanceRunning = false;
   private maintenanceConfig?: PostgreSQLMaintenanceConfig;
   private logger?: Logger;
 
@@ -938,6 +940,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Convert to datoms for transaction object
     const allDatoms: Datom[] = [];
     const latestTx = await this._getLatestTransaction();
+    // biome-ignore lint/style/noNonNullAssertion: latestTx.txId is guaranteed to exist for latest transaction
     const txId = latestTx.txId! + 1;
 
     for (const sub of subs) {
@@ -1087,7 +1090,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
-          reject(new QueryTimeoutError(options.timeoutMs!, options));
+          reject(new QueryTimeoutError(options.timeoutMs ?? 0, options));
         }, options.timeoutMs);
       });
 
@@ -1122,7 +1125,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // Get the next transaction ID for speculative datoms
     const latestTx = await this._getLatestTransaction();
-    const speculativeTxId = latestTx.txId! + 1;
+    const speculativeTxId = latestTx.txId + 1;
 
     // Process operations in sequence, creating speculative datoms directly
     const speculativeDatoms: Datom[] = [];
@@ -1624,7 +1627,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       let entity: EntityId = row.e as EntityId;
       if (typeof entity === 'string') {
         if (/^-?\d+$/.test(entity)) {
-          entity = parseInt(entity, 10);
+          entity = Number.parseInt(entity, 10);
         }
       }
 
@@ -1793,8 +1796,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         if (typeof value === 'string') {
           // For numeric strings (aggregation results), convert directly
           if (/^-?\d+$/.test(value)) {
-            const num = parseInt(value, 10);
-            if (!isNaN(num)) {
+            const num = Number.parseInt(value, 10);
+            if (!Number.isNaN(num)) {
               value = num;
             } else {
               // Try JSON parse for other string values
@@ -1818,13 +1821,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         if (typeof value === 'string') {
           // For numeric strings (like aggregation results), try to convert to number first
           if (/^-?\d+$/.test(value)) {
-            const num = parseInt(value, 10);
-            if (!isNaN(num)) {
+            const num = Number.parseInt(value, 10);
+            if (!Number.isNaN(num)) {
               finalValue = num;
             }
           } else if (/^-?\d*\.\d+$/.test(value)) {
-            const num = parseFloat(value);
-            if (!isNaN(num)) {
+            const num = Number.parseFloat(value);
+            if (!Number.isNaN(num)) {
               finalValue = num;
             }
           }
@@ -2444,7 +2447,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       // Apply ordering if specified
       if (modifiedQuery.orderBy) {
         finalResult.sort((a, b) => {
-          for (const [variable, direction] of modifiedQuery.orderBy!) {
+          for (const [variable, direction] of modifiedQuery.orderBy ?? []) {
             const key = stripQuestionMark(variable);
             const aVal = a[key];
             const bVal = b[key];
@@ -2515,7 +2518,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
       if (modifiedQuery.orderBy) {
         projected.sort((a, b) => {
-          for (const [variable, direction] of modifiedQuery.orderBy!) {
+          for (const [variable, direction] of modifiedQuery.orderBy ?? []) {
             const key = stripQuestionMark(variable);
             const aVal = a[key];
             const bVal = b[key];
@@ -2642,7 +2645,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       }
 
       projected.sort((a, b) => {
-        for (const [variable, direction] of modifiedQuery.orderBy!) {
+        for (const [variable, direction] of modifiedQuery.orderBy ?? []) {
           // Map variable to output key, or fall back to stripped variable name
           const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
           const aVal = a[outputKey];
@@ -2664,7 +2667,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
             aNum = aVal;
           } else if (typeof aVal === 'string' && aVal !== '') {
             const parsed = Number(aVal);
-            if (!isNaN(parsed) && isFinite(parsed)) {
+            if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
               aNum = parsed;
             }
           }
@@ -2673,7 +2676,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
             bNum = bVal;
           } else if (typeof bVal === 'string' && bVal !== '') {
             const parsed = Number(bVal);
-            if (!isNaN(parsed) && isFinite(parsed)) {
+            if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
               bNum = parsed;
             }
           }

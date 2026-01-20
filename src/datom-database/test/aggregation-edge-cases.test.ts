@@ -38,11 +38,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['sum']).toBe(0);
-      expect(results[0]!['avg']).toBe(0);
-      expect(results[0]!['max']).toBe(0);
-      expect(results[0]!['min']).toBe(0);
-      expect(results[0]!['count']).toBe(3);
+      expect(results[0]?.sum).toBe(0);
+      expect(results[0]?.avg).toBe(0);
+      expect(results[0]?.max).toBe(0);
+      expect(results[0]?.min).toBe(0);
+      expect(results[0]?.count).toBe(3);
     });
 
     test('should handle aggregations with very large numbers', async () => {
@@ -64,10 +64,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['max']).toBe(largeNumber);
-      expect(results[0]!['min']).toBe(1000);
+      expect(results[0]?.max).toBe(largeNumber);
+      expect(results[0]?.min).toBe(1000);
       // Sum might overflow, so just check it's a number
-      expect(typeof results[0]!['sum']).toBe('number');
+      expect(typeof results[0]?.sum).toBe('number');
     });
 
     test('should handle aggregations with very small numbers', async () => {
@@ -89,9 +89,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['sum']).toBeCloseTo(0.0000006, 7);
-      expect(results[0]!['avg']).toBeCloseTo(0.0000002, 7);
-      expect(results[0]!['max']).toBe(0.0000003);
+      expect(results[0]?.sum).toBeCloseTo(0.0000006, 7);
+      expect(results[0]?.avg).toBeCloseTo(0.0000002, 7);
+      expect(results[0]?.max).toBe(0.0000003);
     });
 
     test('should handle aggregations with mixed positive and negative values summing to zero', async () => {
@@ -114,10 +114,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['sum']).toBe(0);
-      expect(results[0]!['avg']).toBeCloseTo(0, 1);
-      expect(results[0]!['max']).toBe(100);
-      expect(results[0]!['min']).toBe(-50);
+      expect(results[0]?.sum).toBe(0);
+      expect(results[0]?.avg).toBeCloseTo(0, 1);
+      expect(results[0]?.max).toBe(100);
+      expect(results[0]?.min).toBe(-50);
     });
 
     test('should handle count with retractions', async () => {
@@ -141,8 +141,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['count']).toBe(2);
-      expect(results[0]!['distinct']).toBe(2);
+      expect(results[0]?.count).toBe(2);
+      expect(results[0]?.distinct).toBe(2);
     });
 
     test('should handle aggregations with updates (assert over existing)', async () => {
@@ -169,10 +169,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Values: [50, 60, 70, 90]
-      expect(results[0]!['sum']).toBe(270);
-      expect(results[0]!['avg']).toBeCloseTo(67.5, 1);
-      expect(results[0]!['max']).toBe(90);
-      expect(results[0]!['count']).toBe(4);
+      expect(results[0]?.sum).toBe(270);
+      expect(results[0]?.avg).toBeCloseTo(67.5, 1);
+      expect(results[0]?.max).toBe(90);
+      expect(results[0]?.count).toBe(4);
     });
 
     test('should handle variance and stddev with two identical values', async () => {
@@ -193,8 +193,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Variance and stddev of two identical values should be 0
-      expect(results[0]!['variance']).toBe(0);
-      expect(results[0]!['stddev']).toBe(0);
+      expect(results[0]?.variance).toBe(0);
+      expect(results[0]?.stddev).toBe(0);
     });
 
     test('should handle median with two values', async () => {
@@ -214,7 +214,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
       // Median of two values is their average
-      expect(results[0]!['median']).toBe(15);
+      expect(results[0]?.median).toBe(15);
     });
 
     test('should handle aggregations with single value after retractions', async () => {
@@ -244,11 +244,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['sum']).toBe(200);
-      expect(results[0]!['avg']).toBe(200);
-      expect(results[0]!['max']).toBe(200);
-      expect(results[0]!['min']).toBe(200);
-      expect(results[0]!['count']).toBe(1);
+      expect(results[0]?.sum).toBe(200);
+      expect(results[0]?.avg).toBe(200);
+      expect(results[0]?.max).toBe(200);
+      expect(results[0]?.min).toBe(200);
+      expect(results[0]?.count).toBe(1);
     });
   });
 });

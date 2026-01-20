@@ -81,8 +81,8 @@ function parseSSLConfig(connectionString: string): ParsedConnectionConfig {
 export class PgSQLDatabase implements SQLDatabase {
   private pool: Pool;
   private client?: PoolClient;
-  private inTransaction: boolean = false;
-  private closed: boolean = false;
+  private inTransaction = false;
+  private closed = false;
 
   constructor(connectionString: string) {
     const parsed = parseSSLConfig(connectionString);
@@ -116,7 +116,7 @@ export class PgSQLDatabase implements SQLDatabase {
   async query(sql: string, params?: SQLParams): Promise<DatabaseRow[]> {
     const [convertedSql, convertedParams] = this.convertParams(sql, params);
 
-    let result;
+    let result: {rows: DatabaseRow[]};
     if (this.inTransaction && this.client) {
       result = await this.client.query(convertedSql, convertedParams);
     } else {
@@ -142,7 +142,7 @@ export class PgSQLDatabase implements SQLDatabase {
         if (typeof tx === 'bigint') {
           convertedRow.tx = Number(tx);
         } else if (typeof tx === 'string') {
-          convertedRow.tx = parseInt(tx, 10);
+          convertedRow.tx = Number.parseInt(tx, 10);
         }
       }
       const lastTx = convertedRow.last_tx;
@@ -150,7 +150,7 @@ export class PgSQLDatabase implements SQLDatabase {
         if (typeof lastTx === 'bigint') {
           convertedRow.last_tx = Number(lastTx);
         } else if (typeof lastTx === 'string') {
-          convertedRow.last_tx = parseInt(lastTx, 10);
+          convertedRow.last_tx = Number.parseInt(lastTx, 10);
         }
       }
       return convertedRow;

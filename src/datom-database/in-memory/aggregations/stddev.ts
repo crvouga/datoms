@@ -14,7 +14,7 @@ IN_MEMORY_AGGREGATIONS.set('stddev', {
     const mean = numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
     // Calculate variance
     const variance =
-      numericValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / numericValues.length;
+      numericValues.reduce((sum, val) => sum + (val - mean) ** 2, 0) / numericValues.length;
     // Standard deviation is square root of variance
     return Math.sqrt(variance);
   },

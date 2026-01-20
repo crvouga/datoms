@@ -14,9 +14,9 @@ import type {DatabaseRow, SQLParams} from './types.js';
  */
 export class SQLiteSQLDatabase implements SQLDatabase {
   private db: BunDatabase;
-  private inTransaction: boolean = false;
+  private inTransaction = false;
 
-  constructor(filename: string = ':memory:') {
+  constructor(filename = ':memory:') {
     this.db = new BunDatabase(filename);
   }
 

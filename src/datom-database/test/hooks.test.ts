@@ -144,7 +144,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.v).toBe('Alice');
+      expect(results[0]?.v).toBe('Alice');
     });
 
     test('should block query with errors', async () => {
@@ -331,7 +331,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0]!.e).toBe(1);
+      expect(results[0]?.e).toBe(1);
     });
 
     test('should pass context to after-read hook', async () => {
@@ -791,10 +791,10 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
         expect(error).toBeInstanceOf(TransactionError);
         if (error instanceof TransactionError) {
           expect(error.errors).toHaveLength(2);
-          expect(error.errors[0]!.hook).toBe('error-test');
-          expect(error.errors[0]!.message).toBe('Validation failed');
-          expect(error.errors[0]!.code).toBe('VALIDATION_ERROR');
-          expect(error.errors[1]!.message).toBe('Another error');
+          expect(error.errors[0]?.hook).toBe('error-test');
+          expect(error.errors[0]?.message).toBe('Validation failed');
+          expect(error.errors[0]?.code).toBe('VALIDATION_ERROR');
+          expect(error.errors[1]?.message).toBe('Another error');
         }
       }
     });

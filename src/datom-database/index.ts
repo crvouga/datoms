@@ -40,7 +40,7 @@ export {SQLiteDatomDatabase} from './sqlite/sqlite-datom-database.js';
 export type {SQLDatabase} from '../sql-database/sql-database.js';
 
 // Datalog query types
-export {type DatalogQuery, type QueryClause} from '../datalog/datalog.js';
+export type {DatalogQuery, QueryClause} from '../datalog/datalog.js';
 
 // WithResult type (for speculative transactions)
 export type {WithResult} from './datom-database.js';

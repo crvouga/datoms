@@ -33,7 +33,7 @@ export function expectOrderedBy<T extends Record<string, unknown>>(
       }
       if (typeof val === 'string' && val !== '') {
         const parsed = Number(val);
-        if (!isNaN(parsed) && isFinite(parsed)) {
+        if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
           return parsed;
         }
       }

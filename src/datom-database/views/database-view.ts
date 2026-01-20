@@ -87,9 +87,7 @@ export interface DatabaseView {
       string,
       DatalogQueryFindVariable
     >,
-  >(
-    query: DatalogQuery<keyof TFind & string> & {find: TFind},
-  ): Promise<QueryResultEnvelope<TFind>>;
+  >(query: DatalogQuery<keyof TFind & string> & {find: TFind}): Promise<QueryResultEnvelope<TFind>>;
 }
 
 /**

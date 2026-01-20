@@ -14,11 +14,11 @@ import type {DatabaseRow, SQLParams} from './types.js';
  */
 export class PGLiteSQLDatabase implements SQLDatabase {
   private db: PGlite;
-  private inTransaction: boolean = false;
-  private closed: boolean = false;
+  private inTransaction = false;
+  private closed = false;
   private readyPromise: Promise<void>;
 
-  constructor(dataDir: string = 'memory://') {
+  constructor(dataDir = 'memory://') {
     this.db = new PGlite(dataDir, {
       relaxedDurability: true,
     });
@@ -63,7 +63,7 @@ export class PGLiteSQLDatabase implements SQLDatabase {
         if (typeof tx === 'bigint') {
           convertedRow.tx = Number(tx);
         } else if (typeof tx === 'string') {
-          convertedRow.tx = parseInt(tx, 10);
+          convertedRow.tx = Number.parseInt(tx, 10);
         }
       }
       const lastTx = convertedRow.last_tx;
@@ -71,7 +71,7 @@ export class PGLiteSQLDatabase implements SQLDatabase {
         if (typeof lastTx === 'bigint') {
           convertedRow.last_tx = Number(lastTx);
         } else if (typeof lastTx === 'string') {
-          convertedRow.last_tx = parseInt(lastTx, 10);
+          convertedRow.last_tx = Number.parseInt(lastTx, 10);
         }
       }
       return convertedRow;

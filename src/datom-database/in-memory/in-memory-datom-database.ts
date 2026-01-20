@@ -120,6 +120,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     // Convert to datoms for transaction object
     const allDatoms: Datom[] = [];
     const latestTx = await this._getLatestTransaction();
+    // biome-ignore lint/style/noNonNullAssertion: latestTx.txId is guaranteed to exist for latest transaction
     const txId = latestTx.txId! + 1;
 
     for (const sub of subs) {
@@ -222,6 +223,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
+    // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
     const speculativeTxId = (await this._getLatestTransaction()).txId! + 1;
 
     // Process operations in sequence, creating speculative datoms directly
@@ -283,6 +285,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
+          // biome-ignore lint/style/noNonNullAssertion: timeoutMs is required when timeoutPromise is created
           reject(new QueryTimeoutError(options.timeoutMs!, options));
         }, options.timeoutMs);
       });
@@ -585,7 +588,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       if (!datomsByEntityAttribute.has(key)) {
         datomsByEntityAttribute.set(key, []);
       }
-      datomsByEntityAttribute.get(key)!.push(datom);
+      datomsByEntityAttribute.get(key)?.push(datom);
     }
 
     // For each (e, a) pair, keep only the latest N datoms
@@ -632,7 +635,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       if (!datomsByKey.has(key)) {
         datomsByKey.set(key, []);
       }
-      datomsByKey.get(key)!.push(datom);
+      datomsByKey.get(key)?.push(datom);
     }
 
     // For each (e, a, v) group, find the latest transaction
@@ -847,6 +850,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       }
 
       projected.sort((a, b) => {
+        // biome-ignore lint/style/noNonNullAssertion: orderBy is guaranteed to exist when sorting
         for (const [variable, direction] of modifiedQuery.orderBy!) {
           // Map variable to output key, or fall back to stripped variable name
           const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
@@ -873,7 +877,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
             aNum = aVal;
           } else if (typeof aVal === 'string' && aVal !== '') {
             const parsed = Number(aVal);
-            if (!isNaN(parsed) && isFinite(parsed)) {
+            if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
               aNum = parsed;
             }
           }
@@ -882,7 +886,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
             bNum = bVal;
           } else if (typeof bVal === 'string' && bVal !== '') {
             const parsed = Number(bVal);
-            if (!isNaN(parsed) && isFinite(parsed)) {
+            if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
               bNum = parsed;
             }
           }

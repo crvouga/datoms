@@ -11,8 +11,8 @@ IN_MEMORY_AGGREGATIONS.set('sample', {
     if (values.length === 0) {
       return null;
     }
-    const count = countStr ? parseInt(countStr, 10) : 1;
-    if (isNaN(count) || count <= 0) {
+    const count = countStr ? Number.parseInt(countStr, 10) : 1;
+    if (Number.isNaN(count) || count <= 0) {
       return null;
     }
 

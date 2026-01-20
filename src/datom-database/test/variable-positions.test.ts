@@ -32,9 +32,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2);
-      const entities = results.map(r => r['e']).sort();
+      const entities = results.map(r => r.e).sort();
       expect(entities).toEqual([1, 2]);
-      const values = results.map(r => r['v']).sort();
+      const values = results.map(r => r.v).sort();
       expect(values).toEqual(['Alice', 'Bob']);
     });
 
@@ -54,9 +54,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(2);
-      const attrs = results.map(r => r['attr']).sort();
+      const attrs = results.map(r => r.attr).sort();
       expect(attrs).toEqual(['age', 'name']);
-      const values = results.map(r => r['v']).sort();
+      const values = results.map(r => r.v).sort();
       expect(values).toEqual([30, 'Alice']);
     });
 
@@ -78,9 +78,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(results).toHaveLength(4);
       // Verify we get all entity-attribute-value combinations
       const combinations = results.map(r => ({
-        e: r['e'],
-        a: r['attr'],
-        v: r['v'],
+        e: r.e,
+        a: r.attr,
+        v: r.v,
       }));
       expect(combinations).toContainEqual({e: 1, a: 'name', v: 'Alice'});
       expect(combinations).toContainEqual({e: 1, a: 'age', v: 30});

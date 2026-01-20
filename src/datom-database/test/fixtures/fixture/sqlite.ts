@@ -1,4 +1,4 @@
-import {unlinkSync} from 'fs';
+import {unlinkSync} from 'node:fs';
 import type {Fixture} from '../fixture.js';
 import {SQLiteSQLDatabase} from '../../../../sql-database/sql-database-sqlite.js';
 import {SQLiteDatomDatabase} from '../../../sqlite/sqlite-datom-database.js';

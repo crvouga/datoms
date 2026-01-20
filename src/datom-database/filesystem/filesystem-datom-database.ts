@@ -207,7 +207,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
         const v = this._parseValue(vStr);
         const tx = Number.parseInt(txStr, 10);
 
-        if (isNaN(tx) || (op !== 'assert' && op !== 'retract')) {
+        if (Number.isNaN(tx) || (op !== 'assert' && op !== 'retract')) {
           continue; // Skip invalid rows
         }
 
@@ -277,7 +277,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
    */
   private _parseEntityId(str: string): EntityId {
     const num = Number.parseFloat(str);
-    if (!isNaN(num) && Number.isFinite(num) && str.trim() === String(num)) {
+    if (!Number.isNaN(num) && Number.isFinite(num) && str.trim() === String(num)) {
       return num;
     }
     return str;
@@ -310,7 +310,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
 
     // Try to parse as number
     const num = Number.parseFloat(str);
-    if (!isNaN(num) && Number.isFinite(num) && str.trim() === String(num)) {
+    if (!Number.isNaN(num) && Number.isFinite(num) && str.trim() === String(num)) {
       return num;
     }
 
@@ -355,7 +355,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
         ].join(',');
       });
 
-      const csvContent = [header, ...rows].join('\n') + '\n';
+      const csvContent = `${[header, ...rows].join('\n')}\n`;
       await Bun.write(this.filePath, csvContent);
     } catch (error) {
       // Log error but don't throw to avoid breaking transactions
@@ -376,19 +376,20 @@ export class FileSystemDatomDatabase implements DatomDatabase {
     }
 
     // For complex values, stringify as JSON
+    let processedVal = val;
     if (
       typeof val === 'object' ||
       typeof val === 'boolean' ||
       (typeof val === 'number' && !Number.isFinite(val))
     ) {
-      val = JSON.stringify(val);
+      processedVal = JSON.stringify(val);
     }
 
-    let str = String(val);
+    let str = String(processedVal);
 
     // Escape double quotes by doubling them and wrap in quotes if needed
     if (/["\n,]/.test(str)) {
-      str = '"' + str.replace(/"/g, '""') + '"';
+      str = `"${str.replace(/"/g, '""')}"`;
     }
 
     return str;

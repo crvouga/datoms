@@ -164,6 +164,7 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
 
       const latestTx = await f.db._getLatestTransaction();
       // Total: 10 initial + 3 updates (v2-v4) + 6 updates (v5-v10) = 19 transactions
+      // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
       expect(latestTx.txId!).toBeGreaterThanOrEqual(19);
 
       const result = await policy.execute();
@@ -203,6 +204,7 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       }
 
       const latestTx = await f.db._getLatestTransaction();
+      // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
       expect(latestTx.txId!).toBeGreaterThanOrEqual(10);
 
       const result = await policy.execute();
@@ -501,6 +503,7 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       await f.db.transact([{op: 'assert', e: 1, a: 'name', v: 'Alice Latest'}]);
 
       const latestTx = await f.db._getLatestTransaction();
+      // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
       expect(latestTx.txId!).toBeGreaterThanOrEqual(4);
 
       const result = await policy.execute();

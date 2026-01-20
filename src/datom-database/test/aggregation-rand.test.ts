@@ -32,14 +32,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      const randomValues = results[0]!['random'];
+      const randomValues = results[0]?.random;
       expect(randomValues).toBeDefined();
       expect(Array.isArray(randomValues)).toBe(true);
       expect((randomValues as unknown as number[]).length).toBe(3);
       // All values should be from the set
-      (randomValues as unknown as number[]).forEach(val => {
+      for (const val of randomValues as unknown as number[]) {
         expect([10, 20, 30]).toContain(val);
-      });
+      }
     });
 
     test('should return null for empty results', async () => {
@@ -51,7 +51,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      expect(results[0]!['random'] === null || results[0]!['random'] === undefined).toBe(true);
+      expect(results[0]?.random === null || results[0]?.random === undefined).toBe(true);
     });
 
     test('should return single value when N=1', async () => {
@@ -69,7 +69,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      const randomValue = results[0]!['random'];
+      const randomValue = results[0]?.random;
       expect(randomValue).toBeDefined();
       expect([10, 20, 30]).toContain(randomValue as number);
       expect(Array.isArray(randomValue)).toBe(false);
@@ -89,13 +89,13 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      const randomValues = results[0]!['random'];
+      const randomValues = results[0]?.random;
       expect(Array.isArray(randomValues)).toBe(true);
       expect((randomValues as unknown as number[]).length).toBe(5);
       // Should allow duplicates (with replacement)
-      (randomValues as unknown as number[]).forEach(val => {
+      for (const val of randomValues as unknown as number[]) {
         expect([10, 20]).toContain(val);
-      });
+      }
     });
 
     test('should work with string values', async () => {
@@ -113,12 +113,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      const randomValues = results[0]!['random'];
+      const randomValues = results[0]?.random;
       expect(Array.isArray(randomValues)).toBe(true);
       expect((randomValues as unknown as string[]).length).toBe(2);
-      (randomValues as unknown as string[]).forEach(val => {
+      for (const val of randomValues as unknown as string[]) {
         expect(['Alice', 'Bob', 'Charlie']).toContain(val);
-      });
+      }
     });
 
     test('should work with filters', async () => {
@@ -142,12 +142,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query(query);
       expect(results).toHaveLength(1);
-      const randomValues = results[0]!['random'];
+      const randomValues = results[0]?.random;
       expect(Array.isArray(randomValues)).toBe(true);
       expect((randomValues as unknown as number[]).length).toBe(3);
-      (randomValues as unknown as number[]).forEach(val => {
+      for (const val of randomValues as unknown as number[]) {
         expect([100, 200]).toContain(val);
-      });
+      }
     });
   });
 });
