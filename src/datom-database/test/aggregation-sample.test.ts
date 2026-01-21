@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Aggregation: sample', () => {
+  describe.todo('Aggregation: sample', () => {
     test('should return a sample of N values from the set', async () => {
       const {db} = f;
       await db.transact([

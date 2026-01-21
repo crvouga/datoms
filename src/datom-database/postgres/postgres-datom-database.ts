@@ -618,72 +618,19 @@ function datalogToPostgresSQL(
     }
   }
 
-  // Build aggregation SELECT columns
-  // First check if we have any aggregations
-  const hasAggregations = Object.values(query.find).some(expr => parseAggregation(expr));
-  const groupByColumns: string[] = [];
-  const findKeys = Object.keys(query.find);
-  for (const outputKey of findKeys) {
-    const expr = query.find[outputKey];
-    const agg = parseAggregation(expr);
-
-    if (agg) {
-      // This is an aggregation - convert to SQL
-      const varName = agg.variable;
-      const columnRef = variableToColumn.get(varName);
-      if (columnRef) {
-        const sqlAgg = aggregationToSQL(expr, columnRef, outputKey);
-        if (sqlAgg?.sql) {
-          selectColumns.push(sqlAgg.sql);
-        } else {
-          // Unsupported aggregation - return null
-          selectColumns.push(`NULL AS "${outputKey}"`);
-        }
-      } else {
-        // Variable not found - return null
-        selectColumns.push(`NULL AS "${outputKey}"`);
-      }
-    } else {
-      // Regular variable - include in SELECT
-      let varName: string;
-      if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === 'string') {
-        varName = expr[0];
-      } else if (typeof expr === 'string') {
-        varName = expr;
-      } else {
-        continue;
-      }
-
-      // Special handling for op and tx fields that are not in where clause but may be in find clause
-      if (varName === '?op') {
-        // op is available from the first CTE (d0_active)
-        selectColumns.push(`d0_active.op AS "${outputKey}"`);
-        if (hasAggregations) {
-          groupByColumns.push('d0_active.op');
-        }
-      } else if (varName === '?tx') {
-        // tx is available from the first CTE (d0_active)
-        selectColumns.push(`d0_active.tx AS "${outputKey}"`);
-        if (hasAggregations) {
-          groupByColumns.push('d0_active.tx');
-        }
-      } else {
-        const columnRef = variableToColumn.get(varName);
-        if (columnRef) {
-          selectColumns.push(`${columnRef} AS "${outputKey}"`);
-          // Only add to GROUP BY if we have aggregations (required by SQL)
-          if (hasAggregations) {
-            groupByColumns.push(columnRef);
-          }
-        }
-      }
-    }
-  }
-
   // Build the final SQL query
   // Use _active CTEs which filter to only trueions after DISTINCT ON
   const cteClause = ctes.length > 0 ? `WITH ${ctes.join(', ')}` : '';
-  const fromClause = 'FROM d0_active';
+
+  // When we have aggregations on different variables from different tables,
+  // we need to ensure we're aggregating over distinct entity rows to avoid
+  // counting duplicates. Wrap the joined tables in a subquery that ensures
+  // each entity appears only once.
+  const hasAggregations = Object.values(query.find).some(expr => parseAggregation(expr));
+  const needsDistinctAggregation = hasAggregations && patternClauses.length > 1;
+
+  let fromClause = 'FROM d0_active';
+  let joinClause = '';
 
   // Build JOIN clauses
   const joinClauses: string[] = [];
@@ -761,7 +708,146 @@ function datalogToPostgresSQL(
     }
   }
 
-  const joinClause = joinClauses.join(' ');
+  joinClause = joinClauses.join(' ');
+
+  // If we have aggregations on different variables from different tables,
+  // wrap the joined result in a subquery with DISTINCT to ensure each entity
+  // appears only once before aggregation
+  const findKeys = Object.keys(query.find);
+  if (needsDistinctAggregation) {
+    // Find the entity variable that's shared across clauses
+    let entityVar: string | null = null;
+    for (let i = 0; i < patternClauses.length; i++) {
+      const clause = patternClauses[i];
+      if (!clause || !isQueryPattern(clause)) continue;
+      const {e: entityVal} = clause;
+      if (isVariable(entityVal)) {
+        if (entityVar === null) {
+          entityVar = entityVal as string;
+        } else if (entityVar !== entityVal) {
+          // Multiple different entity variables - can't use distinct entity approach
+          entityVar = null;
+          break;
+        }
+      }
+    }
+
+    if (entityVar) {
+      // Build a subquery that selects one row per entity with all needed columns
+      // Use MAX or MIN aggregation to pick one value per entity (they should all be the same)
+      const entityColName = stripQuestionMark(entityVar);
+      const distinctSelects: string[] = [];
+
+      // Add entity column
+      distinctSelects.push(`d0_active.e AS "${entityColName}"`);
+
+      // Add all value columns that are used in aggregations
+      // Use MAX to pick one value per entity (they should all be the same after the join)
+      // Update variableToColumn to point to the new column references
+      for (const outputKey of findKeys) {
+        const expr = query.find[outputKey];
+        const agg = parseAggregation(expr);
+        if (agg) {
+          const varName = agg.variable;
+          const columnRef = variableToColumn.get(varName);
+          if (columnRef) {
+            // Get the table alias and column from the column reference
+            const match = columnRef.match(/^(d\d+)_active\.(.+)$/);
+            if (match?.[1] && match[2]) {
+              const tableAlias = match[1];
+              const column = match[2];
+              const varColName = stripQuestionMark(varName);
+              // Use MAX to pick one value per entity (they should all be the same)
+              // For JSONB columns, we need to handle them specially
+              if (column === 'v') {
+                distinctSelects.push(`MAX(${tableAlias}_active.${column}) AS "${varColName}"`);
+              } else {
+                distinctSelects.push(`MAX(${tableAlias}_active.${column}) AS "${varColName}"`);
+              }
+              // Update variableToColumn to point to the new column reference in the subquery
+              variableToColumn.set(varName, `distinct_entities."${varColName}"`);
+            }
+          }
+        }
+      }
+
+      // Also update entity variable reference
+      if (entityVar) {
+        variableToColumn.set(entityVar, `distinct_entities."${entityColName}"`);
+      }
+
+      // Wrap the joined tables in a subquery with GROUP BY entity
+      // This ensures exactly one row per entity
+      fromClause = `FROM (
+        SELECT 
+          ${distinctSelects.join(', ')}
+        FROM d0_active
+        ${joinClause}
+        GROUP BY d0_active.e
+      ) AS distinct_entities`;
+      joinClause = ''; // No more joins needed after the subquery
+    }
+  }
+
+  // Build aggregation SELECT columns
+  // First check if we have any aggregations
+  const groupByColumns: string[] = [];
+  for (const outputKey of findKeys) {
+    const expr = query.find[outputKey];
+    const agg = parseAggregation(expr);
+
+    if (agg) {
+      // This is an aggregation - convert to SQL
+      const varName = agg.variable;
+      const columnRef = variableToColumn.get(varName);
+      if (columnRef) {
+        const sqlAgg = aggregationToSQL(expr, columnRef, outputKey);
+        if (sqlAgg?.sql) {
+          selectColumns.push(sqlAgg.sql);
+        } else {
+          // Unsupported aggregation - return null
+          selectColumns.push(`NULL AS "${outputKey}"`);
+        }
+      } else {
+        // Variable not found - return null
+        selectColumns.push(`NULL AS "${outputKey}"`);
+      }
+    } else {
+      // Regular variable - include in SELECT
+      let varName: string;
+      if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === 'string') {
+        varName = expr[0];
+      } else if (typeof expr === 'string') {
+        varName = expr;
+      } else {
+        continue;
+      }
+
+      // Special handling for op and tx fields that are not in where clause but may be in find clause
+      if (varName === '?op') {
+        // op is available from the first CTE (d0_active)
+        selectColumns.push(`d0_active.op AS "${outputKey}"`);
+        if (hasAggregations) {
+          groupByColumns.push('d0_active.op');
+        }
+      } else if (varName === '?tx') {
+        // tx is available from the first CTE (d0_active)
+        selectColumns.push(`d0_active.tx AS "${outputKey}"`);
+        if (hasAggregations) {
+          groupByColumns.push('d0_active.tx');
+        }
+      } else {
+        const columnRef = variableToColumn.get(varName);
+        if (columnRef) {
+          selectColumns.push(`${columnRef} AS "${outputKey}"`);
+          // Only add to GROUP BY if we have aggregations (required by SQL)
+          if (hasAggregations) {
+            groupByColumns.push(columnRef);
+          }
+        }
+      }
+    }
+  }
 
   // Build ORDER BY clause
   // Use variableToColumn map to ensure we reference columns from tables that are definitely joined

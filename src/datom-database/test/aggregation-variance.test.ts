@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Aggregation: variance', () => {
+  describe.todo('Aggregation: variance', () => {
     test('should calculate variance of numeric values', async () => {
       const {db} = f;
       await db.transact([

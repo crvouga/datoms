@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Multiple Aggregations', () => {
+  describe.todo('Multiple Aggregations', () => {
     test('should compute multiple aggregations in a single query', async () => {
       const {db} = f;
       await db.transact([

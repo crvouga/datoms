@@ -296,7 +296,6 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           {e: '?e', a: 'department', v: 'Engineering'},
         ],
       });
-
       expect(results).toHaveLength(2);
       const names = results.map(r => r.name).sort();
       expect(names).toEqual(['Alice', 'Charlie']);

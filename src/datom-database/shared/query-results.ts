@@ -38,7 +38,6 @@ export function joinResults(
 
   // If there are shared non-metadata variables, exclude ?e from compatibility check
   // Otherwise, include ?e in the compatibility check (for cases where ?e is the join key)
-  const excludeE = sharedNonMetadataVars.size > 0;
 
   for (const leftRow of left) {
     for (const rightRow of right) {
@@ -46,6 +45,7 @@ export function joinResults(
       let compatible = true;
 
       // First, check shared non-metadata variables if they exist
+      // If these match, the join is compatible (we allow ?e to differ in this case)
       if (sharedNonMetadataVars.size > 0) {
         for (const key of sharedNonMetadataVars) {
           if (key in leftRow && key in rightRow && leftRow[key] !== rightRow[key]) {
@@ -54,18 +54,20 @@ export function joinResults(
           }
         }
         if (!compatible) continue;
-      }
-
-      // Then check ?e if it should be checked (when there are no other shared variables)
-      if (!excludeE && '?e' in leftRow && '?e' in rightRow) {
-        if (leftRow['?e'] !== rightRow['?e']) {
-          compatible = false;
+      } else {
+        // No shared non-metadata variables - require ?e to match for compatibility
+        // ?e is always present in both rows, so we need to check if values match
+        const leftE = leftRow['?e'];
+        const rightE = rightRow['?e'];
+        if (leftE === undefined || rightE === undefined || leftE !== rightE) {
+          continue; // Skip this row pair - ?e doesn't match or is not present
         }
+        // If we reach here, ?e matches, so rows are compatible
+        compatible = true;
       }
 
       // Always skip ?a, ?v, and ?tx - they represent different attributes, values,
       // or transaction metadata in different clauses and should not prevent joining
-      // (We've already handled ?e and shared variables above)
 
       if (compatible) {
         joined.push({...leftRow, ...rightRow});
