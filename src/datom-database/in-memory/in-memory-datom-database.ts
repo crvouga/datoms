@@ -18,6 +18,7 @@ import {
   TransactionError,
   type Hook,
   type ReadContext,
+  type DatomsReadContext,
   type WriteContext,
   type WriteResult,
 } from '../hook/hook.js';
@@ -683,31 +684,55 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     const startTime = performance.now();
     const metadata: Record<string, unknown> = {};
 
+    // Create datoms read context for hooks
+    const {db: _, query: __, ...restContext} = options.context || {};
+    const ctx: DatomsReadContext = {
+      ...restContext,
+      db: this,
+      query: options,
+    };
+
+    // Run before-datoms-read hooks
+    const beforeResult = await this.hooks.runBeforeDatomsRead(options, ctx);
+
+    if (beforeResult.errors.length > 0) {
+      throw new QueryError('Datoms query blocked by hooks', beforeResult.errors);
+    }
+
+    const modifiedOptions = beforeResult.query;
+
     let result: Datom[];
 
     if (viewConfig.type === 'current') {
-      result = await this._executeCurrentQuery(options);
+      result = await this._executeCurrentQuery(modifiedOptions);
     } else if (viewConfig.type === 'asOf') {
-      result = await this._executeAsOfQuery(options, viewConfig.txId);
+      result = await this._executeAsOfQuery(modifiedOptions, viewConfig.txId);
     } else if (viewConfig.type === 'since') {
-      result = await this._executeSinceQuery(options, viewConfig.txId);
+      result = await this._executeSinceQuery(modifiedOptions, viewConfig.txId);
     } else if (viewConfig.type === 'history') {
-      result = await this._executeHistoryQuery(options);
+      result = await this._executeHistoryQuery(modifiedOptions);
     } else if (viewConfig.type === 'speculative') {
-      result = await this._executeSpeculativeQuery(options, viewConfig.datoms);
+      result = await this._executeSpeculativeQuery(modifiedOptions, viewConfig.datoms);
     } else {
       // TypeScript exhaustiveness check
       const _exhaustive: never = viewConfig;
       throw new Error(`Unknown view config type: ${(_exhaustive as ViewConfig).type}`);
     }
 
+    // Run after-datoms-read hooks
+    const afterResult = await this.hooks.runAfterDatomsRead(result, ctx);
+
+    if (afterResult.errors.length > 0) {
+      throw new QueryError('Datoms query blocked by after-read hooks', afterResult.errors);
+    }
+
     const executionTime = performance.now() - startTime;
     metadata.executionTimeMs = executionTime;
-    metadata.resultCount = result.length;
+    metadata.resultCount = afterResult.datoms.length;
     metadata.executionStrategy = 'in-memory';
 
     return {
-      data: result,
+      data: afterResult.datoms,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     };
   }
@@ -762,7 +787,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       };
     }
 
-    // Extract all datoms from all clauses for afterRead hooks
+    // Extract all datoms needed for query execution
     const allDatomsSet = new Set<string>();
     const allDatoms: Datom[] = [];
 
@@ -795,14 +820,7 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       }
     }
 
-    // Run after-read hooks
-    const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
-
-    if (afterResult.errors && afterResult.errors.length > 0) {
-      throw new QueryError('Query blocked by after-read hooks', afterResult.errors);
-    }
-
-    // Now execute the query with filtered datoms
+    // Now execute the query
     // Start with the first clause
     const firstClause = modifiedQuery.where[0];
     if (!firstClause) {
@@ -812,21 +830,18 @@ export class InMemoryDatomDatabase implements DatomDatabase {
         metadata: {
           executionTimeMs: executionTime,
           resultCount: 0,
-          executionStrategy: 'in-memory-filtered-datoms',
+          executionStrategy: 'in-memory',
         },
       };
     }
-    const firstResults = await this._executeClauseWithFilteredDatoms(
-      firstClause,
-      afterResult.datoms,
-    );
+    const firstResults = await this._executeClauseWithFilteredDatoms(firstClause, allDatoms);
 
     // Join with remaining clauses
     let results = firstResults;
     for (let i = 1; i < modifiedQuery.where.length; i++) {
       const clause = modifiedQuery.where[i];
       if (!clause) continue;
-      const clauseResults = await this._executeClauseWithFilteredDatoms(clause, afterResult.datoms);
+      const clauseResults = await this._executeClauseWithFilteredDatoms(clause, allDatoms);
       results = joinResults(results, clauseResults, modifiedQuery.where.slice(0, i + 1));
     }
 
@@ -916,13 +931,20 @@ export class InMemoryDatomDatabase implements DatomDatabase {
       finalResult = finalResult.slice(0, modifiedQuery.limit) as QueryResult<TFind>;
     }
 
+    // Run after-read hooks on QueryResult
+    const afterResult = await this.hooks.runAfterRead(finalResult, ctx);
+
+    if (afterResult.errors.length > 0) {
+      throw new QueryError('Query blocked by after-read hooks', afterResult.errors);
+    }
+
     const executionTime = performance.now() - startTime;
     metadata.executionTimeMs = executionTime;
-    metadata.resultCount = finalResult.length;
-    metadata.executionStrategy = 'in-memory-filtered-datoms';
+    metadata.resultCount = afterResult.results.length;
+    metadata.executionStrategy = 'in-memory';
 
     return {
-      data: finalResult,
+      data: afterResult.results,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     };
   }

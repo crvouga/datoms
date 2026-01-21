@@ -1,8 +1,9 @@
 import {records, type Attribute, type Datom, type Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {DatomDatabase} from '../datom-database.js';
-import type {Hook} from '../hook/hook.js';
+import type {AfterRead, AfterDatomsRead, Hook} from '../hook/hook.js';
 import {HookValidator} from '../hook/validator.js';
+import type {QueryResult} from '../views/database-view.js';
 
 // Schema constants
 export const USER_TYPE = 'user/type';
@@ -31,73 +32,78 @@ export const POST_STATUS_PUBLISHED = 'published';
 // ============================================================================
 
 /**
- * Post access control hook
- * Filters post datoms based on user role and ownership:
+ * Post access control hook for query results
+ * Filters post query results based on user role and ownership:
  * - Admins can see all posts
  * - Authors can see their own posts (published or draft)
  * - Authors can see published posts from other authors
  * - Readers can only see published posts
  */
-export const POST_ACCESS_CONTROL: Hook = {
+export const POST_ACCESS_CONTROL: AfterRead = {
   type: 'afterRead',
   name: 'post-access-control',
-  async execute(datoms, ctx) {
-    const {db} = ctx;
-    const userId = ctx.userId as number | undefined;
-    const userType = ctx.userType as string | undefined;
+  async execute(results, ctx) {
+    const {db, query} = ctx;
+    const userId = query.context?.userId as number | undefined;
+    const userType = query.context?.userType as string | undefined;
 
     // If no user context, block all posts
     if (!userId || !userType) {
       return {
-        datoms: datoms.filter((d: Datom) => d.a !== POST_TITLE),
+        results: results.filter((r: Record<string, unknown>) => {
+          // Filter out results that look like posts (have 'title' or 'status' fields)
+          return !('title' in r) && !('status' in r);
+        }) as QueryResult<typeof query.find>,
       };
     }
 
-    // Get all post-related datoms
-    const postDatoms = datoms.filter(
-      (d: Datom) =>
-        d.a === POST_TITLE || d.a === POST_CONTENT || d.a === POST_STATUS || d.a === POST_AUTHOR,
-    );
+    // Extract post entities from results
+    // Results have 'e' (entity ID) and may have 'title' and/or 'status' fields
+    const postEntities = new Set<EntityId>();
+    const postStatusMap = new Map<EntityId, string>();
 
-    // Get non-post datoms (always allow)
-    const nonPostDatoms = datoms.filter(
-      (d: Datom) =>
-        d.a !== POST_TITLE && d.a !== POST_CONTENT && d.a !== POST_STATUS && d.a !== POST_AUTHOR,
-    );
-
-    // Group post datoms by entity ID
-    const postEntities = new Set<EntityId>(postDatoms.map(d => d.e));
-    const postData = new Map<EntityId, Record<Attribute, Value>>();
-
-    // Convert post datoms to records grouped by entity
-    for (const postId of postEntities) {
-      const entityDatoms = postDatoms.filter(d => d.e === postId);
-      const entityRecords = records(entityDatoms);
-      const firstRecord = entityRecords[0];
-      if (firstRecord) {
-        postData.set(postId, firstRecord);
+    for (const result of results) {
+      const r = result as Record<string, unknown>;
+      const entityId = r.e as EntityId | undefined;
+      // If result has 'title' or 'status', it's a post
+      if (entityId !== undefined && ('title' in r || 'status' in r)) {
+        postEntities.add(entityId);
+        if ('status' in r && r.status !== undefined) {
+          postStatusMap.set(entityId, r.status as string);
+        }
       }
     }
 
-    // Fetch missing author/status information from database for posts that don't have it
+    // Fetch author and status information for all posts
+    // (author is never in query results, status might be missing)
+    const postAuthorMap = new Map<EntityId, number>();
     for (const postId of postEntities) {
-      const data = postData.get(postId) || {};
-      if (!(POST_AUTHOR in data) || !(POST_STATUS in data)) {
-        const {data: postEntityDatoms} = await db.datoms({e: postId});
-        const existingRecords = records(postEntityDatoms);
-        if (existingRecords.length > 0) {
-          // Merge existing record data into current data
-          Object.assign(data, existingRecords[0]);
-          postData.set(postId, data);
+      // Fetch author
+      const {data: authorDatoms} = await db.datoms({e: postId, a: POST_AUTHOR});
+      if (authorDatoms.length > 0) {
+        const author = authorDatoms[0]?.v as number | undefined;
+        if (author !== undefined) {
+          postAuthorMap.set(postId, author);
+        }
+      }
+
+      // Fetch status if not already in results
+      if (!postStatusMap.has(postId)) {
+        const {data: statusDatoms} = await db.datoms({e: postId, a: POST_STATUS});
+        if (statusDatoms.length > 0) {
+          const status = statusDatoms[0]?.v as string | undefined;
+          if (status !== undefined) {
+            postStatusMap.set(postId, status);
+          }
         }
       }
     }
 
     // Filter posts based on access rules
     const allowedPosts = new Set<EntityId>();
-    for (const [postId, data] of postData.entries()) {
-      const author = data[POST_AUTHOR] as number | undefined;
-      const status = data[POST_STATUS] as string | undefined;
+    for (const postId of postEntities) {
+      const author = postAuthorMap.get(postId);
+      const status = postStatusMap.get(postId);
 
       // Admins can see all posts
       if (userType === USER_TYPE_ADMIN) {
@@ -117,11 +123,19 @@ export const POST_ACCESS_CONTROL: Hook = {
       }
     }
 
-    // Filter datoms to only include allowed posts
-    const filteredPostDatoms = postDatoms.filter(d => allowedPosts.has(d.e));
+    // Filter results to only include allowed posts
+    const filteredResults = results.filter((r: Record<string, unknown>) => {
+      const entityId = r.e as EntityId | undefined;
+      // If it's not a post entity, allow it
+      if (entityId === undefined || !postEntities.has(entityId)) {
+        return true;
+      }
+      // If it's a post entity, check if it's allowed
+      return allowedPosts.has(entityId);
+    }) as QueryResult<typeof query.find>;
 
     return {
-      datoms: [...nonPostDatoms, ...filteredPostDatoms],
+      results: filteredResults,
     };
   },
 };

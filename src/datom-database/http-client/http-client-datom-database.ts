@@ -17,6 +17,7 @@ import {
   QueryTimeoutError,
   TransactionError,
   type ReadContext,
+  type DatomsReadContext,
   type WriteContext,
   type WriteResult,
 } from '../hook/hook.js';
@@ -333,12 +334,17 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     const modifiedQuery = beforeResult.query as DatalogQuery<keyof TFind & string> & {find: TFind};
 
     // Forward modified query to server - server handles timeout and result size validation
-    // Note: After-read hooks are not run for query() since results are structured QueryResult,
-    // not raw datoms. After-read hooks operate on Datom[] and are more appropriate for datoms()
     const results = await this._queryInternal(modifiedQuery, context, viewConfig);
 
+    // Run after-read hooks on QueryResult
+    const afterResult = await this.hooks.runAfterRead(results, ctx);
+
+    if (afterResult.errors.length > 0) {
+      throw new QueryError('Query blocked by after-read hooks', afterResult.errors);
+    }
+
     return {
-      data: results,
+      data: afterResult.results,
     };
   }
 
@@ -355,13 +361,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         viewConfig,
       });
       // Server returns QueryResult which matches our expected type
-      const results = response.results;
-      await this.hooks.runAfterRead([], {
-        db: this,
-        query: query,
-        context: context,
-      });
-      return results as unknown as QueryResult<TFind>;
+      return response.results as unknown as QueryResult<TFind>;
     } catch (error) {
       const mappedError = this._mapHttpError(error);
       if (mappedError.code === 'QUERY_TIMEOUT') {
@@ -395,30 +395,35 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     const startTime = performance.now();
     const metadata: Record<string, unknown> = {};
 
-    // Create read context for hooks
+    // Create datoms read context for hooks
     const {db: _, query: __, ...restContext} = options.context || {};
-    const ctx: ReadContext = {
+    const ctx: DatomsReadContext = {
       ...restContext,
       db: this,
-      query: {
-        find: {},
-        where: [],
-        context: options.context,
-      },
+      query: options,
     };
+
+    // Run before-datoms-read hooks
+    const beforeResult = await this.hooks.runBeforeDatomsRead(options, ctx);
+
+    if (beforeResult.errors.length > 0) {
+      throw new QueryError('Datoms query blocked by hooks', beforeResult.errors);
+    }
+
+    const modifiedOptions = beforeResult.query;
 
     try {
       const response = await this.httpClient.post<DatomsResponse>(this.endpoint, {
         method: 'datoms',
-        options,
+        options: modifiedOptions,
         viewConfig,
       });
 
-      // Run after-read hooks on datoms from server
-      const afterResult = await this.hooks.runAfterRead(response.datoms, ctx);
+      // Run after-datoms-read hooks on datoms from server
+      const afterResult = await this.hooks.runAfterDatomsRead(response.datoms, ctx);
 
-      if (afterResult.errors && afterResult.errors.length > 0) {
-        throw new QueryError('Query blocked by after-read hooks', afterResult.errors);
+      if (afterResult.errors.length > 0) {
+        throw new QueryError('Datoms query blocked by after-read hooks', afterResult.errors);
       }
 
       const executionTime = performance.now() - startTime;

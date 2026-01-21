@@ -88,9 +88,9 @@ export function createLoggedDatabaseWithHooks(
   const afterReadHook: AfterRead = {
     type: 'afterRead',
     name: 'query-editor-logging-after-read',
-    execute: async (datoms, _ctx) => {
+    execute: async (results, _ctx) => {
       // Hook timing is tracked, but actual results captured in wrapped method
-      return {datoms};
+      return {results};
     },
   };
 

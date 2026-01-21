@@ -3,10 +3,10 @@
  * Supports before-read, after-read, before-write, and after-write hooks
  */
 
-import type {DatalogQuery} from '../../datalog/datalog.js';
+import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
 import type {Datom, TransactionId} from '../../datoms.js';
 import type {Transaction} from '../../types.js';
-import type {DatabaseView} from '../views/database-view.js';
+import type {DatabaseView, DatomsQuery, QueryResult} from '../views/database-view.js';
 
 export type Hook_ =
   | {
@@ -44,13 +44,24 @@ export type HookErrorWithName = {
 } & HookError;
 
 /**
- * Context passed to read hooks
+ * Context passed to read hooks for datalog queries
  * Contains database reference and any additional context data
  * Note: This is a generic type that gets resolved when used with DatomDatabase
  */
 export type ReadContext = {
   db: DatabaseView;
   query: DatalogQuery;
+  [key: string]: unknown;
+};
+
+/**
+ * Context passed to read hooks for datoms queries
+ * Contains database reference and any additional context data
+ * Note: This is a generic type that gets resolved when used with DatomDatabase
+ */
+export type DatomsReadContext = {
+  db: DatabaseView;
+  query: DatomsQuery;
   [key: string]: unknown;
 };
 
@@ -85,22 +96,64 @@ export type BeforeRead = {
 };
 
 /**
- * Result from after-read hooks
+ * Result from after-read hooks for datalog queries
  */
-export type AfterReadResult = {
+export type AfterReadResult<
+  TFind extends Record<string, DatalogQueryFindVariable> = Record<string, DatalogQueryFindVariable>,
+> = {
+  results: QueryResult<TFind>;
+  errors?: HookError[];
+  stopProcessing?: boolean;
+};
+
+/**
+ * After-read hook for datalog queries
+ * Runs after query execution, can filter/transform results or return errors
+ */
+export type AfterRead<
+  TFind extends Record<string, DatalogQueryFindVariable> = Record<string, DatalogQueryFindVariable>,
+> = {
+  type: 'afterRead';
+  name: string;
+  execute: (results: QueryResult<TFind>, ctx: ReadContext) => Promise<AfterReadResult<TFind>>;
+};
+
+/**
+ * Result from before-datoms-read hooks
+ */
+export type BeforeDatomsReadResult = {
+  query?: DatomsQuery;
+  errors?: HookError[];
+  stopProcessing?: boolean;
+};
+
+/**
+ * Before-datoms-read hook
+ * Runs before datoms query execution, can modify query or return errors
+ */
+export type BeforeDatomsRead = {
+  type: 'beforeDatomsRead';
+  name: string;
+  execute: (query: DatomsQuery, ctx: DatomsReadContext) => Promise<BeforeDatomsReadResult>;
+};
+
+/**
+ * Result from after-datoms-read hooks
+ */
+export type AfterDatomsReadResult = {
   datoms: Datom[];
   errors?: HookError[];
   stopProcessing?: boolean;
 };
 
 /**
- * After-read hook
- * Runs after query execution, can filter/transform results or return errors
+ * After-datoms-read hook
+ * Runs after datoms query execution, can filter/transform results or return errors
  */
-export type AfterRead = {
-  type: 'afterRead';
+export type AfterDatomsRead = {
+  type: 'afterDatomsRead';
   name: string;
-  execute: (datoms: Datom[], ctx: ReadContext) => Promise<AfterReadResult>;
+  execute: (datoms: Datom[], ctx: DatomsReadContext) => Promise<AfterDatomsReadResult>;
 };
 
 /**
@@ -146,7 +199,13 @@ export type AfterWrite = {
 /**
  * Union type for all hook types
  */
-export type Hook = BeforeRead | AfterRead | BeforeWrite | AfterWrite;
+export type Hook =
+  | BeforeRead
+  | AfterRead
+  | BeforeDatomsRead
+  | AfterDatomsRead
+  | BeforeWrite
+  | AfterWrite;
 
 /**
  * Base error class for all datom database errors
@@ -324,12 +383,16 @@ export class TransactionError extends DatomDatabaseError {
 export class HookEngine {
   private beforeRead: BeforeRead[];
   private afterRead: AfterRead[];
+  private beforeDatomsRead: BeforeDatomsRead[];
+  private afterDatomsRead: AfterDatomsRead[];
   private beforeWrite: BeforeWrite[];
   private afterWrite: AfterWrite[];
 
   constructor() {
     this.beforeRead = [];
     this.afterRead = [];
+    this.beforeDatomsRead = [];
+    this.afterDatomsRead = [];
     this.beforeWrite = [];
     this.afterWrite = [];
   }
@@ -354,6 +417,12 @@ export class HookEngine {
         break;
       case 'afterRead':
         this.afterRead.push(hook);
+        break;
+      case 'beforeDatomsRead':
+        this.beforeDatomsRead.push(hook);
+        break;
+      case 'afterDatomsRead':
+        this.afterDatomsRead.push(hook);
         break;
       case 'beforeWrite':
         this.beforeWrite.push(hook);
@@ -405,14 +474,104 @@ export class HookEngine {
   }
 
   /**
-   * Run after-read hooks (filter/transform results after execution)
-   * @param datoms The datoms returned from the query
+   * Run after-read hooks for datalog queries (filter/transform results after execution)
+   * @param results The query results returned from the query
    * @param ctx Read context with database reference and additional data
+   * @returns Filtered/transformed results and any errors
+   */
+  async runAfterRead<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(
+    results: QueryResult<TFind>,
+    ctx: ReadContext,
+  ): Promise<{
+    results: QueryResult<TFind>;
+    errors: HookErrorWithName[];
+  }> {
+    let result: QueryResult<TFind> = results;
+    const allErrors: HookErrorWithName[] = [];
+
+    for (const hook of this.afterRead) {
+      // Type assertion needed because hooks can have different TFind types
+      // but at runtime they all work with QueryResult
+      const hookResult = await (hook as AfterRead<TFind>).execute(
+        result as QueryResult<TFind>,
+        ctx,
+      );
+
+      result = hookResult.results as QueryResult<TFind>;
+
+      if (hookResult.errors && hookResult.errors.length > 0) {
+        for (const e of hookResult.errors) {
+          allErrors.push({
+            hook: hook.name,
+            message: e.message,
+            code: e.code,
+            datom: e.datom,
+          });
+        }
+      }
+
+      if (hookResult.stopProcessing) {
+        break;
+      }
+    }
+
+    return {results: result, errors: allErrors};
+  }
+
+  /**
+   * Run before-datoms-read hooks (modify/block query before execution)
+   * @param query The datoms query to process
+   * @param ctx Datoms read context with database reference and additional data
+   * @returns Modified query and any errors
+   */
+  async runBeforeDatomsRead(
+    query: DatomsQuery,
+    ctx: DatomsReadContext,
+  ): Promise<{
+    query: DatomsQuery;
+    errors: HookErrorWithName[];
+  }> {
+    let nextQuery = query;
+    const allErrors: HookErrorWithName[] = [];
+
+    for (const hook of this.beforeDatomsRead) {
+      const hookResult = await hook.execute(nextQuery, ctx);
+
+      nextQuery = hookResult.query ?? nextQuery ?? query;
+
+      if (hookResult.errors && hookResult.errors.length > 0) {
+        for (const e of hookResult.errors) {
+          allErrors.push({
+            hook: hook.name,
+            message: e.message,
+            code: e.code,
+            datom: e.datom,
+          });
+        }
+      }
+
+      if (hookResult.stopProcessing) {
+        break;
+      }
+    }
+
+    return {query: nextQuery, errors: allErrors};
+  }
+
+  /**
+   * Run after-datoms-read hooks (filter/transform results after execution)
+   * @param datoms The datoms returned from the query
+   * @param ctx Datoms read context with database reference and additional data
    * @returns Filtered/transformed datoms and any errors
    */
-  async runAfterRead(
+  async runAfterDatomsRead(
     datoms: Datom[],
-    ctx: ReadContext,
+    ctx: DatomsReadContext,
   ): Promise<{
     datoms: Datom[];
     errors: HookErrorWithName[];
@@ -420,7 +579,7 @@ export class HookEngine {
     let result = datoms;
     const allErrors: HookErrorWithName[] = [];
 
-    for (const hook of this.afterRead) {
+    for (const hook of this.afterDatomsRead) {
       const hookResult = await hook.execute(result, ctx);
 
       result = hookResult.datoms;

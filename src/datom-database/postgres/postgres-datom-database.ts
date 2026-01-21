@@ -21,6 +21,7 @@ import {
   TransactionError,
   type Hook,
   type ReadContext,
+  type DatomsReadContext,
   type WriteContext,
   type WriteResult,
 } from '../hook/hook.js';
@@ -1996,24 +1997,49 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const startTime = performance.now();
     const metadata: Record<string, unknown> = {};
 
+    // Create datoms read context for hooks
+    const {db: _, query: __, ...restContext} = options.context || {};
+    const ctx: DatomsReadContext = {
+      ...restContext,
+      db: this,
+      query: options,
+    };
+
+    // Run before-datoms-read hooks
+    const beforeResult = await this.hooks.runBeforeDatomsRead(options, ctx);
+
+    if (beforeResult.errors.length > 0) {
+      throw new QueryError('Datoms query blocked by hooks', beforeResult.errors);
+    }
+
+    const modifiedOptions = beforeResult.query;
+
     let result: Datom[];
     const accumulatedSql: SQLQueryMetadata[] = sqlQueries || [];
 
     if (viewConfig.type === 'current') {
-      const execResult = await this._executeCurrentQuery(options, accumulatedSql);
+      const execResult = await this._executeCurrentQuery(modifiedOptions, accumulatedSql);
       result = execResult.datoms;
     } else if (viewConfig.type === 'asOf') {
-      const execResult = await this._executeAsOfQuery(options, viewConfig.txId, accumulatedSql);
+      const execResult = await this._executeAsOfQuery(
+        modifiedOptions,
+        viewConfig.txId,
+        accumulatedSql,
+      );
       result = execResult.datoms;
     } else if (viewConfig.type === 'since') {
-      const execResult = await this._executeSinceQuery(options, viewConfig.txId, accumulatedSql);
+      const execResult = await this._executeSinceQuery(
+        modifiedOptions,
+        viewConfig.txId,
+        accumulatedSql,
+      );
       result = execResult.datoms;
     } else if (viewConfig.type === 'history') {
-      const execResult = await this._executeHistoryQuery(options, accumulatedSql);
+      const execResult = await this._executeHistoryQuery(modifiedOptions, accumulatedSql);
       result = execResult.datoms;
     } else if (viewConfig.type === 'speculative') {
       const execResult = await this._executeSpeculativeQuery(
-        options,
+        modifiedOptions,
         viewConfig.datoms,
         accumulatedSql,
       );
@@ -2025,16 +2051,23 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       throw new Error(`Unknown view config type: ${(_exhaustive as ViewConfig).type}`);
     }
 
+    // Run after-datoms-read hooks
+    const afterResult = await this.hooks.runAfterDatomsRead(result, ctx);
+
+    if (afterResult.errors.length > 0) {
+      throw new QueryError('Datoms query blocked by after-read hooks', afterResult.errors);
+    }
+
     const executionTime = performance.now() - startTime;
 
     if (accumulatedSql.length > 0) {
       metadata.sql = accumulatedSql;
     }
     metadata.executionTimeMs = executionTime;
-    metadata.resultCount = result.length;
+    metadata.resultCount = afterResult.datoms.length;
 
     return {
-      data: result,
+      data: afterResult.datoms,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     };
   }
@@ -2087,45 +2120,33 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       };
     }
 
-    // Extract all datoms from all clauses for afterRead hooks
-    const allDatomsSet = new Set<string>();
-    const allDatoms: Datom[] = [];
+    // Helper function to build QueryResult and run afterRead hooks
+    const buildAndFilterQueryResult = async (
+      buildResult: () => Promise<QueryResult<TFind>>,
+      executionStrategy: string,
+    ): Promise<QueryResultEnvelope<TFind>> => {
+      const queryResult = await buildResult();
 
-    for (const clause of modifiedQuery.where) {
-      if (!isQueryPattern(clause)) {
-        continue;
+      // Run after-read hooks on QueryResult
+      const afterResult = await this.hooks.runAfterRead(queryResult, ctx);
+
+      if (afterResult.errors.length > 0) {
+        throw new QueryError('Query blocked by after-read hooks', afterResult.errors);
       }
-      const {e: entityVal, a: attributeVal, v: valueVal} = clause;
-      const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
-      const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
-      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      const clauseDatoms = await this._datomsWithMetadataInternal(
-        {
-          e: entity,
-          a: attribute,
-          v: value,
-          viewConfig,
-        },
-        viewConfig,
-        sqlQueries,
-      );
-
-      for (const datom of clauseDatoms.data) {
-        const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
-        if (!allDatomsSet.has(key)) {
-          allDatomsSet.add(key);
-          allDatoms.push(datom);
-        }
+      const executionTime = performance.now() - startTime;
+      metadata.executionTimeMs = executionTime;
+      metadata.resultCount = afterResult.results.length;
+      metadata.executionStrategy = executionStrategy;
+      if (sqlQueries.length > 0) {
+        metadata.sql = sqlQueries;
       }
-    }
 
-    // Run after-read hooks
-    const afterResult = await this.hooks.runAfterRead(allDatoms, ctx);
-
-    if (afterResult.errors && afterResult.errors.length > 0) {
-      throw new QueryError('Query blocked by after-read hooks', afterResult.errors);
-    }
+      return {
+        data: afterResult.results,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      };
+    };
 
     // Check if we have aggregations - if so, use SQL query building
     const aggCheck = checkSQLAggregations(modifiedQuery.find);
@@ -2134,63 +2155,29 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // For speculative views, always use in-memory approach
     if (viewConfig.type === 'speculative') {
-      // Use in-memory join logic for speculative queries
-      const firstClause = modifiedQuery.where[0];
-      if (!firstClause || !isQueryPattern(firstClause)) {
-        throw new Error('First clause must be a QueryPattern');
-      }
-      const {e: entityVal, a: attributeVal, v: valueVal} = firstClause;
-      const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
-      const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
-      const value = isVariable(valueVal) ? undefined : (valueVal as Value);
-
-      const firstDatoms = await this._datomsWithMetadataInternal(
-        {
-          e: entity,
-          a: attribute,
-          v: value,
-          viewConfig,
-        },
-        viewConfig,
-        sqlQueries,
-      );
-
-      const firstResults = firstDatoms.data.map(datom => {
-        const result: Record<string, Value | Attribute> = {};
-        if (isVariable(entityVal)) {
-          result[entityVal as string] = datom.e;
+      return buildAndFilterQueryResult(async () => {
+        // Use in-memory join logic for speculative queries
+        const firstClause = modifiedQuery.where[0];
+        if (!firstClause || !isQueryPattern(firstClause)) {
+          throw new Error('First clause must be a QueryPattern');
         }
-        if (isVariable(attributeVal)) {
-          result[attributeVal as string] = datom.a;
-        }
-        if (isVariable(valueVal)) {
-          result[valueVal as string] = datom.v;
-        }
-        return result;
-      });
-
-      let results = firstResults;
-      for (let i = 1; i < modifiedQuery.where.length; i++) {
-        const clause = modifiedQuery.where[i];
-        if (!clause || !isQueryPattern(clause)) {
-          throw new Error('Only QueryPattern clauses are supported in joins');
-        }
-        const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+        const {e: entityVal, a: attributeVal, v: valueVal} = firstClause;
         const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
         const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
         const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-        const clauseDatoms = await this._datomsWithMetadataInternal(
+        const firstDatoms = await this._datomsWithMetadataInternal(
           {
             e: entity,
             a: attribute,
             v: value,
+            viewConfig,
           },
           viewConfig,
           sqlQueries,
         );
 
-        const clauseResults = clauseDatoms.data.map(datom => {
+        const firstResults = firstDatoms.data.map(datom => {
           const result: Record<string, Value | Attribute> = {};
           if (isVariable(entityVal)) {
             result[entityVal as string] = datom.e;
@@ -2204,104 +2191,309 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           return result;
         });
 
-        results = joinResults(results, clauseResults, modifiedQuery.where.slice(0, i + 1));
-      }
-
-      const projected = project(results, modifiedQuery.find, modifiedQuery.where);
-
-      // Apply aggregations if needed
-      let finalResult: QueryResult<TFind>;
-      if (hasAggs) {
-        finalResult = applyAggregations(projected, modifiedQuery.find) as QueryResult<TFind>;
-      } else {
-        finalResult = projected as QueryResult<TFind>;
-      }
-
-      // Apply ordering if specified
-      if (modifiedQuery.orderBy) {
-        finalResult.sort((a, b) => {
-          for (const [variable, direction] of modifiedQuery.orderBy ?? []) {
-            const key = stripQuestionMark(variable);
-            const aVal = a[key];
-            const bVal = b[key];
-            if (aVal === undefined && bVal === undefined) return 0;
-            if (aVal === undefined || aVal === null) return direction === 'asc' ? 1 : -1;
-            if (bVal === undefined || bVal === null) return direction === 'asc' ? -1 : 1;
-            if (aVal < bVal) return direction === 'asc' ? -1 : 1;
-            if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+        let results = firstResults;
+        for (let i = 1; i < modifiedQuery.where.length; i++) {
+          const clause = modifiedQuery.where[i];
+          if (!clause || !isQueryPattern(clause)) {
+            throw new Error('Only QueryPattern clauses are supported in joins');
           }
-          return 0;
-        });
-      }
+          const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+          const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+          const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
+          const value = isVariable(valueVal) ? undefined : (valueVal as Value);
 
-      // Apply limit if specified
-      if (modifiedQuery.limit !== undefined) {
-        finalResult = finalResult.slice(0, modifiedQuery.limit);
-      }
+          const clauseDatoms = await this._datomsWithMetadataInternal(
+            {
+              e: entity,
+              a: attribute,
+              v: value,
+            },
+            viewConfig,
+            sqlQueries,
+          );
 
-      const executionTime = performance.now() - startTime;
-      metadata.executionTimeMs = executionTime;
-      metadata.resultCount = finalResult.length;
-      metadata.executionStrategy = 'in-memory-speculative';
-      if (sqlQueries.length > 0) {
-        metadata.sql = sqlQueries;
-      }
+          const clauseResults = clauseDatoms.data.map(datom => {
+            const result: Record<string, Value | Attribute> = {};
+            if (isVariable(entityVal)) {
+              result[entityVal as string] = datom.e;
+            }
+            if (isVariable(attributeVal)) {
+              result[attributeVal as string] = datom.a;
+            }
+            if (isVariable(valueVal)) {
+              result[valueVal as string] = datom.v;
+            }
+            return result;
+          });
 
-      return {
-        data: finalResult,
-        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-      };
+          results = joinResults(results, clauseResults, modifiedQuery.where.slice(0, i + 1));
+        }
+
+        const projected = project(results, modifiedQuery.find, modifiedQuery.where);
+
+        // Apply aggregations if needed
+        let finalResult: QueryResult<TFind>;
+        if (hasAggs) {
+          finalResult = applyAggregations(projected, modifiedQuery.find) as QueryResult<TFind>;
+        } else {
+          finalResult = projected as QueryResult<TFind>;
+        }
+
+        // Apply ordering if specified
+        if (modifiedQuery.orderBy) {
+          finalResult.sort((a, b) => {
+            for (const [variable, direction] of modifiedQuery.orderBy ?? []) {
+              const key = stripQuestionMark(variable);
+              const aVal = a[key];
+              const bVal = b[key];
+              if (aVal === undefined && bVal === undefined) return 0;
+              if (aVal === undefined || aVal === null) return direction === 'asc' ? 1 : -1;
+              if (bVal === undefined || bVal === null) return direction === 'asc' ? -1 : 1;
+              if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+              if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+          });
+        }
+
+        // Apply limit if specified
+        if (modifiedQuery.limit !== undefined) {
+          finalResult = finalResult.slice(0, modifiedQuery.limit);
+        }
+
+        return finalResult;
+      }, 'in-memory-speculative');
     }
 
     // For non-speculative views, use the same logic as regular query() method
     // If we have unsupported aggregations, use in-memory approach
     if (hasAggs && !allAggsSupported) {
-      // Use in-memory joins and aggregations
+      return buildAndFilterQueryResult(async () => {
+        // Use in-memory joins and aggregations
+        const firstClause = modifiedQuery.where[0];
+        if (!firstClause) {
+          return [] as QueryResult<TFind>;
+        }
+
+        // Extract all datoms needed for query execution
+        const allDatomsSet = new Set<string>();
+        const allDatoms: Datom[] = [];
+
+        for (const clause of modifiedQuery.where) {
+          if (!isQueryPattern(clause)) {
+            continue;
+          }
+          const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+          const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+          const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
+          const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+          const clauseDatoms = await this._datomsWithMetadataInternal(
+            {
+              e: entity,
+              a: attribute,
+              v: value,
+              viewConfig,
+            },
+            viewConfig,
+            sqlQueries,
+          );
+
+          for (const datom of clauseDatoms.data) {
+            const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
+            if (!allDatomsSet.has(key)) {
+              allDatomsSet.add(key);
+              allDatoms.push(datom);
+            }
+          }
+        }
+
+        const firstResults = await this._executeClauseWithFilteredDatoms(firstClause, allDatoms);
+
+        let results = firstResults;
+        for (let i = 1; i < modifiedQuery.where.length; i++) {
+          const clause = modifiedQuery.where[i];
+          if (!clause) continue;
+          const clauseResults = await this._executeClauseWithFilteredDatoms(clause, allDatoms);
+          results = joinResults(results, clauseResults, modifiedQuery.where.slice(0, i + 1));
+        }
+
+        // Apply aggregations in-memory
+        const aggregated = applyAggregations(results, modifiedQuery.find);
+        const projected = project(aggregated, modifiedQuery.find, modifiedQuery.where);
+
+        if (modifiedQuery.orderBy) {
+          projected.sort((a, b) => {
+            for (const [variable, direction] of modifiedQuery.orderBy ?? []) {
+              const key = stripQuestionMark(variable);
+              const aVal = a[key];
+              const bVal = b[key];
+
+              if (aVal == null && bVal == null) continue;
+              if (aVal == null) return direction === 'asc' ? -1 : 1;
+              if (bVal == null) return direction === 'asc' ? 1 : -1;
+
+              if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+              if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+          });
+        }
+
+        let finalResult: QueryResult<TFind> = projected as QueryResult<TFind>;
+        if (modifiedQuery.limit) {
+          finalResult = finalResult.slice(0, modifiedQuery.limit) as QueryResult<TFind>;
+        }
+
+        return finalResult;
+      }, 'in-memory-unsupported-aggregations');
+    }
+
+    // For multi-clause queries with all aggregations supported, use SQL query building
+    if (modifiedQuery.where.length > 1 && hasAggs && allAggsSupported) {
+      return buildAndFilterQueryResult(async () => {
+        const sqlResult = await this._executeDatalogWithSQL(modifiedQuery, sqlQueries);
+        return sqlResult.results as QueryResult<TFind>;
+      }, 'sql-aggregations');
+    }
+
+    // For multi-clause queries without aggregations, use SQL execution if query qualifies
+    if (modifiedQuery.where.length > 1 && !hasAggs) {
+      // Check if query qualifies for pivot optimization
+      const usePivot = canUsePivotOptimization(modifiedQuery.where);
+
+      if (usePivot) {
+        return buildAndFilterQueryResult(async () => {
+          const sqlResult = await this._executeDatalogWithSQL(modifiedQuery, sqlQueries);
+          return sqlResult.results as QueryResult<TFind>;
+        }, 'sql-pivot');
+      }
+
+      // For regular multi-clause joins, use SQL execution
+      return buildAndFilterQueryResult(async () => {
+        const sqlResult = await this._executeDatalogWithSQL(modifiedQuery, sqlQueries);
+        return sqlResult.results as QueryResult<TFind>;
+      }, 'sql-joins');
+    }
+
+    // Now execute the query (no aggregations or single clause with supported aggregations)
+    return buildAndFilterQueryResult(async () => {
       const firstClause = modifiedQuery.where[0];
       if (!firstClause) {
-        const executionTime = performance.now() - startTime;
-        return {
-          data: [],
-          metadata: {
-            executionTimeMs: executionTime,
-            resultCount: 0,
-            executionStrategy: 'in-memory-unsupported-aggregations',
-          },
-        };
+        return [] as QueryResult<TFind>;
       }
-      const firstResults = await this._executeClauseWithFilteredDatoms(
-        firstClause,
-        afterResult.datoms,
-      );
+
+      // Extract all datoms needed for query execution
+      const allDatomsSet = new Set<string>();
+      const allDatoms: Datom[] = [];
+
+      for (const clause of modifiedQuery.where) {
+        if (!isQueryPattern(clause)) {
+          continue;
+        }
+        const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+        const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
+        const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
+        const value = isVariable(valueVal) ? undefined : (valueVal as Value);
+
+        const clauseDatoms = await this._datomsWithMetadataInternal(
+          {
+            e: entity,
+            a: attribute,
+            v: value,
+            viewConfig,
+          },
+          viewConfig,
+          sqlQueries,
+        );
+
+        for (const datom of clauseDatoms.data) {
+          const key = `${datom.e}|${datom.a}|${JSON.stringify(datom.v)}|${datom.tx}`;
+          if (!allDatomsSet.has(key)) {
+            allDatomsSet.add(key);
+            allDatoms.push(datom);
+          }
+        }
+      }
+
+      const firstResults = await this._executeClauseWithFilteredDatoms(firstClause, allDatoms);
 
       let results = firstResults;
       for (let i = 1; i < modifiedQuery.where.length; i++) {
         const clause = modifiedQuery.where[i];
         if (!clause) continue;
-        const clauseResults = await this._executeClauseWithFilteredDatoms(
-          clause,
-          afterResult.datoms,
-        );
+        const clauseResults = await this._executeClauseWithFilteredDatoms(clause, allDatoms);
         results = joinResults(results, clauseResults, modifiedQuery.where.slice(0, i + 1));
       }
 
-      // Apply aggregations in-memory
-      const aggregated = applyAggregations(results, modifiedQuery.find);
-      const projected = project(aggregated, modifiedQuery.find, modifiedQuery.where);
+      const projected = project(results, modifiedQuery.find, modifiedQuery.where);
 
       if (modifiedQuery.orderBy) {
+        // Map orderBy variables to output keys from find clause
+        const variableToOutputKey = new Map<string, string>();
+        for (const [outputKey, expr] of Object.entries(modifiedQuery.find)) {
+          let varName: string | undefined;
+          if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === 'string') {
+            varName = expr[0];
+          } else if (typeof expr === 'string') {
+            varName = expr;
+          }
+          if (varName) {
+            variableToOutputKey.set(varName, outputKey);
+          }
+        }
+
         projected.sort((a, b) => {
           for (const [variable, direction] of modifiedQuery.orderBy ?? []) {
-            const key = stripQuestionMark(variable);
-            const aVal = a[key];
-            const bVal = b[key];
+            // Map variable to output key, or fall back to stripped variable name
+            const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
+            const aVal = a[outputKey];
+            const bVal = b[outputKey];
 
             if (aVal == null && bVal == null) continue;
             if (aVal == null) return direction === 'asc' ? -1 : 1;
             if (bVal == null) return direction === 'asc' ? 1 : -1;
 
-            if (aVal < bVal) return direction === 'asc' ? -1 : 1;
-            if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+            // Ensure proper numeric comparison when both values are numeric
+            let comparison: number;
+            const aIsNumber = typeof aVal === 'number';
+            const bIsNumber = typeof bVal === 'number';
+
+            let aNum: number | null = null;
+            let bNum: number | null = null;
+
+            if (aIsNumber) {
+              aNum = aVal;
+            } else if (typeof aVal === 'string' && aVal !== '') {
+              const parsed = Number(aVal);
+              if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+                aNum = parsed;
+              }
+            }
+
+            if (bIsNumber) {
+              bNum = bVal;
+            } else if (typeof bVal === 'string' && bVal !== '') {
+              const parsed = Number(bVal);
+              if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+                bNum = parsed;
+              }
+            }
+
+            // If both are numeric, compare as numbers
+            if (aNum !== null && bNum !== null) {
+              comparison = aNum - bNum;
+            } else {
+              // At least one is not numeric, use locale-aware string comparison
+              // Convert to strings to ensure consistent comparison (matching test expectations)
+              const aStr = String(aVal);
+              const bStr = String(bVal);
+              comparison = aStr.localeCompare(bStr);
+            }
+
+            if (comparison !== 0) {
+              return direction === 'asc' ? comparison : -comparison;
+            }
           }
           return 0;
         });
@@ -2312,184 +2504,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         finalResult = finalResult.slice(0, modifiedQuery.limit) as QueryResult<TFind>;
       }
 
-      const executionTime = performance.now() - startTime;
-      metadata.executionTimeMs = executionTime;
-      metadata.resultCount = finalResult.length;
-      metadata.executionStrategy = 'in-memory-unsupported-aggregations';
-      if (sqlQueries.length > 0) {
-        metadata.sql = sqlQueries;
-      }
-
-      return {
-        data: finalResult,
-        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-      };
-    }
-
-    // For multi-clause queries with all aggregations supported, use SQL query building
-    if (modifiedQuery.where.length > 1 && hasAggs && allAggsSupported) {
-      const sqlResult = await this._executeDatalogWithSQL(modifiedQuery, sqlQueries);
-
-      const executionTime = performance.now() - startTime;
-      metadata.executionTimeMs = executionTime;
-      metadata.resultCount = sqlResult.results.length;
-      metadata.executionStrategy = 'sql-aggregations';
-      if (sqlQueries.length > 0) {
-        metadata.sql = sqlQueries;
-      }
-
-      return {
-        data: sqlResult.results as QueryResult<TFind>,
-        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-      };
-    }
-
-    // For multi-clause queries without aggregations, use SQL execution if:
-    // 1. Query qualifies for pivot optimization (same entity variable, multiple bound attributes), OR
-    // 2. Query has multiple clauses and hooks didn't filter datoms
-    // This avoids inefficient in-memory joins when SQL can handle it efficiently
-    if (
-      modifiedQuery.where.length > 1 &&
-      !hasAggs &&
-      // Check if hooks filtered datoms - if length changed, hooks filtered and we need in-memory execution
-      afterResult.datoms.length === allDatoms.length
-    ) {
-      // Check if query qualifies for pivot optimization
-      const usePivot = canUsePivotOptimization(modifiedQuery.where);
-
-      // Use SQL execution for pivot-optimized queries or regular multi-clause joins
-      const sqlResult = await this._executeDatalogWithSQL(modifiedQuery, sqlQueries);
-
-      const executionTime = performance.now() - startTime;
-      metadata.executionTimeMs = executionTime;
-      metadata.resultCount = sqlResult.results.length;
-      metadata.executionStrategy = usePivot ? 'sql-pivot' : 'sql-joins';
-      if (sqlQueries.length > 0) {
-        metadata.sql = sqlQueries;
-      }
-
-      return {
-        data: sqlResult.results as QueryResult<TFind>,
-        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-      };
-    }
-
-    // Now execute the query with filtered datoms (no aggregations or single clause with supported aggregations)
-    const firstClause = modifiedQuery.where[0];
-    if (!firstClause) {
-      const executionTime = performance.now() - startTime;
-      return {
-        data: [],
-        metadata: {
-          executionTimeMs: executionTime,
-          resultCount: 0,
-          executionStrategy: 'in-memory-filtered-datoms',
-        },
-      };
-    }
-    const firstResults = await this._executeClauseWithFilteredDatoms(
-      firstClause,
-      afterResult.datoms,
-    );
-
-    let results = firstResults;
-    for (let i = 1; i < modifiedQuery.where.length; i++) {
-      const clause = modifiedQuery.where[i];
-      if (!clause) continue;
-      const clauseResults = await this._executeClauseWithFilteredDatoms(clause, afterResult.datoms);
-      results = joinResults(results, clauseResults, modifiedQuery.where.slice(0, i + 1));
-    }
-
-    const projected = project(results, modifiedQuery.find, modifiedQuery.where);
-
-    if (modifiedQuery.orderBy) {
-      // Map orderBy variables to output keys from find clause
-      const variableToOutputKey = new Map<string, string>();
-      for (const [outputKey, expr] of Object.entries(modifiedQuery.find)) {
-        let varName: string | undefined;
-        if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === 'string') {
-          varName = expr[0];
-        } else if (typeof expr === 'string') {
-          varName = expr;
-        }
-        if (varName) {
-          variableToOutputKey.set(varName, outputKey);
-        }
-      }
-
-      projected.sort((a, b) => {
-        for (const [variable, direction] of modifiedQuery.orderBy ?? []) {
-          // Map variable to output key, or fall back to stripped variable name
-          const outputKey = variableToOutputKey.get(variable) ?? stripQuestionMark(variable);
-          const aVal = a[outputKey];
-          const bVal = b[outputKey];
-
-          if (aVal == null && bVal == null) continue;
-          if (aVal == null) return direction === 'asc' ? -1 : 1;
-          if (bVal == null) return direction === 'asc' ? 1 : -1;
-
-          // Ensure proper numeric comparison when both values are numeric
-          let comparison: number;
-          const aIsNumber = typeof aVal === 'number';
-          const bIsNumber = typeof bVal === 'number';
-
-          let aNum: number | null = null;
-          let bNum: number | null = null;
-
-          if (aIsNumber) {
-            aNum = aVal;
-          } else if (typeof aVal === 'string' && aVal !== '') {
-            const parsed = Number(aVal);
-            if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
-              aNum = parsed;
-            }
-          }
-
-          if (bIsNumber) {
-            bNum = bVal;
-          } else if (typeof bVal === 'string' && bVal !== '') {
-            const parsed = Number(bVal);
-            if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
-              bNum = parsed;
-            }
-          }
-
-          // If both are numeric, compare as numbers
-          if (aNum !== null && bNum !== null) {
-            comparison = aNum - bNum;
-          } else {
-            // At least one is not numeric, use locale-aware string comparison
-            // Convert to strings to ensure consistent comparison (matching test expectations)
-            const aStr = String(aVal);
-            const bStr = String(bVal);
-            comparison = aStr.localeCompare(bStr);
-          }
-
-          if (comparison !== 0) {
-            return direction === 'asc' ? comparison : -comparison;
-          }
-        }
-        return 0;
-      });
-    }
-
-    let finalResult: QueryResult<TFind> = projected as QueryResult<TFind>;
-    if (modifiedQuery.limit) {
-      finalResult = finalResult.slice(0, modifiedQuery.limit) as QueryResult<TFind>;
-    }
-
-    const executionTime = performance.now() - startTime;
-    metadata.executionTimeMs = executionTime;
-    metadata.resultCount = finalResult.length;
-    metadata.executionStrategy = 'in-memory-filtered-datoms';
-    if (sqlQueries.length > 0) {
-      metadata.sql = sqlQueries;
-    }
-
-    return {
-      data: finalResult,
-      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-    };
+      return finalResult;
+    }, 'in-memory');
   }
 
   /**
