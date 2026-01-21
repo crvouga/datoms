@@ -8,6 +8,26 @@ import type {Datom, TransactionId} from '../../datoms.js';
 import type {Transaction} from '../../types.js';
 import type {DatabaseView} from '../views/database-view.js';
 
+export type Hook_ =
+  | {
+      type: 'beforeTransact';
+    }
+  | {
+      type: 'afterTransact';
+    }
+  | {
+      type: 'beforeDatoms';
+    }
+  | {
+      type: 'afterDatoms';
+    }
+  | {
+      type: 'beforeQuery';
+    }
+  | {
+      type: 'afterQuery';
+    };
+
 /**
  * Error structure returned by hooks
  */

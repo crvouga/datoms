@@ -3,10 +3,7 @@
  * Handles web standard Request/Response objects
  */
 
-import type {DatalogQuery} from '../../datalog/datalog.js';
-import type {Datom, DatomInput, TransactionId} from '../../datoms.js';
 import type {DatomDatabase} from '../datom-database.js';
-import type {Hook} from '../hook/hook.js';
 import {
   QueryError,
   QueryResultSizeError,
@@ -15,96 +12,25 @@ import {
   TransactionError,
 } from '../hook/hook.js';
 import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
-import type {DatomsQuery, QueryResult} from '../views/database-view.js';
 import type {ViewConfig} from '../views/view-config.js';
-
-// Request/Response types for HTTP API contract
-interface InitializeRequest {
-  method: 'initialize';
-}
-
-interface InitializeResponse {
-  success: boolean;
-}
-
-interface DatomsRequest {
-  method: 'datoms';
-  options: DatomsQuery;
-  viewConfig: ViewConfig;
-}
-
-interface DatomsResponse {
-  datoms: Datom[];
-}
-
-interface QueryRequest {
-  method: 'query';
-  query: DatalogQuery;
-  context?: Record<string, unknown>;
-  viewConfig: ViewConfig;
-}
-
-interface QueryResponse {
-  results: QueryResult;
-}
-
-interface TransactRequest {
-  method: 'transact';
-  ops: (DatomInput | DatomInput[])[];
-  metadata?: Record<string, unknown>;
-  context?: Record<string, unknown>;
-}
-
-interface TransactResponse {
-  txId: TransactionId;
-}
-
-interface GetLatestTransactionRequest {
-  method: 'getLatestTransaction';
-}
-
-interface GetLatestTransactionResponse {
-  txId: TransactionId;
-  datoms: Datom[];
-  meta?: Record<string, unknown>;
-}
-
-interface RegisterHookRequest {
-  method: 'registerHook';
-  hook: Hook;
-}
-
-interface RegisterHookResponse {
-  success: boolean;
-}
-
-interface DeleteDatomsRequest {
-  method: 'deleteDatoms';
-  config: {retentionCount: number};
-}
-
-interface DeleteDatomsResponse {
-  success: boolean;
-  deleted?: number;
-}
-
-type TransportRequest =
-  | InitializeRequest
-  | DatomsRequest
-  | QueryRequest
-  | TransactRequest
-  | GetLatestTransactionRequest
-  | RegisterHookRequest
-  | DeleteDatomsRequest;
-
-type TransportResponse =
-  | InitializeResponse
-  | DatomsResponse
-  | QueryResponse
-  | TransactResponse
-  | GetLatestTransactionResponse
-  | RegisterHookResponse
-  | DeleteDatomsResponse;
+import type {
+  DatomsRequest,
+  DatomsResponse,
+  DeleteDatomsRequest,
+  DeleteDatomsResponse,
+  GetLatestTransactionRequest,
+  GetLatestTransactionResponse,
+  InitializeRequest,
+  InitializeResponse,
+  QueryRequest,
+  QueryResponse,
+  RegisterHookRequest,
+  RegisterHookResponse,
+  TransactRequest,
+  TransactResponse,
+  TransportRequest,
+  TransportResponse,
+} from './http-client-transport-types.js';
 
 /**
  * Server component that handles HTTP requests for the HTTP client transport
