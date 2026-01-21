@@ -5,16 +5,12 @@
  */
 
 import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
-import type {Datom, DatomInput, TransactionId, Value} from '../../datoms.js';
+import type {Attribute, Datom, DatomInput, TransactionId, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {Transaction} from '../../types.js';
 import type {Hook} from '../hook/hook.js';
 import type {DatomDatabase, WithResult} from '../datom-database.js';
-import type {
-  DatomsQuery,
-  DatomsResultEnvelope,
-  QueryResultEnvelope,
-} from '../views/database-view.js';
+import type {DatomsQuery, QueryResultEnvelope} from '../views/database-view.js';
 import type {DatabaseView} from '../views/database-view.js';
 import {InMemoryDatomDatabase} from '../in-memory/in-memory-datom-database.js';
 
@@ -103,9 +99,6 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   /**
    * Query datoms (delegated to memory database)
    */
-  async datoms(options: DatomsQuery): Promise<DatomsResultEnvelope> {
-    return this._memoryDb.datoms(options);
-  }
 
   /**
    * Execute a datalog query (delegated to memory database)
@@ -329,11 +322,21 @@ export class FileSystemDatomDatabase implements DatomDatabase {
    */
   private async _persist(): Promise<void> {
     try {
-      // Get all datoms from the memory database using public API
+      // Get all datoms from the memory database using query API
       // Use a large limit similar to server.ts
-      const {data: allDatoms} = await this._memoryDb.datoms({
+      const query: DatalogQuery = {
+        find: {e: ['?e'], a: ['?a'], v: ['?v'], tx: ['?tx'], op: ['?op']},
+        where: [{e: '?e', a: '?a', v: '?v'}],
         limit: 1_000_000,
-      });
+      };
+      const {data: results} = await this._memoryDb.query(query);
+      const allDatoms = results.map(r => ({
+        e: r.e as EntityId,
+        a: r.a as Attribute,
+        v: r.v as Value,
+        tx: r.tx as TransactionId,
+        op: r.op as boolean,
+      }));
 
       // Sort by entity ID (as shown in server.ts)
       allDatoms.sort((a, b) => {

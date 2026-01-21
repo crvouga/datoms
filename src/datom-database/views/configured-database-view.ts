@@ -7,12 +7,7 @@
 import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
 import type {DatomDatabase} from '../datom-database.js';
 import {validateQueryOptions} from '../shared/query-validation.js';
-import type {
-  DatabaseView,
-  DatomsQuery,
-  DatomsResultEnvelope,
-  QueryResultEnvelope,
-} from './database-view.js';
+import type {DatabaseView, DatomsQuery, QueryResultEnvelope} from './database-view.js';
 import type {ViewConfig} from './view-config.js';
 
 /**
@@ -25,17 +20,6 @@ export class ConfiguredDatabaseView implements DatabaseView {
     private db: DatomDatabase,
     private viewConfig: ViewConfig,
   ) {}
-
-  async datoms(options: DatomsQuery): Promise<DatomsResultEnvelope> {
-    // Validate that query has at least one filter or limit to prevent accidental full scans
-    validateQueryOptions(options);
-
-    // Route to implementation with view config
-    return this.db.datoms({
-      ...options,
-      viewConfig: this.viewConfig,
-    });
-  }
 
   async query<
     TFind extends Record<string, DatalogQueryFindVariable> = Record<

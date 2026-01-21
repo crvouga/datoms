@@ -1,5 +1,6 @@
 import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
+import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import {FIXTURES} from './fixtures/fixtures.js';
 import type {Fixture} from './fixtures/fixture.js';
 
@@ -30,7 +31,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     expect(tx).toBeGreaterThanOrEqual(1);
 
-    const {data: entity} = await db.datoms({e: 1, op: true});
+    const query = datomsQueryToDatalogQuery({e: 1, op: true});
+    const {data: results} = await db.query(query);
+    const entity = queryResultsToDatoms(results, {e: 1, op: true});
     expect(entity).toHaveLength(2);
     const values = entity.map(d => d.v);
     expect(values).toContain('Alice');
@@ -44,7 +47,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       {op: true, e: 2, a: 'name', v: 'Bob'},
     ]);
 
-    const {data: results} = await db.datoms({a: 'name'});
+    const query = datomsQueryToDatalogQuery({a: 'name'});
+    const {data: queryResults} = await db.query(query);
+    const results = queryResultsToDatoms(queryResults, {a: 'name'});
     expect(results).toHaveLength(2);
   });
 
@@ -53,7 +58,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
     await db.transact([{op: false, e: 1, a: 'name', v: 'Alice'}]);
 
-    const {data: entity} = await db.datoms({e: 1, op: true});
+    const query = datomsQueryToDatalogQuery({e: 1, op: true});
+    const {data: results} = await db.query(query);
+    const entity = queryResultsToDatoms(results, {e: 1, op: true});
     expect(entity).toHaveLength(0);
   });
 
@@ -65,7 +72,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         {op: true, e: 1, a: 'age', v: 30},
       ]);
 
-      const {data: nameDatoms} = await db.datoms({e: 1, a: 'name'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'name'});
+      const {data: results} = await db.query(query);
+      const nameDatoms = queryResultsToDatoms(results, {e: 1, a: 'name'});
       await db.transact(
         nameDatoms.map(d => ({
           op: false,
@@ -97,7 +106,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         {op: true, e: 1, a: 'name', v: 'Alice'},
       ]);
 
-      const {data: tagDatoms} = await db.datoms({e: 1, a: 'tag'});
+      const query1 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results1} = await db.query(query1);
+      const tagDatoms = queryResultsToDatoms(results1, {e: 1, a: 'tag'});
       await db.transact(
         tagDatoms.map(d => ({
           op: false,
@@ -107,7 +118,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         })),
       );
 
-      const {data: tags} = await db.datoms({e: 1, a: 'tag'});
+      const query2 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results2} = await db.query(query2);
+      const tags = queryResultsToDatoms(results2, {e: 1, a: 'tag'});
       expect(tags).toHaveLength(0);
 
       const {data: nameResults} = await db.query({
@@ -122,7 +135,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       // Should not throw, just return a transaction ID
-      const {data: nonexistentDatoms} = await db.datoms({
+      const query = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'nonexistent',
+      });
+      const {data: results} = await db.query(query);
+      const nonexistentDatoms = queryResultsToDatoms(results, {
         e: 1,
         a: 'nonexistent',
       });
@@ -144,7 +162,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         {op: true, e: 1, a: 'tag', v: 'blue'},
       ]);
 
-      const {data: tagDatoms} = await db.datoms({e: 1, a: 'tag'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results} = await db.query(query);
+      const tagDatoms = queryResultsToDatoms(results, {e: 1, a: 'tag'});
 
       // Use with() to see what subion would look like
       const withResult = await db.with(
@@ -157,7 +177,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       );
 
       // Should see subion in dbAfter
-      const {data: tags} = await withResult.dbAfter.datoms({
+      const query2 = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'tag',
+      });
+      const {data: results2} = await withResult.dbAfter.query(query2);
+      const tags = queryResultsToDatoms(results2, {
         e: 1,
         a: 'tag',
       });
@@ -174,7 +199,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       );
 
       // Should be committed after transact
-      const {data: finalTags} = await db.datoms({e: 1, a: 'tag'});
+      const query3 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results3} = await db.query(query3);
+      const finalTags = queryResultsToDatoms(results3, {e: 1, a: 'tag'});
       expect(finalTags).toHaveLength(0);
     });
 
@@ -187,7 +214,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         {op: true, e: 2, a: 'tag', v: 'green'},
       ]);
 
-      const {data: tag1Datoms} = await db.datoms({e: 1, a: 'tag'});
+      const query1 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results1} = await db.query(query1);
+      const tag1Datoms = queryResultsToDatoms(results1, {e: 1, a: 'tag'});
       await db.transact(
         tag1Datoms.map(d => ({
           op: false,
@@ -197,10 +226,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         })),
       );
 
-      const {data: tags1} = await db.datoms({e: 1, a: 'tag'});
+      const query1b = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results1b} = await db.query(query1b);
+      const tags1 = queryResultsToDatoms(results1b, {e: 1, a: 'tag'});
       expect(tags1).toHaveLength(0);
 
-      const {data: tags2} = await db.datoms({e: 2, a: 'tag'});
+      const query2 = datomsQueryToDatalogQuery({e: 2, a: 'tag'});
+      const {data: results2} = await db.query(query2);
+      const tags2 = queryResultsToDatoms(results2, {e: 2, a: 'tag'});
       expect(tags2).toHaveLength(2);
       const values2 = tags2.map(d => d.v);
       expect(values2).toContain('red');
@@ -226,7 +259,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'tag', v: 'red'}]);
       await db.transact([{op: true, e: 1, a: 'tag', v: 'blue'}]);
 
-      const {data: tags} = await db.datoms({e: 1, a: 'tag'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results} = await db.query(query);
+      const tags = queryResultsToDatoms(results, {e: 1, a: 'tag'});
       expect(tags).toHaveLength(2);
       const values = tags.map(d => d.v);
       expect(values).toContain('red');
@@ -237,7 +272,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       await db.transact([{op: true, e: 1, a: 'status', v: 'pending'}]);
 
-      const {data: existing} = await db.datoms({e: 1, a: 'status'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'status'});
+      const {data: results} = await db.query(query);
+      const existing = queryResultsToDatoms(results, {e: 1, a: 'status'});
 
       // Use with() to see what the upsert would look like
       const withResult = await db.with([
@@ -316,7 +353,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       void (await db.transact([{op: true, e: 1, a: 'tag', v: 'green'}]));
 
       // Should return the value with highest tx
-      const {data: datoms} = await db.datoms({e: 1, a: 'tag'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results} = await db.query(query);
+      const datoms = queryResultsToDatoms(results, {e: 1, a: 'tag'});
       const sorted = datoms.sort((a, b) => b.tx - a.tx);
       expect(sorted[0]?.v).toBe('green');
     });
@@ -330,7 +369,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: false, e: 1, a: 'tag', v: 'blue'}]);
 
       // Latest should be "red" since "blue" was sub
-      const {data: datoms} = await db.datoms({e: 1, a: 'tag'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results} = await db.query(query);
+      const datoms = queryResultsToDatoms(results, {e: 1, a: 'tag'});
       const sorted = datoms.sort((a, b) => b.tx - a.tx);
       expect(sorted[0]?.v).toBe('red');
     });
@@ -343,7 +384,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const withResult = await db.with([{op: true, e: 1, a: 'tag', v: 'blue'}]);
 
       // Should see latest value in dbAfter
-      const {data: datoms} = await withResult.dbAfter.datoms({
+      const query4 = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'tag',
+      });
+      const {data: results4} = await withResult.dbAfter.query(query4);
+      const datoms = queryResultsToDatoms(results4, {
         e: 1,
         a: 'tag',
       });
@@ -354,7 +400,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'tag', v: 'blue'}]);
 
       // After commit, should still be blue
-      const {data: finalDatoms} = await db.datoms({e: 1, a: 'tag'});
+      const query5 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results5} = await db.query(query5);
+      const finalDatoms = queryResultsToDatoms(results5, {e: 1, a: 'tag'});
       const finalSorted = finalDatoms.sort((a, b) => b.tx - a.tx);
       expect(finalSorted[0]?.v).toBe('blue');
     });
@@ -366,17 +414,23 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       void (await db.transact([{op: true, e: 1, a: 'tag', v: 'green'}]));
 
       // Current latest should be green
-      const {data: currentDatoms} = await db.datoms({e: 1, a: 'tag'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results} = await db.query(query);
+      const currentDatoms = queryResultsToDatoms(results, {e: 1, a: 'tag'});
       const currentSorted = currentDatoms.sort((a, b) => b.tx - a.tx);
       expect(currentSorted[0]?.v).toBe('green');
 
       // At tx2, latest should be blue
-      const {data: atTx2Datoms} = await db.asOf(tx2).datoms({e: 1, a: 'tag'});
+      const query2 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results2} = await db.asOf(tx2).query(query2);
+      const atTx2Datoms = queryResultsToDatoms(results2, {e: 1, a: 'tag'});
       const atTx2Sorted = atTx2Datoms.sort((a, b) => b.tx - a.tx);
       expect(atTx2Sorted[0]?.v).toBe('blue');
 
       // At tx1, latest should be red
-      const {data: atTx1Datoms} = await db.asOf(tx1).datoms({e: 1, a: 'tag'});
+      const query1 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results1} = await db.asOf(tx1).query(query1);
+      const atTx1Datoms = queryResultsToDatoms(results1, {e: 1, a: 'tag'});
       const atTx1Sorted = atTx1Datoms.sort((a, b) => b.tx - a.tx);
       expect(atTx1Sorted[0]?.v).toBe('red');
     });
@@ -394,7 +448,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
       expect(nameResults[0]?.v).toBe('Alice');
 
-      const {data: tagDatoms} = await db.datoms({e: 1, a: 'tag'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results} = await db.query(query);
+      const tagDatoms = queryResultsToDatoms(results, {e: 1, a: 'tag'});
       const tagSorted = tagDatoms.sort((a, b) => b.tx - a.tx);
       // Should return the latest value (blue, add last)
       expect(tagSorted[0]?.v).toBe('blue');
@@ -404,14 +460,18 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe('exists', () => {
     test('should return false for non-existent entity', async () => {
       const {db} = f;
-      const {data: datoms} = await db.datoms({e: 999, limit: 1});
+      const query = datomsQueryToDatalogQuery({e: 999, limit: 1});
+      const {data: results} = await db.query(query);
+      const datoms = queryResultsToDatoms(results, {e: 999, limit: 1});
       expect(datoms.length).toBe(0);
     });
 
     test('should return true for existing entity', async () => {
       const {db} = f;
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
-      const {data: datoms} = await db.datoms({e: 1, limit: 1});
+      const query = datomsQueryToDatalogQuery({e: 1, limit: 1});
+      const {data: results} = await db.query(query);
+      const datoms = queryResultsToDatoms(results, {e: 1, limit: 1});
       expect(datoms.length).toBeGreaterThan(0);
     });
 
@@ -419,7 +479,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
       await db.transact([{op: false, e: 1, a: 'name', v: 'Alice'}]);
-      const {data: datoms} = await db.datoms({e: 1, limit: 1});
+      const query = datomsQueryToDatalogQuery({e: 1, limit: 1});
+      const {data: results} = await db.query(query);
+      const datoms = queryResultsToDatoms(results, {e: 1, limit: 1});
       // Entity exists if it has any datoms (including sub ones)
       // This depends on implementation, but typically should return false after subion
       // However, if query uses limit: 1, it might not find sub datoms
@@ -431,7 +493,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
       await db.transact([{op: false, e: 1, a: 'name', v: 'Alice'}]);
       // exists() uses query with limit: 1, which should only return add datoms
-      const {data: datoms} = await db.datoms({e: 1, limit: 1});
+      const query = datomsQueryToDatalogQuery({e: 1, limit: 1});
+      const {data: results} = await db.query(query);
+      const datoms = queryResultsToDatoms(results, {e: 1, limit: 1});
       expect(datoms.length).toBe(0);
     });
   });
@@ -475,11 +539,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       // Upsert initial value
       await db.transact([{op: true, e: 1, a: 'status', v: 'pending'}]);
-      const {data: pendingDatoms} = await db.datoms({e: 1, a: 'status'});
+      const query1 = datomsQueryToDatalogQuery({e: 1, a: 'status'});
+      const {data: results1} = await db.query(query1);
+      const pendingDatoms = queryResultsToDatoms(results1, {e: 1, a: 'status'});
       expect(pendingDatoms[0]?.v).toBe('pending');
 
       // Upsert new value
-      const {data: existing1} = await db.datoms({e: 1, a: 'status'});
+      const query2 = datomsQueryToDatalogQuery({e: 1, a: 'status'});
+      const {data: results2} = await db.query(query2);
+      const existing1 = queryResultsToDatoms(results2, {e: 1, a: 'status'});
       await db.transact([
         ...existing1.map(d => ({
           op: false,
@@ -489,11 +557,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         })),
         {op: true, e: 1, a: 'status', v: 'active'},
       ]);
-      const {data: activeDatoms} = await db.datoms({e: 1, a: 'status'});
+      const query3 = datomsQueryToDatalogQuery({e: 1, a: 'status'});
+      const {data: results3} = await db.query(query3);
+      const activeDatoms = queryResultsToDatoms(results3, {e: 1, a: 'status'});
       expect(activeDatoms[0]?.v).toBe('active');
 
       // sub attribute
-      const {data: statusDatoms} = await db.datoms({e: 1, a: 'status'});
+      const query4 = datomsQueryToDatalogQuery({e: 1, a: 'status'});
+      const {data: results4} = await db.query(query4);
+      const statusDatoms = queryResultsToDatoms(results4, {e: 1, a: 'status'});
       await db.transact(
         statusDatoms.map(d => ({
           op: false,
@@ -502,12 +574,19 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           v: d.v,
         })),
       );
-      const {data} = await db.datoms({e: 1, a: 'status'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'status'});
+      const {data: results} = await db.query(query);
+      const data = queryResultsToDatoms(results, {e: 1, a: 'status'});
       expect(data.length).toBe(0);
 
       // Upsert again
       await db.transact([{op: true, e: 1, a: 'status', v: 'completed'}]);
-      const {data: completedDatoms} = await db.datoms({
+      const query5 = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'status',
+      });
+      const {data: results5} = await db.query(query5);
+      const completedDatoms = queryResultsToDatoms(results5, {
         e: 1,
         a: 'status',
       });
@@ -522,7 +601,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       expect(tx1).toBeGreaterThan(initialTx.txId);
 
-      const {data: nameDatoms} = await db.datoms({e: 1, a: 'name'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'name'});
+      const {data: results} = await db.query(query);
+      const nameDatoms = queryResultsToDatoms(results, {e: 1, a: 'name'});
       const tx2 = await db.transact(
         nameDatoms.map(d => ({
           op: false,

@@ -1,5 +1,6 @@
 import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
+import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import {FIXTURES} from './fixtures/fixtures.js';
 import type {Fixture} from './fixtures/fixture.js';
 
@@ -22,18 +23,24 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       // Use with() to see what the transaction would look like
-      const {data: initial} = await db.datoms({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results1} = await db.query(query1);
+      const initial = queryResultsToDatoms(results1, {e: 1});
       expect(initial).toHaveLength(1);
 
       const withResult = await db.with([{op: true, e: 1, a: 'status', v: 'pending'}]);
-      const {data: updated} = await withResult.dbAfter.datoms({e: 1});
+      const query2 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results2} = await withResult.dbAfter.query(query2);
+      const updated = queryResultsToDatoms(results2, {e: 1});
       expect(updated).toHaveLength(2);
 
       // Now commit the changes
       await db.transact([{op: true, e: 1, a: 'status', v: 'pending'}]);
 
       // Verify changes are committed
-      const {data: final} = await db.datoms({e: 1});
+      const query3 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results3} = await db.query(query3);
+      const final = queryResultsToDatoms(results3, {e: 1});
       expect(final).toHaveLength(2);
       const values = final.map(d => d.v);
       expect(values).toContain('Alice');
@@ -49,11 +56,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const withResult = await db.with([{op: true, e: 1, a: 'status', v: 'pending'}]);
 
       // Query dbAfter to see speculative state
-      const {data: speculative} = await withResult.dbAfter.datoms({e: 1});
+      const query4 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results4} = await withResult.dbAfter.query(query4);
+      const speculative = queryResultsToDatoms(results4, {e: 1});
       expect(speculative).toHaveLength(2);
 
       // But actual database should not be changed (with() doesn't commit)
-      const {data: final} = await db.datoms({e: 1});
+      const query5 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results5} = await db.query(query5);
+      const final = queryResultsToDatoms(results5, {e: 1});
       expect(final).toHaveLength(1);
       expect(final[0]?.v).toBe('Alice');
     });
@@ -64,14 +75,18 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       // Query before adding
-      const {data: before} = await db.datoms({e: 1});
+      const query6 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results6} = await db.query(query6);
+      const before = queryResultsToDatoms(results6, {e: 1});
       expect(before).toHaveLength(1);
 
       // Use with() to see what adding would look like
       const withResult = await db.with([{op: true, e: 1, a: 'age', v: 30}]);
 
       // Query dbAfter - should see speculative change
-      const {data: after} = await withResult.dbAfter.datoms({e: 1});
+      const query7 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results7} = await withResult.dbAfter.query(query7);
+      const after = queryResultsToDatoms(results7, {e: 1});
       expect(after).toHaveLength(2);
       const values = after.map(d => d.v);
       expect(values).toContain('Alice');
@@ -90,7 +105,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const withResult = await db.with([{op: false, e: 1, a: 'age', v: 30}]);
 
       // Query dbAfter should not see sub datom
-      const {data: result} = await withResult.dbAfter.datoms({e: 1});
+      const query8 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results8} = await withResult.dbAfter.query(query8);
+      const result = queryResultsToDatoms(results8, {e: 1});
       expect(result).toHaveLength(1);
       expect(result[0]?.v).toBe('Alice');
 
@@ -98,7 +115,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: false, e: 1, a: 'age', v: 30}]);
 
       // Verify subion is committed
-      const {data: final} = await db.datoms({e: 1});
+      const query9 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results9} = await db.query(query9);
+      const final = queryResultsToDatoms(results9, {e: 1});
       expect(final).toHaveLength(1);
       expect(final[0]?.v).toBe('Alice');
     });
@@ -142,14 +161,18 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       // Verify all operations were applied
-      const {data: alice} = await db.datoms({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results1} = await db.query(query1);
+      const alice = queryResultsToDatoms(results1, {e: 1});
       expect(alice).toHaveLength(2);
       const aliceValues = alice.map(d => d.v);
       expect(aliceValues).toContain('Alice');
       expect(aliceValues).toContain(31);
       expect(aliceValues).not.toContain(30);
 
-      const {data: bob} = await db.datoms({e: 2});
+      const query2 = datomsQueryToDatalogQuery({e: 2});
+      const {data: results2} = await db.query(query2);
+      const bob = queryResultsToDatoms(results2, {e: 2});
       expect(bob).toHaveLength(1);
       expect(bob[0]?.v).toBe('Bob');
     });
@@ -167,15 +190,21 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       // Query dbAfter to see speculative state
-      const {data: speculative} = await withResult.dbAfter.datoms({e: 1});
+      const query10 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results10} = await withResult.dbAfter.query(query10);
+      const speculative = queryResultsToDatoms(results10, {e: 1});
       expect(speculative.length).toBeGreaterThan(0);
 
       // But actual database should not be changed (with() doesn't commit)
-      const {data: result} = await db.datoms({e: 1});
+      const query11 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results11} = await db.query(query11);
+      const result = queryResultsToDatoms(results11, {e: 1});
       expect(result).toHaveLength(1);
       expect(result[0]?.v).toBe('Initial');
 
-      const {data: entity2} = await db.datoms({e: 2});
+      const query2 = datomsQueryToDatalogQuery({e: 2});
+      const {data: results2} = await db.query(query2);
+      const entity2 = queryResultsToDatoms(results2, {e: 2});
       expect(entity2).toHaveLength(0);
     });
 
@@ -204,13 +233,17 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
-      let entity = await db.datoms({e: 1, op: true});
-      expect(entity.data).toHaveLength(1);
+      const query1 = datomsQueryToDatalogQuery({e: 1, op: true});
+      const {data: results1} = await db.query(query1);
+      let entity = queryResultsToDatoms(results1, {e: 1, op: true});
+      expect(entity).toHaveLength(1);
 
       // Use with() to see what adding age would look like
       const withResult = await db.with([{op: true, e: 1, a: 'age', v: 30}]);
-      entity = await withResult.dbAfter.datoms({e: 1, op: true});
-      expect(entity.data).toHaveLength(2);
+      const query2 = datomsQueryToDatalogQuery({e: 1, op: true});
+      const {data: results2} = await withResult.dbAfter.query(query2);
+      entity = queryResultsToDatoms(results2, {e: 1, op: true});
+      expect(entity).toHaveLength(2);
     });
 
     test('should handle hasFact with with()', async () => {
@@ -218,20 +251,24 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
-      const {data: nameDatoms} = await db.datoms({
+      const query = datomsQueryToDatalogQuery({
         e: 1,
         a: 'name',
         v: 'Alice',
       });
+      const {data: nameResults} = await db.query(query);
+      const nameDatoms = queryResultsToDatoms(nameResults, {e: 1, a: 'name', v: 'Alice'});
       expect(nameDatoms.length).toBeGreaterThan(0);
 
       // Use with() to see what adding status would look like
       const withResult = await db.with([{op: true, e: 1, a: 'status', v: 'active'}]);
-      const {data: statusDatoms} = await withResult.dbAfter.datoms({
+      const queryStatus = datomsQueryToDatalogQuery({
         e: 1,
         a: 'status',
         v: 'active',
       });
+      const {data: statusResults} = await withResult.dbAfter.query(queryStatus);
+      const statusDatoms = queryResultsToDatoms(statusResults, {e: 1, a: 'status', v: 'active'});
       expect(statusDatoms.length).toBeGreaterThan(0);
     });
 
@@ -330,12 +367,16 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const withResult = await db.with([{op: true, e: 1, a: 'age', v: 30}]);
 
       // dbBefore should show current state
-      const {data: before} = await withResult.dbBefore.datoms({e: 1});
+      const queryBefore = datomsQueryToDatalogQuery({e: 1});
+      const {data: resultsBefore} = await withResult.dbBefore.query(queryBefore);
+      const before = queryResultsToDatoms(resultsBefore, {e: 1});
       expect(before).toHaveLength(1);
       expect(before[0]?.v).toBe('Alice');
 
       // dbAfter should show speculative state
-      const {data: after} = await withResult.dbAfter.datoms({e: 1});
+      const query = datomsQueryToDatalogQuery({e: 1});
+      const {data: results} = await withResult.dbAfter.query(query);
+      const after = queryResultsToDatoms(results, {e: 1});
       expect(after).toHaveLength(2);
       const values = after.map(d => d.v);
       expect(values).toContain('Alice');

@@ -1,8 +1,9 @@
 import {records, type Attribute, type Datom, type Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {DatomDatabase} from '../datom-database.js';
-import type {AfterRead, AfterDatomsRead, Hook} from '../hook/hook.js';
+import type {AfterRead, Hook} from '../hook/hook.js';
 import {HookValidator} from '../hook/validator.js';
+import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import type {QueryResult} from '../views/database-view.js';
 
 // Schema constants
@@ -79,7 +80,9 @@ export const POST_ACCESS_CONTROL: AfterRead = {
     const postAuthorMap = new Map<EntityId, number>();
     for (const postId of postEntities) {
       // Fetch author
-      const {data: authorDatoms} = await db.datoms({e: postId, a: POST_AUTHOR});
+      const queryAuthor = datomsQueryToDatalogQuery({e: postId, a: POST_AUTHOR});
+      const {data: resultsAuthor} = await db.query(queryAuthor);
+      const authorDatoms = queryResultsToDatoms(resultsAuthor, {e: postId, a: POST_AUTHOR});
       if (authorDatoms.length > 0) {
         const author = authorDatoms[0]?.v as number | undefined;
         if (author !== undefined) {
@@ -89,7 +92,9 @@ export const POST_ACCESS_CONTROL: AfterRead = {
 
       // Fetch status if not already in results
       if (!postStatusMap.has(postId)) {
-        const {data: statusDatoms} = await db.datoms({e: postId, a: POST_STATUS});
+        const queryStatus = datomsQueryToDatalogQuery({e: postId, a: POST_STATUS});
+        const {data: resultsStatus} = await db.query(queryStatus);
+        const statusDatoms = queryResultsToDatoms(resultsStatus, {e: postId, a: POST_STATUS});
         if (statusDatoms.length > 0) {
           const status = statusDatoms[0]?.v as string | undefined;
           if (status !== undefined) {
@@ -173,7 +178,9 @@ export const POST_VALIDATOR: Hook = {
       const hasStatus = POST_STATUS in postRecord;
 
       // Check existing datoms for posts being updated
-      const {data: existingDatoms} = await db.datoms({e: postId});
+      const query = datomsQueryToDatalogQuery({e: postId});
+      const {data: results} = await db.query(query);
+      const existingDatoms = queryResultsToDatoms(results, {e: postId});
       const existingRecord = records(existingDatoms)[0] || {};
       const existingHasTitle = POST_TITLE in existingRecord;
       const existingHasAuthor = POST_AUTHOR in existingRecord;
@@ -226,7 +233,9 @@ export const AUTHOR_VALIDATOR: Hook = {
     for (const datom of tx.datoms) {
       if (datom.a === POST_AUTHOR && datom.op === true) {
         const authorId = datom.v as number;
-        const {data: authorDatoms} = await db.datoms({e: authorId});
+        const query = datomsQueryToDatalogQuery({e: authorId});
+        const {data: results} = await db.query(query);
+        const authorDatoms = queryResultsToDatoms(results, {e: authorId});
         const authorRecord = records(authorDatoms)[0] || {};
         const userType = authorRecord[USER_TYPE] as string | undefined;
         const isAuthor = userType === USER_TYPE_AUTHOR;

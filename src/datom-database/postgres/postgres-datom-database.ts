@@ -13,15 +13,13 @@ import type {Logger, Transaction} from '../../types.js';
 
 import type {DatomDatabase, WithResult} from '../datom-database.js';
 import {
+  type Hook,
   HookEngine,
   QueryError,
   QueryResultSizeError,
   QuerySafetyError,
-  QueryTimeoutError,
-  TransactionError,
-  type Hook,
   type ReadContext,
-  type DatomsReadContext,
+  TransactionError,
   type WriteContext,
   type WriteResult,
 } from '../hook/hook.js';
@@ -33,7 +31,6 @@ import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
 import type {
   DatabaseView,
   DatomsQuery,
-  DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
 } from '../views/database-view.js';
@@ -169,11 +166,24 @@ function datalogToPostgresSQL(
   query: DatalogQuery,
   tableName = 'datoms',
 ): {sql: string; params: unknown[]} {
-  const clauses = query.where;
+  const allClauses = query.where;
   const params: unknown[] = [];
 
-  // Check if we can use pivot optimization
-  const usePivot = canUsePivotOptimization(clauses);
+  // Separate QueryPattern clauses from predicate clauses
+  const patternClauses: QueryClause[] = [];
+  const predicateClauses: QueryClause[] = [];
+  for (const clause of allClauses) {
+    if (isQueryPattern(clause)) {
+      patternClauses.push(clause);
+    } else if (Array.isArray(clause)) {
+      // Predicate clause like ['=', '?tx', value]
+      predicateClauses.push(clause);
+    }
+    // Skip other clause types (or, not) for now
+  }
+
+  // Check if we can use pivot optimization (only on pattern clauses)
+  const usePivot = canUsePivotOptimization(patternClauses);
 
   if (usePivot) {
     // Build SQL using pivot optimization
@@ -183,7 +193,7 @@ function datalogToPostgresSQL(
     const attrToBoundValue: Map<string, Value> = new Map();
     let entityVarName: string | null = null;
 
-    for (const clause of clauses) {
+    for (const clause of patternClauses) {
       if (!clause || !isQueryPattern(clause)) {
         throw new Error('Only QueryPattern clauses are supported in pivot queries');
       }
@@ -247,7 +257,7 @@ function datalogToPostgresSQL(
         ORDER BY e, a, v, tx DESC
       ),
       active_datoms AS (
-        SELECT e, a, v, tx
+        SELECT e, a, v, tx, op
         FROM all_datoms
         WHERE op = true
       )`;
@@ -398,6 +408,40 @@ function datalogToPostgresSQL(
       }
     }
 
+    // Build predicate WHERE conditions for pivot queries
+    const predicateConditions: string[] = [];
+    for (const predicate of predicateClauses) {
+      if (Array.isArray(predicate) && predicate.length === 3) {
+        const [op, varName, value] = predicate;
+        if (typeof varName === 'string' && varName.startsWith('?')) {
+          const varColName = stripQuestionMark(varName);
+          if (op === '=') {
+            if (varName === '?tx') {
+              // Transaction ID - need to reference from active_datoms
+              params.push(value);
+              predicateConditions.push(`"${varColName}" = ?`);
+            } else {
+              // Other variables from pivot
+              params.push(value);
+              predicateConditions.push(`"${varColName}" = ?`);
+            }
+          } else if (op === '<=') {
+            if (varName === '?tx') {
+              // Transaction ID
+              params.push(value);
+              predicateConditions.push(`"${varColName}" <= ?`);
+            } else {
+              params.push(value);
+              predicateConditions.push(`"${varColName}" <= ?`);
+            }
+          }
+        }
+      }
+    }
+
+    const whereClause =
+      predicateConditions.length > 0 ? `WHERE ${predicateConditions.join(' AND ')}` : '';
+
     // Build LIMIT clause
     const limitClause = query.limit ? 'LIMIT ?' : '';
     if (query.limit) {
@@ -413,6 +457,7 @@ function datalogToPostgresSQL(
         ${groupByClause}
         ${havingClause}
       ) AS pivoted
+      ${whereClause}
       ${orderByClause}
       ${limitClause}
     `;
@@ -425,9 +470,9 @@ function datalogToPostgresSQL(
   const selectColumns: string[] = [];
   const joinConditions: string[] = [];
 
-  // Build CTEs for each clause with deduplication using DISTINCT ON
-  for (let i = 0; i < clauses.length; i++) {
-    const clause = clauses[i];
+  // Build CTEs for each pattern clause with deduplication using DISTINCT ON
+  for (let i = 0; i < patternClauses.length; i++) {
+    const clause = patternClauses[i];
     if (!clause || !isQueryPattern(clause)) {
       throw new Error('Only QueryPattern clauses are supported in SQL queries');
     }
@@ -454,24 +499,24 @@ function datalogToPostgresSQL(
       params.push(JSON.stringify(value));
     }
 
-    // We need to include falseions in DISTINCT ON to correctly determine the latest state.
+    // We need to include retractions in DISTINCT ON to correctly determine the latest state.
     // We filter by op AFTER DISTINCT ON. This ensures that if a datom was trueed then falseed, the falseion wins.
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // PostgreSQL uses DISTINCT ON for deduplication
     const cte = `
-      ${alias} AS (
-        SELECT DISTINCT ON (e, a, v)
-          e, a, v, tx, op
-        FROM ${tableName}
-        ${whereClause}
-        ORDER BY e, a, v, tx DESC
-      ),
-      ${alias}_active AS (
-        SELECT e, a, v, tx
-        FROM ${alias}
-        WHERE op = true
-      )`;
+        ${alias} AS (
+          SELECT DISTINCT ON (e, a, v)
+            e, a, v, tx, op
+          FROM ${tableName}
+          ${whereClause}
+          ORDER BY e, a, v, tx DESC
+        ),
+        ${alias}_active AS (
+          SELECT e, a, v, tx, op
+          FROM ${alias}
+          WHERE op = true
+        )`;
 
     ctes.push(cte);
   }
@@ -480,8 +525,8 @@ function datalogToPostgresSQL(
   // Use first occurrence (lowest index) to ensure the table is definitely in FROM/JOIN
   // Use _active CTEs which filter to only trueions after DISTINCT ON
   const variableToColumn: Map<string, string> = new Map();
-  for (let i = 0; i < clauses.length; i++) {
-    const clause = clauses[i];
+  for (let i = 0; i < patternClauses.length; i++) {
+    const clause = patternClauses[i];
     if (!clause || !isQueryPattern(clause)) {
       continue;
     }
@@ -510,8 +555,8 @@ function datalogToPostgresSQL(
   // Build JOIN conditions based on shared variables
   const variableToClause: Map<string, {clauseIndex: number; field: string}[]> = new Map();
 
-  for (let i = 0; i < clauses.length; i++) {
-    const clause = clauses[i];
+  for (let i = 0; i < patternClauses.length; i++) {
+    const clause = patternClauses[i];
     if (!clause || !isQueryPattern(clause)) {
       throw new Error('Only QueryPattern clauses are supported in JOIN conditions');
     }
@@ -609,12 +654,27 @@ function datalogToPostgresSQL(
         continue;
       }
 
-      const columnRef = variableToColumn.get(varName);
-      if (columnRef) {
-        selectColumns.push(`${columnRef} AS "${outputKey}"`);
-        // Only add to GROUP BY if we have aggregations (required by SQL)
+      // Special handling for op and tx fields that are not in where clause but may be in find clause
+      if (varName === '?op') {
+        // op is available from the first CTE (d0_active)
+        selectColumns.push(`d0_active.op AS "${outputKey}"`);
         if (hasAggregations) {
-          groupByColumns.push(columnRef);
+          groupByColumns.push('d0_active.op');
+        }
+      } else if (varName === '?tx') {
+        // tx is available from the first CTE (d0_active)
+        selectColumns.push(`d0_active.tx AS "${outputKey}"`);
+        if (hasAggregations) {
+          groupByColumns.push('d0_active.tx');
+        }
+      } else {
+        const columnRef = variableToColumn.get(varName);
+        if (columnRef) {
+          selectColumns.push(`${columnRef} AS "${outputKey}"`);
+          // Only add to GROUP BY if we have aggregations (required by SQL)
+          if (hasAggregations) {
+            groupByColumns.push(columnRef);
+          }
         }
       }
     }
@@ -627,7 +687,7 @@ function datalogToPostgresSQL(
 
   // Build JOIN clauses
   const joinClauses: string[] = [];
-  for (let i = 1; i < clauses.length; i++) {
+  for (let i = 1; i < patternClauses.length; i++) {
     const alias = `d${i}_active`;
     const conditions: string[] = [];
 
@@ -679,8 +739,8 @@ function datalogToPostgresSQL(
       // This handles cases where variables might not be properly tracked
       const prevAlias = `d${i - 1}_active`;
       // Try to find any shared variables between current and previous clause
-      const currentClause = clauses[i];
-      const prevClause = clauses[i - 1];
+      const currentClause = patternClauses[i];
+      const prevClause = patternClauses[i - 1];
       if (
         currentClause &&
         prevClause &&
@@ -749,6 +809,58 @@ function datalogToPostgresSQL(
     }
   }
 
+  // Build predicate WHERE conditions
+  const predicateConditions: string[] = [];
+  for (const predicate of predicateClauses) {
+    if (Array.isArray(predicate) && predicate.length === 3) {
+      const [op, varName, value] = predicate;
+      if (typeof varName === 'string' && varName.startsWith('?')) {
+        // Handle special variables that aren't in variableToColumn
+        if (varName === '?tx') {
+          // tx is always available from the first CTE
+          if (op === '=') {
+            params.push(value);
+            predicateConditions.push('d0_active.tx = ?');
+          } else if (op === '<=') {
+            params.push(value);
+            predicateConditions.push('d0_active.tx <= ?');
+          }
+          continue;
+        }
+
+        const columnRef = variableToColumn.get(varName);
+        if (columnRef) {
+          if (op === '=') {
+            // For equality, handle different column types
+            if (columnRef.includes('.v')) {
+              // Value column is JSONB
+              params.push(JSON.stringify(value));
+              predicateConditions.push(`${columnRef} = ?::jsonb`);
+            } else {
+              // Entity or attribute is text
+              params.push(String(value));
+              predicateConditions.push(`${columnRef} = ?`);
+            }
+          } else if (op === '<=') {
+            // For <=, handle different column types
+            if (columnRef.includes('.v')) {
+              // Value column is JSONB - cast to numeric for comparison
+              params.push(JSON.stringify(value));
+              predicateConditions.push(`(${columnRef}::jsonb)::text::numeric <= ?::numeric`);
+            } else {
+              // Entity or attribute - use text comparison
+              params.push(String(value));
+              predicateConditions.push(`${columnRef} <= ?`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const whereClause =
+    predicateConditions.length > 0 ? `WHERE ${predicateConditions.join(' AND ')}` : '';
+
   // Build GROUP BY clause if we have aggregations with non-aggregated columns
   let groupByClause = '';
   if (groupByColumns.length > 0) {
@@ -765,6 +877,7 @@ function datalogToPostgresSQL(
     SELECT ${selectColumns.join(', ')}
     ${fromClause}
     ${joinClause}
+    ${whereClause}
     ${groupByClause}
     ${orderByClause}
     ${limitClause}
@@ -1050,53 +1163,6 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       });
       return undefined;
     }
-  }
-
-  async datoms(options: DatomsQuery): Promise<DatomsResultEnvelope> {
-    // Validate that tx and txMax are mutually exclusive
-    if (options.tx !== undefined && options.txMax !== undefined) {
-      throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
-    }
-
-    // Validate that query has at least one filter or limit to prevent accidental full scans
-    const hasFilter =
-      options.e !== undefined ||
-      options.a !== undefined ||
-      options.v !== undefined ||
-      options.tx !== undefined ||
-      options.txMax !== undefined;
-    const hasLimit = options.limit !== undefined;
-
-    if (!hasFilter && !hasLimit) {
-      throw new QuerySafetyError(
-        'Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans',
-      );
-    }
-
-    // Extract viewConfig from options
-    const viewConfig = options.viewConfig ?? {type: 'current'};
-
-    // Execute query with timeout if specified
-    let envelope: DatomsResultEnvelope;
-    if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new QueryTimeoutError(options.timeoutMs ?? 0, options));
-        }, options.timeoutMs);
-      });
-
-      const queryPromise = this._datomsWithMetadataInternal(options, viewConfig);
-      envelope = await Promise.race([queryPromise, timeoutPromise]);
-    } else {
-      envelope = await this._datomsWithMetadataInternal(options, viewConfig);
-    }
-
-    // Check result size limit if specified
-    if (options.maxResultSize !== undefined && envelope.data.length > options.maxResultSize) {
-      throw new QueryResultSizeError(envelope.data.length, options.maxResultSize, options);
-    }
-
-    return envelope;
   }
 
   asOf(txId: TransactionId): DatabaseView {
@@ -1718,7 +1784,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     if (!isQueryPattern(clause)) {
       throw new Error('Only QueryPattern clauses are supported');
     }
-    const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+    const {e: entityVal, a: attributeVal, v: valueVal, tx: _txVal} = clause;
     const entity = isVariable(entityVal) ? undefined : (entityVal as EntityId);
     const attribute = isVariable(attributeVal) ? undefined : (attributeVal as string);
     const value = isVariable(valueVal) ? undefined : (valueVal as Value);
@@ -1738,15 +1804,27 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Map datom fields to variable names from the clause
     return matchingDatoms.map(datom => {
       const result: Record<string, Value | Attribute> = {};
-      if (isVariable(entityVal)) {
+      // Always include e, a, v as variables even if they're bound in the clause
+      // This ensures they're available for projection
+      result['?e'] = datom.e;
+      result['?a'] = datom.a;
+      result['?v'] = datom.v;
+      // Also include the variable names from the clause pattern if they differ from ?e, ?a, ?v
+      // This handles cases where e: '?x' means ?x should be in results, not just ?e
+      if (isVariable(entityVal) && entityVal !== '?e') {
         result[entityVal as string] = datom.e;
       }
-      if (isVariable(attributeVal)) {
+      if (isVariable(attributeVal) && attributeVal !== '?a') {
         result[attributeVal as string] = datom.a;
       }
-      if (isVariable(valueVal)) {
+      if (isVariable(valueVal) && valueVal !== '?v') {
         result[valueVal as string] = datom.v;
       }
+      // Always include tx and op from datoms
+      // tx is always '?tx' in the pattern (set by datomsQueryToDatalogQuery)
+      result['?tx'] = datom.tx;
+      // op is not in QueryPattern, but we include it if it's requested in find clause
+      result['?op'] = datom.op;
       return result;
     });
   }
@@ -1991,28 +2069,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     options: DatomsQuery,
     viewConfig: ViewConfig,
     sqlQueries?: SQLQueryMetadata[],
-  ): Promise<DatomsResultEnvelope> {
+  ): Promise<{data: Datom[]; metadata: Record<string, unknown>}> {
     await this._ensureInitialized();
 
     const startTime = performance.now();
     const metadata: Record<string, unknown> = {};
 
-    // Create datoms read context for hooks
-    const {db: _, query: __, ...restContext} = options.context || {};
-    const ctx: DatomsReadContext = {
-      ...restContext,
-      db: this,
-      query: options,
-    };
-
-    // Run before-datoms-read hooks
-    const beforeResult = await this.hooks.runBeforeDatomsRead(options, ctx);
-
-    if (beforeResult.errors.length > 0) {
-      throw new QueryError('Datoms query blocked by hooks', beforeResult.errors);
-    }
-
-    const modifiedOptions = beforeResult.query;
+    const modifiedOptions = options;
 
     let result: Datom[];
     const accumulatedSql: SQLQueryMetadata[] = sqlQueries || [];
@@ -2051,24 +2114,17 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       throw new Error(`Unknown view config type: ${(_exhaustive as ViewConfig).type}`);
     }
 
-    // Run after-datoms-read hooks
-    const afterResult = await this.hooks.runAfterDatomsRead(result, ctx);
-
-    if (afterResult.errors.length > 0) {
-      throw new QueryError('Datoms query blocked by after-read hooks', afterResult.errors);
-    }
-
     const executionTime = performance.now() - startTime;
 
     if (accumulatedSql.length > 0) {
       metadata.sql = accumulatedSql;
     }
     metadata.executionTimeMs = executionTime;
-    metadata.resultCount = afterResult.datoms.length;
+    metadata.resultCount = result.length;
 
     return {
-      data: afterResult.datoms,
-      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      data: result,
+      metadata: Object.keys(metadata).length > 0 ? metadata : {},
     };
   }
 
@@ -2120,12 +2176,45 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       };
     }
 
+    // Validate query has at least one filter or limit to prevent full table scans
+    // Empty where clauses are safe (return no results), so only validate if where has clauses
+    const hasLimit = modifiedQuery.limit !== undefined;
+    let hasFilter = false;
+    for (const clause of modifiedQuery.where) {
+      if (isQueryPattern(clause)) {
+        // Check if any field is bound (not a variable)
+        // v is optional, so only check if it exists
+        if (
+          !isVariable(clause.e) ||
+          !isVariable(clause.a) ||
+          (clause.v !== undefined && !isVariable(clause.v)) ||
+          (clause.tx !== undefined && !isVariable(clause.tx))
+        ) {
+          hasFilter = true;
+          break;
+        }
+      }
+    }
+    if (!hasFilter && !hasLimit) {
+      throw new QuerySafetyError(
+        'Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans',
+      );
+    }
+
     // Helper function to build QueryResult and run afterRead hooks
     const buildAndFilterQueryResult = async (
       buildResult: () => Promise<QueryResult<TFind>>,
       executionStrategy: string,
     ): Promise<QueryResultEnvelope<TFind>> => {
       const queryResult = await buildResult();
+
+      // Check maxResultSize before running after-read hooks
+      if (modifiedQuery.maxResultSize !== undefined) {
+        const resultSize = queryResult.length;
+        if (resultSize > modifiedQuery.maxResultSize) {
+          throw new QueryResultSizeError(resultSize, modifiedQuery.maxResultSize, modifiedQuery);
+        }
+      }
 
       // Run after-read hooks on QueryResult
       const afterResult = await this.hooks.runAfterRead(queryResult, ctx);
@@ -2157,7 +2246,24 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     if (viewConfig.type === 'speculative') {
       return buildAndFilterQueryResult(async () => {
         // Use in-memory join logic for speculative queries
-        const firstClause = modifiedQuery.where[0];
+        // Separate QueryPattern clauses from predicate clauses
+        const patternClauses: QueryClause[] = [];
+        const predicateClauses: QueryClause[] = [];
+        for (const clause of modifiedQuery.where) {
+          if (isQueryPattern(clause)) {
+            patternClauses.push(clause);
+          } else if (Array.isArray(clause)) {
+            // Predicate clause like ['=', '?tx', value]
+            predicateClauses.push(clause);
+          }
+          // Skip other clause types (or, not) for now
+        }
+
+        if (patternClauses.length === 0) {
+          return [] as QueryResult<TFind>;
+        }
+
+        const firstClause = patternClauses[0];
         if (!firstClause || !isQueryPattern(firstClause)) {
           throw new Error('First clause must be a QueryPattern');
         }
@@ -2177,23 +2283,33 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           sqlQueries,
         );
 
-        const firstResults = firstDatoms.data.map(datom => {
+        const firstResults = firstDatoms.data.map((datom: Datom) => {
           const result: Record<string, Value | Attribute> = {};
-          if (isVariable(entityVal)) {
+          // Always include e, a, v as variables even if they're bound in the clause
+          // This ensures they're available for projection
+          result['?e'] = datom.e;
+          result['?a'] = datom.a;
+          result['?v'] = datom.v;
+          // Also include the variable names from the clause pattern if they differ from ?e, ?a, ?v
+          // This handles cases where e: '?x' means ?x should be in results, not just ?e
+          if (isVariable(entityVal) && entityVal !== '?e') {
             result[entityVal as string] = datom.e;
           }
-          if (isVariable(attributeVal)) {
+          if (isVariable(attributeVal) && attributeVal !== '?a') {
             result[attributeVal as string] = datom.a;
           }
-          if (isVariable(valueVal)) {
+          if (isVariable(valueVal) && valueVal !== '?v') {
             result[valueVal as string] = datom.v;
           }
+          // Always include tx and op from datoms
+          result['?tx'] = datom.tx;
+          result['?op'] = datom.op;
           return result;
         });
 
         let results = firstResults;
-        for (let i = 1; i < modifiedQuery.where.length; i++) {
-          const clause = modifiedQuery.where[i];
+        for (let i = 1; i < patternClauses.length; i++) {
+          const clause = patternClauses[i];
           if (!clause || !isQueryPattern(clause)) {
             throw new Error('Only QueryPattern clauses are supported in joins');
           }
@@ -2212,21 +2328,47 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
             sqlQueries,
           );
 
-          const clauseResults = clauseDatoms.data.map(datom => {
+          const clauseResults = clauseDatoms.data.map((datom: Datom) => {
             const result: Record<string, Value | Attribute> = {};
-            if (isVariable(entityVal)) {
+            // Always include e, a, v as variables even if they're bound in the clause
+            // This ensures they're available for projection
+            result['?e'] = datom.e;
+            result['?a'] = datom.a;
+            result['?v'] = datom.v;
+            // Also include the variable names from the clause pattern if they differ from ?e, ?a, ?v
+            // This handles cases where e: '?x' means ?x should be in results, not just ?e
+            if (isVariable(entityVal) && entityVal !== '?e') {
               result[entityVal as string] = datom.e;
             }
-            if (isVariable(attributeVal)) {
+            if (isVariable(attributeVal) && attributeVal !== '?a') {
               result[attributeVal as string] = datom.a;
             }
-            if (isVariable(valueVal)) {
+            if (isVariable(valueVal) && valueVal !== '?v') {
               result[valueVal as string] = datom.v;
             }
+            // Always include tx and op from datoms
+            result['?tx'] = datom.tx;
+            result['?op'] = datom.op;
             return result;
           });
 
-          results = joinResults(results, clauseResults, modifiedQuery.where.slice(0, i + 1));
+          results = joinResults(results, clauseResults, patternClauses.slice(0, i + 1));
+        }
+
+        // Apply predicate clauses as filters
+        for (const predicate of predicateClauses) {
+          if (Array.isArray(predicate) && predicate.length === 3) {
+            const [op, varName, value] = predicate;
+            if (op === '=' && typeof varName === 'string' && varName.startsWith('?')) {
+              results = results.filter(row => row[varName] === value);
+            } else if (op === '<=' && typeof varName === 'string' && varName.startsWith('?')) {
+              results = results.filter(row => {
+                const rowValue = row[varName];
+                return rowValue !== undefined && rowValue !== null && rowValue <= value;
+              });
+            }
+            // Add other predicate operators as needed
+          }
         }
 
         const projected = project(results, modifiedQuery.find, modifiedQuery.where);

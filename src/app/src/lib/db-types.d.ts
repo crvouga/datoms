@@ -23,7 +23,10 @@ declare global {
    *
    * @example
    * // Get datoms for an entity
-   * const { data: datoms } = await db.datoms({ e: 123 });
+   * const { data: results } = await db.query({
+   *   find: { e: ["?e"], a: ["?a"], v: ["?v"] },
+   *   where: [{ e: 123, a: "?a", v: "?v" }]
+   * });
    *
    * @example
    * // Transact data

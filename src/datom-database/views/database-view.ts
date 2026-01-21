@@ -8,8 +8,6 @@ import type {Attribute, Datom, TransactionId, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {ViewConfig} from './view-config.js';
 
-export type DatomsResult = Array<Datom>;
-
 /**
  * Type helper to extract result type from a DatalogQuery's find clause
  * Extracts the keys from the find clause and creates a record type where each key
@@ -28,14 +26,6 @@ export type QueryResult<
 > = QueryResultFromFind<TFind>;
 
 /**
- * Envelope containing datoms query result and optional metadata
- */
-export type DatomsResultEnvelope = {
-  data: DatomsResult;
-  metadata?: Record<string, unknown>;
-};
-
-/**
  * Envelope containing datalog query result and optional metadata
  * @template TFind The find clause from the DatalogQuery
  */
@@ -47,51 +37,9 @@ export type QueryResultEnvelope<
 };
 
 /**
- * Read-only database view for time-travel queries (Datomic-like)
- * Provides minimal interface for querying historical or filtered database states
- * Views are immutable and cannot modify the database
- */
-export interface DatabaseView {
-  /**
-   * Query datoms from the database view using query options
-   * @param options Query options (must include at least one filter or limit to prevent full scans)
-   * @returns Envelope containing datoms result and optional metadata
-   * @example
-   * const dbPast = db.asOf(100);
-   * const { data: datoms } = await dbPast.datoms({ e: 123 });
-   * // or
-   * const envelope = await dbPast.datoms({ e: 123 });
-   * console.log(envelope.data); // The datoms
-   * console.log(envelope.metadata); // Implementation-specific metadata (SQL queries, etc.)
-   */
-  datoms(options: DatomsQuery): Promise<DatomsResultEnvelope>;
-
-  /**
-   * Execute a datalog query against this database view
-   * @param query Datalog query to execute
-   * @returns Envelope containing query results and optional metadata with type-safe keys from the find clause
-   * @example
-   * const dbPast = db.asOf(100);
-   * const { data: results } = await dbPast.query({
-   *   find: { "movie/id": ["?id"], "movie/title": ["?title"] },
-   *   where: [{ e: "?id", a: "tmdb.movie/title", v: "?title" }]
-   * });
-   * // results is typed as Array<{ "movie/id": Value | Attribute | EntityId, "movie/title": Value | Attribute | EntityId }>
-   * // or
-   * const envelope = await dbPast.query({ ... });
-   * console.log(envelope.data); // The query results
-   * console.log(envelope.metadata); // Implementation-specific metadata (SQL queries, execution plans, etc.)
-   */
-  query<
-    TFind extends Record<string, DatalogQueryFindVariable> = Record<
-      string,
-      DatalogQueryFindVariable
-    >,
-  >(query: DatalogQuery<keyof TFind & string> & {find: TFind}): Promise<QueryResultEnvelope<TFind>>;
-}
-
-/**
- * Options for querying datoms
+ * Options for querying datoms (internal use only)
+ * Used internally by query execution methods
+ * @internal
  */
 export interface DatomsQuery {
   /** Filter by entity ID */
@@ -120,4 +68,34 @@ export interface DatomsQuery {
   context?: Record<string, unknown>;
   /** Optional view configuration */
   viewConfig?: ViewConfig;
+}
+
+/**
+ * Read-only database view for time-travel queries (Datomic-like)
+ * Provides minimal interface for querying historical or filtered database states
+ * Views are immutable and cannot modify the database
+ */
+export interface DatabaseView {
+  /**
+   * Execute a datalog query against this database view
+   * @param query Datalog query to execute
+   * @returns Envelope containing query results and optional metadata with type-safe keys from the find clause
+   * @example
+   * const dbPast = db.asOf(100);
+   * const { data: results } = await dbPast.query({
+   *   find: { "movie/id": ["?id"], "movie/title": ["?title"] },
+   *   where: [{ e: "?id", a: "tmdb.movie/title", v: "?title" }]
+   * });
+   * // results is typed as Array<{ "movie/id": Value | Attribute | EntityId, "movie/title": Value | Attribute | EntityId }>
+   * // or
+   * const envelope = await dbPast.query({ ... });
+   * console.log(envelope.data); // The query results
+   * console.log(envelope.metadata); // Implementation-specific metadata (SQL queries, execution plans, etc.)
+   */
+  query<
+    TFind extends Record<string, DatalogQueryFindVariable> = Record<
+      string,
+      DatalogQueryFindVariable
+    >,
+  >(query: DatalogQuery<keyof TFind & string> & {find: TFind}): Promise<QueryResultEnvelope<TFind>>;
 }

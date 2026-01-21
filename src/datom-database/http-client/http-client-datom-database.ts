@@ -5,7 +5,7 @@
  */
 
 import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
-import {datoms, type Datom, type DatomInput, type TransactionId} from '../../datoms.js';
+import {type Datom, type DatomInput, type TransactionId, datoms} from '../../datoms.js';
 import type {HttpClient} from '../../http-client/http-client.js';
 import type {Transaction} from '../../types.js';
 import type {DatomDatabase, WithResult} from '../datom-database.js';
@@ -15,9 +15,8 @@ import {
   QueryError,
   QueryResultSizeError,
   QueryTimeoutError,
-  TransactionError,
   type ReadContext,
-  type DatomsReadContext,
+  TransactionError,
   type WriteContext,
   type WriteResult,
 } from '../hook/hook.js';
@@ -26,18 +25,16 @@ import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
 import type {
   DatabaseView,
   DatomsQuery,
-  DatomsResultEnvelope,
   QueryResult,
   QueryResultEnvelope,
 } from '../views/database-view.js';
 import type {ViewConfig} from '../views/view-config.js';
 import type {
-  DatomsResponse,
+  DeleteDatomsResponse,
   GetLatestTransactionResponse,
   InitializeResponse,
   QueryResponse,
   TransactResponse,
-  DeleteDatomsResponse,
 } from './http-client-transport-types.js';
 
 /**
@@ -262,37 +259,6 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     };
   }
 
-  async datoms(options: DatomsQuery): Promise<DatomsResultEnvelope> {
-    // Validate that query has at least one filter or limit to prevent accidental full scans
-    validateQueryOptions(options);
-
-    // Extract viewConfig from options
-    const viewConfig = options.viewConfig ?? this.currentViewConfig;
-
-    // Execute query with timeout if specified
-    let envelope: DatomsResultEnvelope;
-    if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          // biome-ignore lint/style/noNonNullAssertion: timeoutMs is required when timeoutPromise is created
-          reject(new QueryTimeoutError(options.timeoutMs!, options));
-        }, options.timeoutMs);
-      });
-
-      const queryPromise = this._datomsInternal(options, viewConfig);
-      envelope = await Promise.race([queryPromise, timeoutPromise]);
-    } else {
-      envelope = await this._datomsInternal(options, viewConfig);
-    }
-
-    // Check result size limit if specified
-    if (options.maxResultSize !== undefined && envelope.data.length > options.maxResultSize) {
-      throw new QueryResultSizeError(envelope.data.length, options.maxResultSize, options);
-    }
-
-    return envelope;
-  }
-
   async query<
     TFind extends Record<string, DatalogQueryFindVariable> = Record<
       string,
@@ -380,82 +346,6 @@ export class HttpClientDatomDatabase implements DatomDatabase {
           errorData.resultSize ?? 0,
           errorData.maxResultSize ?? 0,
           errorData.queryOptions ?? query,
-        );
-      }
-      throw new Error(`Query failed: ${mappedError.message}`);
-    }
-  }
-
-  private async _datomsInternal(
-    options: DatomsQuery,
-    viewConfig: ViewConfig,
-  ): Promise<DatomsResultEnvelope> {
-    await this._ensureInitialized();
-
-    const startTime = performance.now();
-    const metadata: Record<string, unknown> = {};
-
-    // Create datoms read context for hooks
-    const {db: _, query: __, ...restContext} = options.context || {};
-    const ctx: DatomsReadContext = {
-      ...restContext,
-      db: this,
-      query: options,
-    };
-
-    // Run before-datoms-read hooks
-    const beforeResult = await this.hooks.runBeforeDatomsRead(options, ctx);
-
-    if (beforeResult.errors.length > 0) {
-      throw new QueryError('Datoms query blocked by hooks', beforeResult.errors);
-    }
-
-    const modifiedOptions = beforeResult.query;
-
-    try {
-      const response = await this.httpClient.post<DatomsResponse>(this.endpoint, {
-        method: 'datoms',
-        options: modifiedOptions,
-        viewConfig,
-      });
-
-      // Run after-datoms-read hooks on datoms from server
-      const afterResult = await this.hooks.runAfterDatomsRead(response.datoms, ctx);
-
-      if (afterResult.errors.length > 0) {
-        throw new QueryError('Datoms query blocked by after-read hooks', afterResult.errors);
-      }
-
-      const executionTime = performance.now() - startTime;
-      metadata.executionTimeMs = executionTime;
-      metadata.resultCount = afterResult.datoms.length;
-      metadata.executionStrategy = 'http-remote';
-
-      return {
-        data: afterResult.datoms,
-        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-      };
-    } catch (error) {
-      if (error instanceof QueryError) {
-        throw error;
-      }
-      const mappedError = this._mapHttpError(error);
-      if (mappedError.code === 'QUERY_TIMEOUT') {
-        throw new QueryTimeoutError(options.timeoutMs || 0, options);
-      }
-      if (mappedError.code === 'QUERY_SAFETY_VIOLATION') {
-        throw new Error(`Query safety violation: ${mappedError.message}`);
-      }
-      if (mappedError.code === 'QUERY_RESULT_SIZE_EXCEEDED') {
-        const errorData = mappedError.originalError as {
-          resultSize?: number;
-          maxResultSize?: number;
-          queryOptions?: unknown;
-        };
-        throw new QueryResultSizeError(
-          errorData.resultSize ?? 0,
-          errorData.maxResultSize ?? 0,
-          errorData.queryOptions ?? options,
         );
       }
       throw new Error(`Query failed: ${mappedError.message}`);

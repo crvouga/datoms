@@ -1,6 +1,7 @@
 import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
 import {QueryResultSizeError} from '../hook/hook';
+import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import {FIXTURES} from './fixtures/fixtures.js';
 import type {Fixture} from './fixtures/fixture.js';
 
@@ -23,7 +24,12 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
         await db.transact([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
       }
 
-      const {data: results} = await db.datoms({
+      const query = datomsQueryToDatalogQuery({
+        a: 'tag',
+        maxResultSize: 10,
+      });
+      const {data: queryResults} = await db.query(query);
+      const results = queryResultsToDatoms(queryResults, {
         a: 'tag',
         maxResultSize: 10,
       });
@@ -38,7 +44,8 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
       }
 
       try {
-        await db.datoms({a: 'tag', maxResultSize: 5});
+        const query = datomsQueryToDatalogQuery({a: 'tag', maxResultSize: 5});
+        await db.query(query);
         throw new Error('Should have thrown QueryResultSizeError');
       } catch (error: unknown) {
         expect(error).toBeInstanceOf(QueryResultSizeError);
@@ -56,7 +63,13 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
       }
 
       // limit should be applied first, then maxResultSize check
-      const {data: results} = await db.datoms({
+      const query = datomsQueryToDatalogQuery({
+        a: 'tag',
+        limit: 3,
+        maxResultSize: 5,
+      });
+      const {data: queryResults} = await db.query(query);
+      const results = queryResultsToDatoms(queryResults, {
         a: 'tag',
         limit: 3,
         maxResultSize: 5,
@@ -68,7 +81,12 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
       const {db} = f;
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
-      const {data: results} = await db.datoms({
+      const query = datomsQueryToDatalogQuery({
+        e: 1,
+        maxResultSize: 10,
+      });
+      const {data: queryResults} = await db.query(query);
+      const results = queryResultsToDatoms(queryResults, {
         e: 1,
         maxResultSize: 10,
       });

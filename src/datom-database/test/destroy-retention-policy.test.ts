@@ -5,6 +5,7 @@ import {
   DestroyRetentionPolicy,
   type DestroyRetentionPolicyConfig,
 } from '../retention-policy/destroy-retention-policy.js';
+import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import {FIXTURES} from './fixtures/fixtures.js';
 import type {Fixture} from './fixtures/fixture.js';
 
@@ -173,14 +174,18 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       expect(result.error).toBeUndefined();
 
       // Verify current state is preserved
-      const {data: currentDatoms} = await f.db.datoms({e: 1, a: 'name'});
+      const query1 = datomsQueryToDatalogQuery({e: 1, a: 'name'});
+      const {data: results1} = await f.db.query(query1);
+      const currentDatoms = queryResultsToDatoms(results1, {e: 1, a: 'name'});
       expect(currentDatoms.length).toBeGreaterThan(0);
       // Latest value should still be present
       const latestValue = currentDatoms.find(d => d.v === 'Entity-1-v10');
       expect(latestValue).toBeDefined();
 
       // Verify that only the latest 5 historical datoms are kept for entity 1
-      const {data: historyDatoms} = await f.db.history().datoms({e: 1, a: 'name'});
+      const query2 = datomsQueryToDatalogQuery({e: 1, a: 'name'});
+      const {data: results2} = await f.db.history().query(query2);
+      const historyDatoms = queryResultsToDatoms(results2, {e: 1, a: 'name'});
       // Should have at most 5 datoms (or fewer if some were falseed)
       expect(historyDatoms.length).toBeLessThanOrEqual(5);
     });
@@ -212,7 +217,9 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       expect(result.error).toBeUndefined();
 
       // Verify only latest 5 are kept
-      const {data: historyDatoms} = await f.db.history().datoms({e: 1, a: 'value'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'value'});
+      const {data: results} = await f.db.history().query(query);
+      const historyDatoms = queryResultsToDatoms(results, {e: 1, a: 'value'});
       expect(historyDatoms.length).toBeLessThanOrEqual(5);
     });
   });
@@ -238,7 +245,9 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       expect(latestTxBefore.txId).toBe(10);
 
       // Get current datoms before execution
-      const {data: currentDatomsBefore} = await f.db.datoms({e: 10});
+      const queryBefore = datomsQueryToDatalogQuery({e: 10});
+      const {data: resultsBefore} = await f.db.query(queryBefore);
+      const currentDatomsBefore = queryResultsToDatoms(resultsBefore, {e: 10});
 
       const result = await policy.execute();
 
@@ -246,7 +255,9 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       expect(result.error).toBeUndefined();
 
       // Verify current datoms are still present
-      const {data: currentDatomsAfter} = await f.db.datoms({e: 10});
+      const queryAfter = datomsQueryToDatalogQuery({e: 10});
+      const {data: resultsAfter} = await f.db.query(queryAfter);
+      const currentDatomsAfter = queryResultsToDatoms(resultsAfter, {e: 10});
       expect(currentDatomsAfter.length).toBeGreaterThanOrEqual(currentDatomsBefore.length);
       // Current value should still be there
       const currentValue = currentDatomsAfter.find(d => d.v === 'Entity-10');
@@ -285,11 +296,15 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       expect(result.error).toBeUndefined();
 
       // Verify that exactly 5 historical datoms are kept for entity 1
-      const {data: historyDatoms} = await f.db.history().datoms({e: 1, a: 'value'});
+      const query3 = datomsQueryToDatalogQuery({e: 1, a: 'value'});
+      const {data: results3} = await f.db.history().query(query3);
+      const historyDatoms = queryResultsToDatoms(results3, {e: 1, a: 'value'});
       expect(historyDatoms.length).toBe(5);
 
       // Verify the latest value is still present
-      const {data: currentDatoms} = await f.db.datoms({e: 1, a: 'value'});
+      const query4 = datomsQueryToDatalogQuery({e: 1, a: 'value'});
+      const {data: results4} = await f.db.query(query4);
+      const currentDatoms = queryResultsToDatoms(results4, {e: 1, a: 'value'});
       const latestValue = currentDatoms.find(d => d.v === 'value-10');
       expect(latestValue).toBeDefined();
     });
@@ -321,14 +336,18 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
         expect(result.error).toBeUndefined();
 
         // Verify exactly retentionCount datoms are kept
-        const {data: historyDatoms} = await f.db.history().datoms({e: 1, a: 'value'});
+        const query = datomsQueryToDatalogQuery({e: 1, a: 'value'});
+        const {data: results} = await f.db.history().query(query);
+        const historyDatoms = queryResultsToDatoms(results, {e: 1, a: 'value'});
         expect(historyDatoms.length).toBeLessThanOrEqual(3);
 
         // Verify latest value is preserved
-        const {data: currentDatoms} = await f.db.datoms({
+        const query2 = datomsQueryToDatalogQuery({
           e: 1,
           a: 'value',
         });
+        const {data: currentResults} = await f.db.query(query2);
+        const currentDatoms = queryResultsToDatoms(currentResults, {e: 1, a: 'value'});
         const latestValue = currentDatoms.find(d => d.v === `value-${numValues}`);
         expect(latestValue).toBeDefined();
       }
@@ -383,9 +402,15 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       expect(result.error).toBeUndefined();
 
       // Verify all datoms are still present by checking specific entities
-      const {data: datoms1} = await f.db.datoms({e: 1});
-      const {data: datoms2} = await f.db.datoms({e: 2});
-      const {data: datoms3} = await f.db.datoms({e: 3});
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results1} = await f.db.query(query1);
+      const datoms1 = queryResultsToDatoms(results1, {e: 1});
+      const query2 = datomsQueryToDatalogQuery({e: 2});
+      const {data: results2} = await f.db.query(query2);
+      const datoms2 = queryResultsToDatoms(results2, {e: 2});
+      const query3 = datomsQueryToDatalogQuery({e: 3});
+      const {data: results3} = await f.db.query(query3);
+      const datoms3 = queryResultsToDatoms(results3, {e: 3});
       expect(datoms1.length).toBeGreaterThan(0);
       expect(datoms2.length).toBeGreaterThan(0);
       expect(datoms3.length).toBeGreaterThan(0);
@@ -417,7 +442,9 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       expect(result.error).toBeUndefined();
 
       // Verify all datoms are still present
-      const {data: historyDatoms} = await f.db.history().datoms({e: 1, a: 'name'});
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'name'});
+      const {data: results} = await f.db.history().query(query);
+      const historyDatoms = queryResultsToDatoms(results, {e: 1, a: 'name'});
       expect(historyDatoms.length).toBe(5);
     });
 
@@ -510,14 +537,18 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       expect(result.error).toBeUndefined();
 
       // Verify current value is preserved
-      const {data: currentDatoms} = await f.db.datoms({e: 1, a: 'name'});
-      expect(currentDatoms.length).toBeGreaterThan(0);
-      const latestValue = currentDatoms.find(d => d.v === 'Alice Latest');
+      const query5 = datomsQueryToDatalogQuery({e: 1, a: 'name'});
+      const {data: results5} = await f.db.query(query5);
+      const currentDatoms2 = queryResultsToDatoms(results5, {e: 1, a: 'name'});
+      expect(currentDatoms2.length).toBeGreaterThan(0);
+      const latestValue = currentDatoms2.find(d => d.v === 'Alice Latest');
       expect(latestValue).toBeDefined();
 
       // Verify only 3 historical datoms remain
-      const {data: historyDatoms} = await f.db.history().datoms({e: 1, a: 'name'});
-      expect(historyDatoms.length).toBe(3);
+      const query6 = datomsQueryToDatalogQuery({e: 1, a: 'name'});
+      const {data: results6} = await f.db.history().query(query6);
+      const historyDatoms2 = queryResultsToDatoms(results6, {e: 1, a: 'name'});
+      expect(historyDatoms2.length).toBe(3);
     });
 
     test('should preserve at least retentionCount datoms per entity-attribute pair', async () => {
@@ -546,13 +577,17 @@ describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) =>
       expect(result.error).toBeUndefined();
 
       // Verify exactly 5 historical datoms remain for entity 1
-      const {data: historyDatoms} = await f.db.history().datoms({e: 1, a: 'value'});
-      expect(historyDatoms.length).toBe(5);
+      const query7 = datomsQueryToDatalogQuery({e: 1, a: 'value'});
+      const {data: results7} = await f.db.history().query(query7);
+      const historyDatoms3 = queryResultsToDatoms(results7, {e: 1, a: 'value'});
+      expect(historyDatoms3.length).toBe(5);
 
       // Verify latest value is preserved
-      const {data: currentDatoms} = await f.db.datoms({e: 1, a: 'value'});
-      const latestValue = currentDatoms.find(d => d.v === 'value-20');
-      expect(latestValue).toBeDefined();
+      const query8 = datomsQueryToDatalogQuery({e: 1, a: 'value'});
+      const {data: results8} = await f.db.query(query8);
+      const currentDatoms5 = queryResultsToDatoms(results8, {e: 1, a: 'value'});
+      const latestValue3 = currentDatoms5.find(d => d.v === 'value-20');
+      expect(latestValue3).toBeDefined();
     });
   });
 });

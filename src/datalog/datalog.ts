@@ -85,6 +85,8 @@ export interface DatalogQuery<
   orderBy?: [variable: DatalogQueryVariable, direction: 'asc' | 'desc'][];
   /** Optional limit */
   limit?: number;
+  /** Maximum number of results allowed (throws QueryResultSizeError if exceeded) */
+  maxResultSize?: number;
   /** Optional context for the query */
   context?: Record<string, unknown>;
   /** Optional view configuration */

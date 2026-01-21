@@ -8,6 +8,7 @@ import {
   QuerySafetyError,
   QueryTimeoutError,
 } from '../hook/hook.js';
+import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 
 describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
   let f: Fixture;
@@ -27,7 +28,8 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       try {
-        await db.datoms({});
+        const query = datomsQueryToDatalogQuery({});
+        await db.query(query);
         throw new Error('Should have thrown QuerySafetyError');
       } catch (error) {
         expect(error).toBeInstanceOf(QuerySafetyError);
@@ -43,7 +45,8 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       try {
-        await db.history().datoms({});
+        const query = datomsQueryToDatalogQuery({});
+        await db.history().query(query);
         throw new Error('Should have thrown QuerySafetyError');
       } catch (error) {
         expect(error).toBeInstanceOf(QuerySafetyError);
@@ -77,11 +80,13 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
 
       try {
         // Use a very short timeout that will definitely be exceeded
-        await db.datoms({e: 1, timeoutMs: 1});
+        const query1 = datomsQueryToDatalogQuery({e: 1, timeoutMs: 1});
+        await db.query(query1);
         // If query completes too fast, add a delay to ensure timeout
         await new Promise(resolve => setTimeout(resolve, 10));
         // Re-query with timeout
-        await db.datoms({e: 1, timeoutMs: 1});
+        const query = datomsQueryToDatalogQuery({e: 1, timeoutMs: 1});
+        await db.query(query);
         // If we get here, the timeout didn't trigger (query was too fast)
         // This is acceptable - timeout is best-effort
       } catch (error: unknown) {
@@ -106,7 +111,8 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
       }
 
       try {
-        await db.datoms({a: 'tag', maxResultSize: 5});
+        const query = datomsQueryToDatalogQuery({a: 'tag', maxResultSize: 5});
+        await db.query(query);
         throw new Error('Should have thrown QueryResultSizeError');
       } catch (error) {
         expect(error).toBeInstanceOf(QueryResultSizeError);
@@ -123,7 +129,12 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
       const {db} = f;
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
-      const {data: results} = await db.datoms({
+      const query = datomsQueryToDatalogQuery({
+        e: 1,
+        maxResultSize: 10,
+      });
+      const {data: queryResults} = await db.query(query);
+      const results = queryResultsToDatoms(queryResults, {
         e: 1,
         maxResultSize: 10,
       });

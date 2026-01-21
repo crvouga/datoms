@@ -26,16 +26,46 @@ export function joinResults(
 ): Record<string, Value | Attribute>[] {
   const joined: Record<string, Value | Attribute>[] = [];
 
+  // Find all shared variables (excluding metadata)
+  const leftKeys = new Set(Object.keys(left[0] || {}));
+  const rightKeys = new Set(Object.keys(right[0] || {}));
+  const sharedNonMetadataVars = new Set<string>();
+  for (const key of leftKeys) {
+    if (key !== '?e' && key !== '?a' && key !== '?v' && key !== '?tx' && rightKeys.has(key)) {
+      sharedNonMetadataVars.add(key);
+    }
+  }
+
+  // If there are shared non-metadata variables, exclude ?e from compatibility check
+  // Otherwise, include ?e in the compatibility check (for cases where ?e is the join key)
+  const excludeE = sharedNonMetadataVars.size > 0;
+
   for (const leftRow of left) {
     for (const rightRow of right) {
       // Check if rows are compatible (same values for common variables)
       let compatible = true;
-      for (const key of Object.keys(leftRow)) {
-        if (key in rightRow && leftRow[key] !== rightRow[key]) {
+
+      // First, check shared non-metadata variables if they exist
+      if (sharedNonMetadataVars.size > 0) {
+        for (const key of sharedNonMetadataVars) {
+          if (key in leftRow && key in rightRow && leftRow[key] !== rightRow[key]) {
+            compatible = false;
+            break;
+          }
+        }
+        if (!compatible) continue;
+      }
+
+      // Then check ?e if it should be checked (when there are no other shared variables)
+      if (!excludeE && '?e' in leftRow && '?e' in rightRow) {
+        if (leftRow['?e'] !== rightRow['?e']) {
           compatible = false;
-          break;
         }
       }
+
+      // Always skip ?a, ?v, and ?tx - they represent different attributes, values,
+      // or transaction metadata in different clauses and should not prevent joining
+      // (We've already handled ?e and shared variables above)
 
       if (compatible) {
         joined.push({...leftRow, ...rightRow});

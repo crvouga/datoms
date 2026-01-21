@@ -150,8 +150,10 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Read-only database view
    * @example
    * const dbPast = db.asOf(100);
-   * const { data: datoms } = await dbPast.datoms({ e: 42 });
-   * const { data: results } = await dbPast.query({ find: ["?v"], where: [[42, "name", "?v"]] });
+   * const { data: results } = await dbPast.query({
+   *   find: { e: ["?e"], a: ["?a"], v: ["?v"] },
+   *   where: [{ e: 42, a: "name", v: "?v" }]
+   * });
    */
   asOf(txId: TransactionId): DatabaseView;
 
@@ -161,7 +163,10 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Read-only database view showing full history
    * @example
    * const dbHistory = db.history();
-   * const { data: allChanges } = await dbHistory.datoms({ e: 42 });
+   * const { data: allChanges } = await dbHistory.query({
+   *   find: { e: ["?e"], a: ["?a"], v: ["?v"] },
+   *   where: [{ e: 42, a: "?a", v: "?v" }]
+   * });
    * // Includes both add and sub datoms
    */
   history(): DatabaseView;
@@ -174,7 +179,10 @@ export interface DatomDatabase extends DatabaseView {
    * @returns Read-only database view
    * @example
    * const dbSince = db.since(100);
-   * const { data: recentChanges } = await dbSince.datoms({ e: 42 });
+   * const { data: recentChanges } = await dbSince.query({
+   *   find: { e: ["?e"], a: ["?a"], v: ["?v"] },
+   *   where: [{ e: 42, a: "?a", v: "?v" }]
+   * });
    */
   since(txId: TransactionId): DatabaseView;
 
@@ -205,7 +213,10 @@ export interface DatomDatabase extends DatabaseView {
    * ]);
    *
    * // Query the speculative state
-   * const { data: datoms } = await result.dbAfter.datoms({ e: 1 });
+   * const { data: results } = await result.dbAfter.query({
+   *   find: { e: ["?e"], a: ["?a"], v: ["?v"] },
+   *   where: [{ e: 1, a: "?a", v: "?v" }]
+   * });
    * // Preview what would change
    * console.log(result.txData);
    *
@@ -221,7 +232,10 @@ export interface DatomDatabase extends DatabaseView {
    * @example
    * const latestTx = await db._getLatestTransaction();
    * // Use for sync: only fetch changes after this transaction
-   * const { data: changes } = await db.datoms({ tx: latestTx.txId! + 1 });
+   * const { data: changes } = await db.since(latestTx.txId!).query({
+   *   find: { e: ["?e"], a: ["?a"], v: ["?v"] },
+   *   where: [{ e: "?e", a: "?a", v: "?v" }]
+   * });
    * // Access transaction data
    * console.log(`Transaction ${latestTx.txId} has ${latestTx.datoms.length} datoms`);
    */

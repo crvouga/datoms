@@ -1,6 +1,7 @@
 import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
 import type {DatalogQuery} from '../../datalog/datalog.js';
+import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import {FIXTURES} from './fixtures/fixtures.js';
 import type {Fixture} from './fixtures/fixture.js';
 
@@ -25,20 +26,26 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const tx3 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice Updated'}]);
 
       // Query at tx1 - should only see name
-      const {data: atTx1} = await db.asOf(tx1).datoms({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results1} = await db.asOf(tx1).query(query1);
+      const atTx1 = queryResultsToDatoms(results1, {e: 1});
       expect(atTx1).toHaveLength(1);
       expect(atTx1[0]?.a).toBe('name');
       expect(atTx1[0]?.v).toBe('Alice');
 
       // Query at tx2 - should see name and age
-      const {data: atTx2} = await db.asOf(tx2).datoms({e: 1});
+      const query2 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results2} = await db.asOf(tx2).query(query2);
+      const atTx2 = queryResultsToDatoms(results2, {e: 1});
       expect(atTx2).toHaveLength(2);
       const valuesAtTx2 = atTx2.map(d => d.v).sort();
       expect(valuesAtTx2).toContain('Alice');
       expect(valuesAtTx2).toContain(30);
 
       // Query at tx3 - should see updated name and age
-      const {data: atTx3} = await db.asOf(tx3).datoms({e: 1});
+      const query3 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results3} = await db.asOf(tx3).query(query3);
+      const atTx3 = queryResultsToDatoms(results3, {e: 1});
       expect(atTx3).toHaveLength(2);
       const nameAtTx3 = atTx3.find(d => d.a === 'name');
       expect(nameAtTx3?.v).toBe('Alice Updated');
@@ -51,11 +58,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const tx3 = await db.transact([{op: false, e: 1, a: 'age', v: 30}]);
 
       // Query at tx2 - should see both name and age
-      const {data: atTx2} = await db.asOf(tx2).datoms({e: 1});
+      const query2 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results2} = await db.asOf(tx2).query(query2);
+      const atTx2 = queryResultsToDatoms(results2, {e: 1});
       expect(atTx2).toHaveLength(2);
 
       // Query at tx3 - should only see name (age was sub)
-      const {data: atTx3} = await db.asOf(tx3).datoms({e: 1});
+      const query3 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results3} = await db.asOf(tx3).query(query3);
+      const atTx3 = queryResultsToDatoms(results3, {e: 1});
       expect(atTx3).toHaveLength(1);
       expect(atTx3[0]?.a).toBe('name');
     });
@@ -67,7 +78,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
 
       // Query history - should return all changes
-      const {data: history} = await db.history().datoms({
+      const query = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'name',
+      });
+      const {data: results} = await db.history().query(query);
+      const history = queryResultsToDatoms(results, {
         e: 1,
         a: 'name',
       });
@@ -83,11 +99,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
       const tx2 = await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
 
-      const {data: entityAtTx1} = await db.asOf(tx1).datoms({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results1} = await db.asOf(tx1).query(query1);
+      const entityAtTx1 = queryResultsToDatoms(results1, {e: 1});
       expect(entityAtTx1).toHaveLength(1);
       expect(entityAtTx1[0]?.a).toBe('name');
 
-      const {data: entityAtTx2} = await db.asOf(tx2).datoms({e: 1});
+      const query2 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results2} = await db.asOf(tx2).query(query2);
+      const entityAtTx2 = queryResultsToDatoms(results2, {e: 1});
       expect(entityAtTx2).toHaveLength(2);
     });
 
@@ -140,11 +160,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const withResult = await db.with([{op: true, e: 1, a: 'age', v: 30}]);
 
       // Query dbAfter - should see speculative age
-      const {data: current} = await withResult.dbAfter.datoms({e: 1});
+      const query = datomsQueryToDatalogQuery({e: 1});
+      const {data: results} = await withResult.dbAfter.query(query);
+      const current = queryResultsToDatoms(results, {e: 1});
       expect(current).toHaveLength(2);
 
       // Query at tx1 - should only see committed name (not speculative age)
-      const {data: atTx1} = await db.asOf(tx1).datoms({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results1} = await db.asOf(tx1).query(query1);
+      const atTx1 = queryResultsToDatoms(results1, {e: 1});
       expect(atTx1).toHaveLength(1);
       expect(atTx1[0]?.a).toBe('name');
     });
@@ -192,8 +216,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(atTx5Results[0]?.v).toBe('failed');
 
       // Current state should also be failed
-      // Use datoms() to get the latest value (query returns all values)
-      const {data: currentDatoms} = await db.datoms({e: 1, a: 'status'});
+      // Use query() to get the latest value
+      const query = datomsQueryToDatalogQuery({e: 1, a: 'status'});
+      const {data: results} = await db.query(query);
+      const currentDatoms = queryResultsToDatoms(results, {e: 1, a: 'status'});
       const currentSorted = currentDatoms.sort((a, b) => b.tx - a.tx);
       expect(currentSorted[0]?.v).toBe('failed');
     });
@@ -206,10 +232,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         {op: true, e: 1, a: 'email', v: 'alice@example.com'},
       ]);
 
-      const {data: before} = await db.datoms({e: 1, op: true});
+      const query1 = datomsQueryToDatalogQuery({e: 1, op: true});
+      const {data: results1} = await db.query(query1);
+      const before = queryResultsToDatoms(results1, {e: 1, op: true});
       expect(before).toHaveLength(3);
 
-      const {data: entityDatoms} = await db.datoms({e: 1});
+      const query2 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results2} = await db.query(query2);
+      const entityDatoms = queryResultsToDatoms(results2, {e: 1});
       const tx = await db.transact(
         entityDatoms.map(d => ({
           op: false,
@@ -219,7 +249,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         })),
       );
 
-      const {data: after} = await db.datoms({e: 1, op: true});
+      const query3 = datomsQueryToDatalogQuery({e: 1, op: true});
+      const {data: results3} = await db.query(query3);
+      const after = queryResultsToDatoms(results3, {e: 1, op: true});
       expect(after).toHaveLength(0);
 
       // Verify transaction ID was returned
@@ -234,7 +266,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         {op: true, e: 1, a: 'age', v: 30},
       ]);
 
-      const {data: entityDatoms} = await db.datoms({e: 1});
+      const query4 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results4} = await db.query(query4);
+      const entityDatoms = queryResultsToDatoms(results4, {e: 1});
 
       // Use with() to see what subion would look like
       const withResult = await db.with(
@@ -245,7 +279,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           v: d.v,
         })),
       );
-      const {data: during} = await withResult.dbAfter.datoms({
+      const query5 = datomsQueryToDatalogQuery({
+        e: 1,
+        op: true,
+      });
+      const {data: results5} = await withResult.dbAfter.query(query5);
+      const during = queryResultsToDatoms(results5, {
         e: 1,
         op: true,
       });
@@ -261,7 +300,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         })),
       );
 
-      const {data: after} = await db.datoms({e: 1, op: true});
+      const query6 = datomsQueryToDatalogQuery({e: 1, op: true});
+      const {data: results6} = await db.query(query6);
+      const after = queryResultsToDatoms(results6, {e: 1, op: true});
       expect(after).toHaveLength(0);
     });
 
@@ -276,16 +317,22 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(typeof tx).toBe('number');
       expect(tx).toBeGreaterThan(0);
 
-      const {data: alice} = await db.datoms({e: 1, op: true});
+      const query1 = datomsQueryToDatalogQuery({e: 1, op: true});
+      const {data: results1} = await db.query(query1);
+      const alice = queryResultsToDatoms(results1, {e: 1, op: true});
       expect(alice).toHaveLength(1);
       expect(alice[0]?.v).toBe('Alice');
 
-      const {data: bob} = await db.datoms({e: 2, op: true});
+      const query2 = datomsQueryToDatalogQuery({e: 2, op: true});
+      const {data: results2} = await db.query(query2);
+      const bob = queryResultsToDatoms(results2, {e: 2, op: true});
       expect(bob).toHaveLength(1);
       expect(bob[0]?.v).toBe('Bob');
 
       // Charlie should not exist (or was sub if existed)
-      const {data: charlie} = await db.datoms({e: 3, op: true});
+      const query3 = datomsQueryToDatalogQuery({e: 3, op: true});
+      const {data: results3} = await db.query(query3);
+      const charlie = queryResultsToDatoms(results3, {e: 3, op: true});
       expect(charlie).toHaveLength(0);
     });
 
@@ -297,7 +344,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         {op: true, e: 1, a: 'age', v: 30},
       ]);
 
-      const {data: entity} = await withResult.dbAfter.datoms({
+      const query7 = datomsQueryToDatalogQuery({
+        e: 1,
+        op: true,
+      });
+      const {data: results7} = await withResult.dbAfter.query(query7);
+      const entity = queryResultsToDatoms(results7, {
         e: 1,
         op: true,
       });
@@ -309,7 +361,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         {op: true, e: 1, a: 'age', v: 30},
       ]);
 
-      await db.datoms({e: 1, op: true});
+      const query8 = datomsQueryToDatalogQuery({e: 1, op: true});
+      await db.query(query8);
       expect(entity).toHaveLength(2);
     });
 
@@ -320,7 +373,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: false, e: 1, a: 'name', v: 'Bob'}]);
       await db.transact([{op: true, e: 1, a: 'name', v: 'Charlie'}]);
 
-      const {data: history} = await db.history().datoms({
+      const query = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'name',
+      });
+      const {data: results} = await db.history().query(query);
+      const history = queryResultsToDatoms(results, {
         e: 1,
         a: 'name',
       });
@@ -330,20 +388,25 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const txs = history.map(d => d.tx);
       expect(txs).toEqual([...txs].sort((a, b) => a - b));
 
-      // Should include subions
-      const subions = history.filter(d => d.op === false);
-      expect(subions.length).toBeGreaterThan(0);
+      // Should include retractions
+      const retractions = history.filter(d => d.op === false);
+      expect(retractions.length).toBeGreaterThan(0);
     });
 
     test('should require at least one filter or limit for query', async () => {
       const {db} = f;
-      expect(db.datoms({})).rejects.toThrow('full table scans');
+      const queryEmpty = datomsQueryToDatalogQuery({});
+      await expect(db.query(queryEmpty)).rejects.toThrow('full table scans');
 
       // These should work
-      await db.datoms({e: 1});
-      await db.datoms({limit: 10});
-      await db.history().datoms({limit: 100});
-      await db.history().datoms({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      await db.query(query1);
+      const query2 = datomsQueryToDatalogQuery({limit: 10});
+      await db.query(query2);
+      const query3 = datomsQueryToDatalogQuery({limit: 100});
+      await db.history().query(query3);
+      const query4 = datomsQueryToDatalogQuery({e: 1});
+      await db.history().query(query4);
     });
 
     test('should handle empty transact operations', async () => {
@@ -360,23 +423,29 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice Updated'}]);
 
       // Query changes since tx1 - should see age and Bob and updated name
-      const {data: sinceTx1} = await db.since(tx1).datoms({limit: 100});
+      const query1 = datomsQueryToDatalogQuery({limit: 100});
+      const {data: results1} = await db.since(tx1).query(query1);
+      const sinceTx1 = queryResultsToDatoms(results1, {limit: 100});
       expect(sinceTx1.length).toBeGreaterThanOrEqual(3);
 
       // Query changes since tx2 - should see Bob and updated name
-      const {data: sinceTx2} = await db.since(tx2).datoms({limit: 100});
+      const query2 = datomsQueryToDatalogQuery({limit: 100});
+      const {data: results2} = await db.since(tx2).query(query2);
+      const sinceTx2 = queryResultsToDatoms(results2, {limit: 100});
       const entitiesSinceTx2 = new Set(sinceTx2.map(d => d.e));
       expect(entitiesSinceTx2.has(2)).toBe(true); // Bob
       expect(entitiesSinceTx2.has(1)).toBe(true); // Updated name
 
       // Query changes since tx3 - should only see updated name
-      const {data: sinceTx3} = await db.since(tx3).datoms({e: 1});
+      const query3 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results3} = await db.since(tx3).query(query3);
+      const sinceTx3 = queryResultsToDatoms(results3, {e: 1});
       expect(sinceTx3).toHaveLength(1);
       expect(sinceTx3[0]?.a).toBe('name');
       expect(sinceTx3[0]?.v).toBe('Alice Updated');
     });
 
-    test('should handle subions in since queries', async () => {
+    test('should handle retractions in since queries', async () => {
       const {db} = f;
       const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
       await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
@@ -384,7 +453,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'email', v: 'alice@example.com'}]);
 
       // Query changes since tx1 - should see age, subion, and email
-      const {data: sinceTx1} = await db.since(tx1).datoms({e: 1});
+      const query = datomsQueryToDatalogQuery({e: 1});
+      const {data: results} = await db.since(tx1).query(query);
+      const sinceTx1 = queryResultsToDatoms(results, {e: 1});
       // Should only see email (age was sub, so it's filtered out)
       const attributes = sinceTx1.map(d => d.a);
       expect(attributes).toContain('email');
@@ -430,14 +501,21 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice Updated'}]);
 
       // Query changes since tx1 for entity 1 only
-      const {data: sinceTx1Entity1} = await db.since(tx1).datoms({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results1} = await db.since(tx1).query(query1);
+      const sinceTx1Entity1 = queryResultsToDatoms(results1, {e: 1});
       expect(sinceTx1Entity1.length).toBeGreaterThanOrEqual(2);
       const attributes = sinceTx1Entity1.map(d => d.a);
       expect(attributes).toContain('age');
       expect(attributes).toContain('name');
 
       // Query changes since tx2 for entity 1, attribute name
-      const {data: sinceTx2Name} = await db.since(tx2).datoms({
+      const query2 = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'name',
+      });
+      const {data: results2} = await db.since(tx2).query(query2);
+      const sinceTx2Name = queryResultsToDatoms(results2, {
         e: 1,
         a: 'name',
       });
@@ -451,7 +529,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const tx2 = await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
 
       // Query changes since tx2 - should be empty (no changes after tx2)
-      const {data: sinceTx2} = await db.since(tx2).datoms({e: 1});
+      const query = datomsQueryToDatalogQuery({e: 1});
+      const {data: results} = await db.since(tx2).query(query);
+      const sinceTx2 = queryResultsToDatoms(results, {e: 1});
       expect(sinceTx2).toHaveLength(0);
     });
 
@@ -460,11 +540,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const tx1 = await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       // Query at tx 0 (before any transactions) - should return empty
-      const {data: atTx0} = await db.asOf(0).datoms({e: 1});
+      const query0 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results0} = await db.asOf(0).query(query0);
+      const atTx0 = queryResultsToDatoms(results0, {e: 1});
       expect(atTx0).toHaveLength(0);
 
       // Query at tx1 should work
-      const {data: atTx1} = await db.asOf(tx1).datoms({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results1} = await db.asOf(tx1).query(query1);
+      const atTx1 = queryResultsToDatoms(results1, {e: 1});
       expect(atTx1).toHaveLength(1);
     });
 
@@ -476,7 +560,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Query at tx3 but filter to only tx2 datoms - should return empty
       // (tx2 datoms are before tx3, but the tx filter restricts to exactly tx2)
-      const {data: atTx3WithTx2Filter} = await db.asOf(tx3).datoms({
+      const query = datomsQueryToDatalogQuery({
+        e: 1,
+        tx: tx2,
+      });
+      const {data: results} = await db.asOf(tx3).query(query);
+      const atTx3WithTx2Filter = queryResultsToDatoms(results, {
         e: 1,
         tx: tx2,
       });
@@ -491,13 +580,20 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Charlie'}]);
       await db.transact([{op: true, e: 1, a: 'name', v: 'David'}]);
 
-      await db.history().datoms({
+      const query1 = datomsQueryToDatalogQuery({
         e: 1,
         a: 'name',
       });
+      await db.history().query(query1);
 
       // Test limit
-      const {data: limited} = await db.history().datoms({
+      const query2 = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'name',
+        limit: 2,
+      });
+      const {data: results2} = await db.history().query(query2);
+      const limited = queryResultsToDatoms(results2, {
         e: 1,
         a: 'name',
         limit: 2,
@@ -506,7 +602,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(limited[0]?.v).toBe('Alice'); // First change
 
       // Test offset
-      const {data: offset} = await db.history().datoms({
+      const query3 = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'name',
+        offset: 2,
+        limit: 2,
+      });
+      const {data: results3} = await db.history().query(query3);
+      const offset = queryResultsToDatoms(results3, {
         e: 1,
         a: 'name',
         offset: 2,
@@ -522,8 +625,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'email', v: 'alice@example.com'}]);
       await db.transact([{op: true, e: 1, a: 'phone', v: '123-456-7890'}]);
 
-      await db.asOf(tx1).datoms({e: 1});
-      const {data: limited} = await db.asOf(tx1).datoms({
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      await db.asOf(tx1).query(query1);
+      const query2 = datomsQueryToDatalogQuery({
+        e: 1,
+        limit: 1,
+      });
+      const {data: results2} = await db.asOf(tx1).query(query2);
+      const limited = queryResultsToDatoms(results2, {
         e: 1,
         limit: 1,
       });
@@ -537,10 +646,17 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'email', v: 'alice@example.com'}]);
       await db.transact([{op: true, e: 1, a: 'phone', v: '123-456-7890'}]);
 
-      const {data: allSince} = await db.since(tx1).datoms({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results1} = await db.since(tx1).query(query1);
+      const allSince = queryResultsToDatoms(results1, {e: 1});
       expect(allSince.length).toBeGreaterThanOrEqual(3);
 
-      const {data: limited} = await db.since(tx1).datoms({
+      const query2 = datomsQueryToDatalogQuery({
+        e: 1,
+        limit: 2,
+      });
+      const {data: results2} = await db.since(tx1).query(query2);
+      const limited = queryResultsToDatoms(results2, {
         e: 1,
         limit: 2,
       });
@@ -556,13 +672,17 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Note: asOf deduplicates by (entity, attribute), returning the latest value per attribute
       // Query at tx2 - should see "blue" (latest tag value at tx2)
-      const {data: atTx2} = await db.asOf(tx2).datoms({e: 1, a: 'tag'});
+      const query2 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results2} = await db.asOf(tx2).query(query2);
+      const atTx2 = queryResultsToDatoms(results2, {e: 1, a: 'tag'});
       expect(atTx2.length).toBeGreaterThanOrEqual(1);
       const valuesAtTx2 = atTx2.map(d => d.v);
       expect(valuesAtTx2).toContain('blue');
 
       // Query at tx3 - should see green (latest value at tx3)
-      const {data: atTx3} = await db.asOf(tx3).datoms({e: 1, a: 'tag'});
+      const query3 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results3} = await db.asOf(tx3).query(query3);
+      const atTx3 = queryResultsToDatoms(results3, {e: 1, a: 'tag'});
       const valuesAtTx3 = atTx3.map(d => d.v);
       expect(valuesAtTx3).toContain('green');
 
@@ -571,7 +691,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // keeping the latest tx, then filter to add=true. If the subion has the highest tx,
       // it might be picked during deduplication, then filtered out, resulting in empty.
       // This tests the edge case where a subion happens at the query tx.
-      const {data: atTx4} = await db.asOf(tx4).datoms({e: 1, a: 'tag'});
+      const query4 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+      const {data: results4} = await db.asOf(tx4).query(query4);
+      const atTx4 = queryResultsToDatoms(results4, {e: 1, a: 'tag'});
       const valuesAtTx4 = atTx4.map(d => d.v);
       // The implementation should handle this correctly - green (tx3) should be visible
       // as it's the latest add value. If empty, verify green is visible at tx3.
@@ -580,13 +702,20 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         expect(valuesAtTx4).not.toContain('blue');
       } else {
         // If implementation picks subion during deduplication, verify green at tx3
-        const {data: atTx3Check} = await db.asOf(tx3).datoms({e: 1, a: 'tag'});
+        const query3Check = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
+        const {data: results3Check} = await db.asOf(tx3).query(query3Check);
+        const atTx3Check = queryResultsToDatoms(results3Check, {e: 1, a: 'tag'});
         expect(atTx3Check.length).toBeGreaterThanOrEqual(1);
         expect(atTx3Check[0]?.v).toBe('green');
       }
 
       // Query changes since tx2 - should see green (add after tx2)
-      const {data: sinceTx2} = await db.since(tx2).datoms({
+      const querySince = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'tag',
+      });
+      const {data: resultsSince} = await db.since(tx2).query(querySince);
+      const sinceTx2 = queryResultsToDatoms(resultsSince, {
         e: 1,
         a: 'tag',
       });
@@ -595,7 +724,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Should not include red or blue (they were before tx2)
 
       // Use history to see all values at tx2 (including sub ones)
-      const {data: historyAtTx2} = await db.history().datoms({
+      const queryHistory = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'tag',
+      });
+      const {data: resultsHistory} = await db.history().query(queryHistory);
+      const historyAtTx2 = queryResultsToDatoms(resultsHistory, {
         e: 1,
         a: 'tag',
       });
@@ -620,7 +754,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(atTx1Results[0]?.v).toBe(10);
 
       // Query changes since tx1 for entity 1
-      const {data: sinceTx1} = await db.since(tx1).datoms({
+      const querySince = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'parent',
+      });
+      const {data: resultsSince} = await db.since(tx1).query(querySince);
+      const sinceTx1 = queryResultsToDatoms(resultsSince, {
         e: 1,
         a: 'parent',
       });
@@ -628,14 +767,18 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(sinceTx1[0]?.v).toBe(20);
 
       // Query changes since tx1 for all entities
-      const {data: allSinceTx1} = await db.since(tx1).datoms({a: 'parent'});
+      const queryAll = datomsQueryToDatalogQuery({a: 'parent'});
+      const {data: resultsAll} = await db.since(tx1).query(queryAll);
+      const allSinceTx1 = queryResultsToDatoms(resultsAll, {a: 'parent'});
       expect(allSinceTx1.length).toBeGreaterThanOrEqual(2);
     });
 
     test('should handle empty history queries', async () => {
       const {db} = f;
       // Query history before adding anything
-      const {data: history} = await db.history().datoms({e: 1});
+      const query = datomsQueryToDatalogQuery({e: 1});
+      const {data: results} = await db.history().query(query);
+      const history = queryResultsToDatoms(results, {e: 1});
       expect(history).toHaveLength(0);
     });
 
@@ -645,11 +788,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'age', v: 30}]);
 
       // Query changes since tx 0 - should see all changes
-      const {data: sinceTx0} = await db.since(0).datoms({e: 1});
+      const query0 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results0} = await db.since(0).query(query0);
+      const sinceTx0 = queryResultsToDatoms(results0, {e: 1});
       expect(sinceTx0.length).toBeGreaterThanOrEqual(2);
 
       // Query changes since tx1 - should see age
-      const {data: sinceTx1} = await db.since(tx1).datoms({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const {data: results1} = await db.since(tx1).query(query1);
+      const sinceTx1 = queryResultsToDatoms(results1, {e: 1});
       expect(sinceTx1.length).toBeGreaterThanOrEqual(1);
       expect(sinceTx1[0]?.a).toBe('age');
     });
@@ -670,13 +817,20 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'status', v: 'failed'}]);
 
       // Query changes since tx2
-      const {data: sinceTx2} = await db.since(tx2).datoms({a: 'status'});
+      const query2 = datomsQueryToDatalogQuery({a: 'status'});
+      const {data: results2} = await db.since(tx2).query(query2);
+      const sinceTx2 = queryResultsToDatoms(results2, {a: 'status'});
       const entitiesSinceTx2 = new Set(sinceTx2.map(d => d.e));
       expect(entitiesSinceTx2.has(1)).toBe(true); // Entity 1 changed
       expect(entitiesSinceTx2.has(3)).toBe(false); // Entity 3 didn't change after tx2
 
       // Query changes since tx3 for entity 1
-      const {data: sinceTx3} = await db.since(tx3).datoms({
+      const query3 = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'status',
+      });
+      const {data: results3} = await db.since(tx3).query(query3);
+      const sinceTx3 = queryResultsToDatoms(results3, {
         e: 1,
         a: 'status',
       });
@@ -697,11 +851,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(latestTx.txId).toBeGreaterThanOrEqual(tx3);
 
       // Query at current state (should match asOf with latestTx)
-      const {data: current} = await db.datoms({e: 1});
+      const query = datomsQueryToDatalogQuery({e: 1});
+      const {data: results} = await db.query(query);
+      const current = queryResultsToDatoms(results, {e: 1});
       expect(current.length).toBeGreaterThanOrEqual(2);
 
       // Query asOf with latestTx - should return current state
-      const {data: atLatest} = await db.asOf(latestTx.txId).datoms({e: 1});
+      const queryLatest = datomsQueryToDatalogQuery({e: 1});
+      const {data: resultsLatest} = await db.asOf(latestTx.txId).query(queryLatest);
+      const atLatest = queryResultsToDatoms(resultsLatest, {e: 1});
       expect(atLatest.length).toBeGreaterThanOrEqual(2);
       const attributesAtLatest = atLatest.map(d => d.a);
       expect(attributesAtLatest).toContain('name');
@@ -710,7 +868,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Query asOf with a future transaction ID (larger than latest)
       // Should return current state (all datoms have tx <= futureTx)
       const futureTx = latestTx.txId + 1000;
-      const {data: atFuture} = await db.asOf(futureTx).datoms({e: 1});
+      const queryFuture = datomsQueryToDatalogQuery({e: 1});
+      const {data: resultsFuture} = await db.asOf(futureTx).query(queryFuture);
+      const atFuture = queryResultsToDatoms(resultsFuture, {e: 1});
       expect(atFuture.length).toBeGreaterThanOrEqual(2);
       const attributesAtFuture = atFuture.map(d => d.a);
       expect(attributesAtFuture).toContain('name');

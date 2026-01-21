@@ -7,18 +7,12 @@
 import type {DatalogQuery} from '../../datalog/datalog.js';
 import type {Datom, DatomInput, TransactionId} from '../../datoms.js';
 import type {Hook} from '../hook/hook.js';
-import type {DatomsQuery, QueryResult} from '../views/database-view.js';
+import type {QueryResult} from '../views/database-view.js';
 import type {ViewConfig} from '../views/view-config.js';
 
 // Request types
 export interface InitializeRequest {
   method: 'initialize';
-}
-
-export interface DatomsRequest {
-  method: 'datoms';
-  options: DatomsQuery;
-  viewConfig: ViewConfig;
 }
 
 export interface QueryRequest {
@@ -54,10 +48,6 @@ export interface InitializeResponse {
   success: boolean;
 }
 
-export interface DatomsResponse {
-  datoms: Datom[];
-}
-
 export interface QueryResponse {
   results: QueryResult;
 }
@@ -84,7 +74,6 @@ export interface DeleteDatomsResponse {
 // Union types for request/response routing
 export type TransportRequest =
   | InitializeRequest
-  | DatomsRequest
   | QueryRequest
   | TransactRequest
   | GetLatestTransactionRequest
@@ -93,7 +82,6 @@ export type TransportRequest =
 
 export type TransportResponse =
   | InitializeResponse
-  | DatomsResponse
   | QueryResponse
   | TransactResponse
   | GetLatestTransactionResponse

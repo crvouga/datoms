@@ -1,6 +1,7 @@
 import {beforeAll, describe, expect, it} from 'bun:test';
 
 import {FileSystemDatomDatabase} from '../filesystem/filesystem-datom-database.js';
+import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import {expectOrderedBy} from './expect-ordered-by.js';
 import type {Fixture} from './fixtures/fixture.js';
 import {FAST_TESTS, FIXTURES} from './fixtures/fixtures.js';
@@ -15,7 +16,11 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
       f = await createFixture();
       const movieDb = new FileSystemDatomDatabase({filePath: 'movie-db.csv'});
       await movieDb.initialize();
-      const {data: movieDatoms} = await movieDb.datoms({
+      const query = datomsQueryToDatalogQuery({
+        limit: FAST_TESTS ? 500 : 1_000_000,
+      });
+      const {data: results} = await movieDb.query(query);
+      const movieDatoms = queryResultsToDatoms(results, {
         limit: FAST_TESTS ? 500 : 1_000_000,
       });
       await f.db.transact(movieDatoms);

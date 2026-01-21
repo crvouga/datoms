@@ -3,6 +3,7 @@
     "Aggs",
     "bunx",
     "cloc",
+    "ctes",
     "datalog",
     "Datom",
     "Datomic",

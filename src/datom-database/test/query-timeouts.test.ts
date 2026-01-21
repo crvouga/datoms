@@ -1,5 +1,6 @@
 import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 import {QueryTimeoutError} from '../hook/hook';
+import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import {FIXTURES} from './fixtures/fixtures.js';
 import type {Fixture} from './fixtures/fixture.js';
 
@@ -20,7 +21,12 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
       const {db} = f;
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
-      const {data: results} = await db.datoms({
+      const query = datomsQueryToDatalogQuery({
+        e: 1,
+        timeoutMs: 5000,
+      });
+      const {data: queryResults} = await db.query(query);
+      const results = queryResultsToDatoms(queryResults, {
         e: 1,
         timeoutMs: 5000,
       });
@@ -34,7 +40,8 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
 
       // Use a very short timeout - may or may not trigger depending on query speed
       try {
-        await db.datoms({e: 1, timeoutMs: 1});
+        const query = datomsQueryToDatalogQuery({e: 1, timeoutMs: 1});
+        await db.query(query);
         // If query completes quickly, that's fine - timeout is best-effort
       } catch (error: unknown) {
         if (error instanceof QueryTimeoutError) {
@@ -54,7 +61,13 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
         {op: true, e: 1, a: 'age', v: 30},
       ]);
 
-      const {data: results} = await db.datoms({
+      const query = datomsQueryToDatalogQuery({
+        e: 1,
+        a: 'name',
+        timeoutMs: 1000,
+      });
+      const {data: queryResults} = await db.query(query);
+      const results = queryResultsToDatoms(queryResults, {
         e: 1,
         a: 'name',
         timeoutMs: 1000,
@@ -69,7 +82,13 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
         await db.transact([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
       }
 
-      const {data: results} = await db.datoms({
+      const query = datomsQueryToDatalogQuery({
+        a: 'tag',
+        limit: 3,
+        timeoutMs: 1000,
+      });
+      const {data: queryResults} = await db.query(query);
+      const results = queryResultsToDatoms(queryResults, {
         a: 'tag',
         limit: 3,
         timeoutMs: 1000,

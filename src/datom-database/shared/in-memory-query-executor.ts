@@ -36,7 +36,7 @@ export function executeQueryOnDatoms(datoms: Datom[], options: DatomsQuery): Dat
     results = results.filter(d => d.tx <= txMax);
   }
 
-  // Handle subions: for each unique (entity, attribute, value) combination,
+  // Handle retractions: for each unique (entity, attribute, value) combination,
   // keep only the most recent transaction
   // This ensures that sub datoms are not returned when querying
   // and supports multi-valued attributes (multiple values per attribute)
@@ -60,7 +60,7 @@ export function executeQueryOnDatoms(datoms: Datom[], options: DatomsQuery): Dat
   if (options.op === undefined || options.op === true) {
     results = results.filter(d => d.op === true);
   } else if (options.op === false) {
-    // If explicitly requesting subions, filter by op: false
+    // If explicitly requesting retractions, filter by op: false
     results = results.filter(d => d.op === false);
   }
 

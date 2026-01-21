@@ -38,18 +38,8 @@ export function applyAggregations(
       const def = IN_MEMORY_AGGREGATIONS.get(agg.type);
       if (def) {
         const result = def.compute(values, agg.defaultValue);
-        // If result is a string that matches a numeric default value, convert to number
-        if (
-          result !== null &&
-          agg.defaultValue !== undefined &&
-          typeof result === 'string' &&
-          result === agg.defaultValue &&
-          /^-?\d+$/.test(agg.defaultValue)
-        ) {
-          aggregated[outputKey] = Number(agg.defaultValue);
-        } else {
-          aggregated[outputKey] = result;
-        }
+        // Use the result directly - the aggregation function handles count vs default logic
+        aggregated[outputKey] = result;
       } else {
         // Fallback for unregistered aggregations
         aggregated[outputKey] = null;

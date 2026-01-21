@@ -14,8 +14,6 @@ import {
 import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
 import type {ViewConfig} from '../views/view-config.js';
 import type {
-  DatomsRequest,
-  DatomsResponse,
   DeleteDatomsRequest,
   DeleteDatomsResponse,
   GetLatestTransactionRequest,
@@ -85,9 +83,6 @@ export class HttpClientDatomDatabaseServerComponent {
         case 'initialize':
           response = await this._handleInitialize(transportRequest as InitializeRequest);
           break;
-        case 'datoms':
-          response = await this._handleDatoms(transportRequest as DatomsRequest);
-          break;
         case 'query':
           response = await this._handleQuery(transportRequest as QueryRequest);
           break;
@@ -130,66 +125,6 @@ export class HttpClientDatomDatabaseServerComponent {
     await this.db.initialize();
     this.initialized = true;
     return {success: true};
-  }
-
-  private async _handleDatoms(request: DatomsRequest): Promise<DatomsResponse> {
-    await this._ensureInitialized();
-
-    // Handle speculative queries - need to merge speculative datoms with current state
-    if (request.viewConfig.type === 'speculative') {
-      const currentView = this._createView({type: 'current'});
-      // Use a large limit to fetch all current datoms for speculative queries
-      // This bypasses validation that requires at least one filter or limit
-      const {data: currentDatoms} = await currentView.datoms({
-        limit: Number.MAX_SAFE_INTEGER,
-      });
-      const speculativeDatoms = request.viewConfig.datoms;
-
-      // Merge speculative datoms with current state
-      const mergedMap = new Map<string, (typeof speculativeDatoms)[0]>();
-      for (const datom of currentDatoms) {
-        const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
-        mergedMap.set(key, datom);
-      }
-
-      for (const speculativeDatom of speculativeDatoms) {
-        const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
-        if (speculativeDatom.op === false) {
-          mergedMap.delete(key);
-        } else {
-          mergedMap.set(key, speculativeDatom);
-        }
-      }
-
-      const mergedDatoms = Array.from(mergedMap.values());
-      // Apply filters from options
-      let filtered = mergedDatoms;
-      if (request.options.e !== undefined) {
-        filtered = filtered.filter(d => d.e === request.options.e);
-      }
-      if (request.options.a !== undefined) {
-        filtered = filtered.filter(d => d.a === request.options.a);
-      }
-      if (request.options.v !== undefined) {
-        filtered = filtered.filter(d => d.v === request.options.v);
-      }
-      if (request.options.tx !== undefined) {
-        filtered = filtered.filter(d => d.tx === request.options.tx);
-      }
-      if (request.options.txMax !== undefined) {
-        const txMax = request.options.txMax;
-        filtered = filtered.filter(d => d.tx <= txMax);
-      }
-      if (request.options.op !== undefined) {
-        filtered = filtered.filter(d => d.op === request.options.op);
-      }
-
-      return {datoms: filtered};
-    }
-
-    const view = this._createView(request.viewConfig);
-    const {data: datoms} = await view.datoms(request.options);
-    return {datoms};
   }
 
   private async _handleQuery(request: QueryRequest): Promise<QueryResponse> {

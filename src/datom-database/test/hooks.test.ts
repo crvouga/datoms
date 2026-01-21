@@ -6,12 +6,11 @@ import {
   QueryError,
   TransactionError,
   type AfterRead,
-  type AfterDatomsRead,
   type AfterWrite,
   type BeforeRead,
-  type BeforeDatomsRead,
   type BeforeWrite,
 } from '../hook/hook.js';
+import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import {HookValidator} from '../hook/validator.js';
 
 describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
@@ -277,21 +276,24 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
         {op: true, e: 3, a: 'name', v: 'Alice'},
       ]);
 
-      const hook: AfterDatomsRead = {
-        type: 'afterDatomsRead',
-        name: 'filter-datoms',
-        execute: async datoms => {
-          // Filter to only return datoms with value "Alice"
-          return {datoms: datoms.filter(d => d.v === 'Alice')};
+      const hook: AfterRead = {
+        type: 'afterRead',
+        name: 'filter-results',
+        execute: async results => {
+          // Filter to only return results with value "Alice"
+          return {results: results.filter(r => (r as {v?: unknown}).v === 'Alice')};
         },
       };
 
       db.hook(hook);
 
-      const {data: datoms} = await db.datoms({a: 'name'});
+      const {data: results} = await db.query({
+        find: {e: ['?e'], v: ['?v']},
+        where: [{e: '?e', a: 'name', v: '?v'}],
+      });
 
-      expect(datoms).toHaveLength(2);
-      expect(datoms.every(d => d.v === 'Alice')).toBe(true);
+      expect(results).toHaveLength(2);
+      expect(results.every(r => (r as {v?: unknown}).v === 'Alice')).toBe(true);
     });
 
     test('should transform query results', async () => {
@@ -360,14 +362,14 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       expect(results[0]?.e).toBe(1);
     });
 
-    test('should register before-datoms-read hook', async () => {
+    test('should register before-read hook', async () => {
       const {db} = f;
 
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       let called = false;
-      const hook: BeforeDatomsRead = {
-        type: 'beforeDatomsRead',
+      const hook: BeforeRead = {
+        type: 'beforeRead',
         name: 'test-hook',
         execute: async query => {
           called = true;
@@ -376,33 +378,39 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       };
 
       db.hook(hook);
-      await db.datoms({e: 1});
+      await db.query({
+        find: {e: ['?e'], a: ['?a'], v: ['?v']},
+        where: [{e: 1, a: '?a', v: '?v'}],
+      });
 
       expect(called).toBe(true);
     });
 
-    test('should register after-datoms-read hook', async () => {
+    test('should register after-read hook', async () => {
       const {db} = f;
 
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       let called = false;
-      const hook: AfterDatomsRead = {
-        type: 'afterDatomsRead',
+      const hook: AfterRead = {
+        type: 'afterRead',
         name: 'test-hook',
-        execute: async datoms => {
+        execute: async results => {
           called = true;
-          return {datoms};
+          return {results};
         },
       };
 
       db.hook(hook);
-      await db.datoms({e: 1});
+      await db.query({
+        find: {e: ['?e'], a: ['?a'], v: ['?v']},
+        where: [{e: 1, a: '?a', v: '?v'}],
+      });
 
       expect(called).toBe(true);
     });
 
-    test('should modify datoms query with before-datoms-read hook', async () => {
+    test('should modify query with before-read hook', async () => {
       const {db} = f;
 
       await db.transact([
@@ -410,15 +418,15 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
         {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
 
-      const hook: BeforeDatomsRead = {
-        type: 'beforeDatomsRead',
+      const hook: BeforeRead = {
+        type: 'beforeRead',
         name: 'modify-query',
         execute: async query => {
-          // Modify query to only find entity 1
+          // Modify query to only return entity 1
           return {
             query: {
               ...query,
-              e: 1,
+              where: [{e: 1, a: 'name', v: '?v'}],
             },
           };
         },
@@ -426,10 +434,13 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      const {data: datoms} = await db.datoms({a: 'name'});
+      const {data: results} = await db.query({
+        find: {e: ['?e'], v: ['?v']},
+        where: [{e: '?e', a: 'name', v: '?v'}],
+      });
 
-      expect(datoms).toHaveLength(1);
-      expect(datoms[0]?.e).toBe(1);
+      expect(results).toHaveLength(1);
+      expect(results[0]?.e).toBe(1);
     });
 
     test('should pass context to after-read hook', async () => {
@@ -532,7 +543,9 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
-      const {data: datoms} = await db.datoms({e: 1});
+      const query = datomsQueryToDatalogQuery({e: 1});
+      const {data: results} = await db.query(query);
+      const datoms = queryResultsToDatoms(results, {e: 1});
       const hasTimestamp = datoms.some(d => d.a === 'updatedAt');
       expect(hasTimestamp).toBe(true);
     });
@@ -701,7 +714,9 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
         await new Promise(resolve => setTimeout(resolve, 10));
 
         // Verify transaction succeeded
-        const {data: datoms} = await db.datoms({e: 1});
+        const query = datomsQueryToDatalogQuery({e: 1});
+        const {data: results} = await db.query(query);
+        const datoms = queryResultsToDatoms(results, {e: 1});
         expect(datoms).toHaveLength(1);
       } finally {
         // Restore console.error
@@ -982,11 +997,13 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       await db.transact([{op: false, e: 1, a: 'name', v: 'Alice'}]);
 
       expect(called).toBe(true);
-      const {data: datoms} = await db.datoms({e: 1});
+      const query = datomsQueryToDatalogQuery({e: 1});
+      const {data: results} = await db.query(query);
+      const datoms = queryResultsToDatoms(results, {e: 1});
       expect(datoms).toHaveLength(0);
     });
 
-    test('should call appropriate hooks for query() and datoms() methods', async () => {
+    test('should call appropriate hooks for query() method', async () => {
       const {db} = f;
 
       await db.transact([
@@ -996,8 +1013,6 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       let queryBeforeReadCalled = false;
       let queryAfterReadCalled = false;
-      let datomsBeforeReadCalled = false;
-      let datomsAfterReadCalled = false;
 
       const queryBeforeHook: BeforeRead = {
         type: 'beforeRead',
@@ -1017,32 +1032,11 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
         },
       };
 
-      const datomsBeforeHook: BeforeDatomsRead = {
-        type: 'beforeDatomsRead',
-        name: 'datoms-before',
-        execute: async query => {
-          datomsBeforeReadCalled = true;
-          return {query};
-        },
-      };
-
-      const datomsAfterHook: AfterDatomsRead = {
-        type: 'afterDatomsRead',
-        name: 'datoms-after',
-        execute: async datoms => {
-          datomsAfterReadCalled = true;
-          return {datoms};
-        },
-      };
-
-      // Register all hooks
+      // Register hooks
       db.hook(queryBeforeHook);
       db.hook(queryAfterHook);
-      db.hook(datomsBeforeHook);
-      db.hook(datomsAfterHook);
 
-      // Call query() - should trigger query hooks, and also datoms hooks
-      // because query() internally calls datoms() to fetch datoms
+      // Call query() - should trigger query hooks
       await db.query({
         find: {e: ['?e']},
         where: [{e: '?e', a: 'name', v: '?v'}],
@@ -1050,23 +1044,6 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       expect(queryBeforeReadCalled).toBe(true);
       expect(queryAfterReadCalled).toBe(true);
-      // Query internally calls datoms(), so datoms hooks will be called
-      expect(datomsBeforeReadCalled).toBe(true);
-      expect(datomsAfterReadCalled).toBe(true);
-
-      // Reset flags
-      queryBeforeReadCalled = false;
-      queryAfterReadCalled = false;
-      datomsBeforeReadCalled = false;
-      datomsAfterReadCalled = false;
-
-      // Call datoms() - should only trigger datoms hooks (not query hooks)
-      await db.datoms({a: 'name'});
-
-      expect(queryBeforeReadCalled).toBe(false);
-      expect(queryAfterReadCalled).toBe(false);
-      expect(datomsBeforeReadCalled).toBe(true);
-      expect(datomsAfterReadCalled).toBe(true);
     });
   });
 });
