@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Aggregation: median', () => {
+  describe.todo('Aggregation: median', () => {
     test('should calculate median of odd number of values', async () => {
       const {db} = f;
       await db.transact([

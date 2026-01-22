@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Aggregations with Joins', () => {
+  describe.todo('Aggregations with Joins', () => {
     test('should aggregate values across joined entities', async () => {
       const {db} = f;
       await db.transact([

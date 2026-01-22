@@ -377,8 +377,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         e: 1,
         a: 'name',
       });
-      const {data: results} = await db.history().query(query);
-      const history = queryResultsToDatoms(results, {
+      const queried = await db.history().query(query);
+      const history = queryResultsToDatoms(queried.data, {
         e: 1,
         a: 'name',
       });
@@ -670,13 +670,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const tx3 = await db.transact([{op: true, e: 1, a: 'tag', v: 'green'}]);
       const tx4 = await db.transact([{op: false, e: 1, a: 'tag', v: 'blue'}]);
 
-      // Note: asOf deduplicates by (entity, attribute), returning the latest value per attribute
       // Query at tx2 - should see "blue" (latest tag value at tx2)
       const query2 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
       const {data: results2} = await db.asOf(tx2).query(query2);
       const atTx2 = queryResultsToDatoms(results2, {e: 1, a: 'tag'});
+      console.log('[log] Query at tx2:', {tx2, results2, atTx2});
       expect(atTx2.length).toBeGreaterThanOrEqual(1);
       const valuesAtTx2 = atTx2.map(d => d.v);
+      console.log('[log] Values at tx2:', valuesAtTx2);
       expect(valuesAtTx2).toContain('blue');
 
       // Query at tx3 - should see green (latest value at tx3)

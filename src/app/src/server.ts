@@ -23,16 +23,9 @@ async function main() {
   const db = new PostgreSQLDatomDatabase({
     sqlDb: sqlDb,
     tableName: 'datoms',
-    maintenanceConfig: {
-      enabled: true,
-      intervalMs: 60_000,
-      runImmediately: true,
-    },
-    logger,
   });
 
   await db.initialize();
-  db.startMaintenance();
 
   const retentionPolicy = new DestroyRetentionPolicy({
     sourceDb: db,

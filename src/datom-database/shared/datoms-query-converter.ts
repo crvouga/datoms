@@ -76,19 +76,22 @@ export function queryResultsToDatoms<TFind extends Record<string, DatalogQueryFi
   options?: DatomsQuery,
 ): Datom[] {
   // Filter out results missing required fields before mapping
+  // When pattern has literal values (e.g., e: 1), the query executor may not include
+  // the variable in results, so we use the literal value from options as fallback
   let datoms = results
-    .filter(result => {
-      // e is required - filter out if missing
-      return result.e != null;
-    })
     .map(result => ({
-      e: result.e as EntityId,
-      a: result.a as Attribute,
-      v: result.v as Value,
+      // Use literal value from options if result field is missing (happens when pattern has literal)
+      e: (result.e as EntityId | undefined) ?? (options?.e as EntityId | undefined),
+      a: (result.a as Attribute | undefined) ?? (options?.a as Attribute | undefined),
+      v: (result.v as Value | undefined) ?? (options?.v as Value | undefined),
       tx: result.tx as TransactionId,
       // op defaults to true if not present (for backward compatibility)
       op: (result.op as boolean | undefined) ?? true,
-    }));
+    }))
+    .filter(datom => {
+      // e is required - filter out if still missing after fallback
+      return datom.e != null;
+    });
 
   // Apply op filter if specified
   // When op is not specified, include both added and retracted datoms
@@ -98,5 +101,5 @@ export function queryResultsToDatoms<TFind extends Record<string, DatalogQueryFi
   }
   // If op is not specified, don't filter - include all datoms
 
-  return datoms;
+  return datoms as Datom[];
 }

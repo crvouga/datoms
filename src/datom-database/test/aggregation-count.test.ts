@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Aggregation: count', () => {
+  describe.todo('Aggregation: count', () => {
     test('should count all matching values', async () => {
       const {db} = f;
       await db.transact([

@@ -29,10 +29,7 @@ export {
 } from './filesystem/filesystem-datom-database.js';
 export {HttpClientDatomDatabase} from './http-client/http-client-datom-database.js';
 export {InMemoryDatomDatabase} from './in-memory/in-memory-datom-database.js';
-export {
-  PostgreSQLDatomDatabase,
-  type PostgreSQLMaintenanceConfig,
-} from './postgres/postgres-datom-database.js';
+export {PostgreSQLDatomDatabase} from './postgres/postgres-datom-database.js';
 
 // SQL connection adapter
 export type {SQLDatabase} from '../sql-database/sql-database.js';

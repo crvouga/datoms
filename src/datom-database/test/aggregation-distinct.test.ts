@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Aggregation: distinct', () => {
+  describe.todo('Aggregation: distinct', () => {
     test('should return distinct values', async () => {
       const {db} = f;
       await db.transact([

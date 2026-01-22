@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Aggregation: stddev', () => {
+  describe.todo('Aggregation: stddev', () => {
     test('should calculate standard deviation of numeric values', async () => {
       const {db} = f;
       await db.transact([

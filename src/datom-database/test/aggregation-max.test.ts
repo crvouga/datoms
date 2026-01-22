@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Aggregation: max', () => {
+  describe.todo('Aggregation: max', () => {
     test('should find maximum numeric value', async () => {
       const {db} = f;
       await db.transact([

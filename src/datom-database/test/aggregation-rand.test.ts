@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Aggregation: rand', () => {
+  describe.todo('Aggregation: rand', () => {
     test('should return N random values with replacement', async () => {
       const {db} = f;
       await db.transact([

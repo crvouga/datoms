@@ -133,12 +133,16 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
         e: 1,
         maxResultSize: 10,
       });
-      const {data: queryResults} = await db.query(query);
-      const results = queryResultsToDatoms(queryResults, {
+      const results = await db.query(query);
+      // Verify queryResults has data
+      expect(results.data.length).toBeGreaterThan(0);
+      const datoms = queryResultsToDatoms(results.data, {
         e: 1,
         maxResultSize: 10,
       });
-      expect(results).toHaveLength(1);
+      // The query should return the datom we just added
+      expect(datoms).toHaveLength(1);
+      expect(datoms[0]?.v).toBe('Alice');
     });
   });
 

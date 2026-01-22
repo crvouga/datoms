@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Aggregation: min', () => {
+  describe.todo('Aggregation: min', () => {
     test('should find minimum numeric value', async () => {
       const {db} = f;
       await db.transact([

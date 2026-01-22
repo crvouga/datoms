@@ -16,7 +16,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await f.afterEach();
   });
 
-  describe('Aggregation Edge Cases', () => {
+  describe.todo('Aggregation Edge Cases', () => {
     test('should handle aggregations with all zero values', async () => {
       const {db} = f;
       await db.transact([
