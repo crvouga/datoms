@@ -16,10 +16,10 @@ import type {DatabaseRow, SQLParams} from './types.js';
 export interface SQLDatabase {
   query(sql: string, params?: SQLParams): Promise<DatabaseRow[]>;
   execute(sql: string, params?: SQLParams): Promise<void>;
-  beginTransaction?(): Promise<void>;
-  commitTransaction?(): Promise<void>;
-  rollbackTransaction?(): Promise<void>;
-  close?(): Promise<void>;
+  beginTransaction(): Promise<void>;
+  commitTransaction(): Promise<void>;
+  rollbackTransaction(): Promise<void>;
+  close(): Promise<void>;
   /**
    * Get connection pool statistics (optional, for implementations with connection pooling)
    * @returns Pool statistics if pooling is used, undefined otherwise

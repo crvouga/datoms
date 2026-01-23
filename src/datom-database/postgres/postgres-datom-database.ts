@@ -118,21 +118,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const txResult = await this._getNextTransactionId();
     const tx = txResult.txId;
 
-    if (
-      this.sqlDb.beginTransaction &&
-      this.sqlDb.commitTransaction &&
-      this.sqlDb.rollbackTransaction
-    ) {
-      await this.sqlDb.beginTransaction();
-      try {
-        await this._writeDatomsInternal(datoms, tx);
-        await this.sqlDb.commitTransaction();
-      } catch (error) {
-        await this.sqlDb.rollbackTransaction();
-        throw error;
-      }
-    } else {
+    await this.sqlDb.beginTransaction();
+    try {
       await this._writeDatomsInternal(datoms, tx);
+      await this.sqlDb.commitTransaction();
+    } catch (error) {
+      await this.sqlDb.rollbackTransaction();
+      throw error;
     }
 
     return tx;

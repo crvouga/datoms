@@ -70,6 +70,10 @@ describe('Connection Pooling Types', () => {
       const sqlDb: SQLDatabase = {
         query: async () => [],
         execute: async () => {},
+        beginTransaction: async () => {},
+        commitTransaction: async () => {},
+        rollbackTransaction: async () => {},
+        close: async () => {},
       };
 
       expect(sqlDb.getPoolStats).toBeUndefined();
@@ -86,6 +90,10 @@ describe('Connection Pooling Types', () => {
       const sqlDb: SQLDatabase = {
         query: async () => [],
         execute: async () => {},
+        beginTransaction: async () => {},
+        commitTransaction: async () => {},
+        rollbackTransaction: async () => {},
+        close: async () => {},
         getPoolStats: async () => stats,
       };
 
@@ -107,6 +115,10 @@ describe('Connection Pooling Types', () => {
           totalConnections: 5,
           waitingRequests: 1,
         }),
+        beginTransaction: async () => {},
+        commitTransaction: async () => {},
+        rollbackTransaction: async () => {},
+        close: async () => {},
       };
 
       if (sqlDb.getPoolStats) {
