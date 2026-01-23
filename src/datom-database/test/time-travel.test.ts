@@ -674,10 +674,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query2 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
       const {data: results2} = await db.asOf(tx2).query(query2);
       const atTx2 = queryResultsToDatoms(results2, {e: 1, a: 'tag'});
-      console.log('[log] Query at tx2:', {tx2, results2, atTx2});
       expect(atTx2.length).toBeGreaterThanOrEqual(1);
       const valuesAtTx2 = atTx2.map(d => d.v);
-      console.log('[log] Values at tx2:', valuesAtTx2);
       expect(valuesAtTx2).toContain('blue');
 
       // Query at tx3 - should see green (latest value at tx3)
@@ -688,16 +686,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(valuesAtTx3).toContain('green');
 
       // Query at tx4 - should see green (latest add value before or at tx4)
-      // Note: When subing blue at tx4, asOf queries deduplicate by (entity, attribute)
-      // keeping the latest tx, then filter to add=true. If the subion has the highest tx,
-      // it might be picked during deduplication, then filtered out, resulting in empty.
-      // This tests the edge case where a subion happens at the query tx.
       const query4 = datomsQueryToDatalogQuery({e: 1, a: 'tag'});
       const {data: results4} = await db.asOf(tx4).query(query4);
       const atTx4 = queryResultsToDatoms(results4, {e: 1, a: 'tag'});
       const valuesAtTx4 = atTx4.map(d => d.v);
-      // The implementation should handle this correctly - green (tx3) should be visible
-      // as it's the latest add value. If empty, verify green is visible at tx3.
       if (valuesAtTx4.length > 0) {
         expect(valuesAtTx4).toContain('green');
         expect(valuesAtTx4).not.toContain('blue');
@@ -722,7 +714,6 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
       const valuesSinceTx2 = sinceTx2.map(d => d.v);
       expect(valuesSinceTx2).toContain('green');
-      // Should not include red or blue (they were before tx2)
 
       // Use history to see all values at tx2 (including sub ones)
       const queryHistory = datomsQueryToDatalogQuery({

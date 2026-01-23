@@ -104,17 +104,34 @@ function datalogToPostgresSQL(
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // PostgreSQL uses DISTINCT ON for deduplication
+    // For history queries, don't use DISTINCT ON - return all datoms including duplicates
     // For asOf queries, deduplicate by (e, a) to keep latest tx per attribute
     // For other queries, deduplicate by (e, a, v) to support multi-valued attributes
+    const isHistory = viewConfig?.type === 'history';
     const distinctOn = viewConfig?.type === 'asOf' ? '(e, a)' : '(e, a, v)';
     const orderBy = viewConfig?.type === 'asOf' ? 'e, a, tx DESC' : 'e, a, v, tx DESC';
 
     // For history queries, don't filter by op = true (include retractions)
     // For other queries, filter to only active (op = true) datoms
-    const isHistory = viewConfig?.type === 'history';
     const activeFilter = isHistory ? '' : 'WHERE op = true';
-    const cte = `
+
+    let cte: string;
+    if (isHistory) {
+      // History queries: no deduplication, return all datoms
+      cte = `
+        ${alias} AS (
+          SELECT e, a, v, tx, op
+          FROM ${tableName}
+          ${whereClause}
+          ORDER BY tx ASC, e ASC, a ASC
+        ),
+        ${alias}_active AS (
+          SELECT e, a, v, tx, op
+          FROM ${alias}
+        )`;
+    } else {
+      // Regular queries: use DISTINCT ON for deduplication
+      cte = `
         ${alias} AS (
           SELECT DISTINCT ON ${distinctOn}
             e, a, v, tx, op
@@ -127,6 +144,7 @@ function datalogToPostgresSQL(
           FROM ${alias}
           ${activeFilter}
         )`;
+    }
 
     ctes.push(cte);
   }
@@ -1426,6 +1444,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // Validate query has at least one filter or limit
     const hasLimit = modifiedQuery.limit !== undefined;
+    const hasMaxResultSize = modifiedQuery.maxResultSize !== undefined;
     let hasFilter = false;
     for (const clause of modifiedQuery.where) {
       if (isQueryPattern(clause)) {
@@ -1440,9 +1459,11 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         }
       }
     }
-    if (!hasFilter && !hasLimit) {
+    // Require at least one filter, limit, or maxResultSize to prevent full table scans
+    // Queries with all variables still scan the entire table and need protection
+    if (!hasFilter && !hasLimit && !hasMaxResultSize) {
       throw new QuerySafetyError(
-        'Query must include at least one filter (entity, attribute, value, tx, txMax) or a limit to prevent full table scans',
+        'Query must include at least one filter (entity, attribute, value, tx, txMax), limit, or maxResultSize to prevent full table scans',
       );
     }
 
