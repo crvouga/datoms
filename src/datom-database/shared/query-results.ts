@@ -31,7 +31,14 @@ export function joinResults(
   const rightKeys = new Set(Object.keys(right[0] || {}));
   const sharedNonMetadataVars = new Set<string>();
   for (const key of leftKeys) {
-    if (key !== '?e' && key !== '?a' && key !== '?v' && key !== '?tx' && rightKeys.has(key)) {
+    if (
+      key !== '?e' &&
+      key !== '?a' &&
+      key !== '?v' &&
+      key !== '?tx' &&
+      key !== '?op' &&
+      rightKeys.has(key)
+    ) {
       sharedNonMetadataVars.add(key);
     }
   }
@@ -70,7 +77,36 @@ export function joinResults(
       // or transaction metadata in different clauses and should not prevent joining
 
       if (compatible) {
-        joined.push({...leftRow, ...rightRow});
+        // Merge rows intelligently: when a variable exists in both rows with different values,
+        // prefer non-string values over strings (user variables over metadata)
+        const mergedRow = {...leftRow};
+        for (const key of Object.keys(rightRow)) {
+          const leftVal = mergedRow[key];
+          const rightVal = rightRow[key];
+
+          // If key doesn't exist in left, just add it
+          if (!(key in mergedRow)) {
+            mergedRow[key] = rightVal;
+            continue;
+          }
+
+          // If values are equal, keep either (already have leftVal)
+          if (leftVal === rightVal) {
+            continue;
+          }
+
+          // When values differ, prefer non-string values (more likely to be user variables)
+          // over strings (more likely to be attribute metadata)
+          const leftIsString = typeof leftVal === 'string';
+          const rightIsString = typeof rightVal === 'string';
+
+          if (leftIsString && !rightIsString) {
+            // Prefer rightVal (non-string) over leftVal (string)
+            mergedRow[key] = rightVal;
+          }
+          // Otherwise keep leftVal (either non-string, or both same type)
+        }
+        joined.push(mergedRow);
       }
     }
   }

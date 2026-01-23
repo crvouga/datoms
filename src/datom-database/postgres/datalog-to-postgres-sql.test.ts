@@ -47,50 +47,85 @@ describe('datalogToPostgresSQL', () => {
 
   test('query with multiple patterns and joins', () => {
     const query: DatalogQuery = {
-      find: {person: ['?person'], name: ['?name'], age: ['?age']},
+      find: {
+        'movie/id': ['?movie/id'],
+        'movie/title': ['?title'],
+        'movie/popularity': ['?popularity'],
+      },
       where: [
-        {e: '?person', a: 'name', v: '?name'},
-        {e: '?person', a: 'age', v: '?age'},
+        {e: '?movie/id', a: 'tmdb.movie/id', v: '?movie/id'},
+        {e: '?movie/id', a: 'tmdb.movie/title', v: '?title'},
+        {e: '?movie/id', a: 'tmdb.movie/popularity', v: '?popularity'},
       ],
+      orderBy: [['?popularity', 'desc']],
+      limit: 10,
     };
 
-    const result = datalogToPostgresSQL(query);
+    const actual = datalogToPostgresSQL(query);
 
-    const _expectedSQL = `
-      WITH d0 AS (
-        SELECT DISTINCT ON (e, a, v)
-          e, a, v, tx, op
-        FROM datoms
-        WHERE a = ?
-        ORDER BY e, a, v, tx DESC
-      ),
-      d0_active AS (
-        SELECT e, a, v, tx, op
-        FROM d0
-        WHERE op = true
-      ),
-      d1 AS (
-        SELECT DISTINCT ON (e, a, v)
-          e, a, v, tx, op
-        FROM datoms
-        WHERE a = ?
-        ORDER BY e, a, v, tx DESC
-      ),
-      d1_active AS (
-        SELECT e, a, v, tx, op
-        FROM d1
-        WHERE op = true
-      )
-      SELECT d0_active.e AS "person", d0_active.v AS "y", d1_active.v AS "age"
+    // Example tests (not format checked, but cover core params and major CTEs)
+    expect(actual.params).toEqual([
+      'tmdb.movie/id',
+      'tmdb.movie/title',
+      'tmdb.movie/popularity',
+      10,
+    ]);
+    expect(actual.sql).toContain('d0 AS');
+    expect(actual.sql).toContain('d1 AS');
+    expect(actual.sql).toContain('d2 AS');
+    // Check 'ORDER BY' and 'LIMIT'
+    expect(actual.sql).toMatch(/ORDER BY.*d2_active\.v DESC/is);
+    expect(actual.sql).toMatch(/LIMIT\s+?/is);
+
+    const expectedSQL = `
+      WITH
+        d0 AS (
+          SELECT DISTINCT ON (e, a, v)
+            e, a, v, tx, op
+          FROM datoms
+          WHERE a = ?
+          ORDER BY e, a, v, tx DESC
+        ),
+        d0_active AS (
+          SELECT e, a, v, tx, op
+          FROM d0
+          WHERE op = true
+        ),
+        d1 AS (
+          SELECT DISTINCT ON (e, a, v)
+            e, a, v, tx, op
+          FROM datoms
+          WHERE a = ?
+          ORDER BY e, a, v, tx DESC
+        ),
+        d1_active AS (
+          SELECT e, a, v, tx, op
+          FROM d1
+          WHERE op = true
+        ),
+        d2 AS (
+          SELECT DISTINCT ON (e, a, v)
+            e, a, v, tx, op
+          FROM datoms
+          WHERE a = ?
+          ORDER BY e, a, v, tx DESC
+        ),
+        d2_active AS (
+          SELECT e, a, v, tx, op
+          FROM d2
+          WHERE op = true
+        )
+      SELECT 
+        d0_active.e AS "movie/id", 
+        d1_active.v AS "movie/title", 
+        d2_active.v AS "movie/popularity"
       FROM d0_active
-      JOIN d1_active ON d0_active.e = d1_active.e
+      JOIN d1_active ON d1_active.e = d0_active.v::text
+      JOIN d2_active ON d2_active.e = d1_active.e
+      ORDER BY d2_active.v DESC
+      LIMIT ?
     `;
-
-    expect(result.params).toEqual(['name', 'age']);
-    // Check that both CTEs are present
-    expect(result.sql).toContain('d0 AS');
-    expect(result.sql).toContain('d1 AS');
-    expect(result.sql).toContain('JOIN d1_active ON');
+    expect(formatSQL(actual.sql)).toBe(formatSQL(expectedSQL));
   });
 
   test('query with constant values', () => {
