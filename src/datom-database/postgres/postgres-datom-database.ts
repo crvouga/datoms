@@ -379,6 +379,37 @@ function datalogToPostgresSQL(
           if (columnRef) {
             selectColumns.push(`${columnRef} AS "${outputKey}"`);
             groupByColumns.push(columnRef);
+          } else {
+            // Variable not found in variableToColumn - check pattern clauses for literal value
+            // This handles cases where a hook modifies the WHERE clause to use literals
+            // but the find clause still references the variable (e.g., e: 1 in WHERE, e: ['?e'] in find)
+            let literal: Value | Attribute | EntityId | undefined;
+            for (const clause of patternClauses) {
+              if (!clause || !isQueryPattern(clause)) continue;
+              // Map common variable names to their field positions
+              if (varName === '?e' && !isVariable(clause.e)) {
+                literal = clause.e as EntityId;
+                break;
+              }
+              if (varName === '?a' && !isVariable(clause.a)) {
+                literal = clause.a as Attribute;
+                break;
+              }
+              if (varName === '?v' && clause.v !== undefined && !isVariable(clause.v)) {
+                literal = clause.v as Value;
+                break;
+              }
+            }
+            if (literal !== undefined) {
+              // Use the literal value in SELECT
+              if (typeof literal === 'string') {
+                params.push(literal);
+                selectColumns.push(`? AS "${outputKey}"`);
+              } else {
+                params.push(JSON.stringify(literal));
+                selectColumns.push(`?::jsonb AS "${outputKey}"`);
+              }
+            }
           }
         }
       }

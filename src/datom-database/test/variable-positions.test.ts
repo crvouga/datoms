@@ -72,6 +72,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query: DatalogQuery = {
         find: {e: ['?e'], attr: ['?attr'], v: ['?v']},
         where: [{e: '?e', a: '?attr', v: '?v'}],
+        limit: 100, // Required for all-variable queries to pass safety check
       };
 
       const {data: results} = await db.query(query);
