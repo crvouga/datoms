@@ -14,6 +14,7 @@ import {
   HookEngine,
   QueryError,
   QueryResultSizeError,
+  QuerySafetyError,
   QueryTimeoutError,
   type ReadContext,
   TransactionError,
@@ -334,7 +335,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
         throw new QueryTimeoutError(0, query as unknown);
       }
       if (mappedError.code === 'QUERY_SAFETY_VIOLATION') {
-        throw new Error(`Query safety violation: ${mappedError.message}`);
+        throw new QuerySafetyError(mappedError.message);
       }
       if (mappedError.code === 'QUERY_RESULT_SIZE_EXCEEDED') {
         const errorData = mappedError.originalError as {
