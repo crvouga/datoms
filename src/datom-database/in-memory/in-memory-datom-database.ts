@@ -4,34 +4,33 @@
  * Useful for testing and small datasets
  */
 
-import type {DatalogQuery, DatalogQueryFindVariable, QueryClause} from '../../datalog/datalog.js';
-import type {Attribute, Datom, DatomInput, TransactionId, Value} from '../../datoms.js';
-import type {EntityId} from '../../entity-id.js';
-import type {Transaction} from '../../types.js';
-import type {DatomDatabase, WithResult} from '../datom-database.js';
+import type { DatalogQuery, DatalogQueryFindVariable, QueryClause } from '../../datalog/datalog.js';
+import type { Attribute, Datom, DatomInput, TransactionId, Value } from '../../datoms.js';
+import type { EntityId } from '../../entity-id.js';
+import type { Transaction } from '../../types.js';
+import type { DatomDatabase, WithResult } from '../datom-database.js';
 import {
+  type Hook,
   HookEngine,
   QueryError,
   QueryResultSizeError,
   QuerySafetyError,
-  QueryTimeoutError,
-  TransactionError,
-  type Hook,
   type ReadContext,
+  TransactionError,
   type WriteContext,
-  type WriteResult,
+  type WriteResult
 } from '../hook/hook.js';
-import {isQueryPattern, isVariable, stripQuestionMark} from '../shared/datalog-helpers.js';
-import {executeQueryOnDatoms} from '../shared/in-memory-query-executor.js';
-import {joinResults, project} from '../shared/query-results.js';
-import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
+import { isQueryPattern, isVariable, stripQuestionMark } from '../shared/datalog-helpers.js';
+import { executeQueryOnDatoms } from '../shared/in-memory-query-executor.js';
+import { joinResults, project } from '../shared/query-results.js';
+import { ConfiguredDatabaseView } from '../views/configured-database-view.js';
 import type {
   DatabaseView,
   DatomsQuery,
   QueryResult,
   QueryResultEnvelope,
 } from '../views/database-view.js';
-import type {ViewConfig} from '../views/view-config.js';
+import type { ViewConfig } from '../views/view-config.js';
 
 /**
  * In-memory database implementation
@@ -587,59 +586,6 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     });
 
     return beforeLength - this._datomsArray.length;
-  }
-
-  /**
-   * Compute obsolete datoms from a list of datoms.
-   * A datom is obsolete if it has been superseded by a later transaction for the same (entity, attribute, value).
-   * @param datoms Array of datoms to analyze
-   * @returns Array of obsolete datoms (all datoms that are not the latest for their (e, a, v) group)
-   */
-  private _computeObsoleteDatoms(datoms: Datom[]): Datom[] {
-    // Group datoms by (entity, attribute, value)
-    const datomsByKey = new Map<string, Datom[]>();
-    for (const datom of datoms) {
-      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}`;
-      if (!datomsByKey.has(key)) {
-        datomsByKey.set(key, []);
-      }
-      datomsByKey.get(key)?.push(datom);
-    }
-
-    // For each (e, a, v) group, find the latest transaction
-    // All datoms with tx < latestTx are obsolete
-    const obsoleteDatoms: Datom[] = [];
-    for (const [_key, groupDatoms] of datomsByKey.entries()) {
-      if (groupDatoms.length === 0) {
-        continue;
-      }
-
-      // Sort by transaction ID descending
-      groupDatoms.sort((a, b) => b.tx - a.tx);
-
-      // Get the latest transaction ID for this (e, a, v)
-      const latestDatom = groupDatoms[0];
-      if (!latestDatom) {
-        continue;
-      }
-
-      // All datoms with tx < latestTx are obsolete (they've been superseded)
-      for (let i = 1; i < groupDatoms.length; i++) {
-        const datom = groupDatoms[i];
-        if (datom) {
-          obsoleteDatoms.push(datom);
-        }
-      }
-    }
-
-    // Remove duplicates using a unique key
-    const uniqueObsolete = new Map<string, Datom>();
-    for (const datom of obsoleteDatoms) {
-      const key = `${String(datom.e)}|${String(datom.a)}|${JSON.stringify(datom.v)}|${datom.tx}|${datom.op}`;
-      uniqueObsolete.set(key, datom);
-    }
-
-    return Array.from(uniqueObsolete.values());
   }
 
   private async _queryWithMetadataInternal<TFind extends Record<string, DatalogQueryFindVariable>>(
