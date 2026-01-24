@@ -1,11 +1,43 @@
 import type {HttpClient} from '../../lib/http-client';
-import {discoverMovies as discoverMoviesImpl} from './discover-movies';
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 
-// Re-export types
-export type {DiscoverMoviesResponse} from './discover-movies';
-export type {Movie} from './types';
+type Nullish<T> = T extends object
+  ?
+      | {
+          [K in keyof T]?: Nullish<T[K]> | null | undefined;
+        }
+      | null
+      | undefined
+  : T | null | undefined;
+
+/**
+ * Movie data structure from TMDB API.
+ * @see {@link https://developer.themoviedb.org/reference/movie-details TMDB Movie Details API}
+ * @see {@link https://developer.themoviedb.org/docs/getting-started/introduction TMDB API Documentation}
+ */
+export interface Movie {
+  id: number;
+  title: string;
+  overview: string;
+  release_date: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  vote_average: number;
+  vote_count: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Response structure for the discover movies endpoint.
+ * @see {@link https://developer.themoviedb.org/reference/discover-movie TMDB Discover Movie API}
+ */
+export interface DiscoverMoviesResponse {
+  page: number;
+  results: Movie[];
+  total_pages: number;
+  total_results: number;
+}
 
 /**
  * Client for interacting with The Movie Database (TMDB) API.
@@ -44,8 +76,24 @@ export class TmdbClient {
    * @see {@link https://developer.themoviedb.org/reference/discover-movie TMDB Discover Movie API}
    * @see {@link https://developer.themoviedb.org/docs/getting-started/discover TMDB Discover Documentation}
    */
-  async discoverMovies(params?: Parameters<typeof discoverMoviesImpl>[1]) {
-    return discoverMoviesImpl(this.httpClient, params);
+  async discoverMovies(params?: {
+    page?: number;
+    sort_by?: string;
+    with_genres?: string;
+    primary_release_year?: number;
+    'primary_release_date.gte'?: string;
+    'primary_release_date.lte'?: string;
+    [key: string]: string | number | undefined;
+  }): Promise<Nullish<DiscoverMoviesResponse>> {
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params ?? {})) {
+      if (!value) continue;
+      searchParams.append(key, String(value));
+    }
+    const queryString = searchParams.toString();
+    // Pass relative path (baseURL ends with / so this will be appended correctly)
+    const path = `discover/movie${queryString ? `?${queryString}` : ''}`;
+    return this.httpClient.get<Nullish<DiscoverMoviesResponse>>(path);
   }
 }
 
