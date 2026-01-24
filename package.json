@@ -20,7 +20,7 @@
     "check": "bun run check:quick && bun test --bail && bun test:e2e && echo '✅ Checks passed'",
     "check:fast": "bun run check:quick && bun test:fast --bail && echo '✅ Fast checks passed'",
     "check:quick": "bun format && bun typecheck && bun lint && bun cir-deps && echo '✅ Quick checks passed'",
-    "cir-deps": "madge --circular src/index.ts",
+    "cir-deps": "madge --circular src/index.ts && madge --circular src/app/src/server.ts",
     "cloc": "bun x cloc src",
     "docker": "bun docker:down && bun docker:up",
     "docker:destroy": "docker-compose down -v",
