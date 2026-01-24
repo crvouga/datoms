@@ -9,7 +9,20 @@ export const createPostgresFixture = async (): Promise<Fixture> => {
   const tableName = 'datoms';
   const db = new PostgreSQLDatomDatabase({sqlDb: sqlDb, tableName});
   await db.initialize();
-  const cleanUp = async () => {
+  const cleanUpData = async () => {
+    // Delete all data from tables without dropping them
+    try {
+      await sqlDb.query(`DELETE FROM ${tableName}`);
+      await sqlDb.query(`DELETE FROM ${tableName}_tx`);
+      // Reset the transaction counter
+      await sqlDb.query(
+        `INSERT INTO ${tableName}_tx (id, last_tx) VALUES (1, 0) ON CONFLICT (id) DO UPDATE SET last_tx = 0`,
+      );
+    } catch (error) {
+      console.error('Error cleaning up Postgres data', error);
+    }
+  };
+  const cleanUpTables = async () => {
     try {
       await sqlDb.query(`DROP TABLE IF EXISTS ${tableName}, ${tableName}_tx`);
     } catch (error) {
@@ -18,9 +31,11 @@ export const createPostgresFixture = async (): Promise<Fixture> => {
   };
   return {
     db,
-    beforeEach: async () => {},
+    beforeEach: async () => {
+      await cleanUpData();
+    },
     afterEach: async () => {
-      await cleanUp();
+      await cleanUpTables();
       await sqlDb.close();
     },
   };

@@ -14,7 +14,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
   beforeAll(
     async () => {
       f = await createFixture();
-      const movieDb = new FileSystemDatomDatabase({filePath: 'movie-db.csv'});
+      const movieDb = new FileSystemDatomDatabase({filePath: 'movie-db.csv', db: f.db});
       await movieDb.initialize();
       const query = datomsQueryToDatalogQuery({
         limit: FAST_TESTS ? 500 : 1_000_000,

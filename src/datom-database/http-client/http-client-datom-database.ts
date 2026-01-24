@@ -5,7 +5,7 @@
  */
 
 import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
-import {type Datom, type DatomInput, type TransactionId, datoms} from '../../datoms.js';
+import type {Datom, DatomInput, TransactionId} from '../../datoms.js';
 import type {HttpClient} from '../../http-client/http-client.js';
 import type {Transaction} from '../../types.js';
 import type {DatomDatabase, WithResult} from '../datom-database.js';
@@ -21,14 +21,8 @@ import {
   type WriteContext,
   type WriteResult,
 } from '../hook/hook.js';
-import {validateQueryOptions} from '../shared/query-validation.js';
 import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
-import type {
-  DatabaseView,
-  DatomsQuery,
-  QueryResult,
-  QueryResultEnvelope,
-} from '../views/database-view.js';
+import type {DatabaseView, QueryResult, QueryResultEnvelope} from '../views/database-view.js';
 import type {ViewConfig} from '../views/view-config.js';
 import type {
   DeleteDatomsResponse,

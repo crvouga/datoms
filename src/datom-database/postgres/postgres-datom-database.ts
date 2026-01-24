@@ -30,7 +30,6 @@ import {
   type WriteContext,
   type WriteResult,
 } from '../hook/hook.js';
-import {parseAggregation} from '../in-memory/aggregations/parser.js';
 import {isQueryPattern, isVariable, stripQuestionMark} from '../shared/datalog-helpers.js';
 import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
 import type {
@@ -697,8 +696,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // When we have aggregations only (no GROUP BY), we should get exactly 1 row
     // If we get multiple rows, something is wrong with the SQL
     const findKeys = Object.keys(query.find);
-    const hasAggregations =
-      findKeys.length > 0 && findKeys.some(key => parseAggregation(query.find[key]));
+    const hasAggregations = Object.values(query.find).some(e => e.t !== 'identity');
     if (hasAggregations && rows.length > 1) {
       // Take only the first row - aggregations without GROUP BY should return 1 row
       const firstRow = rows[0];

@@ -12,11 +12,11 @@ import type {Hook} from '../hook/hook.js';
 import type {DatomDatabase, WithResult} from '../datom-database.js';
 import type {DatomsQuery, QueryResultEnvelope} from '../views/database-view.js';
 import type {DatabaseView} from '../views/database-view.js';
-import {InMemoryDatomDatabase} from '../in-memory/in-memory-datom-database.js';
 
 export interface FileSystemDatomDatabaseOptions {
   /** Path to the CSV file for persistence (default: "datoms.csv") */
   filePath: string;
+  db: DatomDatabase;
 }
 
 /**
@@ -25,20 +25,12 @@ export interface FileSystemDatomDatabaseOptions {
  * but adds file system persistence for durability
  */
 export class FileSystemDatomDatabase implements DatomDatabase {
-  private _memoryDb: InMemoryDatomDatabase;
+  private db: DatomDatabase;
   private readonly filePath: string;
 
   constructor(options: FileSystemDatomDatabaseOptions) {
     this.filePath = options.filePath;
-    // Start with empty array, will be loaded in initialize()
-    this._memoryDb = new InMemoryDatomDatabase([]);
-  }
-
-  /**
-   * Access to hooks (delegated to memory database)
-   */
-  get hooks() {
-    return this._memoryDb.hooks;
+    this.db = options.db;
   }
 
   /**
@@ -56,18 +48,17 @@ export class FileSystemDatomDatabase implements DatomDatabase {
     }
 
     const datoms = await this._loadDatoms();
-    // Create a new memory database instance with loaded datoms
-    // Note: Hooks should be registered after initialize() (recommended pattern)
-    // InMemoryDatomDatabase constructor will automatically calculate nextTx from datoms
-    this._memoryDb = new InMemoryDatomDatabase(datoms);
-    await this._memoryDb.initialize();
+    // Only transact if there are datoms to load (avoid incrementing tx counter for empty loads)
+    if (datoms.length > 0) {
+      await this.db.transact(datoms);
+    }
   }
 
   /**
    * Register a hook (delegated to memory database)
    */
   hook(hook: Hook): void {
-    this._memoryDb.hook(hook);
+    this.db.hook(hook);
   }
 
   /**
@@ -79,7 +70,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
     context?: Record<string, unknown>,
   ): Promise<TransactionId> {
     // Delegate to memory database
-    const txId = await this._memoryDb.transact(ops, metadata, context);
+    const txId = await this.db.transact(ops, metadata, context);
 
     // Persist to file system after successful transaction
     await this._persist();
@@ -102,49 +93,49 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   >(
     query: DatalogQuery<keyof TFind & string> & {find: TFind},
   ): Promise<QueryResultEnvelope<TFind>> {
-    return this._memoryDb.query(query);
+    return this.db.query(query);
   }
 
   /**
    * Create an as-of view (delegated to memory database)
    */
   asOf(txId: TransactionId): DatabaseView {
-    return this._memoryDb.asOf(txId);
+    return this.db.asOf(txId);
   }
 
   /**
    * Create a history view (delegated to memory database)
    */
   history(): DatabaseView {
-    return this._memoryDb.history();
+    return this.db.history();
   }
 
   /**
    * Create a since view (delegated to memory database)
    */
   since(txId: TransactionId): DatabaseView {
-    return this._memoryDb.since(txId);
+    return this.db.since(txId);
   }
 
   /**
    * Speculative transaction (delegated to memory database)
    */
   async with(ops: DatomInput[]): Promise<WithResult> {
-    return this._memoryDb.with(ops);
+    return this.db.with(ops);
   }
 
   /**
    * Get latest transaction (delegated to memory database)
    */
   async _getLatestTransaction(): Promise<Transaction> {
-    return this._memoryDb._getLatestTransaction();
+    return this.db._getLatestTransaction();
   }
 
   /**
    * Destroy old datoms (delegated to memory database)
    */
   async _destroy(config: {retentionCount: number}): Promise<number> {
-    const result = await this._memoryDb._destroy(config);
+    const result = await this.db._destroy(config);
     // Persist after destruction
     await this._persist();
     return result;
@@ -326,7 +317,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
         where: [{e: '?e', a: '?a', v: '?v'}],
         limit: 1_000_000,
       };
-      const {data: results} = await this._memoryDb.query(query);
+      const {data: results} = await this.db.query(query);
       const allDatoms = results.map(r => ({
         e: r.e as EntityId,
         a: r.a as Attribute,

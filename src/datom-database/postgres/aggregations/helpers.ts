@@ -2,14 +2,13 @@
  * PostgreSQL SQL helper functions
  */
 
-import {parseAggregation} from '../../in-memory/aggregations/parser.js';
-import {POSTGRES_AGGREGATIONS} from './registry.js';
+import type {DatalogQueryFindVariable} from '../../../datalog/datalog.js';
 import type {SQLAggregationResult} from './types.js';
 
 /**
  * Escape a column name for PostgreSQL SQL
  */
-export function escapeColumnName(name: string): string {
+function escapeColumnName(name: string): string {
   // Remove question mark prefix if present
   const cleanName = name.startsWith('?') ? name.slice(1) : name;
   // PostgreSQL uses double quotes for identifiers
@@ -19,7 +18,7 @@ export function escapeColumnName(name: string): string {
 /**
  * Escape a value for SQL (for default values)
  */
-export function escapeValue(value: string | number): string {
+function escapeValue(value: string | number): string {
   if (typeof value === 'number') {
     return String(value);
   }
@@ -30,10 +29,7 @@ export function escapeValue(value: string | number): string {
 /**
  * Get JSONB text extraction expression for PostgreSQL
  */
-export function getPostgresJSONBTextExtraction(
-  variableColumn: string,
-  isValueColumn: boolean,
-): string {
+function getPostgresJSONBTextExtraction(variableColumn: string, isValueColumn: boolean): string {
   if (!isValueColumn) {
     return variableColumn;
   }
@@ -47,11 +43,151 @@ export function getPostgresJSONBTextExtraction(
 /**
  * Get value extraction expression for numeric operations
  */
-export function getValueExtraction(variableColumn: string, isValueColumn: boolean): string {
+function getValueExtraction(variableColumn: string, isValueColumn: boolean): string {
   if (!isValueColumn) {
     return variableColumn;
   }
   return `(${variableColumn}::jsonb#>>'{}')::numeric`;
+}
+
+/**
+ * Convert an aggregation expression to PostgreSQL SQL using a typesafe switch case
+ * @param expr Aggregation expression from find clause
+ * @param variableColumn SQL column reference for the variable (e.g., "d0.v")
+ * @param outputKey Output key name for the aggregation (used as column alias)
+ * @returns SQL aggregation expression or null if not supported
+ */
+function aggregationToPostgresSQL(
+  expr: DatalogQueryFindVariable,
+  variableColumn: string,
+  outputKey: string,
+): SQLAggregationResult | null {
+  const isValueColumn = variableColumn.includes('.v');
+
+  switch (expr.t) {
+    case 'identity':
+      return null; // Not an aggregation
+
+    case 'count': {
+      return {
+        sql: `COUNT(*) AS ${escapeColumnName(outputKey)}`,
+        requiresGroupBy: false,
+      };
+    }
+
+    case 'count-distinct': {
+      // For JSONB columns, we need to extract the value first as text
+      const distinctColumn = isValueColumn
+        ? getPostgresJSONBTextExtraction(variableColumn, isValueColumn)
+        : variableColumn;
+      return {
+        sql: `COUNT(DISTINCT ${distinctColumn}) AS ${escapeColumnName(outputKey)}`,
+        requiresGroupBy: false,
+      };
+    }
+
+    case 'sum': {
+      const sql = isValueColumn
+        ? `SUM(${getValueExtraction(variableColumn, isValueColumn)}) AS ${escapeColumnName(outputKey)}`
+        : `SUM(CAST(${variableColumn} AS NUMERIC)) AS ${escapeColumnName(outputKey)}`;
+      return {
+        sql,
+        requiresGroupBy: false,
+      };
+    }
+
+    case 'avg': {
+      const sql = isValueColumn
+        ? `AVG(${getValueExtraction(variableColumn, isValueColumn)}) AS ${escapeColumnName(outputKey)}`
+        : `AVG(CAST(${variableColumn} AS NUMERIC)) AS ${escapeColumnName(outputKey)}`;
+      return {
+        sql,
+        requiresGroupBy: false,
+      };
+    }
+
+    case 'min': {
+      // For min/max on value columns, extract as numeric for proper numeric comparison
+      // This ensures 50 < 100 instead of "100" < "50" lexicographically
+      const minColumn = isValueColumn
+        ? getValueExtraction(variableColumn, isValueColumn)
+        : variableColumn;
+      const defaultValue = expr.count !== undefined ? String(expr.count) : undefined;
+      const minDefault =
+        defaultValue !== undefined
+          ? `COALESCE(MIN(${minColumn}), ${escapeValue(defaultValue)})`
+          : `MIN(${minColumn})`;
+      return {
+        sql: `${minDefault} AS ${escapeColumnName(outputKey)}`,
+        requiresGroupBy: false,
+      };
+    }
+
+    case 'max': {
+      // For min/max on value columns, extract as numeric for proper numeric comparison
+      const maxColumn = isValueColumn
+        ? getValueExtraction(variableColumn, isValueColumn)
+        : variableColumn;
+      const defaultValue = expr.count !== undefined ? String(expr.count) : undefined;
+      const maxDefault =
+        defaultValue !== undefined
+          ? `COALESCE(MAX(${maxColumn}), ${escapeValue(defaultValue)})`
+          : `MAX(${maxColumn})`;
+      return {
+        sql: `${maxDefault} AS ${escapeColumnName(outputKey)}`,
+        requiresGroupBy: false,
+      };
+    }
+
+    case 'median': {
+      const sql = isValueColumn
+        ? `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${getValueExtraction(variableColumn, isValueColumn)}) AS ${escapeColumnName(outputKey)}`
+        : `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY CAST(${variableColumn} AS NUMERIC)) AS ${escapeColumnName(outputKey)}`;
+      return {
+        sql,
+        requiresGroupBy: false,
+      };
+    }
+
+    case 'variance': {
+      const sql = isValueColumn
+        ? `VAR_POP(${getValueExtraction(variableColumn, isValueColumn)}) AS ${escapeColumnName(outputKey)}`
+        : `VAR_POP(CAST(${variableColumn} AS NUMERIC)) AS ${escapeColumnName(outputKey)}`;
+      return {
+        sql,
+        requiresGroupBy: false,
+      };
+    }
+
+    case 'stddev': {
+      const sql = isValueColumn
+        ? `STDDEV_POP(${getValueExtraction(variableColumn, isValueColumn)}) AS ${escapeColumnName(outputKey)}`
+        : `STDDEV_POP(CAST(${variableColumn} AS NUMERIC)) AS ${escapeColumnName(outputKey)}`;
+      return {
+        sql,
+        requiresGroupBy: false,
+      };
+    }
+
+    case 'distinct': {
+      // PostgreSQL supports ARRAY_AGG(DISTINCT ...)
+      return {
+        sql: `ARRAY_AGG(DISTINCT ${variableColumn}) AS ${escapeColumnName(outputKey)}`,
+        requiresGroupBy: false,
+      };
+    }
+
+    case 'rand':
+    case 'sample':
+      // Not supported in PostgreSQL aggregations
+      return null;
+
+    default: {
+      // Exhaustiveness check - TypeScript will error if we miss a case
+      const _exhaustive: never = expr;
+      return _exhaustive;
+    }
+  }
 }
 
 /**
@@ -66,50 +202,10 @@ export function aggregationToSQL(
   variableColumn: string,
   outputKey: string,
 ): SQLAggregationResult | null {
-  const agg = parseAggregation(expr);
-  if (!agg) {
-    return null; // Not an aggregation
+  // Type guard to check if expr is a valid DatalogQueryFindVariable
+  if (typeof expr !== 'object' || expr === null || !('t' in expr) || typeof expr.t !== 'string') {
+    return null;
   }
 
-  const def = POSTGRES_AGGREGATIONS.get(agg.type);
-  if (!def) {
-    return null; // Aggregation not supported for this database type
-  }
-
-  const isValueColumn = variableColumn.includes('.v');
-  return def.convert(variableColumn, outputKey, agg.defaultValue, isValueColumn);
-}
-
-/**
- * Check if a query has aggregations that can be handled in SQL
- * @param find Find clause object
- * @returns Object with hasAggregations flag and whether all aggregations are SQL-supported
- */
-export function checkSQLAggregations(find: {[key: string]: unknown}): {
-  hasAggregations: boolean;
-  allSupported: boolean;
-  hasUnsupported: boolean;
-} {
-  const findKeys = Object.keys(find);
-  let hasAggregations = false;
-  let hasUnsupported = false;
-
-  for (const outputKey of findKeys) {
-    const expr = find[outputKey];
-    const agg = parseAggregation(expr);
-    if (agg) {
-      hasAggregations = true;
-      // Check if this aggregation is supported
-      const result = aggregationToSQL(expr, 'dummy', outputKey);
-      if (result === null || result.sql === null) {
-        hasUnsupported = true;
-      }
-    }
-  }
-
-  return {
-    hasAggregations,
-    allSupported: hasAggregations && !hasUnsupported,
-    hasUnsupported,
-  };
+  return aggregationToPostgresSQL(expr as DatalogQueryFindVariable, variableColumn, outputKey);
 }

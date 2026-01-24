@@ -1,12 +1,13 @@
 import {serve} from 'bun';
-import type {Fixture} from '../fixture.js';
 import {FetchHttpClient} from '../../../../http-client/http-client.js';
 import {HttpClientDatomDatabaseServerComponent} from '../../../http-client/http-client-datom-database-server-component.js';
 import {HttpClientDatomDatabase} from '../../../http-client/http-client-datom-database.js';
-import {InMemoryDatomDatabase} from '../../../in-memory/in-memory-datom-database.js';
+import type {Fixture} from '../fixture.js';
+import {createPostgresFixture} from './postgres.js';
 
 export const createHttpClientFixture = async (): Promise<Fixture> => {
-  let serverDb = new InMemoryDatomDatabase();
+  const f = await createPostgresFixture();
+  const serverDb = f.db;
   const transportServerComponent = new HttpClientDatomDatabaseServerComponent(serverDb);
   const endpoint = '/api/datom-database';
   const server = serve({
@@ -23,16 +24,11 @@ export const createHttpClientFixture = async (): Promise<Fixture> => {
   return {
     db,
     beforeEach: async () => {
-      // Create a new in-memory database for clean state
-      serverDb = new InMemoryDatomDatabase();
-      await serverDb.initialize();
-      // Update the server component to use the new database
-      transportServerComponent.setDatabase(serverDb);
-      // Also reset the remote database's initialization state
-      await db.initialize();
+      await f.beforeEach();
     },
     afterEach: async () => {
       await server.stop();
+      await f.afterEach();
     },
   };
 };

@@ -1,7 +1,6 @@
 import {describe, expect, test} from 'bun:test';
 import {format} from 'sql-formatter';
 import type {DatalogQuery} from '../../datalog/datalog.js';
-import './aggregations/index.js'; // Register PostgreSQL aggregations
 import {datalogToPostgresSQL} from './datalog-to-postgres-sql.js';
 
 /**

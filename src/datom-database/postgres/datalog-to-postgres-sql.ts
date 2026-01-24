@@ -6,7 +6,6 @@ import type {DatalogQuery, QueryClause} from '../../datalog/datalog.js';
 import type {Attribute, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {ViewConfig} from '../views/view-config.js';
-import {parseAggregation} from '../in-memory/aggregations/parser.js';
 import {isQueryPattern, isVariable, stripQuestionMark} from '../shared/datalog-helpers.js';
 import {aggregationToSQL} from './aggregations/helpers.js';
 
@@ -237,9 +236,7 @@ function _buildWhereClause(
  * Build GROUP BY clause if we have aggregations
  */
 function _buildGroupByClause(query: DatalogQuery, groupByColumns: string[]): string {
-  const findKeys = Object.keys(query.find);
-  const hasAggregations =
-    findKeys.length > 0 && findKeys.some(key => parseAggregation(query.find[key]));
+  const hasAggregations = Object.values(query.find).some(e => e.t !== 'identity');
 
   if (hasAggregations && groupByColumns.length > 0) {
     return `GROUP BY ${groupByColumns.join(', ')}`;
@@ -561,24 +558,22 @@ function _buildSelectColumnsNonEmpty(
   groupByColumns: string[],
   params: unknown[],
 ): void {
-  const findKeys = Object.keys(query.find);
-
-  for (const outputKey of findKeys) {
-    const expr = query.find[outputKey];
-    const agg = parseAggregation(expr);
-
-    if (agg) {
-      _buildAggregationColumn(expr, agg.variable, outputKey, variableToColumn, selectColumns);
-    } else {
-      _buildVariableColumn(
-        expr,
-        outputKey,
-        patternClauses,
-        variableToColumn,
-        selectColumns,
-        groupByColumns,
-        params,
-      );
+  for (const [outputKey, expr] of Object.entries(query.find)) {
+    switch (expr.t) {
+      case 'identity':
+        _buildVariableColumn(
+          expr,
+          outputKey,
+          patternClauses,
+          variableToColumn,
+          selectColumns,
+          groupByColumns,
+          params,
+        );
+        break;
+      default:
+        _buildAggregationColumn(expr, expr.c, outputKey, variableToColumn, selectColumns);
+        break;
     }
   }
 }

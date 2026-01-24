@@ -28,7 +28,6 @@ export {
   type FileSystemDatomDatabaseOptions,
 } from './filesystem/filesystem-datom-database.js';
 export {HttpClientDatomDatabase} from './http-client/http-client-datom-database.js';
-export {InMemoryDatomDatabase} from './in-memory/in-memory-datom-database.js';
 export {PostgreSQLDatomDatabase} from './postgres/postgres-datom-database.js';
 
 // SQL connection adapter
