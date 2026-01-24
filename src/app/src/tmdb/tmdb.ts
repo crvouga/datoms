@@ -1,5 +1,6 @@
-export const TMDB_MOVIE_ID = 'tmdb.movie/id';
-export const TMDB_MOVIE_TITLE = 'tmdb.movie/title';
+import { namespaceKey } from '../../../namespace';
 
-export const tmdbPrefixKey = (entity: 'movie' | 'tv' | 'person', key: string) =>
-  `tmdb.${entity}/${key}`;
+export const tmdbNamespace = (
+  entity: 'movie' | 'tv' | 'person' | 'config' | 'country' | 'language',
+  key: string,
+) => namespaceKey(['tmdb'], entity, key);

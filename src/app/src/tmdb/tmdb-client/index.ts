@@ -40,6 +40,49 @@ export interface DiscoverMoviesResponse {
 }
 
 /**
+ * Image configuration from TMDB API.
+ * @see {@link https://developer.themoviedb.org/reference/configuration-details TMDB Configuration API}
+ */
+export interface ImageConfiguration {
+  base_url: string;
+  secure_base_url: string;
+  backdrop_sizes: string[];
+  logo_sizes: string[];
+  poster_sizes: string[];
+  profile_sizes: string[];
+  still_sizes: string[];
+}
+
+/**
+ * API configuration response from TMDB.
+ * @see {@link https://developer.themoviedb.org/reference/configuration-details TMDB Configuration API}
+ */
+export interface ConfigurationResponse {
+  images: ImageConfiguration;
+  change_keys: string[];
+}
+
+/**
+ * Country data structure from TMDB API.
+ * @see {@link https://developer.themoviedb.org/reference/configuration-countries TMDB Countries API}
+ */
+export interface Country {
+  iso_3166_1: string;
+  english_name: string;
+  native_name?: string;
+}
+
+/**
+ * Language data structure from TMDB API.
+ * @see {@link https://developer.themoviedb.org/reference/configuration-languages TMDB Languages API}
+ */
+export interface Language {
+  iso_639_1: string;
+  english_name: string;
+  name: string;
+}
+
+/**
  * Client for interacting with The Movie Database (TMDB) API.
  * @see {@link https://developer.themoviedb.org/docs/getting-started/introduction TMDB API Documentation}
  * @see {@link https://developer.themoviedb.org/reference/discover-movie Discover Movie Endpoint}
@@ -94,6 +137,60 @@ export class TmdbClient {
     // Pass relative path (baseURL ends with / so this will be appended correctly)
     const path = `discover/movie${queryString ? `?${queryString}` : ''}`;
     return this.httpClient.get<Nullish<DiscoverMoviesResponse>>(path);
+  }
+
+  /**
+   * Get the system-wide configuration information. This includes image configuration.
+   * Some elements of the API require some knowledge of this configuration data.
+   * The purpose of this is to try and keep the actual API responses as light as possible.
+   * It is recommended you cache this data within your application and check for updates every few days.
+   * @returns Promise resolving to configuration response with nullish types
+   * @see {@link https://developer.themoviedb.org/reference/configuration-details TMDB Configuration API}
+   */
+  async getConfiguration(): Promise<Nullish<ConfigurationResponse>> {
+    return this.httpClient.get<Nullish<ConfigurationResponse>>('configuration');
+  }
+
+  /**
+   * Get the list of countries (ISO 3166-1 tags) used throughout TMDB.
+   * @returns Promise resolving to array of countries with nullish types
+   * @see {@link https://developer.themoviedb.org/reference/configuration-countries TMDB Countries API}
+   */
+  async getCountries(): Promise<Nullish<Country[]>> {
+    return this.httpClient.get<Nullish<Country[]>>('configuration/countries');
+  }
+
+  /**
+   * Get a list of the officially supported languages on TMDB.
+   * @returns Promise resolving to array of languages with nullish types
+   * @see {@link https://developer.themoviedb.org/reference/configuration-languages TMDB Languages API}
+   */
+  async getLanguages(): Promise<Nullish<Language[]>> {
+    return this.httpClient.get<Nullish<Language[]>>('configuration/languages');
+  }
+
+  /**
+   * Get the list of languages (ISO 639-1 tags) used throughout TMDB that have been translated to a primary language.
+   * @returns Promise resolving to array of primary translation language codes with nullish types
+   * @see {@link https://developer.themoviedb.org/reference/configuration-primary-translations TMDB Primary Translations API}
+   */
+  async getPrimaryTranslations(): Promise<Nullish<string[]>> {
+    return this.httpClient.get<Nullish<string[]>>(
+      'configuration/primary_translations'
+    );
+  }
+
+  /**
+   * Get the list of timezones used throughout TMDB.
+   * @returns Promise resolving to array of timezone objects with nullish types
+   * @see {@link https://developer.themoviedb.org/reference/configuration-timezones TMDB Timezones API}
+   */
+  async getTimezones(): Promise<
+    Nullish<{iso_3166_1: string; zones: string[]}[]>
+  > {
+    return this.httpClient.get<Nullish<{iso_3166_1: string; zones: string[]}[]>>(
+      'configuration/timezones'
+    );
   }
 }
 
