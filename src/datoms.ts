@@ -87,6 +87,17 @@ export type Datom = {
   op: boolean;
 };
 
+export function validateDatoms(datoms: DatomInput[]): void {
+  for (const datom of datoms) {
+    if (datom.e === null || datom.e === undefined) {
+      throw new Error('Datom must have an entity ID');
+    }
+    if (datom.a === null || datom.a === undefined) {
+      throw new Error('Datom must have an attribute');
+    }
+  }
+}
+
 /**
  * A partial datom for asserting/retracting facts (without tx)
  * Object format: { e: entity, a: attribute, v: value, op: operation }

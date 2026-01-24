@@ -5,7 +5,14 @@
 
 import type {DatalogQuery, DatalogQueryFindVariable, QueryClause} from '../../datalog/datalog.js';
 
-import type {Attribute, Datom, DatomInput, TransactionId, Value} from '../../datoms.js';
+import {
+  validateDatoms,
+  type Attribute,
+  type Datom,
+  type DatomInput,
+  type TransactionId,
+  type Value,
+} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {SQLDatabase} from '../../sql-database/sql-database.js';
 import type {DatabaseRow} from '../../sql-database/types.js';
@@ -144,45 +151,15 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       ...(context || {}),
     };
 
-    // Process operations sequentially
-    const adds: DatomInput[] = [];
-    const subs: DatomInput[] = [];
-
-    for (const op of ops.flat()) {
-      const datom = {e: op.e, a: op.a, v: op.v, op: op.op};
-
-      if (op.op === true) {
-        await this._validateDatoms([datom], true, subs);
-        adds.push(datom);
-      } else {
-        await this._validateDatoms([datom], false);
-        subs.push(datom);
-      }
-    }
+    const datomInputs = ops.flat();
+    validateDatoms(datomInputs);
 
     // Convert to datoms for transaction object
     const allDatoms: Datom[] = [];
     const latestTx = await this._getLatestTransaction();
     const txId = (latestTx.txId ?? 0) + 1;
-
-    for (const sub of subs) {
-      allDatoms.push({
-        e: sub.e,
-        a: sub.a,
-        v: sub.v,
-        tx: txId,
-        op: false,
-      });
-    }
-
-    for (const add of adds) {
-      allDatoms.push({
-        e: add.e,
-        a: add.a,
-        v: add.v,
-        tx: txId,
-        op: true,
-      });
+    for (const datomInput of datomInputs) {
+      allDatoms.push({...datomInput, tx: txId});
     }
 
     // Create transaction object
@@ -224,21 +201,6 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     });
 
     return committedTxId;
-  }
-
-  private async _validateDatoms(
-    datoms: DatomInput[],
-    _isAdd: boolean,
-    _subsInSameTransaction?: DatomInput[],
-  ): Promise<void> {
-    for (const datom of datoms) {
-      if (datom.e === null || datom.e === undefined) {
-        throw new Error('Datom must have an entity ID');
-      }
-      if (datom.a === null || datom.a === undefined) {
-        throw new Error('Datom must have an attribute');
-      }
-    }
   }
 
   private async _ensureInitialized(): Promise<void> {
