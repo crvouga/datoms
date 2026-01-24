@@ -6,7 +6,7 @@
  */
 
 import {Database as BunDatabase} from 'bun:sqlite';
-import type {SQLDatabase} from './sql-database.js';
+import type {SQLDatabase, SQLDatabaseTransaction} from './sql-database.js';
 import type {DatabaseRow, SQLParams} from './types.js';
 
 /**
@@ -14,7 +14,6 @@ import type {DatabaseRow, SQLParams} from './types.js';
  */
 export class SQLiteSQLDatabase implements SQLDatabase {
   private db: BunDatabase;
-  private inTransaction = false;
 
   constructor(filename = ':memory:') {
     this.db = new BunDatabase(filename);
@@ -39,34 +38,33 @@ export class SQLiteSQLDatabase implements SQLDatabase {
     stmt.run(...(params || []));
   }
 
-  async beginTransaction(): Promise<void> {
-    if (this.inTransaction) {
-      throw new Error('Transaction already in progress');
-    }
-    await this.execute('BEGIN TRANSACTION');
-    this.inTransaction = true;
-  }
+  async transaction(callback: (tx: SQLDatabaseTransaction) => Promise<void>): Promise<void> {
+    try {
+      await this.execute('BEGIN TRANSACTION');
 
-  async commitTransaction(): Promise<void> {
-    if (!this.inTransaction) {
-      throw new Error('No transaction in progress');
-    }
-    await this.execute('COMMIT');
-    this.inTransaction = false;
-  }
+      const tx: SQLDatabaseTransaction = {
+        execute: async (sql: string, params?: SQLParams): Promise<void> => {
+          const stmt = this.db.prepare(sql);
+          // @ts-expect-error - SQLParams is unknown[] but Bun expects specific types; values are valid at runtime
+          stmt.run(...(params || []));
+        },
+        query: async (sql: string, params?: SQLParams): Promise<DatabaseRow[]> => {
+          const stmt = this.db.prepare(sql);
+          // @ts-expect-error - SQLParams is unknown[] but Bun expects specific types; values are valid at runtime
+          const results = stmt.all(...(params || []));
+          return results as DatabaseRow[];
+        },
+      };
 
-  async rollbackTransaction(): Promise<void> {
-    if (!this.inTransaction) {
-      throw new Error('No transaction in progress');
+      await callback(tx);
+      await this.execute('COMMIT');
+    } catch (error) {
+      await this.execute('ROLLBACK');
+      throw error;
     }
-    await this.execute('ROLLBACK');
-    this.inTransaction = false;
   }
 
   async close(): Promise<void> {
-    if (this.inTransaction) {
-      await this.rollbackTransaction();
-    }
     this.db.close();
   }
 }

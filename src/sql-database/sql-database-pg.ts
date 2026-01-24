@@ -7,7 +7,7 @@
 
 import {Pool} from 'pg';
 import type {PoolClient} from 'pg';
-import type {SQLDatabase} from './sql-database.js';
+import type {SQLDatabase, SQLDatabaseTransaction} from './sql-database.js';
 import type {DatabaseRow, SQLParams} from './types.js';
 
 /**
@@ -80,8 +80,6 @@ function parseSSLConfig(connectionString: string): ParsedConnectionConfig {
  */
 export class PgSQLDatabase implements SQLDatabase {
   private pool: Pool;
-  private client?: PoolClient;
-  private inTransaction = false;
   private closed = false;
 
   constructor(connectionString: string) {
@@ -116,12 +114,7 @@ export class PgSQLDatabase implements SQLDatabase {
   async query(sql: string, params?: SQLParams): Promise<DatabaseRow[]> {
     const [convertedSql, convertedParams] = this.convertParams(sql, params);
 
-    let result: {rows: DatabaseRow[]};
-    if (this.inTransaction && this.client) {
-      result = await this.client.query(convertedSql, convertedParams);
-    } else {
-      result = await this.pool.query(convertedSql, convertedParams);
-    }
+    const result = await this.pool.query(convertedSql, convertedParams);
 
     // PostgreSQL returns JSONB values as JavaScript primitives/objects
     // We need to convert ALL values to JSON strings for consistency with SQLite
@@ -159,37 +152,58 @@ export class PgSQLDatabase implements SQLDatabase {
 
   async execute(sql: string, params?: SQLParams): Promise<void> {
     const [convertedSql, convertedParams] = this.convertParams(sql, params);
-
-    if (this.inTransaction && this.client) {
-      await this.client.query(convertedSql, convertedParams);
-    } else {
-      await this.pool.query(convertedSql, convertedParams);
-    }
+    await this.pool.query(convertedSql, convertedParams);
   }
 
-  async beginTransaction(): Promise<void> {
-    if (!this.client) {
-      this.client = await this.pool.connect();
-    }
-    await this.client.query('BEGIN');
-    this.inTransaction = true;
-  }
+  async transaction(callback: (tx: SQLDatabaseTransaction) => Promise<void>): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
 
-  async commitTransaction(): Promise<void> {
-    if (this.client && this.inTransaction) {
-      await this.client.query('COMMIT');
-      this.inTransaction = false;
-      this.client.release();
-      this.client = undefined;
-    }
-  }
+      const tx: SQLDatabaseTransaction = {
+        execute: async (sql: string, params?: SQLParams): Promise<void> => {
+          const [convertedSql, convertedParams] = this.convertParams(sql, params);
+          await client.query(convertedSql, convertedParams);
+        },
+        query: async (sql: string, params?: SQLParams): Promise<DatabaseRow[]> => {
+          const [convertedSql, convertedParams] = this.convertParams(sql, params);
+          const result = await client.query(convertedSql, convertedParams);
 
-  async rollbackTransaction(): Promise<void> {
-    if (this.client && this.inTransaction) {
-      await this.client.query('ROLLBACK');
-      this.inTransaction = false;
-      this.client.release();
-      this.client = undefined;
+          // Apply the same conversion as the main query method
+          return result.rows.map((row: DatabaseRow): DatabaseRow => {
+            const convertedRow: DatabaseRow = {...row};
+            const value = convertedRow.value;
+            if (value !== null && value !== undefined) {
+              convertedRow.value = JSON.stringify(value);
+            }
+            const txVal = convertedRow.tx;
+            if (txVal !== undefined) {
+              if (typeof txVal === 'bigint') {
+                convertedRow.tx = Number(txVal);
+              } else if (typeof txVal === 'string') {
+                convertedRow.tx = Number.parseInt(txVal, 10);
+              }
+            }
+            const lastTx = convertedRow.last_tx;
+            if (lastTx !== undefined) {
+              if (typeof lastTx === 'bigint') {
+                convertedRow.last_tx = Number(lastTx);
+              } else if (typeof lastTx === 'string') {
+                convertedRow.last_tx = Number.parseInt(lastTx, 10);
+              }
+            }
+            return convertedRow;
+          });
+        },
+      };
+
+      await callback(tx);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
   }
 
@@ -198,17 +212,6 @@ export class PgSQLDatabase implements SQLDatabase {
       return; // Already closed
     }
     this.closed = true;
-
-    // Rollback any active transaction
-    if (this.inTransaction && this.client) {
-      await this.rollbackTransaction();
-    }
-
-    // Release client if still connected
-    if (this.client) {
-      this.client.release();
-      this.client = undefined;
-    }
 
     await this.pool.end();
   }

@@ -14,7 +14,7 @@ import {
   type Value,
 } from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
-import type {SQLDatabase} from '../../sql-database/sql-database.js';
+import type {SQLDatabase, SQLDatabaseTransaction} from '../../sql-database/sql-database.js';
 import type {DatabaseRow} from '../../sql-database/types.js';
 import type {Transaction} from '../../types.js';
 
@@ -67,8 +67,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    await this.sqlDb.beginTransaction();
-    try {
+    await this.sqlDb.transaction(async tx => {
       // 1. Create datoms table
       const createTableSql = `
         CREATE TABLE IF NOT EXISTS ${this.tableName} (
@@ -80,7 +79,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           PRIMARY KEY (e, a, v, tx, op)
         )
       `;
-      await this.sqlDb.execute(createTableSql);
+      await tx.execute(createTableSql);
 
       // 2. Create indexes
       const indexes = [
@@ -91,7 +90,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       ];
 
       for (const indexSql of indexes) {
-        await this.sqlDb.execute(indexSql);
+        await tx.execute(indexSql);
       }
 
       // 3. Create transaction counter table
@@ -101,7 +100,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           last_tx BIGINT NOT NULL DEFAULT 0
         )
       `;
-      await this.sqlDb.execute(txTableSql);
+      await tx.execute(txTableSql);
 
       // 4. Initialize transaction counter if needed
       const initTxSql = `
@@ -109,14 +108,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         SELECT 1, 0
         WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
       `;
-      await this.sqlDb.execute(initTxSql);
+      await tx.execute(initTxSql);
+    });
 
-      await this.sqlDb.commitTransaction();
-      this.initialized = true;
-    } catch (error) {
-      await this.sqlDb.rollbackTransaction();
-      throw error;
-    }
+    this.initialized = true;
   }
 
   hook(hook: Hook): void {
@@ -127,14 +122,9 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const txResult = await this._getNextTransactionId();
     const tx = txResult.txId;
 
-    await this.sqlDb.beginTransaction();
-    try {
-      await this._writeDatomsInternal(datoms, tx);
-      await this.sqlDb.commitTransaction();
-    } catch (error) {
-      await this.sqlDb.rollbackTransaction();
-      throw error;
-    }
+    await this.sqlDb.transaction(async transaction => {
+      await this._writeDatomsInternal(datoms, tx, transaction);
+    });
 
     return tx;
   }
@@ -814,7 +804,11 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     return {txId: Number(row.last_tx)};
   }
 
-  private async _writeDatomsInternal(datoms: DatomInput[], tx: TransactionId): Promise<void> {
+  private async _writeDatomsInternal(
+    datoms: DatomInput[],
+    tx: TransactionId,
+    transaction: SQLDatabaseTransaction,
+  ): Promise<void> {
     if (datoms.length === 0) return;
 
     // Batch inserts to avoid PostgreSQL's parameter limit
@@ -836,7 +830,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         return [String(d.e), String(d.a), JSON.stringify(value), tx, d.op];
       });
 
-      await this.sqlDb.execute(sql, params);
+      await transaction.execute(sql, params);
     }
   }
 

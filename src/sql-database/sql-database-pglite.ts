@@ -6,7 +6,7 @@
  */
 
 import {PGlite} from '@electric-sql/pglite';
-import type {SQLDatabase} from './sql-database.js';
+import type {SQLDatabase, SQLDatabaseTransaction} from './sql-database.js';
 import type {DatabaseRow, SQLParams} from './types.js';
 
 /**
@@ -14,7 +14,6 @@ import type {DatabaseRow, SQLParams} from './types.js';
  */
 export class PGLiteSQLDatabase implements SQLDatabase {
   private db: PGlite;
-  private inTransaction = false;
   private closed = false;
   private readyPromise: Promise<void>;
 
@@ -89,31 +88,55 @@ export class PGLiteSQLDatabase implements SQLDatabase {
     await this.db.query(convertedSql, convertedParams);
   }
 
-  async beginTransaction(): Promise<void> {
-    if (this.inTransaction) {
-      throw new Error('Transaction already in progress');
-    }
+  async transaction(callback: (tx: SQLDatabaseTransaction) => Promise<void>): Promise<void> {
     await this.readyPromise;
-    await this.db.exec('BEGIN');
-    this.inTransaction = true;
-  }
 
-  async commitTransaction(): Promise<void> {
-    if (!this.inTransaction) {
-      throw new Error('No transaction in progress');
-    }
-    await this.readyPromise;
-    await this.db.exec('COMMIT');
-    this.inTransaction = false;
-  }
+    try {
+      await this.db.exec('BEGIN');
 
-  async rollbackTransaction(): Promise<void> {
-    if (!this.inTransaction) {
-      throw new Error('No transaction in progress');
+      const tx: SQLDatabaseTransaction = {
+        execute: async (sql: string, params?: SQLParams): Promise<void> => {
+          const [convertedSql, convertedParams] = this.convertParams(sql, params);
+          await this.db.query(convertedSql, convertedParams);
+        },
+        query: async (sql: string, params?: SQLParams): Promise<DatabaseRow[]> => {
+          const [convertedSql, convertedParams] = this.convertParams(sql, params);
+          const result = await this.db.query(convertedSql, convertedParams);
+
+          // Apply the same conversion as the main query method
+          return (result.rows as DatabaseRow[]).map((row: DatabaseRow): DatabaseRow => {
+            const convertedRow: DatabaseRow = {...row};
+            const value = convertedRow.value;
+            if (value !== null && value !== undefined) {
+              convertedRow.value = JSON.stringify(value);
+            }
+            const txVal = convertedRow.tx;
+            if (txVal !== undefined) {
+              if (typeof txVal === 'bigint') {
+                convertedRow.tx = Number(txVal);
+              } else if (typeof txVal === 'string') {
+                convertedRow.tx = Number.parseInt(txVal, 10);
+              }
+            }
+            const lastTx = convertedRow.last_tx;
+            if (lastTx !== undefined) {
+              if (typeof lastTx === 'bigint') {
+                convertedRow.last_tx = Number(lastTx);
+              } else if (typeof lastTx === 'string') {
+                convertedRow.last_tx = Number.parseInt(lastTx, 10);
+              }
+            }
+            return convertedRow;
+          });
+        },
+      };
+
+      await callback(tx);
+      await this.db.exec('COMMIT');
+    } catch (error) {
+      await this.db.exec('ROLLBACK');
+      throw error;
     }
-    await this.readyPromise;
-    await this.db.exec('ROLLBACK');
-    this.inTransaction = false;
   }
 
   async close(): Promise<void> {
@@ -121,11 +144,6 @@ export class PGLiteSQLDatabase implements SQLDatabase {
       return; // Already closed
     }
     this.closed = true;
-
-    // Rollback any active transaction
-    if (this.inTransaction) {
-      await this.rollbackTransaction();
-    }
 
     await this.db.close();
   }
