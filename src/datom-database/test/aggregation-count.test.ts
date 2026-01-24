@@ -26,7 +26,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const {data: results} = await db.query({
-        find: {total: ['count', '?age']},
+        find: {total: {t: 'count', c: '?age'}},
         where: [{e: '?e', a: 'age', v: '?age'}],
       });
       expect(results).toHaveLength(1);
@@ -36,7 +36,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should return 0 for empty results', async () => {
       const {db} = f;
       const query: DatalogQuery = {
-        find: {total: ['count', '?age']},
+        find: {total: {t: 'count', c: '?age'}},
         where: [{e: '?e', a: 'age', v: '?age'}],
       };
 
@@ -50,7 +50,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       const query: DatalogQuery = {
-        find: {total: ['count', '?name']},
+        find: {total: {t: 'count', c: '?name'}},
         where: [{e: '?e', a: 'name', v: '?name'}],
       };
 
@@ -68,7 +68,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {total: ['count', '?e']},
+        find: {total: {t: 'count', c: '?e'}},
         where: [{e: '?e', a: 'type', v: 'person'}],
       };
 
@@ -87,7 +87,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {total: ['count', '?e']},
+        find: {total: {t: 'count', c: '?e'}},
         where: [
           {e: '?e', a: 'name', v: '?name'},
           {e: '?e', a: 'age', v: '?age'},
@@ -108,7 +108,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {total: ['count', '?value']},
+        find: {total: {t: 'count', c: '?value'}},
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
@@ -133,7 +133,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {total: ['count', '?item']},
+        find: {total: {t: 'count', c: '?item'}},
         where: [{e: '?e', a: 'item', v: '?item'}],
       };
 
@@ -154,7 +154,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {total: ['count', '?line']},
+        find: {total: {t: 'count', c: '?line'}},
         where: [
           {e: '?line', a: 'order', v: '?order'},
           {e: '?line', a: 'product', v: '?product'},

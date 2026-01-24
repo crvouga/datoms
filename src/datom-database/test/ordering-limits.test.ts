@@ -26,7 +26,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {e: ['?e'], s: ['?s']},
+        find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
         where: [{e: '?e', a: 'score', v: '?s'}],
         orderBy: [['?s', 'desc']],
         limit: 2,
@@ -54,7 +54,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Find all people, ordered by score (desc) then age (asc)
       const query: DatalogQuery = {
-        find: {name: ['?name'], score: ['?score'], age: ['?age']},
+        find: {
+          name: {t: 'identity', c: '?name'},
+          score: {t: 'identity', c: '?score'},
+          age: {t: 'identity', c: '?age'},
+        },
         where: [
           {e: '?person', a: 'name', v: '?name'},
           {e: '?person', a: 'score', v: '?score'},
@@ -84,7 +88,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {e: ['?e'], s: ['?s']},
+        find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
         where: [{e: '?e', a: 'score', v: '?s'}],
         limit: 0,
       };
@@ -104,7 +108,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const {data: results} = await db.query({
-        find: {e: ['?e'], s: ['?s']},
+        find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
         where: [{e: '?e', a: 'score', v: '?s'}],
         limit: 10,
       });
@@ -121,7 +125,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const {data: results} = await db.query({
-        find: {e: ['?e'], s: ['?s']},
+        find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
         where: [{e: '?e', a: 'score', v: '?s'}],
         orderBy: [['?s', 'desc']],
         limit: 2,
@@ -144,7 +148,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // not in find doesn't work (they're undefined after projection).
       // This test documents that limitation - ordering variables should be in find.
       const queryWithoutScoreInFind: DatalogQuery = {
-        find: {name: ['?name']},
+        find: {name: {t: 'identity', c: '?name'}},
         where: [
           {e: '?e', a: 'name', v: '?name'},
           {e: '?e', a: 'score', v: '?score'},
@@ -159,7 +163,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // To make ordering work, include the ordering variable in find
       const queryWithScoreInFind: DatalogQuery = {
-        find: {name: ['?name'], score: ['?score']},
+        find: {name: {t: 'identity', c: '?name'}, score: {t: 'identity', c: '?score'}},
         where: [
           {e: '?e', a: 'name', v: '?name'},
           {e: '?e', a: 'score', v: '?score'},
@@ -185,7 +189,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {e: ['?e'], s: ['?s']},
+        find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
         where: [{e: '?e', a: 'score', v: '?s'}],
         orderBy: [['?s', 'asc']],
       };
@@ -208,7 +212,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {e: ['?e'], v: ['?v']},
+        find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
         where: [{e: '?e', a: 'value', v: '?v'}],
         orderBy: [['?v', 'asc']],
       };

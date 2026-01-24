@@ -175,9 +175,7 @@ export class TmdbClient {
    * @see {@link https://developer.themoviedb.org/reference/configuration-primary-translations TMDB Primary Translations API}
    */
   async getPrimaryTranslations(): Promise<Nullish<string[]>> {
-    return this.httpClient.get<Nullish<string[]>>(
-      'configuration/primary_translations'
-    );
+    return this.httpClient.get<Nullish<string[]>>('configuration/primary_translations');
   }
 
   /**
@@ -185,11 +183,9 @@ export class TmdbClient {
    * @returns Promise resolving to array of timezone objects with nullish types
    * @see {@link https://developer.themoviedb.org/reference/configuration-timezones TMDB Timezones API}
    */
-  async getTimezones(): Promise<
-    Nullish<{iso_3166_1: string; zones: string[]}[]>
-  > {
+  async getTimezones(): Promise<Nullish<{iso_3166_1: string; zones: string[]}[]>> {
     return this.httpClient.get<Nullish<{iso_3166_1: string; zones: string[]}[]>>(
-      'configuration/timezones'
+      'configuration/timezones',
     );
   }
 }

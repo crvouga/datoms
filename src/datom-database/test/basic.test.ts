@@ -85,13 +85,13 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       );
 
       const {data: nameResults} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'name', v: '?v'}],
       });
       expect(nameResults).toHaveLength(0);
 
       const {data: ageResults} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'age', v: '?v'}],
       });
       expect(ageResults[0]?.v).toBe(30);
@@ -124,7 +124,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(tags).toHaveLength(0);
 
       const {data: nameResults} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'name', v: '?v'}],
       });
       expect(nameResults[0]?.v).toBe('Alice');
@@ -247,7 +247,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'status', v: 'active'}]);
 
       const {data: statusResults} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'status', v: '?v'}],
       });
       expect(statusResults[0]?.v).toBe('active');
@@ -289,7 +289,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Should see new value in dbAfter
       const {data: statusResults} = await withResult.dbAfter.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'status', v: '?v'}],
       });
       expect(statusResults[0]?.v).toBe('active');
@@ -307,7 +307,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Should be committed
       const {data: finalStatusResults} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'status', v: '?v'}],
       });
       expect(finalStatusResults[0]?.v).toBe('active');
@@ -319,7 +319,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
     const {data: nameResults} = await db.query({
-      find: {v: ['?v']},
+      find: {v: {t: 'identity', c: '?v'}},
       where: [{e: 1, a: 'name', v: '?v'}],
     });
     expect(nameResults[0]?.v).toBe('Alice');
@@ -329,7 +329,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should return undefined for non-existent attribute', async () => {
       const {db} = f;
       const {data: results} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'nonexistent', v: '?v'}],
       });
       expect(results).toHaveLength(0);
@@ -340,7 +340,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       const {data: results} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'name', v: '?v'}],
       });
       expect(results[0]?.v).toBe('Alice');
@@ -443,7 +443,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'tag', v: 'blue'}]);
 
       const {data: nameResults} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'name', v: '?v'}],
       });
       expect(nameResults[0]?.v).toBe('Alice');
@@ -510,15 +510,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const {data: status1Results} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'status', v: '?v'}],
       });
       const {data: status2Results} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 2, a: 'status', v: '?v'}],
       });
       const {data: name1Results} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'name', v: '?v'}],
       });
 

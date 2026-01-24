@@ -17,7 +17,7 @@ export class TransactionDb {
   async getLatestTransaction(): Promise<Transaction> {
     // Step 1: Find the maximum transaction ID
     const maxTxResult = await this.db.query({
-      find: {maxTx: ['max', '?tx']},
+      find: {maxTx: {t: 'max', c: '?tx', count: 1}},
       where: [{e: '?e', a: '?a', v: '?v', tx: '?tx'}],
     });
 
@@ -32,11 +32,11 @@ export class TransactionDb {
     // History view includes both op: true and op: false datoms
     const datomsResult = await this.db.history().query({
       find: {
-        e: ['?e'],
-        a: ['?a'],
-        v: ['?v'],
-        tx: ['?tx'],
-        op: ['?op'],
+        e: {t: 'identity', c: '?e'},
+        a: {t: 'identity', c: '?a'},
+        v: {t: 'identity', c: '?v'},
+        tx: {t: 'identity', c: '?tx'},
+        op: {t: 'identity', c: '?op'},
       },
       where: [
         {e: '?e', a: '?a', v: '?v', tx: '?tx'},

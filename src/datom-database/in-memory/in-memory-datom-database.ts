@@ -796,6 +796,16 @@ export class InMemoryDatomDatabase implements DatomDatabase {
           varName = expr[0];
         } else if (typeof expr === 'string') {
           varName = expr;
+        } else if (
+          typeof expr === 'object' &&
+          expr !== null &&
+          't' in expr &&
+          'c' in expr &&
+          expr.t === 'identity' &&
+          typeof expr.c === 'string'
+        ) {
+          // Handle structured find format: {t: 'identity', c: '?x'}
+          varName = expr.c;
         }
         if (varName) {
           variableToOutputKey.set(varName, outputKey);

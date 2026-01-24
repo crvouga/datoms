@@ -316,7 +316,13 @@ export class FileSystemDatomDatabase implements DatomDatabase {
       // Get all datoms from the memory database using query API
       // Use a large limit similar to server.ts
       const query: DatalogQuery = {
-        find: {e: ['?e'], a: ['?a'], v: ['?v'], tx: ['?tx'], op: ['?op']},
+        find: {
+          e: {t: 'identity', c: '?e'},
+          a: {t: 'identity', c: '?a'},
+          v: {t: 'identity', c: '?v'},
+          tx: {t: 'identity', c: '?tx'},
+          op: {t: 'identity', c: '?op'},
+        },
         where: [{e: '?e', a: '?a', v: '?v'}],
         limit: 1_000_000,
       };

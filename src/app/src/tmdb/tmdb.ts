@@ -1,4 +1,4 @@
-import { namespaceKey } from '../../../namespace';
+import {namespaceKey} from '../../../namespace';
 
 export const tmdbNamespace = (
   entity: 'movie' | 'tv' | 'person' | 'config' | 'country' | 'language',

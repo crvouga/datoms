@@ -26,7 +26,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {distinctNames: ['distinct', '?name']},
+        find: {distinctNames: {t: 'distinct', c: '?name'}},
         where: [{e: '?e', a: 'name', v: '?name'}],
       };
 
@@ -48,7 +48,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should return empty array or null for empty results', async () => {
       const {db} = f;
       const query: DatalogQuery = {
-        find: {distinctNames: ['distinct', '?name']},
+        find: {distinctNames: {t: 'distinct', c: '?name'}},
         where: [{e: '?e', a: 'name', v: '?name'}],
       };
 
@@ -67,7 +67,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       const query: DatalogQuery = {
-        find: {distinctNames: ['distinct', '?name']},
+        find: {distinctNames: {t: 'distinct', c: '?name'}},
         where: [{e: '?e', a: 'name', v: '?name'}],
       };
 
@@ -76,7 +76,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const distinctValue = results[0]?.distinctNames;
       if (Array.isArray(distinctValue)) {
         const arr = distinctValue as unknown;
-        expect(arr).toEqual(['Alice']);
+        expect(arr).toEqual({t: 'identity', c: 'Alice'});
       } else {
         expect(distinctValue).toBe('Alice');
       }
@@ -93,7 +93,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {distinctAges: ['distinct', '?age']},
+        find: {distinctAges: {t: 'distinct', c: '?age'}},
         where: [{e: '?e', a: 'age', v: '?age'}],
       };
 
@@ -122,7 +122,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {distinctCities: ['distinct', '?city']},
+        find: {distinctCities: {t: 'distinct', c: '?city'}},
         where: [
           {e: '?e', a: 'type', v: 'person'},
           {e: '?e', a: 'city', v: '?city'},
@@ -150,7 +150,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {distinctValues: ['distinct', '?value']},
+        find: {distinctValues: {t: 'distinct', c: '?value'}},
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
 

@@ -18,7 +18,7 @@ function formatSQL(sql: string): string {
 describe('datalogToPostgresSQL', () => {
   test('simple single pattern query', () => {
     const query: DatalogQuery = {
-      find: {x: ['?x'], y: ['?y']},
+      find: {x: {t: 'identity', c: '?x'}, y: {t: 'identity', c: '?y'}},
       where: [{e: '?x', a: 'name', v: '?y'}],
     };
 
@@ -48,9 +48,9 @@ describe('datalogToPostgresSQL', () => {
   test('query with multiple patterns and joins', () => {
     const query: DatalogQuery = {
       find: {
-        'movie/id': ['?movie/id'],
-        'movie/title': ['?title'],
-        'movie/popularity': ['?popularity'],
+        'movie/id': {t: 'identity', c: '?movie/id'},
+        'movie/title': {t: 'identity', c: '?title'},
+        'movie/popularity': {t: 'identity', c: '?popularity'},
       },
       where: [
         {e: '?movie/id', a: 'tmdb.movie/id', v: '?movie/id'},
@@ -130,7 +130,7 @@ describe('datalogToPostgresSQL', () => {
 
   test('query with constant values', () => {
     const query: DatalogQuery = {
-      find: {name: ['?name']},
+      find: {name: {t: 'identity', c: '?name'}},
       where: [{e: 1, a: 'name', v: '?name'}],
     };
 
@@ -174,7 +174,7 @@ describe('datalogToPostgresSQL', () => {
 
   test('query with LIMIT clause', () => {
     const query: DatalogQuery = {
-      find: {x: ['?x']},
+      find: {x: {t: 'identity', c: '?x'}},
       where: [{e: '?x', a: 'name', v: '?y'}],
       limit: 10,
     };
@@ -187,7 +187,7 @@ describe('datalogToPostgresSQL', () => {
 
   test('query with ORDER BY clause', () => {
     const query: DatalogQuery = {
-      find: {x: ['?x'], name: ['?name']},
+      find: {x: {t: 'identity', c: '?x'}, name: {t: 'identity', c: '?name'}},
       where: [{e: '?x', a: 'name', v: '?name'}],
       orderBy: [['?name', 'asc']],
     };
@@ -214,7 +214,7 @@ describe('datalogToPostgresSQL', () => {
   test.skip('query with aggregation', () => {
     // TODO: Aggregation support needs investigation - currently not generating COUNT in SELECT
     const query: DatalogQuery = {
-      find: {total: ['count', '?age']},
+      find: {total: {t: 'count', c: '?age'}},
       where: [{e: '?e', a: 'age', v: '?age'}],
     };
 
@@ -226,7 +226,7 @@ describe('datalogToPostgresSQL', () => {
 
   test('throws error when no pattern clauses provided', () => {
     const query: DatalogQuery = {
-      find: {x: ['?x']},
+      find: {x: {t: 'identity', c: '?x'}},
       where: [],
     };
 
@@ -237,7 +237,7 @@ describe('datalogToPostgresSQL', () => {
 
   test('query with custom table name', () => {
     const query: DatalogQuery = {
-      find: {x: ['?x']},
+      find: {x: {t: 'identity', c: '?x'}},
       where: [{e: '?x', a: 'name', v: '?y'}],
     };
 
@@ -248,7 +248,7 @@ describe('datalogToPostgresSQL', () => {
 
   test('query with asOf view config', () => {
     const query: DatalogQuery = {
-      find: {x: ['?x']},
+      find: {x: {t: 'identity', c: '?x'}},
       where: [{e: '?x', a: 'name', v: '?y'}],
     };
 
@@ -264,7 +264,7 @@ describe('datalogToPostgresSQL', () => {
 
   test('query with history view config', () => {
     const query: DatalogQuery = {
-      find: {x: ['?x'], op: ['?op']},
+      find: {x: {t: 'identity', c: '?x'}, op: {t: 'identity', c: '?op'}},
       where: [{e: '?x', a: 'name', v: '?y'}],
     };
 

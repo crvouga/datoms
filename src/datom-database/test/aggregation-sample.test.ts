@@ -26,7 +26,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {sample: ['sample', 2, '?value']},
+        find: {sample: {t: 'sample', c: '?value', count: 2}},
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
@@ -48,7 +48,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should return null for empty results', async () => {
       const {db} = f;
       const query: DatalogQuery = {
-        find: {sample: ['sample', 1, '?value']},
+        find: {sample: {t: 'sample', c: '?value', count: 1}},
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
@@ -66,7 +66,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {sample: ['sample', 1, '?value']},
+        find: {sample: {t: 'sample', c: '?value', count: 1}},
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
@@ -86,7 +86,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {sample: ['sample', 5, '?value']},
+        find: {sample: {t: 'sample', c: '?value', count: 5}},
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
@@ -109,7 +109,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {sample: ['sample', 3, '?value']},
+        find: {sample: {t: 'sample', c: '?value', count: 3}},
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
@@ -132,7 +132,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {sample: ['sample', 2, '?name']},
+        find: {sample: {t: 'sample', c: '?name', count: 2}},
         where: [{e: '?e', a: 'name', v: '?name'}],
       };
 
@@ -158,7 +158,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {sample: ['sample', 2, '?price']},
+        find: {sample: {t: 'sample', c: '?price', count: 2}},
         where: [
           {e: '?e', a: 'type', v: 'product'},
           {e: '?e', a: 'price', v: '?price'},

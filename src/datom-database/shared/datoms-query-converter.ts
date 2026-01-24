@@ -51,11 +51,11 @@ export function datomsQueryToDatalogQuery(options: DatomsQuery): DatalogQuery {
 
   const query: DatalogQuery = {
     find: {
-      e: ['?e'],
-      a: ['?a'],
-      v: ['?v'],
-      tx: ['?tx'],
-      op: ['?op'],
+      e: {t: 'identity', c: '?e'},
+      a: {t: 'identity', c: '?a'},
+      v: {t: 'identity', c: '?v'},
+      tx: {t: 'identity', c: '?tx'},
+      op: {t: 'identity', c: '?op'},
     },
     where,
     limit: options.limit,

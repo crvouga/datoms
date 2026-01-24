@@ -34,10 +34,10 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
       const limit = 10;
       const {data: results} = await f.db.query({
         find: {
-          'movie/id': ['?id'],
-          'movie/title': ['?title'],
-          'movie/popularity': ['?popularity'],
-          'movie/overview': ['?overview'],
+          'movie/id': {t: 'identity', c: '?id'},
+          'movie/title': {t: 'identity', c: '?title'},
+          'movie/popularity': {t: 'identity', c: '?popularity'},
+          'movie/overview': {t: 'identity', c: '?overview'},
         },
         where: [
           {e: '?id', a: 'tmdb.movie/overview', v: '?overview'},
@@ -63,8 +63,8 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
       const limit = 10;
       const {data: results} = await f.db.query({
         find: {
-          'movie/id': ['?id'],
-          'movie/title': ['?title'],
+          'movie/id': {t: 'identity', c: '?id'},
+          'movie/title': {t: 'identity', c: '?title'},
         },
         where: [{e: '?id', a: 'tmdb.movie/title', v: '?title'}],
         orderBy: [['?title', 'asc']],
@@ -90,10 +90,10 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
 
       const {data: results} = await f.db.query({
         find: {
-          'movie/id': ['?id'],
-          'movie/title': ['?title'],
-          'movie/vote_average': ['?vote_average'],
-          'movie/vote_count': ['?vote_count'],
+          'movie/id': {t: 'identity', c: '?id'},
+          'movie/title': {t: 'identity', c: '?title'},
+          'movie/vote_average': {t: 'identity', c: '?vote_average'},
+          'movie/vote_count': {t: 'identity', c: '?vote_count'},
         },
         where: [
           {e: '?id', a: 'tmdb.movie/genre_id', v: actionGenreId},
@@ -129,10 +129,10 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
       const limit = 10;
       const {data: results} = await f.db.query({
         find: {
-          'movie/id': ['?id'],
-          'movie/title': ['?title'],
-          'movie/vote_count': ['?vote_count'],
-          'movie/vote_average': ['?vote_average'],
+          'movie/id': {t: 'identity', c: '?id'},
+          'movie/title': {t: 'identity', c: '?title'},
+          'movie/vote_count': {t: 'identity', c: '?vote_count'},
+          'movie/vote_average': {t: 'identity', c: '?vote_average'},
         },
         where: [
           {e: '?id', a: 'tmdb.movie/title', v: '?title'},

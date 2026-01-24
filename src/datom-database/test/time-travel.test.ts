@@ -117,7 +117,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       await db.transact([{op: true, e: 1, a: 'name', v: 'Bob'}]);
 
       const {data: nameAtTx1Results} = await db.asOf(tx1).query({
-        find: {name: ['?v']},
+        find: {name: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'name', v: '?v'}],
       });
       expect(nameAtTx1Results[0]?.name).toBe('Alice');
@@ -133,7 +133,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Query at tx1 - should only see Alice and Bob
       const queryAtTx1: DatalogQuery = {
-        find: {name: ['?name']},
+        find: {name: {t: 'identity', c: '?name'}},
         where: [{e: '?e', a: 'name', v: '?name'}],
       };
       const {data: resultsAtTx1} = await db.asOf(tx1).query(queryAtTx1);
@@ -143,7 +143,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Query at tx2 - should see all three
       const queryAtTx2: DatalogQuery = {
-        find: {name: ['?name']},
+        find: {name: {t: 'identity', c: '?name'}},
         where: [{e: '?e', a: 'name', v: '?name'}],
       };
       const {data: resultsAtTx2} = await db.asOf(tx2).query(queryAtTx2);
@@ -184,33 +184,33 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Verify state at each transaction
       const {data: atTx1Results} = await db.asOf(tx1).query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'status', v: '?v'}],
       });
       expect(atTx1Results[0]?.v).toBe('pending');
 
       const {data: atTx2Results} = await db.asOf(tx2).query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'status', v: '?v'}],
       });
       expect(atTx2Results[0]?.v).toBe('processing');
 
       const {data: atTx3Results} = await db.asOf(tx3).query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'status', v: '?v'}],
       });
       expect(atTx3Results[0]?.v).toBe('completed');
 
       // At tx4, status was sub, so should return undefined
       const {data: atTx4Results} = await db.asOf(tx4).query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'status', v: '?v'}],
       });
       expect(atTx4Results).toHaveLength(0);
 
       // At tx5, status is failed
       const {data: atTx5Results} = await db.asOf(tx5).query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'status', v: '?v'}],
       });
       expect(atTx5Results[0]?.v).toBe('failed');
@@ -474,7 +474,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Query changes since tx1
       const querySinceTx1: DatalogQuery = {
-        find: {name: ['?name']},
+        find: {name: {t: 'identity', c: '?name'}},
         where: [{e: '?e', a: 'name', v: '?name'}],
       };
       const {data: resultsSinceTx1} = await db.since(tx1).query(querySinceTx1);
@@ -740,7 +740,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Query at tx1
       const {data: atTx1Results} = await db.asOf(tx1).query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: 1, a: 'parent', v: '?v'}],
       });
       expect(atTx1Results[0]?.v).toBe(10);
@@ -876,7 +876,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Query asOf with future transaction ID using datalog query
       const {data: queryAtFuture} = await db.asOf(futureTx).query({
-        find: {name: ['?name'], age: ['?age']},
+        find: {name: {t: 'identity', c: '?name'}, age: {t: 'identity', c: '?age'}},
         where: [
           {e: 1, a: 'name', v: '?name'},
           {e: 1, a: 'age', v: '?age'},

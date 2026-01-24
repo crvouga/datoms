@@ -9,21 +9,19 @@ import type {EntityId} from '../entity-id.js';
 export type DatalogQueryVariable = `?${string}`;
 
 export type DatalogQueryFindVariable =
-  | [DatalogQueryVariable]
-  | ['count', DatalogQueryVariable]
-  | ['count-distinct', DatalogQueryVariable]
-  | ['sum', DatalogQueryVariable]
-  | ['avg', DatalogQueryVariable]
-  | ['min', DatalogQueryVariable]
-  | ['min', string | number, DatalogQueryVariable]
-  | ['max', DatalogQueryVariable]
-  | ['max', string | number, DatalogQueryVariable]
-  | ['median', DatalogQueryVariable]
-  | ['variance', DatalogQueryVariable]
-  | ['stddev', DatalogQueryVariable]
-  | ['rand', string | number, DatalogQueryVariable]
-  | ['sample', string | number, DatalogQueryVariable]
-  | ['distinct', DatalogQueryVariable];
+  | {t: 'identity'; c: DatalogQueryVariable}
+  | {t: 'count'; c: DatalogQueryVariable}
+  | {t: 'count-distinct'; c: DatalogQueryVariable}
+  | {t: 'sum'; c: DatalogQueryVariable}
+  | {t: 'avg'; c: DatalogQueryVariable}
+  | {t: 'min'; c: DatalogQueryVariable; count: number}
+  | {t: 'max'; c: DatalogQueryVariable; count: number}
+  | {t: 'median'; c: DatalogQueryVariable}
+  | {t: 'variance'; c: DatalogQueryVariable}
+  | {t: 'stddev'; c: DatalogQueryVariable}
+  | {t: 'rand'; c: DatalogQueryVariable; count: number}
+  | {t: 'sample'; c: DatalogQueryVariable; count: number}
+  | {t: 'distinct'; c: DatalogQueryVariable};
 
 /**
  * Basic query pattern

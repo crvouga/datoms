@@ -43,7 +43,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
       await db.query({
-        find: {e: ['?e']},
+        find: {e: {t: 'identity', c: '?e'}},
         where: [{e: '?e', a: 'name', v: 'Alice'}],
       });
 
@@ -67,7 +67,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
       await db.query({
-        find: {e: ['?e']},
+        find: {e: {t: 'identity', c: '?e'}},
         where: [{e: 1, a: 'name', v: '?v'}],
       });
 
@@ -140,7 +140,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
       const {data: results} = await db.query({
-        find: {v: ['?v']},
+        find: {v: {t: 'identity', c: '?v'}},
         where: [{e: '?e', a: 'name', v: '?v'}],
       });
 
@@ -166,7 +166,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       await expect(
         db.query({
-          find: {e: ['?e']},
+          find: {e: {t: 'identity', c: '?e'}},
           where: [{e: '?e', a: 'name', v: 'Alice'}],
         }),
       ).rejects.toThrow(QueryError);
@@ -200,7 +200,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook2);
 
       await db.query({
-        find: {e: ['?e']},
+        find: {e: {t: 'identity', c: '?e'}},
         where: [{e: '?e', a: 'name', v: 'Alice'}],
       });
 
@@ -225,7 +225,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook);
 
       await db.query({
-        find: {e: ['?e']},
+        find: {e: {t: 'identity', c: '?e'}},
         where: [{e: '?e', a: 'name', v: 'Alice'}],
         context: {userId: 'alice', source: 'test'},
       });
@@ -259,7 +259,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook);
 
       const {data: results} = await db.query({
-        find: {e: ['?e'], v: ['?v']},
+        find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
         where: [{e: '?e', a: 'name', v: '?v'}],
       });
 
@@ -288,7 +288,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook);
 
       const {data: results} = await db.query({
-        find: {e: ['?e'], v: ['?v']},
+        find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
         where: [{e: '?e', a: 'name', v: '?v'}],
       });
 
@@ -318,7 +318,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook);
 
       const {data: results} = await db.query({
-        find: {e: ['?e']},
+        find: {e: {t: 'identity', c: '?e'}},
         where: [{e: 1, a: 'name', v: '?v'}],
       });
 
@@ -354,7 +354,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook2);
 
       const {data: results} = await db.query({
-        find: {e: ['?e'], v: ['?v']},
+        find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
         where: [{e: '?e', a: 'name', v: '?v'}],
       });
 
@@ -379,7 +379,11 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
       await db.query({
-        find: {e: ['?e'], a: ['?a'], v: ['?v']},
+        find: {
+          e: {t: 'identity', c: '?e'},
+          a: {t: 'identity', c: '?a'},
+          v: {t: 'identity', c: '?v'},
+        },
         where: [{e: 1, a: '?a', v: '?v'}],
       });
 
@@ -403,7 +407,11 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
       await db.query({
-        find: {e: ['?e'], a: ['?a'], v: ['?v']},
+        find: {
+          e: {t: 'identity', c: '?e'},
+          a: {t: 'identity', c: '?a'},
+          v: {t: 'identity', c: '?v'},
+        },
         where: [{e: 1, a: '?a', v: '?v'}],
       });
 
@@ -435,7 +443,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook);
 
       const {data: results} = await db.query({
-        find: {e: ['?e'], v: ['?v']},
+        find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
         where: [{e: '?e', a: 'name', v: '?v'}],
       });
 
@@ -462,7 +470,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook);
 
       await db.query({
-        find: {e: ['?e']},
+        find: {e: {t: 'identity', c: '?e'}},
         where: [{e: 1, a: 'name', v: '?v'}],
         context: {userId: 'alice', source: 'test'},
       });
@@ -865,7 +873,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       expect(writeCalled).toBe(true);
 
       await db.query({
-        find: {e: ['?e']},
+        find: {e: {t: 'identity', c: '?e'}},
         where: [{e: 1, a: 'name', v: '?v'}],
       });
       expect(readCalled).toBe(true);
@@ -1038,7 +1046,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       // Call query() - should trigger query hooks
       await db.query({
-        find: {e: ['?e']},
+        find: {e: {t: 'identity', c: '?e'}},
         where: [{e: '?e', a: 'name', v: '?v'}],
       });
 

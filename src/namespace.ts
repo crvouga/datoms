@@ -1,5 +1,5 @@
 /**
- * Combines a namespace, entity, and key into a single string, 
+ * Combines a namespace, entity, and key into a single string,
  * separated by dots and a forward slash.
  *
  * @param namespace - An array of tuples representing namespace segments.
@@ -10,7 +10,7 @@
 export function namespaceKey(
   namespace: NonEmptyArray<string>,
   entity: string,
-  key: string
+  key: string,
 ): string {
   return `${namespace.join('.')}.${entity}/${key}`;
 }

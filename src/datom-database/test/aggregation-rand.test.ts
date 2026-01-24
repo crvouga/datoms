@@ -26,7 +26,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {random: ['rand', 3, '?value']},
+        find: {random: {t: 'rand', c: '?value', count: 3}},
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
@@ -45,7 +45,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should return null for empty results', async () => {
       const {db} = f;
       const query: DatalogQuery = {
-        find: {random: ['rand', 1, '?value']},
+        find: {random: {t: 'rand', c: '?value', count: 1}},
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
@@ -63,7 +63,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {random: ['rand', 1, '?value']},
+        find: {random: {t: 'rand', c: '?value', count: 1}},
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
@@ -83,7 +83,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {random: ['rand', 5, '?value']},
+        find: {random: {t: 'rand', c: '?value', count: 5}},
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
 
@@ -107,7 +107,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {random: ['rand', 2, '?name']},
+        find: {random: {t: 'rand', c: '?name', count: 2}},
         where: [{e: '?e', a: 'name', v: '?name'}],
       };
 
@@ -133,7 +133,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {random: ['rand', 3, '?price']},
+        find: {random: {t: 'rand', c: '?price', count: 3}},
         where: [
           {e: '?e', a: 'type', v: 'product'},
           {e: '?e', a: 'price', v: '?price'},

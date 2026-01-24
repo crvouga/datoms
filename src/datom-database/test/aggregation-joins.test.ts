@@ -30,9 +30,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          total: ['sum', '?price'],
-          average: ['avg', '?price'],
-          count: ['count', '?e'],
+          total: {t: 'sum', c: '?price'},
+          average: {t: 'avg', c: '?price'},
+          count: {t: 'count', c: '?e'},
         },
         where: [
           {e: '?e', a: 'name', v: '?name'},
@@ -62,8 +62,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          orderCount: ['count', '?order'],
-          customerCount: ['count-distinct', '?customer'],
+          orderCount: {t: 'count', c: '?order'},
+          customerCount: {t: 'count-distinct', c: '?customer'},
         },
         where: [
           {e: '?order', a: 'customer', v: '?customer'},
@@ -93,9 +93,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          total: ['sum', '?price'],
-          average: ['avg', '?price'],
-          maxPrice: ['max', '?price'],
+          total: {t: 'sum', c: '?price'},
+          average: {t: 'avg', c: '?price'},
+          maxPrice: {t: 'max', c: '?price', count: 1},
         },
         where: [
           {e: '?e', a: 'type', v: 'product'},
@@ -126,9 +126,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          childCount: ['count', '?child'],
-          childTotal: ['sum', '?childValue'],
-          childAvg: ['avg', '?childValue'],
+          childCount: {t: 'count', c: '?child'},
+          childTotal: {t: 'sum', c: '?childValue'},
+          childAvg: {t: 'avg', c: '?childValue'},
         },
         where: [
           {e: '?parent', a: 'name', v: 'Parent'},
@@ -153,8 +153,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          total: ['sum', '?price'],
-          count: ['count', '?e'],
+          total: {t: 'sum', c: '?price'},
+          count: {t: 'count', c: '?e'},
         },
         where: [
           {e: '?e', a: 'name', v: '?name'},

@@ -4,10 +4,10 @@ export const notepad = async (db: DatomDatabase) => {
   // Query to get image configuration specifically
   const imageConfig = await db.query({
     find: {
-      'base_url': ['?base_url'],
-      'secure_base_url': ['?secure_base_url'],
-      'poster_size': ['?poster_size'],
-      'backdrop_size': ['?backdrop_size'],
+      base_url: {t: 'identity', c: '?base_url'},
+      secure_base_url: {t: 'identity', c: '?secure_base_url'},
+      poster_size: {t: 'identity', c: '?poster_size'},
+      backdrop_size: {t: 'identity', c: '?backdrop_size'},
     },
     where: [
       {

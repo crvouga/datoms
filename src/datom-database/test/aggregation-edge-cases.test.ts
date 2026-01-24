@@ -27,11 +27,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          sum: ['sum', '?value'],
-          avg: ['avg', '?value'],
-          max: ['max', '?value'],
-          min: ['min', '?value'],
-          count: ['count', '?value'],
+          sum: {t: 'sum', c: '?value'},
+          avg: {t: 'avg', c: '?value'},
+          max: {t: 'max', c: '?value', count: 1},
+          min: {t: 'min', c: '?value', count: 1},
+          count: {t: 'count', c: '?value'},
         },
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
@@ -55,9 +55,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          sum: ['sum', '?value'],
-          max: ['max', '?value'],
-          min: ['min', '?value'],
+          sum: {t: 'sum', c: '?value'},
+          max: {t: 'max', c: '?value', count: 1},
+          min: {t: 'min', c: '?value', count: 1},
         },
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
@@ -80,9 +80,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          sum: ['sum', '?value'],
-          avg: ['avg', '?value'],
-          max: ['max', '?value'],
+          sum: {t: 'sum', c: '?value'},
+          avg: {t: 'avg', c: '?value'},
+          max: {t: 'max', c: '?value', count: 1},
         },
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
@@ -104,10 +104,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          sum: ['sum', '?value'],
-          avg: ['avg', '?value'],
-          max: ['max', '?value'],
-          min: ['min', '?value'],
+          sum: {t: 'sum', c: '?value'},
+          avg: {t: 'avg', c: '?value'},
+          max: {t: 'max', c: '?value', count: 1},
+          min: {t: 'min', c: '?value', count: 1},
         },
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
@@ -133,8 +133,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          count: ['count', '?item'],
-          distinct: ['count-distinct', '?item'],
+          count: {t: 'count', c: '?item'},
+          distinct: {t: 'count-distinct', c: '?item'},
         },
         where: [{e: '?e', a: 'item', v: '?item'}],
       };
@@ -158,10 +158,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          sum: ['sum', '?score'],
-          avg: ['avg', '?score'],
-          max: ['max', '?score'],
-          count: ['count', '?score'],
+          sum: {t: 'sum', c: '?score'},
+          avg: {t: 'avg', c: '?score'},
+          max: {t: 'max', c: '?score', count: 1},
+          count: {t: 'count', c: '?score'},
         },
         where: [{e: '?e', a: 'score', v: '?score'}],
       };
@@ -184,8 +184,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          variance: ['variance', '?value'],
-          stddev: ['stddev', '?value'],
+          variance: {t: 'variance', c: '?value'},
+          stddev: {t: 'stddev', c: '?value'},
         },
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
@@ -206,7 +206,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          median: ['median', '?value'],
+          median: {t: 'median', c: '?value'},
         },
         where: [{e: '?e', a: 'value', v: '?value'}],
       };
@@ -233,11 +233,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {
-          sum: ['sum', '?price'],
-          avg: ['avg', '?price'],
-          max: ['max', '?price'],
-          min: ['min', '?price'],
-          count: ['count', '?price'],
+          sum: {t: 'sum', c: '?price'},
+          avg: {t: 'avg', c: '?price'},
+          max: {t: 'max', c: '?price', count: 1},
+          min: {t: 'min', c: '?price', count: 1},
+          count: {t: 'count', c: '?price'},
         },
         where: [{e: '?e', a: 'price', v: '?price'}],
       };

@@ -36,7 +36,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Find all friendships: who is friends with whom
 
       const {data: results} = await db.query({
-        find: {from: ['?from'], to: ['?to']},
+        find: {from: {t: 'identity', c: '?from'}, to: {t: 'identity', c: '?to'}},
         where: [
           {e: '?f', a: 'from', v: '?from'},
           {e: '?f', a: 'to', v: '?to'},
@@ -69,7 +69,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Find friends of Alice's friends (friends of friends)
       const query: DatalogQuery = {
-        find: {friendOfFriend: ['?friendOfFriend']},
+        find: {friendOfFriend: {t: 'identity', c: '?friendOfFriend'}},
         where: [
           {e: '?f1', a: 'from', v: 1},
           {e: '?f1', a: 'to', v: '?friend'},
@@ -101,7 +101,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Find all parent-child pairs with names
       const query: DatalogQuery = {
-        find: {parentName: ['?parentName'], childName: ['?childName']},
+        find: {
+          parentName: {t: 'identity', c: '?parentName'},
+          childName: {t: 'identity', c: '?childName'},
+        },
         where: [
           {e: '?parent', a: 'name', v: '?parentName'},
           {e: '?parent', a: 'child', v: '?child'},
@@ -137,7 +140,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const {data: results} = await db.query({
-        find: {studentName: ['?studentName'], courseTitle: ['?courseTitle']},
+        find: {
+          studentName: {t: 'identity', c: '?studentName'},
+          courseTitle: {t: 'identity', c: '?courseTitle'},
+        },
         where: [
           {e: '?enrollment', a: 'student', v: '?student'},
           {e: '?enrollment', a: 'course', v: '?course'},
@@ -162,7 +168,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       ]);
 
       const query: DatalogQuery = {
-        find: {e: ['?e'], tag: ['?tag']},
+        find: {e: {t: 'identity', c: '?e'}, tag: {t: 'identity', c: '?tag'}},
         where: [{e: '?e', a: 'tag', v: '?tag'}],
       };
 
