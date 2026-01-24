@@ -198,14 +198,9 @@ function aggregationToPostgresSQL(
  * @returns SQL aggregation expression or null if not supported
  */
 export function aggregationToSQL(
-  expr: unknown,
+  expr: DatalogQueryFindVariable,
   variableColumn: string,
   outputKey: string,
 ): SQLAggregationResult | null {
-  // Type guard to check if expr is a valid DatalogQueryFindVariable
-  if (typeof expr !== 'object' || expr === null || !('t' in expr) || typeof expr.t !== 'string') {
-    return null;
-  }
-
-  return aggregationToPostgresSQL(expr as DatalogQueryFindVariable, variableColumn, outputKey);
+  return aggregationToPostgresSQL(expr, variableColumn, outputKey);
 }

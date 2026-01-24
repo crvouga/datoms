@@ -2,7 +2,7 @@
  * Converts DatalogQuery to PostgreSQL SQL
  */
 
-import type {DatalogQuery, QueryClause} from '../../datalog/datalog.js';
+import type {DatalogQuery, DatalogQueryFindVariable, QueryClause} from '../../datalog/datalog.js';
 import type {Attribute, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {ViewConfig} from '../views/view-config.js';
@@ -582,7 +582,7 @@ function _buildSelectColumnsNonEmpty(
  * Build aggregation SELECT column
  */
 function _buildAggregationColumn(
-  expr: unknown,
+  expr: DatalogQueryFindVariable,
   varName: string,
   outputKey: string,
   variableToColumn: Map<string, string>,
