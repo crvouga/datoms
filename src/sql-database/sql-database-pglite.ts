@@ -82,12 +82,6 @@ export class PGLiteSQLDatabase implements SQLDatabase {
     });
   }
 
-  async execute(sql: string, params?: SQLParams): Promise<void> {
-    await this.readyPromise;
-    const [convertedSql, convertedParams] = this.convertParams(sql, params);
-    await this.db.query(convertedSql, convertedParams);
-  }
-
   async transaction(callback: (tx: SQLDatabaseTransaction) => Promise<void>): Promise<void> {
     await this.readyPromise;
 
@@ -95,10 +89,6 @@ export class PGLiteSQLDatabase implements SQLDatabase {
       await this.db.exec('BEGIN');
 
       const tx: SQLDatabaseTransaction = {
-        execute: async (sql: string, params?: SQLParams): Promise<void> => {
-          const [convertedSql, convertedParams] = this.convertParams(sql, params);
-          await this.db.query(convertedSql, convertedParams);
-        },
         query: async (sql: string, params?: SQLParams): Promise<DatabaseRow[]> => {
           const [convertedSql, convertedParams] = this.convertParams(sql, params);
           const result = await this.db.query(convertedSql, convertedParams);

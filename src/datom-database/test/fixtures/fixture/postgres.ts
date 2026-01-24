@@ -11,7 +11,7 @@ export const createPostgresFixture = async (): Promise<Fixture> => {
   await db.initialize();
   const cleanUp = async () => {
     try {
-      await sqlDb.execute(`DROP TABLE IF EXISTS ${tableName}, ${tableName}_tx`);
+      await sqlDb.query(`DROP TABLE IF EXISTS ${tableName}, ${tableName}_tx`);
     } catch (error) {
       console.error('Error cleaning up Postgres tables', error);
     }

@@ -150,21 +150,12 @@ export class PgSQLDatabase implements SQLDatabase {
     });
   }
 
-  async execute(sql: string, params?: SQLParams): Promise<void> {
-    const [convertedSql, convertedParams] = this.convertParams(sql, params);
-    await this.pool.query(convertedSql, convertedParams);
-  }
-
   async transaction(callback: (tx: SQLDatabaseTransaction) => Promise<void>): Promise<void> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
 
       const tx: SQLDatabaseTransaction = {
-        execute: async (sql: string, params?: SQLParams): Promise<void> => {
-          const [convertedSql, convertedParams] = this.convertParams(sql, params);
-          await client.query(convertedSql, convertedParams);
-        },
         query: async (sql: string, params?: SQLParams): Promise<DatabaseRow[]> => {
           const [convertedSql, convertedParams] = this.convertParams(sql, params);
           const result = await client.query(convertedSql, convertedParams);

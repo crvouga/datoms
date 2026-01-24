@@ -79,7 +79,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           PRIMARY KEY (e, a, v, tx, op)
         )
       `;
-      await tx.execute(createTableSql);
+      await tx.query(createTableSql);
 
       // 2. Create indexes
       const indexes = [
@@ -90,7 +90,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       ];
 
       for (const indexSql of indexes) {
-        await tx.execute(indexSql);
+        await tx.query(indexSql);
       }
 
       // 3. Create transaction counter table
@@ -100,7 +100,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           last_tx BIGINT NOT NULL DEFAULT 0
         )
       `;
-      await tx.execute(txTableSql);
+      await tx.query(txTableSql);
 
       // 4. Initialize transaction counter if needed
       const initTxSql = `
@@ -108,7 +108,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         SELECT 1, 0
         WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
       `;
-      await tx.execute(initTxSql);
+      await tx.query(initTxSql);
     });
 
     this.initialized = true;
@@ -830,7 +830,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         return [String(d.e), String(d.a), JSON.stringify(value), tx, d.op];
       });
 
-      await transaction.execute(sql, params);
+      await transaction.query(sql, params);
     }
   }
 

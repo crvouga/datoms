@@ -29,25 +29,11 @@ export class SQLiteSQLDatabase implements SQLDatabase {
     return results as DatabaseRow[];
   }
 
-  async execute(sql: string, params?: SQLParams): Promise<void> {
-    const stmt = this.db.prepare(sql);
-    // Bun SQLite accepts positional parameters via spread operator
-    // Type trueion needed because SQLParams (unknown[]) is more permissive
-    // than Bun's strict SQLQueryBindings type, but runtime values are valid
-    // @ts-expect-error - SQLParams is unknown[] but Bun expects specific types; values are valid at runtime
-    stmt.run(...(params || []));
-  }
-
   async transaction(callback: (tx: SQLDatabaseTransaction) => Promise<void>): Promise<void> {
     try {
-      await this.execute('BEGIN TRANSACTION');
+      await this.query('BEGIN TRANSACTION');
 
       const tx: SQLDatabaseTransaction = {
-        execute: async (sql: string, params?: SQLParams): Promise<void> => {
-          const stmt = this.db.prepare(sql);
-          // @ts-expect-error - SQLParams is unknown[] but Bun expects specific types; values are valid at runtime
-          stmt.run(...(params || []));
-        },
         query: async (sql: string, params?: SQLParams): Promise<DatabaseRow[]> => {
           const stmt = this.db.prepare(sql);
           // @ts-expect-error - SQLParams is unknown[] but Bun expects specific types; values are valid at runtime
@@ -57,9 +43,9 @@ export class SQLiteSQLDatabase implements SQLDatabase {
       };
 
       await callback(tx);
-      await this.execute('COMMIT');
+      await this.query('COMMIT');
     } catch (error) {
-      await this.execute('ROLLBACK');
+      await this.query('ROLLBACK');
       throw error;
     }
   }
