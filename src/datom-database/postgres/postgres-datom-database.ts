@@ -110,13 +110,6 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     this.initialized = true;
   }
 
-  async close(): Promise<void> {
-    if (this.sqlDb.close) {
-      await this.sqlDb.close();
-    }
-    this.initialized = false;
-  }
-
   hook(hook: Hook): void {
     this.hooks.register(hook);
   }

@@ -73,10 +73,6 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     }
   }
 
-  async close(): Promise<void> {
-    this.initialized = false;
-  }
-
   hook(hook: Hook): void {
     // Register hook locally only
     // Hooks run locally on HttpClientDatomDatabase, not on the remote server

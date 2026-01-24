@@ -24,8 +24,7 @@ export const createFileSystemFixture = async (filePath: string): Promise<Fixture
       await db.initialize();
     },
     afterEach: async () => {
-      // After each test, close DB and remove the test file
-      await db.close();
+      // Data is already persisted via auto-persist
       try {
         await Bun.file(filePath).delete();
       } catch {

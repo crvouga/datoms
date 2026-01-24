@@ -64,15 +64,6 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   }
 
   /**
-   * Close the database and persist final state
-   */
-  async close(): Promise<void> {
-    // Persist before closing
-    await this._persist();
-    await this._memoryDb.close();
-  }
-
-  /**
    * Register a hook (delegated to memory database)
    */
   hook(hook: Hook): void {

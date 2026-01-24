@@ -36,8 +36,19 @@ import type {
  */
 export class HttpClientDatomDatabaseServerComponent {
   private initialized = false;
+  private db: DatomDatabase;
 
-  constructor(private db: DatomDatabase) {}
+  constructor(db: DatomDatabase) {
+    this.db = db;
+  }
+
+  /**
+   * Update the database reference (useful for test fixtures that need to reset state)
+   */
+  setDatabase(db: DatomDatabase): void {
+    this.db = db;
+    this.initialized = false;
+  }
 
   /**
    * Handle an incoming HTTP request

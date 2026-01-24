@@ -58,11 +58,6 @@ export class InMemoryDatomDatabase implements DatomDatabase {
     }
   }
 
-  async close(): Promise<void> {
-    this._datomsArray = [];
-    this.initialized = false;
-  }
-
   hook(hook: Hook): void {
     this.hooks.register(hook);
   }

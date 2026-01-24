@@ -21,7 +21,7 @@ export const createPostgresFixture = async (): Promise<Fixture> => {
     beforeEach: async () => {},
     afterEach: async () => {
       await cleanUp();
-      await db.close();
+      await sqlDb.close();
     },
   };
 };

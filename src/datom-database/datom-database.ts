@@ -10,8 +10,6 @@ import type {DatabaseView} from './views/database-view.js';
 export interface DatomDatabase extends DatabaseView {
   /** Initialize the database. */
   initialize(): Promise<void>;
-  /** Close all connections and resources. */
-  close(): Promise<void>;
   /** Register a database-level hook. */
   hook(hook: Hook): void;
   /** Atomically apply a batch of datom operations. */

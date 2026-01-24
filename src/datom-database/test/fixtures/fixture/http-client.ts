@@ -6,7 +6,7 @@ import {HttpClientDatomDatabase} from '../../../http-client/http-client-datom-da
 import {InMemoryDatomDatabase} from '../../../in-memory/in-memory-datom-database.js';
 
 export const createHttpClientFixture = async (): Promise<Fixture> => {
-  const serverDb = new InMemoryDatomDatabase();
+  let serverDb = new InMemoryDatomDatabase();
   const transportServerComponent = new HttpClientDatomDatabaseServerComponent(serverDb);
   const endpoint = '/api/datom-database';
   const server = serve({
@@ -23,9 +23,11 @@ export const createHttpClientFixture = async (): Promise<Fixture> => {
   return {
     db,
     beforeEach: async () => {
-      // Reset the server database state between tests
-      await serverDb.close();
+      // Create a new in-memory database for clean state
+      serverDb = new InMemoryDatomDatabase();
       await serverDb.initialize();
+      // Update the server component to use the new database
+      transportServerComponent.setDatabase(serverDb);
       // Also reset the remote database's initialization state
       await db.initialize();
     },
