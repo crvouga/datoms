@@ -66,48 +66,57 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
-    const createTableSql = `
-      CREATE TABLE IF NOT EXISTS ${this.tableName} (
-        e TEXT NOT NULL,
-        a TEXT NOT NULL,
-        v JSONB NOT NULL,
-        tx BIGINT NOT NULL,
-        op BOOLEAN NOT NULL,
-        PRIMARY KEY (e, a, v, tx, op)
-      )
-    `;
 
-    // Basic indexes
-    const indexes = [
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_e_a_tx ON ${this.tableName}(e, a, tx DESC)`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_v_tx ON ${this.tableName}(a, v, tx DESC)`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(e, a, tx DESC) WHERE op = true`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx DESC)`,
-    ];
+    await this.sqlDb.beginTransaction();
+    try {
+      // 1. Create datoms table
+      const createTableSql = `
+        CREATE TABLE IF NOT EXISTS ${this.tableName} (
+          e TEXT NOT NULL,
+          a TEXT NOT NULL,
+          v JSONB NOT NULL,
+          tx BIGINT NOT NULL,
+          op BOOLEAN NOT NULL,
+          PRIMARY KEY (e, a, v, tx, op)
+        )
+      `;
+      await this.sqlDb.execute(createTableSql);
 
-    await this.sqlDb.execute(createTableSql);
-    for (const indexSql of indexes) {
-      await this.sqlDb.execute(indexSql);
+      // 2. Create indexes
+      const indexes = [
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_e_a_tx ON ${this.tableName}(e, a, tx DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_a_v_tx ON ${this.tableName}(a, v, tx DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_active ON ${this.tableName}(e, a, tx DESC) WHERE op = true`,
+        `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_tx ON ${this.tableName}(tx DESC)`,
+      ];
+
+      for (const indexSql of indexes) {
+        await this.sqlDb.execute(indexSql);
+      }
+
+      // 3. Create transaction counter table
+      const txTableSql = `
+        CREATE TABLE IF NOT EXISTS ${this.tableName}_tx (
+          id BIGINT PRIMARY KEY,
+          last_tx BIGINT NOT NULL DEFAULT 0
+        )
+      `;
+      await this.sqlDb.execute(txTableSql);
+
+      // 4. Initialize transaction counter if needed
+      const initTxSql = `
+        INSERT INTO ${this.tableName}_tx (id, last_tx)
+        SELECT 1, 0
+        WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
+      `;
+      await this.sqlDb.execute(initTxSql);
+
+      await this.sqlDb.commitTransaction();
+      this.initialized = true;
+    } catch (error) {
+      await this.sqlDb.rollbackTransaction();
+      throw error;
     }
-
-    // Create transaction counter table
-    const txTableSql = `
-      CREATE TABLE IF NOT EXISTS ${this.tableName}_tx (
-        id BIGINT PRIMARY KEY,
-        last_tx BIGINT NOT NULL DEFAULT 0
-      )
-    `;
-    await this.sqlDb.execute(txTableSql);
-
-    // Initialize transaction counter if needed
-    const initTxSql = `
-      INSERT INTO ${this.tableName}_tx (id, last_tx)
-      SELECT 1, 0
-      WHERE NOT EXISTS (SELECT 1 FROM ${this.tableName}_tx WHERE id = 1)
-    `;
-    await this.sqlDb.execute(initTxSql);
-
-    this.initialized = true;
   }
 
   hook(hook: Hook): void {
