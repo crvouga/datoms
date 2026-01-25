@@ -127,38 +127,36 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Create students and courses with enrollments
       await db.write([
         // Students
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: 100_000, a: 'person/name', v: 'Alice'},
+        {op: true, e: 100_001, a: 'person/name', v: 'Bob'},
         // Courses
-        {op: true, e: 10, a: 'title', v: 'Math 101'},
-        {op: true, e: 11, a: 'title', v: 'CS 101'},
+        {op: true, e: 200_000, a: 'course/title', v: 'Math 101'},
+        {op: true, e: 200_001, a: 'course/title', v: 'CS 101'},
         // Enrollments (many-to-many)
-        {op: true, e: 100, a: 'student', v: 1},
-        {op: true, e: 100, a: 'course', v: 10},
-        {op: true, e: 101, a: 'student', v: 1},
-        {op: true, e: 101, a: 'course', v: 11},
-        {op: true, e: 102, a: 'student', v: 2},
-        {op: true, e: 102, a: 'course', v: 10},
+        {op: true, e: 300_000, a: 'enrollment/student', v: 100_000},
+        {op: true, e: 300_000, a: 'enrollment/course', v: 200_000},
+        {op: true, e: 300_001, a: 'enrollment/student', v: 100_000},
+        {op: true, e: 300_001, a: 'enrollment/course', v: 200_001},
+        {op: true, e: 300_002, a: 'enrollment/student', v: 100_001},
+        {op: true, e: 300_002, a: 'enrollment/course', v: 200_000},
       ]);
-
       const found = await db.read({
         find: {
           studentName: {t: 'identity', c: '?studentName'},
           courseTitle: {t: 'identity', c: '?courseTitle'},
         },
         where: [
-          {t: 'match', e: '?enrollment', a: 'student', v: '?student'},
-          {t: 'match', e: '?enrollment', a: 'course', v: '?course'},
-          {t: 'match', e: '?student', a: 'name', v: '?studentName'},
-          {t: 'match', e: '?course', a: 'title', v: '?courseTitle'},
+          {t: 'match', e: '?enrollment', a: 'enrollment/student', v: '?person'},
+          {t: 'match', e: '?enrollment', a: 'enrollment/course', v: '?course'},
+          {t: 'match', e: '?person', a: 'person/name', v: '?studentName'},
+          {t: 'match', e: '?course', a: 'course/title', v: '?courseTitle'},
         ],
       });
       const results = found.data;
       expect(results).toHaveLength(3);
-      const enrollments = results.map(r => [r.studentName, r.courseTitle]);
-      expect(enrollments).toContainEqual(['Alice', 'Math 101']);
-      expect(enrollments).toContainEqual(['Alice', 'CS 101']);
-      expect(enrollments).toContainEqual(['Bob', 'Math 101']);
+      expect(results).toContainEqual({studentName: 'Alice', courseTitle: 'Math 101'});
+      expect(results).toContainEqual({studentName: 'Alice', courseTitle: 'CS 101'});
+      expect(results).toContainEqual({studentName: 'Bob', courseTitle: 'Math 101'});
     });
 
     test('should handle multi-valued attributes', async () => {
