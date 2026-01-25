@@ -39,10 +39,10 @@ import {
   type WriteContext,
   type WriteResult,
 } from '../hook/hook.js';
-import {ConfiguredDatomDatabaseView} from '../views/configured-datom-database-view.js';
+import {ConfiguredDatomDatabaseView} from '../configured-datom-database-view.js';
 import type {DatomDatabaseView, QueryResult, QueryResultEnvelope} from '../datom-database-view.js';
 import type {DatomsQuery} from '../../datoms-query.js';
-import type {ViewConfig} from '../views/view-config.js';
+import type {DatomDatabaseViewConfig} from '../datom-database-view-config.js';
 import {datalogToPostgresSQL} from './datalog-to-postgres-sql.js';
 
 /**
@@ -261,7 +261,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   /**
    * Convert DatomsQuery options to DatalogQuery format for unified SQL generation
    */
-  private _datomsQueryToDatalogQuery(options: DatomsQuery, viewConfig?: ViewConfig): DatalogQuery {
+  private _datomsQueryToDatalogQuery(
+    options: DatomsQuery,
+    viewConfig?: DatomDatabaseViewConfig,
+  ): DatalogQuery {
     // Validate mutually exclusive parameters
     if (options.tx !== undefined && options.txMax !== undefined) {
       throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
@@ -359,7 +362,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
    */
   private async _executeUnifiedQuery(
     options: DatomsQuery,
-    viewConfig?: ViewConfig,
+    viewConfig?: DatomDatabaseViewConfig,
   ): Promise<Datom[]> {
     await this._ensureInitialized();
 
@@ -506,7 +509,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
    */
   private async _executeDatalogWithSQL(
     query: DatalogQuery,
-    viewConfig?: ViewConfig,
+    viewConfig?: DatomDatabaseViewConfig,
   ): Promise<{results: QueryResult}> {
     const {sql, params} = datalogToPostgresSQL(query, this.tableName, viewConfig);
 
@@ -702,7 +705,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
   private async _datomsWithMetadataInternal(
     options: DatomsQuery,
-    viewConfig: ViewConfig,
+    viewConfig: DatomDatabaseViewConfig,
   ): Promise<{data: Datom[]}> {
     await this._ensureInitialized();
 
@@ -722,7 +725,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   private async _queryWithMetadataInternal<TFind extends Record<string, DatalogQueryFindVariable>>(
     query: DatalogQuery<keyof TFind & string> & {find: TFind},
     context: Record<string, unknown> | undefined,
-    viewConfig: ViewConfig,
+    viewConfig: DatomDatabaseViewConfig,
   ): Promise<QueryResultEnvelope<TFind>> {
     await this._ensureInitialized();
 

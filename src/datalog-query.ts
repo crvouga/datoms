@@ -2,7 +2,7 @@
  * Datalog query
  */
 
-import type {ViewConfig} from './datom-database/views/view-config.js';
+import type {DatomDatabaseViewConfig} from './datom-database/datom-database-view-config.js';
 import type {Attribute, Value} from './datoms.js';
 import type {EntityId} from './entity-id.js';
 
@@ -101,7 +101,7 @@ export interface DatalogQuery<
   /** Optional context for the query */
   context?: Record<string, unknown>;
   /** Optional view configuration */
-  viewConfig?: ViewConfig;
+  viewConfig?: DatomDatabaseViewConfig;
 }
 
 /**

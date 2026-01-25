@@ -4,10 +4,10 @@
  * Not part of the public API
  */
 
-import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog-query.js';
-import type {DatomDatabase} from '../datom-database.js';
-import type {DatomDatabaseView, QueryResultEnvelope} from '../datom-database-view.js';
-import type {ViewConfig} from './view-config.js';
+import type {DatalogQuery, DatalogQueryFindVariable} from '../datalog-query.js';
+import type {DatomDatabase} from './datom-database.js';
+import type {DatomDatabaseView, QueryResultEnvelope} from './datom-database-view.js';
+import type {DatomDatabaseViewConfig} from './datom-database-view-config.js';
 
 /**
  * Datom database view that is configured with a view config
@@ -17,7 +17,7 @@ import type {ViewConfig} from './view-config.js';
 export class ConfiguredDatomDatabaseView implements DatomDatabaseView {
   constructor(
     private db: DatomDatabase,
-    private viewConfig: ViewConfig,
+    private viewConfig: DatomDatabaseViewConfig,
   ) {}
 
   async query<

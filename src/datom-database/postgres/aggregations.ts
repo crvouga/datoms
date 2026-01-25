@@ -2,8 +2,17 @@
  * PostgreSQL SQL helper functions
  */
 
-import type {DatalogQueryFindVariable} from '../../../datalog-query.js';
-import type {SQLAggregationResult} from './types.js';
+import type {DatalogQueryFindVariable} from '../../datalog-query.js';
+
+/**
+ * Result of converting an aggregation to SQL
+ */
+export interface SQLAggregationResult {
+  /** SQL expression for the aggregation, or null if not supported */
+  sql: string | null;
+  /** Whether this aggregation requires GROUP BY */
+  requiresGroupBy: boolean;
+}
 
 /**
  * Escape a column name for PostgreSQL SQL

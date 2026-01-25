@@ -11,8 +11,8 @@ import {
   QueryTimeoutError,
   TransactionError,
 } from '../hook/hook.js';
-import {ConfiguredDatomDatabaseView} from '../views/configured-datom-database-view.js';
-import type {ViewConfig} from '../views/view-config.js';
+import {ConfiguredDatomDatabaseView} from '../configured-datom-database-view.js';
+import type {DatomDatabaseViewConfig} from '../datom-database-view-config.js';
 import type {
   DeleteDatomsRequest,
   DeleteDatomsResponse,
@@ -187,7 +187,7 @@ export class HttpClientDatomDatabaseServerComponent {
     return {success: true, deleted};
   }
 
-  private _createView(viewConfig: ViewConfig) {
+  private _createView(viewConfig: DatomDatabaseViewConfig) {
     return new ConfiguredDatomDatabaseView(this.db, viewConfig);
   }
 

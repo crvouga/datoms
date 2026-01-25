@@ -21,9 +21,9 @@ import {
   type WriteContext,
   type WriteResult,
 } from '../hook/hook.js';
-import {ConfiguredDatomDatabaseView} from '../views/configured-datom-database-view.js';
+import {ConfiguredDatomDatabaseView} from '../configured-datom-database-view.js';
 import type {DatomDatabaseView, QueryResult, QueryResultEnvelope} from '../datom-database-view.js';
-import type {ViewConfig} from '../views/view-config.js';
+import type {DatomDatabaseViewConfig} from '../datom-database-view-config.js';
 import type {
   DeleteDatomsResponse,
   GetLatestTransactionResponse,
@@ -40,7 +40,7 @@ import type {
 export class HttpClientDatomDatabase implements DatomDatabase {
   public readonly hooks: HookEngine;
   private initialized = false;
-  private currentViewConfig: ViewConfig = {type: 'current'};
+  private currentViewConfig: DatomDatabaseViewConfig = {type: 'current'};
 
   constructor(
     private readonly httpClient: HttpClient,
@@ -308,7 +308,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
   private async _queryInternal<TFind extends Record<string, DatalogQueryFindVariable>>(
     query: DatalogQuery<keyof TFind & string> & {find: TFind},
     context: Record<string, unknown> | undefined,
-    viewConfig: ViewConfig,
+    viewConfig: DatomDatabaseViewConfig,
   ): Promise<QueryResult<TFind>> {
     try {
       const response = await this.httpClient.post<QueryResponse>(this.endpoint, {

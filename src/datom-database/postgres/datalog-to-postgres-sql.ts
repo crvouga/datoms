@@ -9,9 +9,9 @@ import type {
 } from '../../datalog-query.js';
 import type {Attribute, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
-import type {ViewConfig} from '../views/view-config.js';
+import type {DatomDatabaseViewConfig} from '../datom-database-view-config.js';
 import {isQueryPattern, isVariable, stripQuestionMark} from '../../datalog-query.js';
-import {aggregationToSQL} from './aggregations/helpers.js';
+import {aggregationToSQL} from './aggregations.js';
 
 /**
  * Convert a DatalogQuery to PostgreSQL SQL
@@ -20,7 +20,7 @@ import {aggregationToSQL} from './aggregations/helpers.js';
 export function datalogToPostgresSQL(
   query: DatalogQuery,
   tableName = 'datoms',
-  viewConfig?: ViewConfig,
+  viewConfig?: DatomDatabaseViewConfig,
 ): {sql: string; params: unknown[]} {
   const params: unknown[] = [];
 
@@ -124,7 +124,7 @@ function _separateClauses(allClauses: DatalogQueryWhereClause[]): {
 function _buildCTEs(
   patternClauses: DatalogQueryWhereClause[],
   tableName: string,
-  viewConfig: ViewConfig | undefined,
+  viewConfig: DatomDatabaseViewConfig | undefined,
   params: unknown[],
   hasOpPredicate: boolean,
 ): string[] {
@@ -313,7 +313,7 @@ function _buildCTEForPattern(
   clause: DatalogQueryWhereClause,
   index: number,
   tableName: string,
-  viewConfig: ViewConfig | undefined,
+  viewConfig: DatomDatabaseViewConfig | undefined,
   params: unknown[],
   hasOpPredicate: boolean,
 ): string {
@@ -377,7 +377,7 @@ function _buildWhereConditions(
   entityVal: unknown,
   attributeVal: unknown,
   valueVal: unknown,
-  viewConfig: ViewConfig | undefined,
+  viewConfig: DatomDatabaseViewConfig | undefined,
   params: unknown[],
 ): string[] {
   const conditions: string[] = [];

@@ -4,7 +4,7 @@ import type {
   DatalogQueryWhereClauseMatch,
 } from './datalog-query.js';
 import {QuerySafetyError} from './datom-database/hook/hook.js';
-import type {ViewConfig} from './datom-database/views/view-config.js';
+import type {DatomDatabaseViewConfig} from './datom-database/datom-database-view-config.js';
 import type {Attribute, TransactionId, Value} from './datoms.js';
 import type {EntityId} from './entity-id.js';
 
@@ -21,7 +21,7 @@ export interface DatomsQuery {
   timeoutMs?: number;
   maxResultSize?: number;
   context?: Record<string, unknown>;
-  viewConfig?: ViewConfig;
+  viewConfig?: DatomDatabaseViewConfig;
 }
 
 /**

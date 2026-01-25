@@ -8,7 +8,7 @@ import type {DatalogQuery} from '../../datalog-query.js';
 import type {Datom, DatomInput, TransactionId} from '../../datoms.js';
 import type {Hook} from '../hook/hook.js';
 import type {QueryResult} from '../datom-database-view.js';
-import type {ViewConfig} from '../views/view-config.js';
+import type {DatomDatabaseViewConfig} from '../datom-database-view-config.js';
 
 // Request types
 export interface InitializeRequest {
@@ -19,7 +19,7 @@ export interface QueryRequest {
   method: 'query';
   query: DatalogQuery;
   context?: Record<string, unknown>;
-  viewConfig: ViewConfig;
+  viewConfig: DatomDatabaseViewConfig;
 }
 
 export interface TransactRequest {

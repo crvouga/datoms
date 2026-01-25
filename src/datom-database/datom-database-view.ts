@@ -20,12 +20,11 @@ export type QueryResultEnvelope<
   metadata?: Record<string, unknown>;
 };
 
+export type DefaultQueryResult = Record<string, DatalogQueryFindVariable>;
+
 // Database view interface for querying (read-only)
 export interface DatomDatabaseView {
-  query<
-    TFind extends Record<string, DatalogQueryFindVariable> = Record<
-      string,
-      DatalogQueryFindVariable
-    >,
-  >(query: DatalogQuery<keyof TFind & string> & {find: TFind}): Promise<QueryResultEnvelope<TFind>>;
+  query<TFind extends DefaultQueryResult = DefaultQueryResult>(
+    query: DatalogQuery<keyof TFind & string> & {find: TFind},
+  ): Promise<QueryResultEnvelope<TFind>>;
 }
