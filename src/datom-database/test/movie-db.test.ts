@@ -1,10 +1,11 @@
 import {beforeAll, describe, expect, it} from 'bun:test';
 
 import {FileSystemDatomDatabase} from '../filesystem/filesystem-datom-database.js';
-import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
+import {queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import {expectOrderedBy} from './expect-ordered-by.js';
 import type {Fixture} from './fixtures/fixture.js';
 import {FAST_TESTS, FIXTURES} from './fixtures/fixtures.js';
+import {datomsQueryToDatalogQuery} from '../../datoms-query.js';
 
 const TIMEOUT = 30000;
 

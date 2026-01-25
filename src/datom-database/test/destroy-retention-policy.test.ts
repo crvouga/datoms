@@ -5,9 +5,10 @@ import {
   DestroyRetentionPolicy,
   type DestroyRetentionPolicyConfig,
 } from '../retention-policy/destroy-retention-policy.js';
-import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
+import {queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import {FIXTURES} from './fixtures/fixtures.js';
 import type {Fixture} from './fixtures/fixture.js';
+import {datomsQueryToDatalogQuery} from '../../datoms-query.js';
 
 describe.each(FIXTURES)('DestroyRetentionPolicy (%s)', (_name, createFixture) => {
   let f: Fixture;

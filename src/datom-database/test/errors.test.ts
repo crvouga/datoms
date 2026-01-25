@@ -8,7 +8,8 @@ import {
   QuerySafetyError,
   QueryTimeoutError,
 } from '../hook/hook.js';
-import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
+import {queryResultsToDatoms} from '../shared/datoms-query-converter.js';
+import {datomsQueryToDatalogQuery} from '../../datoms-query.js';
 
 describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
   let f: Fixture;

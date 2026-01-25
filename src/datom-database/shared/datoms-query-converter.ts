@@ -3,71 +3,11 @@
  * This is used during the migration from datoms() to query() and can be removed once migration is complete
  */
 
-import type {
-  DatalogQuery,
-  DatalogQueryFindVariable,
-  DatalogQueryWhereClause,
-  DatalogQueryWhereClauseMatch,
-} from '../../datalog-query.js';
+import type {DatalogQueryFindVariable} from '../../datalog-query.js';
+import type {DatomsQuery} from '../../datoms-query.js';
 import type {Attribute, Datom, TransactionId, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {QueryResult} from '../datom-database-view.js';
-import type {DatomsQuery} from '../../datoms-query.js';
-
-/**
- * Convert DatomsQuery to DatalogQuery
- * Creates a query that returns all datom fields (e, a, v, tx, op)
- * Note: op filtering is handled in post-processing since QueryPattern doesn't support op
- */
-export function datomsQueryToDatalogQuery(options: DatomsQuery): DatalogQuery {
-  // Note: Validation is performed during query execution, not during conversion
-  // This allows queries to be constructed and passed around before execution
-  const where: DatalogQueryWhereClause[] = [];
-
-  // Build the main query pattern
-  const pattern: DatalogQueryWhereClauseMatch = {
-    t: 'match',
-    e: options.e !== undefined ? options.e : '?e',
-    a: options.a !== undefined ? options.a : '?a',
-    v: options.v !== undefined ? options.v : '?v',
-  };
-
-  // Add tx filter if specified
-  if (options.tx !== undefined) {
-    // TransactionId is a number, but QueryPattern.tx expects a variable or '_'
-    // We'll use a predicate instead for exact match
-    pattern.tx = '?tx';
-    where.push(['=', '?tx', options.tx] as unknown as DatalogQueryWhereClause);
-  } else if (options.txMax !== undefined) {
-    // For txMax, we need to use a predicate
-    pattern.tx = '?tx';
-    where.push(['<=', '?tx', options.txMax] as unknown as DatalogQueryWhereClause);
-  } else {
-    pattern.tx = '?tx';
-  }
-
-  where.push(pattern);
-
-  // Note: op filtering cannot be done in the where clause since QueryPattern doesn't support op
-  // It will be handled in post-processing by queryResultsToDatoms
-
-  const query: DatalogQuery = {
-    find: {
-      e: {t: 'identity', c: '?e'},
-      a: {t: 'identity', c: '?a'},
-      v: {t: 'identity', c: '?v'},
-      tx: {t: 'identity', c: '?tx'},
-      op: {t: 'identity', c: '?op'},
-    },
-    where,
-    limit: options.limit,
-    maxResultSize: options.maxResultSize,
-    context: options.context,
-    viewConfig: options.viewConfig,
-  };
-
-  return query;
-}
 
 /**
  * Convert query results back to Datom[] format and apply op filter if specified

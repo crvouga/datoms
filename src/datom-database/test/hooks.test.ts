@@ -10,8 +10,9 @@ import {
   type BeforeRead,
   type BeforeWrite,
 } from '../hook/hook.js';
-import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
+import {queryResultsToDatoms} from '../shared/datoms-query-converter.js';
 import {HookValidator} from '../hook/validator.js';
+import {datomsQueryToDatalogQuery} from '../../datoms-query.js';
 
 describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
   let f: Fixture;
