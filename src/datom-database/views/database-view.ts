@@ -1,4 +1,4 @@
-import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
+import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog.js';
 import type {Attribute, Datom, TransactionId, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {ViewConfig} from './view-config.js';

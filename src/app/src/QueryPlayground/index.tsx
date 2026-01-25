@@ -3,7 +3,7 @@ import {Panel, PanelResizeHandle} from 'react-resizable-panels';
 import Editor from '@monaco-editor/react';
 import {db} from '../lib/db';
 import {ResizablePanels} from './ui/ResizablePanels';
-import type {DatalogQuery} from '../../../datalog/datalog';
+import type {DatalogQuery} from '../../../datalog';
 import type {QueryResultEnvelope} from '../../../datom-database/views/database-view';
 
 // Monaco Editor theme configuration

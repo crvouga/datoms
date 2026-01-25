@@ -2,9 +2,9 @@
  * Datalog query interface and parser
  */
 
-import type {ViewConfig} from '../datom-database/views/view-config.js';
-import type {Attribute, Value} from '../datoms.js';
-import type {EntityId} from '../entity-id.js';
+import type {ViewConfig} from './datom-database/views/view-config.js';
+import type {Attribute, Value} from './datoms.js';
+import type {EntityId} from './entity-id.js';
 
 export type DatalogQueryVariable = `?${string}`;
 

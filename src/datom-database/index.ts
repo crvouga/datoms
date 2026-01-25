@@ -34,7 +34,7 @@ export {PostgreSQLDatomDatabase} from './postgres/postgres-datom-database.js';
 export type {SQLDatabase} from '../sql-database/sql-database.js';
 
 // Datalog query types
-export type {DatalogQuery, DatalogQueryWhereClause as QueryClause} from '../datalog/datalog.js';
+export type {DatalogQuery, DatalogQueryWhereClause as QueryClause} from '../datalog.js';
 
 // WithResult type (for speculative transactions)
 export type {WithResult} from './datom-database.js';

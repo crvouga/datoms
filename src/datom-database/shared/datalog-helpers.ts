@@ -3,7 +3,7 @@
  * These utilities are used across all database implementations
  */
 
-import type {DatalogQueryWhereClause, DatalogQueryWherePattern} from '../../datalog/datalog.js';
+import type {DatalogQueryWhereClause, DatalogQueryWherePattern} from '../../datalog.js';
 
 /**
  * Check if a value is a variable (starts with ?)

@@ -4,7 +4,7 @@
  * Loads datoms from a CSV file on initialize() and persists after every transaction
  */
 
-import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
+import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog.js';
 import type {Attribute, Datom, DatomInput, TransactionId, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {Transaction} from '../../types.js';

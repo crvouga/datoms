@@ -3,7 +3,7 @@
  * Supports before-read, after-read, before-write, and after-write hooks
  */
 
-import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog/datalog.js';
+import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog.js';
 import type {Datom, TransactionId} from '../../datoms.js';
 import type {Transaction} from '../../types.js';
 import type {DatabaseView, QueryResult} from '../views/database-view.js';

@@ -7,7 +7,7 @@
  * minimally to capture actual results while using hooks for the logging infrastructure.
  */
 
-import type {DatalogQuery, DatalogQueryFindVariable} from '../../../../datalog/datalog.js';
+import type {DatalogQuery, DatalogQueryFindVariable} from '../../../../datalog.js';
 import type {DatomDatabase} from '../../../../datom-database/datom-database.js';
 import type {
   AfterRead,

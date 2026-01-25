@@ -4,7 +4,7 @@
  * HttpClientDatomDatabase (client) and HttpClientDatomDatabaseServerComponent (server)
  */
 
-import type {DatalogQuery} from '../../datalog/datalog.js';
+import type {DatalogQuery} from '../../datalog.js';
 import type {Datom, DatomInput, TransactionId} from '../../datoms.js';
 import type {Hook} from '../hook/hook.js';
 import type {QueryResult} from '../views/database-view.js';
