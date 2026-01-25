@@ -13,7 +13,7 @@ export interface DatomDatabase extends DatomDatabaseView {
   /** Register a database-level hook. */
   hook(hook: Hook): void;
   /** Atomically apply a batch of datom operations. */
-  transact(
+  write(
     ops: (DatomInput | DatomInput[] | Datom | Datom[])[],
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>,

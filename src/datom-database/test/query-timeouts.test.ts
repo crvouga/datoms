@@ -20,13 +20,13 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
   describe('timeoutMs option', () => {
     test('should complete query within timeout', async () => {
       const {db} = f;
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       const query = datomsQueryToDatalogQuery({
         e: 1,
         timeoutMs: 5000,
       });
-      const {data: queryResults} = await db.query(query);
+      const {data: queryResults} = await db.read(query);
       const results = queryResultsToDatoms(queryResults, {
         e: 1,
         timeoutMs: 5000,
@@ -37,12 +37,12 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
 
     test('should throw QueryTimeoutError when timeout exceeded', async () => {
       const {db} = f;
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       // Use a very short timeout - may or may not trigger depending on query speed
       try {
         const query = datomsQueryToDatalogQuery({e: 1, timeoutMs: 1});
-        await db.query(query);
+        await db.read(query);
         // If query completes quickly, that's fine - timeout is best-effort
       } catch (error: unknown) {
         if (error instanceof QueryTimeoutError) {
@@ -57,7 +57,7 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
 
     test('should work with other query options', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'age', v: 30},
       ]);
@@ -67,7 +67,7 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
         a: 'name',
         timeoutMs: 1000,
       });
-      const {data: queryResults} = await db.query(query);
+      const {data: queryResults} = await db.read(query);
       const results = queryResultsToDatoms(queryResults, {
         e: 1,
         a: 'name',
@@ -80,7 +80,7 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
     test('should work with pagination', async () => {
       const {db} = f;
       for (let i = 1; i <= 5; i++) {
-        await db.transact([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.write([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
       }
 
       const query = datomsQueryToDatalogQuery({
@@ -88,7 +88,7 @@ describe.each(FIXTURES)('Query Timeouts (%s)', (_name, createFixture) => {
         limit: 3,
         timeoutMs: 1000,
       });
-      const {data: queryResults} = await db.query(query);
+      const {data: queryResults} = await db.read(query);
       const results = queryResultsToDatoms(queryResults, {
         a: 'tag',
         limit: 3,

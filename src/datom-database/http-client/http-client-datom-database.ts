@@ -74,7 +74,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     this.hooks.register(hook);
   }
 
-  async transact(
+  async write(
     ops: (DatomInput | DatomInput[])[],
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>,
@@ -250,7 +250,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     };
   }
 
-  async query<
+  async read<
     TFind extends Record<string, DatalogQueryFindVariable> = Record<
       string,
       DatalogQueryFindVariable

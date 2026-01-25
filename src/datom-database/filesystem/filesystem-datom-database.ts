@@ -50,7 +50,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
     const datoms = await this._loadDatoms();
     // Only transact if there are datoms to load (avoid incrementing tx counter for empty loads)
     if (datoms.length > 0) {
-      await this.db.transact(datoms);
+      await this.db.write(datoms);
     }
   }
 
@@ -64,13 +64,13 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   /**
    * Execute a transaction and persist to file system
    */
-  async transact(
+  async write(
     ops: (DatomInput | DatomInput[] | Datom | Datom[])[],
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>,
   ): Promise<TransactionId> {
     // Delegate to memory database
-    const txId = await this.db.transact(ops, metadata, context);
+    const txId = await this.db.write(ops, metadata, context);
 
     // Persist to file system after successful transaction
     await this._persist();
@@ -85,7 +85,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   /**
    * Execute a datalog query (delegated to memory database)
    */
-  async query<
+  async read<
     TFind extends Record<string, DatalogQueryFindVariable> = Record<
       string,
       DatalogQueryFindVariable
@@ -93,7 +93,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   >(
     query: DatalogQuery<keyof TFind & string> & {find: TFind},
   ): Promise<QueryResultEnvelope<TFind>> {
-    return this.db.query(query);
+    return this.db.read(query);
   }
 
   /**
@@ -317,8 +317,8 @@ export class FileSystemDatomDatabase implements DatomDatabase {
         where: [{t: 'match', e: '?e', a: '?a', v: '?v'}],
         limit: 1_000_000,
       };
-      const {data: results} = await this.db.query(query);
-      const allDatoms = results.map(r => ({
+      const found = await this.db.read(query);
+      const allDatoms = found.data.map(r => ({
         e: r.e as EntityId,
         a: r.a as Attribute,
         v: r.v as Value,

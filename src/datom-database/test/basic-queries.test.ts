@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe('Database query (Datalog)', () => {
     test('should execute simple query', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
@@ -32,7 +32,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(query.find.x).toEqual({t: 'identity', c: '?x'});
       expect(query.where).toHaveLength(1);
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       expect(results[0]?.x).toBe(1);
       expect(results[1]?.x).toBe(2);
@@ -45,14 +46,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(Array.isArray(results)).toBe(true);
       expect(results).toHaveLength(0);
     });
 
     test('should filter by constant in where clause', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'type', v: 'person'},
         {op: true, e: 2, a: 'type', v: 'car'},
         {op: true, e: 3, a: 'type', v: 'person'},
@@ -63,13 +65,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?x', a: 'type', v: 'person'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results.map(r => r.x).sort()).toEqual([1, 3]);
     });
 
     test('should handle empty find clause', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
@@ -79,7 +82,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?x', a: 'name', v: '?y'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       // Empty find should return all variables from where clause
       expect(Object.keys(results[0] ?? {}).length).toBeGreaterThan(0);
@@ -87,7 +91,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle find variables not in where clause', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
@@ -97,7 +101,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?x', a: 'name', v: '?y'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       // Missing variable should be undefined
       expect(results[0]?.x).toBeDefined();

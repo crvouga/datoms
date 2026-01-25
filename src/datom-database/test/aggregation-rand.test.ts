@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe.todo('Aggregation: rand', () => {
     test('should return N random values with replacement', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
         {op: true, e: 3, a: 'value', v: 30},
@@ -30,7 +30,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       const randomValues = results[0]?.random;
       expect(randomValues).toBeDefined();
@@ -49,14 +50,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.random === null || results[0]?.random === undefined).toBe(true);
     });
 
     test('should return single value when N=1', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
         {op: true, e: 3, a: 'value', v: 30},
@@ -67,7 +69,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       const randomValue = results[0]?.random;
       expect(randomValue).toBeDefined();
@@ -77,7 +80,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should allow duplicates (with replacement)', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
       ]);
@@ -87,7 +90,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       const randomValues = results[0]?.random;
       expect(Array.isArray(randomValues)).toBe(true);
@@ -100,7 +104,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should work with string values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
         {op: true, e: 3, a: 'name', v: 'Charlie'},
@@ -111,7 +115,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       const randomValues = results[0]?.random;
       expect(Array.isArray(randomValues)).toBe(true);
@@ -123,7 +128,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should work with filters', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'type', v: 'product'},
         {op: true, e: 1, a: 'price', v: 100},
         {op: true, e: 2, a: 'type', v: 'product'},
@@ -140,7 +145,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       const randomValues = results[0]?.random;
       expect(Array.isArray(randomValues)).toBe(true);

@@ -30,7 +30,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should register before-read hook', async () => {
       const {db} = f;
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       let called = false;
       const hook: BeforeRead = {
@@ -43,7 +43,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       };
 
       db.hook(hook);
-      await db.query({
+      await db.read({
         find: {e: {t: 'identity', c: '?e'}},
         where: [{t: 'match', e: '?e', a: 'name', v: 'Alice'}],
       });
@@ -54,7 +54,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should register after-read hook', async () => {
       const {db} = f;
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       let called = false;
       const hook: AfterRead = {
@@ -67,7 +67,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       };
 
       db.hook(hook);
-      await db.query({
+      await db.read({
         find: {e: {t: 'identity', c: '?e'}},
         where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
       });
@@ -89,7 +89,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       };
 
       db.hook(hook);
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       expect(called).toBe(true);
     });
@@ -107,7 +107,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       };
 
       db.hook(hook);
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       // Wait a bit for async after-write hooks
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -120,7 +120,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should modify query before execution', async () => {
       const {db} = f;
 
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
@@ -140,11 +140,11 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       };
 
       db.hook(hook);
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {v: {t: 'identity', c: '?v'}},
         where: [{t: 'match', e: '?e', a: 'name', v: '?v'}],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.v).toBe('Alice');
     });
@@ -166,7 +166,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook);
 
       await expect(
-        db.query({
+        db.read({
           find: {e: {t: 'identity', c: '?e'}},
           where: [{t: 'match', e: '?e', a: 'name', v: 'Alice'}],
         }),
@@ -200,7 +200,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook1);
       db.hook(hook2);
 
-      await db.query({
+      await db.read({
         find: {e: {t: 'identity', c: '?e'}},
         where: [{t: 'match', e: '?e', a: 'name', v: 'Alice'}],
       });
@@ -225,7 +225,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      await db.query({
+      await db.read({
         find: {e: {t: 'identity', c: '?e'}},
         where: [{t: 'match', e: '?e', a: 'name', v: 'Alice'}],
         context: {userId: 'alice', source: 'test'},
@@ -242,7 +242,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should filter query results', async () => {
       const {db} = f;
 
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
         {op: true, e: 3, a: 'name', v: 'Alice'},
@@ -259,11 +259,11 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
         where: [{t: 'match', e: '?e', a: 'name', v: '?v'}],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(2);
       expect(results.every(r => r.v === 'Alice')).toBe(true);
     });
@@ -271,7 +271,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should filter datoms results', async () => {
       const {db} = f;
 
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
         {op: true, e: 3, a: 'name', v: 'Alice'},
@@ -288,11 +288,11 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
         where: [{t: 'match', e: '?e', a: 'name', v: '?v'}],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(2);
       expect(results.every(r => (r as {v?: unknown}).v === 'Alice')).toBe(true);
     });
@@ -300,7 +300,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should transform query results', async () => {
       const {db} = f;
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       const hook: AfterRead = {
         type: 'afterRead',
@@ -318,18 +318,18 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}},
         where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
     });
 
     test('should chain multiple after-read hooks', async () => {
       const {db} = f;
 
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
         {op: true, e: 3, a: 'name', v: 'Charlie'},
@@ -354,11 +354,11 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook1);
       db.hook(hook2);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
         where: [{t: 'match', e: '?e', a: 'name', v: '?v'}],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.e).toBe(1);
     });
@@ -366,7 +366,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should register before-read hook', async () => {
       const {db} = f;
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       let called = false;
       const hook: BeforeRead = {
@@ -379,7 +379,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       };
 
       db.hook(hook);
-      await db.query({
+      await db.read({
         find: {
           e: {t: 'identity', c: '?e'},
           a: {t: 'identity', c: '?a'},
@@ -394,7 +394,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should register after-read hook', async () => {
       const {db} = f;
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       let called = false;
       const hook: AfterRead = {
@@ -407,7 +407,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       };
 
       db.hook(hook);
-      await db.query({
+      await db.read({
         find: {
           e: {t: 'identity', c: '?e'},
           a: {t: 'identity', c: '?a'},
@@ -422,7 +422,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should modify query with before-read hook', async () => {
       const {db} = f;
 
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
@@ -443,11 +443,11 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
         where: [{t: 'match', e: '?e', a: 'name', v: '?v'}],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.e).toBe(1);
     });
@@ -455,7 +455,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should pass context to after-read hook', async () => {
       const {db} = f;
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       let receivedContext: Record<string, unknown> | undefined;
 
@@ -470,7 +470,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      await db.query({
+      await db.read({
         find: {e: {t: 'identity', c: '?e'}},
         where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
         context: {userId: 'alice', source: 'test'},
@@ -509,10 +509,10 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook);
 
       // Valid email should succeed
-      await db.transact([{op: true, e: 1, a: 'email', v: 'alice@example.com'}]);
+      await db.write([{op: true, e: 1, a: 'email', v: 'alice@example.com'}]);
 
       // Invalid email should fail
-      await expect(db.transact([{op: true, e: 2, a: 'email', v: 'invalid-email'}])).rejects.toThrow(
+      await expect(db.write([{op: true, e: 2, a: 'email', v: 'invalid-email'}])).rejects.toThrow(
         TransactionError,
       );
     });
@@ -550,10 +550,11 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       const query = datomsQueryToDatalogQuery({e: 1});
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       const datoms = queryResultsToDatoms(results, {e: 1});
       const hasTimestamp = datoms.some(d => d.a === 'updatedAt');
       expect(hasTimestamp).toBe(true);
@@ -586,7 +587,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook1);
       db.hook(hook2);
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       expect(firstCalled).toBe(true);
       expect(secondCalled).toBe(false);
@@ -608,7 +609,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      await db.transact(
+      await db.write(
         [{op: true, e: 1, a: 'name', v: 'Alice'}],
         {userId: 'alice', reason: 'test'},
         {source: 'client', ip: '127.0.0.1'},
@@ -658,12 +659,10 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook2);
 
       // This should pass (no errors)
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       // This should fail with age validation error
-      await expect(db.transact([{op: true, e: 2, a: 'age', v: -5}])).rejects.toThrow(
-        TransactionError,
-      );
+      await expect(db.write([{op: true, e: 2, a: 'age', v: -5}])).rejects.toThrow(TransactionError);
     });
   });
 
@@ -685,7 +684,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      void (await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]));
+      void (await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]));
 
       // Wait for async after-write hooks
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -717,14 +716,15 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       try {
         // Transaction should succeed even if after-write hook fails
-        void (await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]));
+        void (await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]));
 
         // Wait for async after-write hooks to complete
         await new Promise(resolve => setTimeout(resolve, 10));
 
         // Verify transaction succeeded
         const query = datomsQueryToDatalogQuery({e: 1});
-        const {data: results} = await db.query(query);
+        const found = await db.read(query);
+        const results = found.data;
         const datoms = queryResultsToDatoms(results, {e: 1});
         expect(datoms).toHaveLength(1);
       } finally {
@@ -757,7 +757,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook1);
       db.hook(hook2);
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       // Wait for async after-write hooks
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -780,7 +780,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      await db.transact(
+      await db.write(
         [{op: true, e: 1, a: 'name', v: 'Alice'}],
         {userId: 'alice', reason: 'test'},
         {source: 'client', ip: '127.0.0.1'},
@@ -870,10 +870,10 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(readHook);
       db.hook(writeHook);
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
       expect(writeCalled).toBe(true);
 
-      await db.query({
+      await db.read({
         find: {e: {t: 'identity', c: '?e'}},
         where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
       });
@@ -907,7 +907,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook);
 
       try {
-        await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+        await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
         throw new Error('Should have thrown TransactionError');
       } catch (error: unknown) {
         expect(error).toBeInstanceOf(TransactionError);
@@ -957,7 +957,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook2);
       db.hook(hook3);
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       expect(executionOrder).toEqual(['first', 'second', 'third']);
     });
@@ -979,7 +979,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook);
 
       // Empty transaction (should still create a transaction ID)
-      await db.transact([]);
+      await db.write([]);
 
       expect(called).toBe(true);
     });
@@ -987,7 +987,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should handle sub operations with hooks', async () => {
       const {db} = f;
 
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       let called = false;
       const hook: BeforeWrite = {
@@ -1003,11 +1003,12 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       db.hook(hook);
 
-      await db.transact([{op: false, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: false, e: 1, a: 'name', v: 'Alice'}]);
 
       expect(called).toBe(true);
       const query = datomsQueryToDatalogQuery({e: 1});
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       const datoms = queryResultsToDatoms(results, {e: 1});
       expect(datoms).toHaveLength(0);
     });
@@ -1015,7 +1016,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
     test('should call appropriate hooks for query() method', async () => {
       const {db} = f;
 
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
       ]);
@@ -1046,7 +1047,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(queryAfterHook);
 
       // Call query() - should trigger query hooks
-      await db.query({
+      await db.read({
         find: {e: {t: 'identity', c: '?e'}},
         where: [{t: 'match', e: '?e', a: 'name', v: '?v'}],
       });

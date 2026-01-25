@@ -20,11 +20,12 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
       const query = datomsQueryToDatalogQuery({
         limit: FAST_TESTS ? 500 : 1_000_000,
       });
-      const {data: results} = await movieDb.query(query);
+      const found = await movieDb.read(query);
+      const results = found.data;
       const movieDatoms = queryResultsToDatoms(results, {
         limit: FAST_TESTS ? 500 : 1_000_000,
       });
-      await f.db.transact(movieDatoms);
+      await f.db.write(movieDatoms);
     },
     {timeout: TIMEOUT},
   );
@@ -33,7 +34,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
     'should return the top movies by popularity',
     async () => {
       const limit = 10;
-      const {data: results} = await f.db.query({
+      const found = await f.db.read({
         find: {
           'movie/id': {t: 'identity', c: '?id'},
           'movie/title': {t: 'identity', c: '?title'},
@@ -48,7 +49,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
         orderBy: [{t: 'desc', c: '?popularity'}],
         limit: limit,
       });
-
+      const results = found.data;
       expect(results).toBeDefined();
 
       expect(Array.isArray(results)).toBe(true);
@@ -62,7 +63,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
     'should return movies sorted by title A to Z',
     async () => {
       const limit = 10;
-      const {data: results} = await f.db.query({
+      const found = await f.db.read({
         find: {
           'movie/id': {t: 'identity', c: '?id'},
           'movie/title': {t: 'identity', c: '?title'},
@@ -71,7 +72,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
         orderBy: [{t: 'asc', c: '?title'}],
         limit: limit,
       });
-
+      const results = found.data;
       expect(results).toBeDefined();
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBe(limit);
@@ -89,7 +90,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
       const limit = 10;
       const actionGenreId = 28;
 
-      const {data: results} = await f.db.query({
+      const found = await f.db.read({
         find: {
           'movie/id': {t: 'identity', c: '?id'},
           'movie/title': {t: 'identity', c: '?title'},
@@ -105,7 +106,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
         orderBy: [{t: 'desc', c: '?vote_average'}],
         limit: limit,
       });
-
+      const results = found.data;
       expect(results).toBeDefined();
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBeGreaterThan(0);
@@ -128,7 +129,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
     async () => {
       // Get movies sorted by vote_count descending (most voted movies)
       const limit = 10;
-      const {data: results} = await f.db.query({
+      const found = await f.db.read({
         find: {
           'movie/id': {t: 'identity', c: '?id'},
           'movie/title': {t: 'identity', c: '?title'},
@@ -143,6 +144,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
         orderBy: [{t: 'desc', c: '?vote_count'}],
         limit: limit,
       });
+      const results = found.data;
       expect(results).toBeDefined();
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBe(limit);

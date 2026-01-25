@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe.todo('Aggregation: sample', () => {
     test('should return a sample of N values from the set', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
         {op: true, e: 3, a: 'value', v: 30},
@@ -30,7 +30,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       const sampleValues = results[0]?.sample;
       expect(sampleValues).toBeDefined();
@@ -52,14 +53,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.sample === null || results[0]?.sample === undefined).toBe(true);
     });
 
     test('should return single value when N=1', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
         {op: true, e: 3, a: 'value', v: 30},
@@ -70,7 +72,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       const sampleValue = results[0]?.sample;
       expect(sampleValue).toBeDefined();
@@ -80,7 +83,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should return all values when N >= total', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
       ]);
@@ -90,7 +93,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       const sampleValues = results[0]?.sample;
       expect(Array.isArray(sampleValues)).toBe(true);
@@ -100,7 +104,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should return array of N values without duplicates', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
         {op: true, e: 3, a: 'value', v: 30},
@@ -113,7 +117,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       const sampleValues = results[0]?.sample;
       expect(Array.isArray(sampleValues)).toBe(true);
@@ -125,7 +130,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should work with string values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
         {op: true, e: 3, a: 'name', v: 'Charlie'},
@@ -136,7 +141,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       const sampleValues = results[0]?.sample;
       expect(Array.isArray(sampleValues)).toBe(true);
@@ -148,7 +154,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should work with filters', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'type', v: 'product'},
         {op: true, e: 1, a: 'price', v: 100},
         {op: true, e: 2, a: 'type', v: 'product'},
@@ -165,7 +171,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       const sampleValues = results[0]?.sample;
       expect(Array.isArray(sampleValues)).toBe(true);

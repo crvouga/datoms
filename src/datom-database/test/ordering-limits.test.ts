@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe('Database query (Datalog)', () => {
     test('should support ordering and limits', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'score', v: 100},
         {op: true, e: 2, a: 'score', v: 400},
         {op: true, e: 3, a: 'score', v: 250},
@@ -32,7 +32,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         limit: 2,
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       expect(results[0]?.s).toBe(400);
       expect(results[1]?.s).toBe(250);
@@ -40,7 +41,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle queries with ordering on multiple variables', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'score', v: 100},
         {op: true, e: 1, a: 'age', v: 30},
@@ -70,7 +71,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(3);
       expect(results[0]?.score).toBe(200); // Charlie first (highest score)
       expect(results[1]?.score).toBe(100); // Bob second (same score, younger)
@@ -81,7 +83,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle limit 0', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'score', v: 100},
         {op: true, e: 2, a: 'score', v: 200},
         {op: true, e: 3, a: 'score', v: 300},
@@ -93,7 +95,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         limit: 0,
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       // Note: Current implementation doesn't handle limit 0 correctly (if (query.limit) is false for 0)
       // This test documents the current behavior - limit 0 doesn't apply the limit
       // In a proper implementation, limit 0 should return empty array
@@ -102,34 +105,36 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle limit larger than results', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'score', v: 100},
         {op: true, e: 2, a: 'score', v: 200},
       ]);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
         where: [{t: 'match', e: '?e', a: 'score', v: '?s'}],
         limit: 10,
       });
+      const results = found.data;
       expect(results).toHaveLength(2);
     });
 
     test('should handle limit with ordering', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'score', v: 100},
         {op: true, e: 2, a: 'score', v: 400},
         {op: true, e: 3, a: 'score', v: 250},
         {op: true, e: 4, a: 'score', v: 300},
       ]);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
         where: [{t: 'match', e: '?e', a: 'score', v: '?s'}],
         orderBy: [{t: 'desc', c: '?s'}],
         limit: 2,
       });
+      const results = found.data;
       expect(results).toHaveLength(2);
       expect(results[0]?.s).toBe(400);
       expect(results[1]?.s).toBe(300);
@@ -137,7 +142,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle ordering on variable not in find', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'score', v: 100},
         {op: true, e: 2, a: 'name', v: 'Bob'},
@@ -157,7 +162,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       };
 
       // Ordering by ?score won't work since it's not in find
-      const {data: resultsWithoutScore} = await db.query(queryWithoutScoreInFind);
+      const {data: resultsWithoutScore} = await db.read(queryWithoutScoreInFind);
       expect(resultsWithoutScore).toHaveLength(2);
       // Results may not be properly ordered since ?score is undefined after projection
 
@@ -171,7 +176,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         orderBy: [{t: 'desc', c: '?score'}],
       };
 
-      const {data: resultsWithScore} = await db.query(queryWithScoreInFind);
+      const {data: resultsWithScore} = await db.read(queryWithScoreInFind);
       expect(resultsWithScore).toHaveLength(2);
       expect(resultsWithScore[0]?.name).toBe('Bob');
       expect(resultsWithScore[0]?.score).toBe(200);
@@ -181,7 +186,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle ordering with null values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'score', v: 100},
         {op: true, e: 2, a: 'score', v: null},
         {op: true, e: 3, a: 'score', v: 200},
@@ -194,7 +199,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         orderBy: [{t: 'asc', c: '?s'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Null values should be handled (sorted first or last depending on implementation)
       const scores = results.map(r => r.s);
@@ -204,7 +210,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle ordering with mixed types', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 'zebra'},
         {op: true, e: 2, a: 'value', v: 100},
         {op: true, e: 3, a: 'value', v: 'apple'},
@@ -217,7 +223,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         orderBy: [{t: 'asc', c: '?v'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(4);
       // Mixed types should be sortable (strings vs numbers)
       // The exact order depends on implementation, but should be consistent

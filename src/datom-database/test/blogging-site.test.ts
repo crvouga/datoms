@@ -41,7 +41,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
     test('should create admin user', async () => {
       const {db} = f;
 
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_ADMIN,
@@ -50,7 +50,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         }),
       );
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {
           e: {t: 'identity', c: '?e'},
           name: {t: 'identity', c: '?name'},
@@ -62,7 +62,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           {t: 'match', e: '?e', a: USER_EMAIL, v: '?email'},
         ],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.name).toBe('Admin User');
       expect(results[0]?.email).toBe('admin@example.com');
@@ -71,7 +71,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
     test('should create author user', async () => {
       const {db} = f;
 
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 2,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -80,14 +80,14 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         }),
       );
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, name: {t: 'identity', c: '?name'}},
         where: [
           {t: 'match', e: '?e', a: USER_TYPE, v: USER_TYPE_AUTHOR},
           {t: 'match', e: '?e', a: USER_NAME, v: '?name'},
         ],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.name).toBe('Author User');
     });
@@ -95,7 +95,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
     test('should create reader user', async () => {
       const {db} = f;
 
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 3,
           [USER_TYPE]: USER_TYPE_READER,
@@ -104,14 +104,14 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         }),
       );
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, name: {t: 'identity', c: '?name'}},
         where: [
           {t: 'match', e: '?e', a: USER_TYPE, v: USER_TYPE_READER},
           {t: 'match', e: '?e', a: USER_NAME, v: '?name'},
         ],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.name).toBe('Reader User');
     });
@@ -122,7 +122,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {db} = f;
 
       // Create author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -132,7 +132,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Create draft post
       const now = new Date().toISOString();
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: 'My First Post',
@@ -143,7 +143,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         }),
       );
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {
           e: {t: 'identity', c: '?e'},
           title: {t: 'identity', c: '?title'},
@@ -154,7 +154,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           {t: 'match', e: '?e', a: POST_STATUS, v: '?status'},
         ],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.title).toBe('My First Post');
       expect(results[0]?.status).toBe(POST_STATUS_DRAFT);
@@ -164,7 +164,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {db} = f;
 
       // Create author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -173,7 +173,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Create draft post
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: 'My Post',
@@ -185,7 +185,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Publish the post
       const now = new Date().toISOString();
-      await db.transact([
+      await db.write([
         {op: false, e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT},
         ...datoms({
           entityId: 100,
@@ -194,13 +194,14 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         }),
       ]);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, status: {t: 'identity', c: '?status'}},
         where: [
           {t: 'match', e: '?e', a: POST_TITLE, v: 'My Post'},
           {t: 'match', e: '?e', a: POST_STATUS, v: '?status'},
         ],
       });
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.status).toBe(POST_STATUS_PUBLISHED);
     });
@@ -209,7 +210,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {db} = f;
 
       // Create author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -218,7 +219,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Create post
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: 'Original Title',
@@ -230,7 +231,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Edit the post
       const now = new Date().toISOString();
-      await db.transact([
+      await db.write([
         {op: false, e: 100, a: POST_TITLE, v: 'Original Title'},
         {op: false, e: 100, a: POST_CONTENT, v: 'Original Content'},
         ...datoms({
@@ -241,7 +242,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         }),
       ]);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {
           e: {t: 'identity', c: '?e'},
           title: {t: 'identity', c: '?title'},
@@ -252,7 +253,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           {t: 'match', e: '?e', a: POST_CONTENT, v: '?content'},
         ],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.title).toBe('Updated Title');
       expect(results[0]?.content).toBe('Updated Content');
@@ -265,7 +266,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Create author
       const authorId = 1;
-      await db.transact(
+      await db.write(
         datoms({
           entityId: authorId,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -274,7 +275,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Create draft post by this author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: 'Draft Post',
@@ -288,7 +289,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as the author
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {
           e: {t: 'identity', c: '?e'},
           title: {t: 'identity', c: '?title'},
@@ -300,7 +301,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         ],
         context: {userId: authorId, userType: USER_TYPE_AUTHOR},
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.title).toBe('Draft Post');
       expect(results[0]?.status).toBe(POST_STATUS_DRAFT);
@@ -312,7 +313,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create two authors
       const author1Id = 1;
       const author2Id = 2;
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: author1Id,
@@ -328,7 +329,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Create draft post by author 2
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: "Author 2's Draft",
@@ -342,12 +343,12 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should NOT see author 2's draft)
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, title: {t: 'identity', c: '?title'}},
         where: [{t: 'match', e: '?e', a: POST_TITLE, v: '?title'}],
         context: {userId: author1Id, userType: USER_TYPE_AUTHOR},
       });
-
+      const results = found.data;
       expect(results).toHaveLength(0);
     });
 
@@ -357,7 +358,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create two authors
       const author1Id = 1;
       const author2Id = 2;
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: author1Id,
@@ -373,7 +374,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Create published post by author 2
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: 'Published Post',
@@ -387,12 +388,12 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as author 1 (should see author 2's published post)
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, title: {t: 'identity', c: '?title'}},
         where: [{t: 'match', e: '?e', a: POST_TITLE, v: '?title'}],
         context: {userId: author1Id, userType: USER_TYPE_AUTHOR},
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.title).toBe('Published Post');
     });
@@ -403,7 +404,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create author and reader
       const authorId = 1;
       const readerId = 2;
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: authorId,
@@ -419,7 +420,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Create draft and published posts
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: 100,
@@ -440,7 +441,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as reader (should only see published post)
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {
           e: {t: 'identity', c: '?e'},
           title: {t: 'identity', c: '?title'},
@@ -452,7 +453,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         ],
         context: {userId: readerId, userType: USER_TYPE_READER},
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.title).toBe('Published Post');
       expect(results[0]?.status).toBe(POST_STATUS_PUBLISHED);
@@ -464,7 +465,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create admin and author
       const adminId = 1;
       const authorId = 2;
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: adminId,
@@ -480,7 +481,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Create draft and published posts
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: 100,
@@ -501,7 +502,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       db.hook(POST_ACCESS_CONTROL);
 
       // Query as admin (should see all posts)
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {
           e: {t: 'identity', c: '?e'},
           title: {t: 'identity', c: '?title'},
@@ -513,7 +514,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         ],
         context: {userId: adminId, userType: USER_TYPE_ADMIN},
       });
-
+      const results = found.data;
       expect(results).toHaveLength(2);
       const titles = results.map(r => r.title).sort();
       expect(titles).toEqual(['Draft Post', 'Published Post']);
@@ -528,7 +529,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Try to create post without title (should fail)
       await expect(
-        db.transact(
+        db.write(
           datoms({
             entityId: 100,
             [POST_CONTENT]: 'Content',
@@ -539,7 +540,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       ).rejects.toThrow(TransactionError);
 
       // Create post with all required fields (should succeed)
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 101,
           [POST_TITLE]: 'Valid Post',
@@ -549,11 +550,11 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         }),
       );
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, title: {t: 'identity', c: '?title'}},
         where: [{t: 'match', e: '?e', a: POST_TITLE, v: '?title'}],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.title).toBe('Valid Post');
     });
@@ -565,7 +566,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Try to create post with non-existent author (should fail)
       await expect(
-        db.transact(
+        db.write(
           datoms({
             entityId: 100,
             [POST_TITLE]: 'Post',
@@ -575,7 +576,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       ).rejects.toThrow(TransactionError);
 
       // Create author first
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -584,7 +585,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Now create post (should succeed)
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: 'Post',
@@ -592,11 +593,11 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         }),
       );
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, title: {t: 'identity', c: '?title'}},
         where: [{t: 'match', e: '?e', a: POST_TITLE, v: '?title'}],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
     });
   });
@@ -605,7 +606,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
     test('should create tags', async () => {
       const {db} = f;
 
-      await db.transact(
+      await db.write(
         datoms(
           {entityId: 1, [TAG_NAME]: 'javascript'},
           {entityId: 2, [TAG_NAME]: 'typescript'},
@@ -613,14 +614,14 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         ),
       );
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, name: {t: 'identity', c: '?name'}},
         where: [
           {t: 'match', e: '?e', a: TAG_NAME, v: '?name'},
           {t: 'match', e: '?e', a: TAG_NAME, v: 'javascript'},
         ],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.name).toBe('javascript');
     });
@@ -629,7 +630,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {db} = f;
 
       // Create author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -638,7 +639,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Create post
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: 'My Post',
@@ -648,12 +649,12 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Create tags
-      await db.transact(
+      await db.write(
         datoms({entityId: 1, [TAG_NAME]: 'javascript'}, {entityId: 2, [TAG_NAME]: 'typescript'}),
       );
 
       // Associate tags with post
-      await db.transact([
+      await db.write([
         ...datoms({
           entityId: 100,
           [POST_TAG]: 1,
@@ -664,7 +665,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
         }),
       ]);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {
           e: {t: 'identity', c: '?e'},
           title: {t: 'identity', c: '?title'},
@@ -677,7 +678,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           {t: 'match', e: '?tag', a: TAG_NAME, v: '?tagName'},
         ],
       });
-
+      const results = found.data;
       expect(results.length).toBeGreaterThanOrEqual(2);
       const tagNames = results.map(r => r.tagName).sort();
       expect(tagNames).toContain('javascript');
@@ -688,7 +689,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {db} = f;
 
       // Create author
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 1,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -697,12 +698,12 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Create tags
-      await db.transact(
+      await db.write(
         datoms({entityId: 1, [TAG_NAME]: 'javascript'}, {entityId: 2, [TAG_NAME]: 'typescript'}),
       );
 
       // Create posts
-      await db.transact(
+      await db.write(
         datoms(
           {
             entityId: 100,
@@ -722,14 +723,14 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Query posts with javascript tag
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, title: {t: 'identity', c: '?title'}},
         where: [
           {t: 'match', e: '?e', a: POST_TITLE, v: '?title'},
           {t: 'match', e: '?e', a: POST_TAG, v: 1},
         ],
       });
-
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.title).toBe('JS Post');
     });
@@ -741,7 +742,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Create author
       const authorId = 1;
-      await db.transact(
+      await db.write(
         datoms({
           entityId: authorId,
           [USER_TYPE]: USER_TYPE_AUTHOR,
@@ -750,7 +751,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Create draft post
-      await db.transact(
+      await db.write(
         datoms({
           entityId: 100,
           [POST_TITLE]: 'My Blog Post',
@@ -761,7 +762,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       );
 
       // Edit post
-      await db.transact([
+      await db.write([
         {op: false, e: 100, a: POST_CONTENT, v: 'Initial content'},
         ...datoms({
           entityId: 100,
@@ -770,15 +771,15 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       ]);
 
       // Create tags
-      await db.transact(
+      await db.write(
         datoms({entityId: 1, [TAG_NAME]: 'javascript'}, {entityId: 2, [TAG_NAME]: 'tutorial'}),
       );
 
       // Add tags to post
-      await db.transact(datoms({entityId: 100, [POST_TAG]: 1}, {entityId: 100, [POST_TAG]: 2}));
+      await db.write(datoms({entityId: 100, [POST_TAG]: 1}, {entityId: 100, [POST_TAG]: 2}));
 
       // Publish post
-      await db.transact([
+      await db.write([
         {op: false, e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT},
         datoms({
           entityId: 100,
@@ -787,7 +788,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       ]);
 
       // Verify final state
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {
           id: {t: 'identity', c: '?id'},
           title: {t: 'identity', c: '?title'},
@@ -803,6 +804,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           {t: 'match', e: '?tag', a: TAG_NAME, v: '?tagName'},
         ],
       });
+      const results = found.data;
       expect(results.length).toBeGreaterThanOrEqual(2); // At least 2 results (one per tag)
       const firstResult = results[0];
       expect(firstResult?.title).toBe('My Blog Post');

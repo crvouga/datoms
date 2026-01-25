@@ -19,21 +19,22 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe('Database query (Datalog)', () => {
     test('should exclude sub datoms from query results', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
         {op: true, e: 3, a: 'name', v: 'Charlie'},
       ]);
 
       // sub one datom
-      await db.transact([{op: false, e: 2, a: 'name', v: 'Bob'}]);
+      await db.write([{op: false, e: 2, a: 'name', v: 'Bob'}]);
 
       const query: DatalogQuery = {
         find: {name: {t: 'identity', c: '?name'}},
         where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       const names = results.map(r => r.name).sort();
       expect(names).toEqual(['Alice', 'Charlie']);
@@ -42,7 +43,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle self-joins', async () => {
       const {db} = f;
       // Create a graph where nodes can connect to themselves
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'connects', v: 2},
         {op: true, e: 1, a: 'connects', v: 1}, // self-connection
         {op: true, e: 2, a: 'connects', v: 3},
@@ -69,7 +70,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?from', a: 'connects', v: '?to'}],
       };
 
-      const {data: allResults} = await db.query(simpleQuery);
+      const {data: allResults} = await db.read(simpleQuery);
       // Filter to self-connections where from equals to
       const selfConnections = allResults.filter(r => r.from === r.to);
       expect(selfConnections).toHaveLength(2);
@@ -80,7 +81,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle circular relationships', async () => {
       const {db} = f;
       // Create a circular graph: 1 -> 2 -> 3 -> 1
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'next', v: 2},
         {op: true, e: 2, a: 'next', v: 3},
         {op: true, e: 3, a: 'next', v: 1},
@@ -92,7 +93,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?from', a: 'next', v: '?to'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(3);
       const relationships = results.map(r => [r.from, r.to]);
       expect(relationships).toContainEqual([1, 2]);
@@ -102,7 +104,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle variable binding across disconnected clauses', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'age', v: 30},
         {op: true, e: 2, a: 'name', v: 'Bob'},
@@ -123,7 +125,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       const alice = results.find(r => r.name === 'Alice');
       expect(alice).toBeDefined();

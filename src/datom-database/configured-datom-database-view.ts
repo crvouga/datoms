@@ -20,7 +20,7 @@ export class ConfiguredDatomDatabaseView implements DatomDatabaseView {
     private viewConfig: DatomDatabaseViewConfig,
   ) {}
 
-  async query<
+  async read<
     TFind extends Record<string, DatalogQueryFindVariable> = Record<
       string,
       DatalogQueryFindVariable
@@ -28,6 +28,6 @@ export class ConfiguredDatomDatabaseView implements DatomDatabaseView {
   >(
     query: DatalogQuery<keyof TFind & string> & {find: TFind},
   ): Promise<QueryResultEnvelope<TFind>> {
-    return this.db.query({...query, viewConfig: this.viewConfig});
+    return this.db.read({...query, viewConfig: this.viewConfig});
   }
 }

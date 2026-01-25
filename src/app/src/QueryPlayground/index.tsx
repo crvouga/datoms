@@ -90,7 +90,7 @@ export function QueryPlayground() {
       }
 
       // Execute query
-      const queryResult = await db.query(parsedQuery);
+      const queryResult = await db.read(parsedQuery);
       setResult(queryResult);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);

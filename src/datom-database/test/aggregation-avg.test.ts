@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe.todo('Aggregation: avg', () => {
     test('should calculate average of numeric values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'age', v: 20},
         {op: true, e: 2, a: 'age', v: 30},
         {op: true, e: 3, a: 'age', v: 40},
@@ -30,7 +30,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.average).toBe(30);
     });
@@ -42,7 +43,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       // Average of empty set could be null, undefined, or 0 depending on implementation
       expect(
@@ -54,21 +56,22 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should calculate average of single value', async () => {
       const {db} = f;
-      await db.transact([{op: true, e: 1, a: 'score', v: 85}]);
+      await db.write([{op: true, e: 1, a: 'score', v: 85}]);
 
       const query: DatalogQuery = {
         find: {average: {t: 'avg', c: '?score'}},
         where: [{t: 'match', e: '?e', a: 'score', v: '?score'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.average).toBe(85);
     });
 
     test('should calculate average of decimal numbers', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'price', v: 10.5},
         {op: true, e: 2, a: 'price', v: 20.5},
         {op: true, e: 3, a: 'price', v: 30.0},
@@ -79,14 +82,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.average).toBeCloseTo(20.333, 2);
     });
 
     test('should calculate average with negative numbers', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: -5},
         {op: true, e: 3, a: 'value', v: 15},
@@ -97,14 +101,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.average).toBeCloseTo(6.667, 2);
     });
 
     test('should calculate average with filters', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'type', v: 'student'},
         {op: true, e: 1, a: 'score', v: 80},
         {op: true, e: 2, a: 'type', v: 'student'},
@@ -121,14 +126,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.average).toBe(85);
     });
 
     test('should calculate average with duplicate values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 10},
         {op: true, e: 3, a: 'value', v: 10},
@@ -139,14 +145,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.average).toBe(10);
     });
 
     test('should calculate average with zero values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 0},
         {op: true, e: 2, a: 'value', v: 0},
         {op: true, e: 3, a: 'value', v: 30},
@@ -157,28 +164,30 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.average).toBe(10);
     });
 
     test('should calculate average after updates', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'score', v: 50},
         {op: true, e: 2, a: 'score', v: 60},
         {op: true, e: 3, a: 'score', v: 70},
       ]);
 
       // Update a value (true adds a new value, doesn't replace)
-      await db.transact([{op: true, e: 1, a: 'score', v: 80}]);
+      await db.write([{op: true, e: 1, a: 'score', v: 80}]);
 
       const query: DatalogQuery = {
         find: {average: {t: 'avg', c: '?score'}},
         where: [{t: 'match', e: '?e', a: 'score', v: '?score'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       // Average of [50, 60, 70, 80] = 65
       expect(results[0]?.average).toBeCloseTo(65, 1);

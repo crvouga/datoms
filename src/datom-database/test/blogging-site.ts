@@ -82,7 +82,7 @@ export const POST_ACCESS_CONTROL: AfterRead = {
     for (const postId of postEntities) {
       // Fetch author
       const queryAuthor = datomsQueryToDatalogQuery({e: postId, a: POST_AUTHOR});
-      const {data: resultsAuthor} = await db.query(queryAuthor);
+      const {data: resultsAuthor} = await db.read(queryAuthor);
       const authorDatoms = queryResultsToDatoms(resultsAuthor, {e: postId, a: POST_AUTHOR});
       if (authorDatoms.length > 0) {
         const author = authorDatoms[0]?.v as number | undefined;
@@ -94,7 +94,7 @@ export const POST_ACCESS_CONTROL: AfterRead = {
       // Fetch status if not already in results
       if (!postStatusMap.has(postId)) {
         const queryStatus = datomsQueryToDatalogQuery({e: postId, a: POST_STATUS});
-        const {data: resultsStatus} = await db.query(queryStatus);
+        const {data: resultsStatus} = await db.read(queryStatus);
         const statusDatoms = queryResultsToDatoms(resultsStatus, {e: postId, a: POST_STATUS});
         if (statusDatoms.length > 0) {
           const status = statusDatoms[0]?.v as string | undefined;
@@ -180,7 +180,8 @@ export const POST_VALIDATOR: Hook = {
 
       // Check existing datoms for posts being updated
       const query = datomsQueryToDatalogQuery({e: postId});
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       const existingDatoms = queryResultsToDatoms(results, {e: postId});
       const existingRecord = records(existingDatoms)[0] || {};
       const existingHasTitle = POST_TITLE in existingRecord;
@@ -235,7 +236,8 @@ export const AUTHOR_VALIDATOR: Hook = {
       if (datom.a === POST_AUTHOR && datom.op === true) {
         const authorId = datom.v as number;
         const query = datomsQueryToDatalogQuery({e: authorId});
-        const {data: results} = await db.query(query);
+        const found = await db.read(query);
+        const results = found.data;
         const authorDatoms = queryResultsToDatoms(results, {e: authorId});
         const authorRecord = records(authorDatoms)[0] || {};
         const userType = authorRecord[USER_TYPE] as string | undefined;

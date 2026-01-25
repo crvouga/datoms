@@ -148,14 +148,14 @@ export class HttpClientDatomDatabaseServerComponent {
       context: request.context ?? request.query.context,
       viewConfig: request.viewConfig,
     };
-    const {data: results} = await view.query(queryWithContext);
-    return {results};
+    const found = await view.read(queryWithContext);
+    return {results: found.data};
   }
 
   private async _handleTransact(request: TransactRequest): Promise<TransactResponse> {
     await this._ensureInitialized();
 
-    const txId = await this.db.transact(request.ops, request.metadata, request.context);
+    const txId = await this.db.write(request.ops, request.metadata, request.context);
     return {txId};
   }
 

@@ -22,14 +22,14 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
     test('should allow queries within limit', async () => {
       const {db} = f;
       for (let i = 1; i <= 5; i++) {
-        await db.transact([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.write([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
       }
 
       const query = datomsQueryToDatalogQuery({
         a: 'tag',
         maxResultSize: 10,
       });
-      const {data: queryResults} = await db.query(query);
+      const {data: queryResults} = await db.read(query);
       const results = queryResultsToDatoms(queryResults, {
         a: 'tag',
         maxResultSize: 10,
@@ -41,12 +41,12 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
       const {db} = f;
       // Add more datoms than the limit
       for (let i = 1; i <= 10; i++) {
-        await db.transact([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.write([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
       }
 
       try {
         const query = datomsQueryToDatalogQuery({a: 'tag', maxResultSize: 5});
-        await db.query(query);
+        await db.read(query);
         throw new Error('Should have thrown QueryResultSizeError');
       } catch (error: unknown) {
         expect(error).toBeInstanceOf(QueryResultSizeError);
@@ -60,7 +60,7 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
     test('should work with limit option', async () => {
       const {db} = f;
       for (let i = 1; i <= 10; i++) {
-        await db.transact([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.write([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
       }
 
       // limit should be applied first, then maxResultSize check
@@ -69,7 +69,7 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
         limit: 3,
         maxResultSize: 5,
       });
-      const {data: queryResults} = await db.query(query);
+      const {data: queryResults} = await db.read(query);
       const results = queryResultsToDatoms(queryResults, {
         a: 'tag',
         limit: 3,
@@ -80,13 +80,13 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
 
     test('should work with filters', async () => {
       const {db} = f;
-      await db.transact([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
 
       const query = datomsQueryToDatalogQuery({
         e: 1,
         maxResultSize: 10,
       });
-      const {data: queryResults} = await db.query(query);
+      const {data: queryResults} = await db.read(query);
       const results = queryResultsToDatoms(queryResults, {
         e: 1,
         maxResultSize: 10,

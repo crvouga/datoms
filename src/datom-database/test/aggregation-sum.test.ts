@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe.todo('Aggregation: sum', () => {
     test('should sum numeric values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'age', v: 25},
         {op: true, e: 2, a: 'age', v: 30},
         {op: true, e: 3, a: 'age', v: 35},
@@ -30,7 +30,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(90);
     });
@@ -42,28 +43,30 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(0);
     });
 
     test('should sum single value', async () => {
       const {db} = f;
-      await db.transact([{op: true, e: 1, a: 'price', v: 100}]);
+      await db.write([{op: true, e: 1, a: 'price', v: 100}]);
 
       const query: DatalogQuery = {
         find: {total: {t: 'sum', c: '?price'}},
         where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(100);
     });
 
     test('should sum negative numbers', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: -5},
         {op: true, e: 3, a: 'value', v: 3},
@@ -74,14 +77,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(8);
     });
 
     test('should sum decimal numbers', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'price', v: 10.5},
         {op: true, e: 2, a: 'price', v: 20.25},
         {op: true, e: 3, a: 'price', v: 5.75},
@@ -92,14 +96,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBeCloseTo(36.5, 2);
     });
 
     test('should sum with filters', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'type', v: 'product'},
         {op: true, e: 1, a: 'price', v: 100},
         {op: true, e: 2, a: 'type', v: 'product'},
@@ -116,14 +121,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(300);
     });
 
     test('should sum large numbers', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 1000000},
         {op: true, e: 2, a: 'value', v: 2000000},
         {op: true, e: 3, a: 'value', v: 3000000},
@@ -134,14 +140,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(6000000);
     });
 
     test('should sum zero values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 0},
         {op: true, e: 2, a: 'value', v: 0},
         {op: true, e: 3, a: 'value', v: 10},
@@ -152,35 +159,37 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(10);
     });
 
-    test('should sum values after falseion', async () => {
+    test('should sum values after retraction', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'price', v: 100},
         {op: true, e: 2, a: 'price', v: 200},
         {op: true, e: 3, a: 'price', v: 300},
       ]);
 
       // false one value
-      await db.transact([{op: false, e: 2, a: 'price', v: 200}]);
+      await db.write([{op: false, e: 2, a: 'price', v: 200}]);
 
       const query: DatalogQuery = {
         find: {total: {t: 'sum', c: '?price'}},
         where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(400);
     });
 
     test('should sum with very small decimal numbers', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 0.0001},
         {op: true, e: 2, a: 'value', v: 0.0002},
         {op: true, e: 3, a: 'value', v: 0.0003},
@@ -191,7 +200,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBeCloseTo(0.0006, 4);
     });

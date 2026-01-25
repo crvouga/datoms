@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe.todo('Aggregation: min', () => {
     test('should find minimum numeric value', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'age', v: 25},
         {op: true, e: 2, a: 'age', v: 30},
         {op: true, e: 3, a: 'age', v: 20},
@@ -30,7 +30,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.minimum).toBe(20);
     });
@@ -42,28 +43,30 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.minimum === null || results[0]?.minimum === undefined).toBe(true);
     });
 
     test('should find minimum of single value', async () => {
       const {db} = f;
-      await db.transact([{op: true, e: 1, a: 'price', v: 100}]);
+      await db.write([{op: true, e: 1, a: 'price', v: 100}]);
 
       const query: DatalogQuery = {
         find: {minimum: {t: 'min', c: '?price', count: 1}},
         where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.minimum).toBe(100);
     });
 
     test('should find minimum with negative numbers', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: -5},
         {op: true, e: 3, a: 'value', v: 3},
@@ -74,14 +77,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.minimum).toBe(-5);
     });
 
     test('should find minimum decimal numbers', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'price', v: 10.5},
         {op: true, e: 2, a: 'price', v: 5.25},
         {op: true, e: 3, a: 'price', v: 15.75},
@@ -92,14 +96,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.minimum).toBe(5.25);
     });
 
     test('should find minimum string values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Charlie'},
         {op: true, e: 2, a: 'name', v: 'Alice'},
         {op: true, e: 3, a: 'name', v: 'Bob'},
@@ -110,14 +115,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.minimum).toBe('Alice');
     });
 
     test('should find minimum with filters', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'type', v: 'product'},
         {op: true, e: 1, a: 'price', v: 100},
         {op: true, e: 2, a: 'type', v: 'product'},
@@ -134,14 +140,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.minimum).toBe(50);
     });
 
     test('should find minimum with duplicate values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 10},
         {op: true, e: 3, a: 'value', v: 20},
@@ -152,14 +159,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.minimum).toBe(10);
     });
 
     test('should find minimum with zero values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 0},
         {op: true, e: 2, a: 'value', v: 10},
         {op: true, e: 3, a: 'value', v: 5},
@@ -170,27 +178,29 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.minimum).toBe(0);
     });
 
     test('should find minimum after updates', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'price', v: 100},
         {op: true, e: 2, a: 'price', v: 200},
       ]);
 
       // Update to a lower value
-      await db.transact([{op: true, e: 2, a: 'price', v: 50}]);
+      await db.write([{op: true, e: 2, a: 'price', v: 50}]);
 
       const query: DatalogQuery = {
         find: {minimum: {t: 'min', c: '?price', count: 1}},
         where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.minimum).toBe(50);
     });

@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe.todo('Aggregation: stddev', () => {
     test('should calculate standard deviation of numeric values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
         {op: true, e: 3, a: 'value', v: 30},
@@ -30,7 +30,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       // Mean = 20, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]?.stddev).toBeCloseTo(8.16, 1);
@@ -43,21 +44,23 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.stddev === null || results[0]?.stddev === undefined).toBe(true);
     });
 
     test('should return 0 or null for single value', async () => {
       const {db} = f;
-      await db.transact([{op: true, e: 1, a: 'value', v: 10}]);
+      await db.write([{op: true, e: 1, a: 'value', v: 10}]);
 
       const query: DatalogQuery = {
         find: {stddev: {t: 'stddev', c: '?value'}},
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       // Standard deviation of single value should be 0 or null/undefined
       expect(
@@ -67,7 +70,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should calculate standard deviation with identical values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 10},
         {op: true, e: 3, a: 'value', v: 10},
@@ -78,7 +81,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       // Standard deviation of identical values should be 0
       expect(results[0]?.stddev).toBe(0);
@@ -86,7 +90,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should calculate standard deviation with negative numbers', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: -10},
         {op: true, e: 2, a: 'value', v: 0},
         {op: true, e: 3, a: 'value', v: 10},
@@ -97,7 +101,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       // Mean = 0, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]?.stddev).toBeCloseTo(8.16, 1);
@@ -105,7 +110,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should calculate standard deviation with decimal numbers', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10.5},
         {op: true, e: 2, a: 'value', v: 20.5},
         {op: true, e: 3, a: 'value', v: 30.5},
@@ -116,7 +121,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       // Mean = 20.5, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]?.stddev).toBeCloseTo(8.16, 1);
@@ -124,7 +130,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should calculate standard deviation with filters', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'type', v: 'group1'},
         {op: true, e: 1, a: 'score', v: 80},
         {op: true, e: 2, a: 'type', v: 'group1'},
@@ -143,7 +149,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       // Mean = 90, variance = 66.67, stddev = sqrt(66.67) ≈ 8.16
       expect(results[0]?.stddev).toBeCloseTo(8.16, 1);
@@ -151,7 +158,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should calculate standard deviation with larger dataset', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 1},
         {op: true, e: 2, a: 'value', v: 2},
         {op: true, e: 3, a: 'value', v: 3},
@@ -164,7 +171,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       // Mean = 3, variance = 2, stddev = sqrt(2) ≈ 1.41
       expect(results[0]?.stddev).toBeCloseTo(1.41, 1);

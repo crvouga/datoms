@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe('Database query (Datalog)', () => {
     test('should handle boolean values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'active', v: true},
         {op: true, e: 2, a: 'active', v: false},
         {op: true, e: 3, a: 'active', v: true},
@@ -30,7 +30,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'active', v: true}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       const entities = results.map(r => r.e).sort();
       expect(entities).toEqual([1, 3]);
@@ -38,7 +39,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle null values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'middleName', v: null},
         {op: true, e: 2, a: 'middleName', v: 'Smith'},
         {op: true, e: 3, a: 'middleName', v: null},
@@ -49,7 +50,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'middleName', v: null}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       const entities = results.map(r => r.e).sort();
       expect(entities).toEqual([1, 3]);
@@ -57,7 +59,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle undefined values', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'optional', v: undefined},
         {op: true, e: 2, a: 'optional', v: 'value'},
         {op: true, e: 3, a: 'optional', v: undefined},
@@ -69,7 +71,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
         where: [{t: 'match', e: '?e', a: 'optional', v: '?v'}],
       };
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Verify undefined values are stored and can be retrieved
       const undefinedEntities = results
@@ -81,7 +84,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle mixed value types', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'data', v: 'string'},
         {op: true, e: 1, a: 'data', v: 42},
         {op: true, e: 1, a: 'data', v: true},
@@ -89,10 +92,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         {op: true, e: 2, a: 'data', v: 100},
       ]);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
         where: [{t: 'match', e: '?e', a: 'data', v: '?v'}],
       });
+      const results = found.data;
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Verify we can query across different types
       const values = results.map(r => r.v);

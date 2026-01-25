@@ -90,7 +90,7 @@ export class TmdbLoader {
         }
         return [datom];
       });
-      await this.db.transact(configDatoms, {createdBy: 'tmdb-loader'});
+      await this.db.write(configDatoms, {createdBy: 'tmdb-loader'});
     }
 
     // Load countries
@@ -102,7 +102,7 @@ export class TmdbLoader {
         },
         countries.map(c => mapKeys(c, key => tmdbNamespace('country', key))),
       );
-      await this.db.transact(countryDatoms, {createdBy: 'tmdb-loader'});
+      await this.db.write(countryDatoms, {createdBy: 'tmdb-loader'});
     }
 
     // Load languages
@@ -114,7 +114,7 @@ export class TmdbLoader {
         },
         languages.map(l => mapKeys(l, key => tmdbNamespace('language', key))),
       );
-      await this.db.transact(languageDatoms, {createdBy: 'tmdb-loader'});
+      await this.db.write(languageDatoms, {createdBy: 'tmdb-loader'});
     }
 
     // Load primary translations
@@ -128,7 +128,7 @@ export class TmdbLoader {
           op: true,
         }),
       );
-      await this.db.transact(translationDatoms, {createdBy: 'tmdb-loader'});
+      await this.db.write(translationDatoms, {createdBy: 'tmdb-loader'});
     }
 
     // Load timezones
@@ -146,7 +146,7 @@ export class TmdbLoader {
           }),
         );
       });
-      await this.db.transact(timezoneDatoms, {createdBy: 'tmdb-loader'});
+      await this.db.write(timezoneDatoms, {createdBy: 'tmdb-loader'});
     }
 
     this.logger.info('TMDB configuration loaded', {
@@ -195,7 +195,7 @@ export class TmdbLoader {
           }),
         );
       });
-      await this.db.transact(movieDatoms, {createdBy: 'tmdb-loader'});
+      await this.db.write(movieDatoms, {createdBy: 'tmdb-loader'});
       totalMoviesProcessed += movies.length;
       this.logger.info('Page processed', {
         page,

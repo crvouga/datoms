@@ -135,10 +135,10 @@ export function createLoggedDatabaseWithHooks(
   db.hook(afterWriteHook);
 
   // Wrap query and transact to capture results (hooks provide timing context)
-  const originalQuery = db.query.bind(db);
-  const originalTransact = db.transact.bind(db);
+  const originalQuery = db.read.bind(db);
+  const originalTransact = db.write.bind(db);
 
-  db.query = async <
+  db.read = async <
     TFind extends Record<string, DatalogQueryFindVariable> = Record<
       string,
       DatalogQueryFindVariable
@@ -195,7 +195,7 @@ export function createLoggedDatabaseWithHooks(
     }
   };
 
-  db.transact = async (
+  db.write = async (
     ops: Parameters<typeof originalTransact>[0],
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>,

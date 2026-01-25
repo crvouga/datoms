@@ -19,13 +19,13 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe.todo('Multiple Aggregations', () => {
     test('should compute multiple aggregations in a single query', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'price', v: 100},
         {op: true, e: 2, a: 'price', v: 200},
         {op: true, e: 3, a: 'price', v: 300},
       ]);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {
           total: {t: 'sum', c: '?price'},
           average: {t: 'avg', c: '?price'},
@@ -35,6 +35,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         },
         where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       });
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(600);
       expect(results[0]?.average).toBe(200);
@@ -45,7 +46,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should compute statistical aggregations together', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
         {op: true, e: 3, a: 'value', v: 30},
@@ -63,7 +64,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.average).toBe(30);
       expect(results[0]?.median).toBe(30);
@@ -73,7 +75,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should compute aggregations on different variables', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'price', v: 100},
         {op: true, e: 1, a: 'quantity', v: 5},
         {op: true, e: 2, a: 'price', v: 200},
@@ -95,7 +97,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.totalPrice).toBe(600);
       expect(results[0]?.totalQuantity).toBe(10);
@@ -105,7 +108,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle multiple aggregations with filters', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'type', v: 'product'},
         {op: true, e: 1, a: 'price', v: 100},
         {op: true, e: 2, a: 'type', v: 'product'},
@@ -127,7 +130,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.count).toBe(2);
       expect(results[0]?.total).toBe(300);
@@ -137,7 +141,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should compute distinct and count-distinct together', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
         {op: true, e: 3, a: 'name', v: 'Alice'},
@@ -153,7 +157,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.distinctCount).toBe(3);
       expect(results[0]?.totalCount).toBe(4);
@@ -177,7 +182,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(0);
       expect(results[0]?.count).toBe(0);
@@ -192,7 +198,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should compute aggregations with sample and rand', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
         {op: true, e: 3, a: 'value', v: 30},
@@ -209,7 +215,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.count).toBe(5);
       const sample = results[0]?.sample;

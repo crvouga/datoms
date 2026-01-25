@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe('Database query (Datalog)', () => {
     test('should handle multiple where clauses (join)', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'age', v: 30},
         {op: true, e: 2, a: 'name', v: 'Bob'},
@@ -34,7 +34,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       const ages = results.map(r => r.a);
       expect(ages).toContain(30);
@@ -44,7 +45,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle complex joins with multiple entities and attributes', async () => {
       const {db} = f;
       // Create a company structure: employees, departments, and their relationships
-      await db.transact([
+      await db.write([
         // Employees
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'role', v: 'engineer'},
@@ -78,7 +79,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2); // Alice and Charlie are engineers
       const engineers = results.map(r => r.emp).sort();
       expect(engineers).toEqual([1, 3]);
@@ -91,7 +93,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle queries with multiple constraints on same entity', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'age', v: 30},
         {op: true, e: 1, a: 'city', v: 'NYC'},
@@ -102,7 +104,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         {op: true, e: 3, a: 'age', v: 30},
         {op: true, e: 3, a: 'city', v: 'LA'},
       ]);
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {name: {t: 'identity', c: '?name'}},
         where: [
           {t: 'match', e: '?e', a: 'age', v: 30},
@@ -110,6 +112,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           {t: 'match', e: '?e', a: 'name', v: '?name'},
         ],
       });
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.name).toBe('Alice');
     });
@@ -117,7 +120,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle complex variable bindings across multiple clauses', async () => {
       const {db} = f;
       // Create a network of connections
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Node1'},
         {op: true, e: 2, a: 'name', v: 'Node2'},
         {op: true, e: 3, a: 'name', v: 'Node3'},
@@ -142,7 +145,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2); // 1->2->3 and 2->3->4
       const paths = results.map(r => [r.a, r.b, r.c]);
       expect(paths).toContainEqual([1, 2, 3]);
@@ -151,7 +155,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle join with no matching results', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
         {op: true, e: 3, a: 'age', v: 30},
@@ -165,7 +169,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       // Entity 3 has age but no name, entities 1 and 2 have name but no age
       // So no results should match both conditions
       expect(results).toHaveLength(0);
@@ -173,7 +178,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle join with incompatible variable bindings', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'age', v: 30},
         {op: true, e: 2, a: 'name', v: 'Bob'},
@@ -192,14 +197,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.e).toBe(3);
     });
 
     test('should handle join with multiple common variables', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'age', v: 30},
         {op: true, e: 1, a: 'city', v: 'NYC'},
@@ -221,7 +227,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       const alice = results.find(r => r.name === 'Alice');
       expect(alice).toBeDefined();
@@ -231,7 +238,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle variable binding across disconnected clauses', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'age', v: 30},
         {op: true, e: 2, a: 'name', v: 'Bob'},
@@ -252,7 +259,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       const alice = results.find(r => r.name === 'Alice');
       expect(alice).toBeDefined();

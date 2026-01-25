@@ -132,7 +132,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     return tx;
   }
 
-  async transact(
+  async write(
     ops: (DatomInput | DatomInput[])[],
     metadata?: Record<string, unknown>,
     context?: Record<string, unknown>,
@@ -491,7 +491,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     return value;
   }
 
-  async query<
+  async read<
     TFind extends Record<string, DatalogQueryFindVariable> = Record<
       string,
       DatalogQueryFindVariable

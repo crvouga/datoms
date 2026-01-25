@@ -19,16 +19,17 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe.todo('Aggregation: max with default', () => {
     test('should find maximum value when values exist', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'age', v: 25},
         {op: true, e: 2, a: 'age', v: 30},
         {op: true, e: 3, a: 'age', v: 20},
       ]);
 
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {maximum: {t: 'max', c: '?age', count: 1}},
         where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
       });
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.maximum).toBe(30);
     });
@@ -40,7 +41,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       // Should return the default value when no results
       expect(results[0]?.maximum).toBe(0);
@@ -48,21 +50,22 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should find maximum of single value', async () => {
       const {db} = f;
-      await db.transact([{op: true, e: 1, a: 'price', v: 100}]);
+      await db.write([{op: true, e: 1, a: 'price', v: 100}]);
 
       const query: DatalogQuery = {
         find: {maximum: {t: 'max', c: '?price', count: 0}},
         where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.maximum).toBe(100);
     });
 
     test('should find maximum with numeric default', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
       ]);
@@ -72,14 +75,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.maximum).toBe(20);
     });
 
     test('should use default when all values are filtered out', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'type', v: 'product'},
         {op: true, e: 1, a: 'price', v: 100},
       ]);
@@ -92,14 +96,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.maximum).toBe(0);
     });
 
     test('should find maximum with string default', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Charlie'},
         {op: true, e: 3, a: 'name', v: 'Bob'},
@@ -110,14 +115,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.maximum).toBe('Charlie');
     });
 
     test('should handle default with different data types', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'value', v: 10},
         {op: true, e: 2, a: 'value', v: 20},
       ]);
@@ -127,7 +133,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       // Should return the maximum value (20) when values exist
       expect(results[0]?.maximum).toBe(20);

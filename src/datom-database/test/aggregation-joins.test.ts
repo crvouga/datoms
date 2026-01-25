@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe.todo('Aggregations with Joins', () => {
     test('should aggregate values across joined entities', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Product A'},
         {op: true, e: 1, a: 'price', v: 100},
         {op: true, e: 2, a: 'name', v: 'Product B'},
@@ -40,7 +40,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(600);
       expect(results[0]?.average).toBe(200);
@@ -49,7 +50,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should aggregate with relationship joins', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Order 1'},
         {op: true, e: 1, a: 'customer', v: 10},
         {op: true, e: 2, a: 'name', v: 'Order 2'},
@@ -71,7 +72,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.orderCount).toBe(3);
       expect(results[0]?.customerCount).toBe(2);
@@ -79,7 +81,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should aggregate with multiple join conditions', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'type', v: 'product'},
         {op: true, e: 1, a: 'category', v: 'electronics'},
         {op: true, e: 1, a: 'price', v: 100},
@@ -104,7 +106,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(300);
       expect(results[0]?.average).toBe(150);
@@ -113,7 +116,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should aggregate with self-joins', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Parent'},
         {op: true, e: 1, a: 'value', v: 100},
         {op: true, e: 2, a: 'name', v: 'Child 1'},
@@ -137,7 +140,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.childCount).toBe(2);
       expect(results[0]?.childTotal).toBe(125);
@@ -146,7 +150,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle aggregations with empty joins', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Product A'},
         {op: true, e: 1, a: 'price', v: 100},
       ]);
@@ -163,7 +167,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         ],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(1);
       expect(results[0]?.total).toBe(0);
       expect(results[0]?.count).toBe(0);

@@ -19,7 +19,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe('Database query (Datalog)', () => {
     test('should handle variable in entity position', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 2, a: 'name', v: 'Bob'},
         {op: true, e: 3, a: 'age', v: 30},
@@ -30,7 +30,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: '?e', a: 'name', v: '?v'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       const entities = results.map(r => r.e).sort();
       expect(entities).toEqual([1, 2]);
@@ -40,7 +41,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle variable in attribute position', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'age', v: 30},
         {op: true, e: 2, a: 'name', v: 'Bob'},
@@ -52,7 +53,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         where: [{t: 'match', e: 1, a: '?attr', v: '?v'}],
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(2);
       const attrs = results.map(r => r.attr).sort();
       expect(attrs).toEqual(['age', 'name']);
@@ -62,7 +64,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle all positions as variables', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 1, a: 'name', v: 'Alice'},
         {op: true, e: 1, a: 'age', v: 30},
         {op: true, e: 2, a: 'name', v: 'Bob'},
@@ -79,7 +81,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         limit: 100, // Required for all-variable queries to pass safety check
       };
 
-      const {data: results} = await db.query(query);
+      const found = await db.read(query);
+      const results = found.data;
       expect(results).toHaveLength(4);
       // Verify we get all entity-attribute-value combinations
       const combinations = results.map(r => ({
@@ -95,18 +98,19 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle string entity IDs', async () => {
       const {db} = f;
-      await db.transact([
+      await db.write([
         {op: true, e: 'user-1', a: 'name', v: 'Alice'},
         {op: true, e: 'user-2', a: 'name', v: 'Bob'},
         {op: true, e: 'user-1', a: 'age', v: 30},
       ]);
-      const {data: results} = await db.query({
+      const found = await db.read({
         find: {e: {t: 'identity', c: '?e'}, n: {t: 'identity', c: '?n'}},
         where: [
           {t: 'match', e: '?e', a: 'name', v: '?n'},
           {t: 'match', e: '?e', a: 'age', v: '?a'},
         ],
       });
+      const results = found.data;
       expect(results).toEqual([{e: 'user-1', n: 'Alice'}]);
     });
   });
