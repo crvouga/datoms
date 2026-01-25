@@ -1,4 +1,4 @@
-import type {QueryClause} from '../../datalog/datalog.js';
+import type {DatalogQueryWhereClause} from '../../datalog/datalog.js';
 import type {Datom, TransactionId} from '../../datoms.js';
 import type {Transaction} from '../../types.js';
 import type {DatomDatabase} from '../datom-database.js';
@@ -40,7 +40,7 @@ export class TransactionDb {
       },
       where: [
         {e: '?e', a: '?a', v: '?v', tx: '?tx'},
-        ['=', '?tx', maxTxId] as unknown as QueryClause,
+        ['=', '?tx', maxTxId] as unknown as DatalogQueryWhereClause,
       ],
     });
 

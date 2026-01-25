@@ -6,8 +6,8 @@
 import type {
   DatalogQuery,
   DatalogQueryFindVariable,
-  QueryClause,
-  QueryPattern,
+  DatalogQueryWhereClause,
+  DatalogQueryWherePattern,
 } from '../../datalog/datalog.js';
 import type {Attribute, Datom, TransactionId, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
@@ -21,10 +21,10 @@ import type {DatomsQuery, QueryResult} from '../views/database-view.js';
 export function datomsQueryToDatalogQuery(options: DatomsQuery): DatalogQuery {
   // Note: Validation is performed during query execution, not during conversion
   // This allows queries to be constructed and passed around before execution
-  const where: QueryClause[] = [];
+  const where: DatalogQueryWhereClause[] = [];
 
   // Build the main query pattern
-  const pattern: QueryPattern = {
+  const pattern: DatalogQueryWherePattern = {
     e: options.e !== undefined ? options.e : '?e',
     a: options.a !== undefined ? options.a : '?a',
     v: options.v !== undefined ? options.v : '?v',
@@ -35,11 +35,11 @@ export function datomsQueryToDatalogQuery(options: DatomsQuery): DatalogQuery {
     // TransactionId is a number, but QueryPattern.tx expects a variable or '_'
     // We'll use a predicate instead for exact match
     pattern.tx = '?tx';
-    where.push(['=', '?tx', options.tx] as unknown as QueryClause);
+    where.push(['=', '?tx', options.tx] as unknown as DatalogQueryWhereClause);
   } else if (options.txMax !== undefined) {
     // For txMax, we need to use a predicate
     pattern.tx = '?tx';
-    where.push(['<=', '?tx', options.txMax] as unknown as QueryClause);
+    where.push(['<=', '?tx', options.txMax] as unknown as DatalogQueryWhereClause);
   } else {
     pattern.tx = '?tx';
   }

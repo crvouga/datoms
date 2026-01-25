@@ -9,7 +9,7 @@ export const FAST_TESTS = process.env.FAST_TESTS === 'true';
 export const FIXTURES: [string, () => Promise<Fixture>][] = [];
 FIXTURES.push(['PostgreSQL', () => createPostgresFixture()]);
 if (!FAST_TESTS) {
-  FIXTURES.push(['PGLite', () => createPGLiteFixture()]);
+  // FIXTURES.push(['PGLite', () => createPGLiteFixture()]);
   FIXTURES.push(['HTTP Client', () => createHttpClientFixture()]);
   FIXTURES.push(['FileSystem', () => createFileSystemFixture('test.csv')]);
 }

@@ -2,7 +2,11 @@
  * Converts DatalogQuery to PostgreSQL SQL
  */
 
-import type {DatalogQuery, DatalogQueryFindVariable, QueryClause} from '../../datalog/datalog.js';
+import type {
+  DatalogQuery,
+  DatalogQueryFindVariable,
+  DatalogQueryWhereClause,
+} from '../../datalog/datalog.js';
 import type {Attribute, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {ViewConfig} from '../views/view-config.js';
@@ -27,8 +31,13 @@ export function datalogToPostgresSQL(
     throw new Error('Query must have at least one pattern clause');
   }
 
+  // Check if there's an op predicate that would override default filtering
+  const hasOpPredicate = predicateClauses.some(
+    p => Array.isArray(p) && p.length === 3 && p[1] === '?op',
+  );
+
   // Build CTEs for each pattern clause with deduplication using DISTINCT ON
-  const ctes = _buildCTEs(patternClauses, tableName, viewConfig, params);
+  const ctes = _buildCTEs(patternClauses, tableName, viewConfig, params, hasOpPredicate);
 
   // Map variables to their column references
   const variableToColumn = _buildVariableMapping(patternClauses);
@@ -61,6 +70,9 @@ export function datalogToPostgresSQL(
   // Build LIMIT clause
   const limitClause = _buildLimitClause(query, params);
 
+  // Build OFFSET clause
+  const offsetClause = _buildOffsetClause(query, params);
+
   // Build the final SQL query
   const cteClause = ctes.length > 0 ? `WITH ${ctes.join(', ')}` : '';
   const fromClause = 'FROM d0_active';
@@ -74,6 +86,7 @@ export function datalogToPostgresSQL(
     ${groupByClause}
     ${orderByClause}
     ${limitClause}
+    ${offsetClause}
   `;
 
   return {sql: sql.trim(), params};
@@ -86,12 +99,12 @@ export function datalogToPostgresSQL(
 /**
  * Separate QueryPattern clauses from predicate clauses
  */
-function _separateClauses(allClauses: QueryClause[]): {
-  patternClauses: QueryClause[];
-  predicateClauses: QueryClause[];
+function _separateClauses(allClauses: DatalogQueryWhereClause[]): {
+  patternClauses: DatalogQueryWhereClause[];
+  predicateClauses: DatalogQueryWhereClause[];
 } {
-  const patternClauses: QueryClause[] = [];
-  const predicateClauses: QueryClause[] = [];
+  const patternClauses: DatalogQueryWhereClause[] = [];
+  const predicateClauses: DatalogQueryWhereClause[] = [];
 
   for (const clause of allClauses) {
     if (isQueryPattern(clause)) {
@@ -109,10 +122,11 @@ function _separateClauses(allClauses: QueryClause[]): {
  * Build CTEs for all pattern clauses
  */
 function _buildCTEs(
-  patternClauses: QueryClause[],
+  patternClauses: DatalogQueryWhereClause[],
   tableName: string,
   viewConfig: ViewConfig | undefined,
   params: unknown[],
+  hasOpPredicate: boolean,
 ): string[] {
   const ctes: string[] = [];
 
@@ -122,7 +136,7 @@ function _buildCTEs(
       throw new Error('Only QueryPattern clauses are supported in SQL queries');
     }
 
-    const cte = _buildCTEForPattern(clause, i, tableName, viewConfig, params);
+    const cte = _buildCTEForPattern(clause, i, tableName, viewConfig, params, hasOpPredicate);
     ctes.push(cte);
   }
 
@@ -132,7 +146,7 @@ function _buildCTEs(
 /**
  * Map variables to their column references
  */
-function _buildVariableMapping(patternClauses: QueryClause[]): Map<string, string> {
+function _buildVariableMapping(patternClauses: DatalogQueryWhereClause[]): Map<string, string> {
   const variableToColumn: Map<string, string> = new Map();
 
   for (let i = 0; i < patternClauses.length; i++) {
@@ -169,7 +183,7 @@ function _buildVariableMapping(patternClauses: QueryClause[]): Map<string, strin
 /**
  * Build JOIN clauses from shared variables
  */
-function _buildJoinClauses(patternClauses: QueryClause[]): string {
+function _buildJoinClauses(patternClauses: DatalogQueryWhereClause[]): string {
   const variableToClause = _mapVariableOccurrences(patternClauses);
   const joinConditions = _buildJoinConditions(variableToClause);
 
@@ -189,7 +203,7 @@ function _buildJoinClauses(patternClauses: QueryClause[]): string {
  */
 function _buildSelectClause(
   query: DatalogQuery,
-  patternClauses: QueryClause[],
+  patternClauses: DatalogQueryWhereClause[],
   variableToColumn: Map<string, string>,
   params: unknown[],
 ): {selectColumns: string[]; groupByColumns: string[]} {
@@ -217,7 +231,7 @@ function _buildSelectClause(
  * Build WHERE clause from predicate clauses
  */
 function _buildWhereClause(
-  predicateClauses: QueryClause[],
+  predicateClauses: DatalogQueryWhereClause[],
   variableToColumn: Map<string, string>,
   params: unknown[],
 ): string {
@@ -276,6 +290,17 @@ function _buildLimitClause(query: DatalogQuery, params: unknown[]): string {
   return '';
 }
 
+/**
+ * Build OFFSET clause
+ */
+function _buildOffsetClause(query: DatalogQuery, params: unknown[]): string {
+  if (query.offset !== undefined) {
+    params.push(query.offset);
+    return 'OFFSET ?';
+  }
+  return '';
+}
+
 // ============================================================================
 // Mid-Level Helper Functions
 // ============================================================================
@@ -284,11 +309,12 @@ function _buildLimitClause(query: DatalogQuery, params: unknown[]): string {
  * Build CTE for a single pattern clause
  */
 function _buildCTEForPattern(
-  clause: QueryClause,
+  clause: DatalogQueryWhereClause,
   index: number,
   tableName: string,
   viewConfig: ViewConfig | undefined,
   params: unknown[],
+  hasOpPredicate: boolean,
 ): string {
   if (!isQueryPattern(clause)) {
     throw new Error('Only QueryPattern clauses are supported');
@@ -309,8 +335,9 @@ function _buildCTEForPattern(
   const orderBy = viewConfig?.type === 'asOf' ? 'e, a, tx DESC' : 'e, a, v, tx DESC';
 
   // For history queries, don't filter by op = true (include retractions)
-  // For other queries, filter to only active (op = true) datoms
-  const activeFilter = isHistory ? '' : 'WHERE op = true';
+  // For other queries, filter to only active (op = true) datoms UNLESS there's an op predicate
+  // If there's an op predicate, let it handle the filtering in the WHERE clause
+  const activeFilter = isHistory || hasOpPredicate ? '' : 'WHERE op = true';
 
   if (isHistory) {
     // History queries: no deduplication, return all datoms
@@ -388,7 +415,7 @@ function _buildWhereConditions(
  * Map variables to their clause occurrences
  */
 function _mapVariableOccurrences(
-  patternClauses: QueryClause[],
+  patternClauses: DatalogQueryWhereClause[],
 ): Map<string, {clauseIndex: number; field: string}[]> {
   const variableToClause: Map<string, {clauseIndex: number; field: string}[]> = new Map();
 
@@ -458,7 +485,7 @@ function _buildJoinConditions(
  */
 function _buildJoinClauseForAlias(
   index: number,
-  patternClauses: QueryClause[],
+  patternClauses: DatalogQueryWhereClause[],
   joinConditions: string[],
 ): string {
   const alias = `d${index}_active`;
@@ -518,7 +545,7 @@ function _buildJoinClauseForAlias(
  * Build SELECT columns for empty find clause
  */
 function _buildSelectColumnsEmpty(
-  patternClauses: QueryClause[],
+  patternClauses: DatalogQueryWhereClause[],
   variableToColumn: Map<string, string>,
   selectColumns: string[],
 ): void {
@@ -552,7 +579,7 @@ function _buildSelectColumnsEmpty(
  */
 function _buildSelectColumnsNonEmpty(
   query: DatalogQuery,
-  patternClauses: QueryClause[],
+  patternClauses: DatalogQueryWhereClause[],
   variableToColumn: Map<string, string>,
   selectColumns: string[],
   groupByColumns: string[],
@@ -610,7 +637,7 @@ function _buildAggregationColumn(
 function _buildVariableColumn(
   expr: unknown,
   outputKey: string,
-  patternClauses: QueryClause[],
+  patternClauses: DatalogQueryWhereClause[],
   variableToColumn: Map<string, string>,
   selectColumns: string[],
   groupByColumns: string[],
@@ -671,7 +698,7 @@ function _buildVariableColumn(
  */
 function _findLiteralInPatterns(
   varName: string,
-  patternClauses: QueryClause[],
+  patternClauses: DatalogQueryWhereClause[],
 ): Value | Attribute | EntityId | undefined {
   for (const clause of patternClauses) {
     if (!clause || !isQueryPattern(clause)) continue;
@@ -710,6 +737,14 @@ function _addPredicateCondition(
     } else if (op === '<=') {
       params.push(value);
       predicateConditions.push('d0_active.tx <= ?');
+    }
+    return;
+  }
+
+  if (varName === '?op') {
+    if (op === '=') {
+      params.push(value);
+      predicateConditions.push('d0_active.op = ?');
     }
     return;
   }

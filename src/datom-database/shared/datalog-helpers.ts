@@ -3,7 +3,7 @@
  * These utilities are used across all database implementations
  */
 
-import type {QueryClause, QueryPattern} from '../../datalog/datalog.js';
+import type {DatalogQueryWhereClause, DatalogQueryWherePattern} from '../../datalog/datalog.js';
 
 /**
  * Check if a value is a variable (starts with ?)
@@ -19,7 +19,9 @@ export function isVariable(value: unknown): boolean {
  * @param clause Query clause to check
  * @returns True if the clause is a QueryPattern
  */
-export function isQueryPattern(clause: QueryClause): clause is QueryPattern {
+export function isQueryPattern(
+  clause: DatalogQueryWhereClause,
+): clause is DatalogQueryWherePattern {
   return (
     typeof clause === 'object' &&
     clause !== null &&

@@ -3,7 +3,12 @@
  * Accepts a SqlConnection interface for PostgreSQL-compatible databases
  */
 
-import type {DatalogQuery, DatalogQueryFindVariable, QueryClause} from '../../datalog/datalog.js';
+import type {
+  DatalogQuery,
+  DatalogQueryFindVariable,
+  DatalogQueryVariable,
+  DatalogQueryWhereClause,
+} from '../../datalog/datalog.js';
 
 import {
   validateDatoms,
@@ -254,304 +259,118 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     };
   }
 
-  private async _executeCurrentQuery(options: DatomsQuery): Promise<Datom[]> {
-    await this._ensureInitialized();
-
-    const conditions: string[] = [];
-    const params: unknown[] = [];
-
-    // Build WHERE conditions
-    if (options.e !== undefined) {
-      conditions.push('e = ?');
-      params.push(String(options.e));
-    }
-    if (options.a !== undefined) {
-      conditions.push('a = ?');
-      params.push(String(options.a));
-    }
-    if (options.v !== undefined) {
-      let value = options.v;
-      if (value === undefined) {
-        value = '__UNDEFINED__';
-      }
-      conditions.push('v = ?::jsonb');
-      params.push(JSON.stringify(value));
-    }
-    if (options.tx !== undefined) {
-      conditions.push('tx = ?');
-      params.push(options.tx);
-    }
-    if (options.txMax !== undefined) {
-      conditions.push('tx <= ?');
-      params.push(options.txMax);
-    }
-
-    const limitClause = options.limit ? 'LIMIT ?' : '';
-    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
-
-    const combinedWhereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    let opFilterAfter = '';
-    if (options.op === undefined || options.op === true) {
-      opFilterAfter = 'WHERE op = true';
-    } else if (options.op === false) {
-      opFilterAfter = 'WHERE op = false';
-    }
-
-    const sql = `
-      WITH latest_datoms AS (
-        SELECT DISTINCT ON (e, a, v)
-          e, a, v, tx, op
-        FROM ${this.tableName}
-        ${combinedWhereClause}
-        ORDER BY e, a, v, tx DESC
-      )
-      SELECT 
-        e,
-        a,
-        v,
-        tx,
-        op
-      FROM latest_datoms
-      ${opFilterAfter}
-      ORDER BY
-        CASE 
-          WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
-          ELSE 0 
-        END,
-        a
-      ${limitClause}
-      ${offsetClause}
-    `.trim();
-
-    if (options.limit) {
-      params.push(options.limit);
-    }
-    if (options.offset !== undefined) {
-      params.push(options.offset);
-    }
-
-    const rows = await this.sqlDb.query(sql, params);
-    return this._mapRowsToDatoms(rows);
-  }
-
-  private async _executeAsOfQuery(options: DatomsQuery, txId: TransactionId): Promise<Datom[]> {
-    await this._ensureInitialized();
-
+  /**
+   * Convert DatomsQuery options to DatalogQuery format for unified SQL generation
+   */
+  private _datomsQueryToDatalogQuery(options: DatomsQuery, viewConfig?: ViewConfig): DatalogQuery {
+    // Validate mutually exclusive parameters
     if (options.tx !== undefined && options.txMax !== undefined) {
       throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
     }
 
-    const conditions: string[] = [];
-    const params: unknown[] = [];
+    // Build QueryPattern based on provided filters
+    const pattern: DatalogQueryWhereClause = {
+      e: options.e !== undefined ? options.e : '?e',
+      a: options.a !== undefined ? options.a : '?a',
+      v: options.v !== undefined ? options.v : '?v',
+    };
 
-    // Build WHERE conditions
-    if (options.e !== undefined) {
-      conditions.push('e = ?');
-      params.push(String(options.e));
-    }
-    if (options.a !== undefined) {
-      conditions.push('a = ?');
-      params.push(String(options.a));
-    }
-    if (options.v !== undefined) {
-      let value = options.v;
-      if (value === undefined) {
-        value = '__UNDEFINED__';
+    // Build WHERE clause predicates for tx/txMax/op filters
+    const where: DatalogQueryWhereClause[] = [pattern];
+
+    // Handle tx/txMax filtering
+    // For asOf queries, _buildWhereConditions already adds tx <= viewConfig.txId
+    // We only add predicates if user's constraints are more restrictive
+    if (viewConfig?.type === 'asOf') {
+      // For asOf, viewConfig.txId is already applied as upper bound
+      // Add user's tx/txMax only if more restrictive
+      if (options.tx !== undefined) {
+        // If user specifies exact tx, use it (it will be ANDed with tx <= viewConfig.txId)
+        where.push(['=', '?tx' as const, options.tx] as unknown as DatalogQueryWhereClause);
+      } else if (options.txMax !== undefined && options.txMax < viewConfig.txId) {
+        // If user's txMax is more restrictive, add it
+        where.push(['<=', '?tx' as const, options.txMax] as unknown as DatalogQueryWhereClause);
       }
-      conditions.push('v = ?::jsonb');
-      params.push(JSON.stringify(value));
+      // Otherwise, rely on viewConfig.txId from _buildWhereConditions
+    } else {
+      // For non-asOf queries, use options directly
+      if (options.tx !== undefined) {
+        where.push(['=', '?tx' as const, options.tx] as unknown as DatalogQueryWhereClause);
+      }
+      if (options.txMax !== undefined) {
+        where.push(['<=', '?tx' as const, options.txMax] as unknown as DatalogQueryWhereClause);
+      }
     }
 
-    // Merge options.tx or options.txMax with txId: use minimum of both
-    let maxTx = txId;
-    if (options.tx !== undefined) {
-      maxTx = Math.min(options.tx, txId);
-    } else if (options.txMax !== undefined) {
-      maxTx = Math.min(options.txMax, txId);
+    // Handle op filtering: if undefined or true, default to true (handled by CTE)
+    // If explicitly false, add predicate to filter to false
+    // If explicitly true, we can add predicate or rely on CTE default
+    if (options.op === false) {
+      where.push(['=', '?op' as const, false] as unknown as DatalogQueryWhereClause);
+    } else if (options.op === true) {
+      // Explicitly true - can add predicate or rely on CTE default (CTE default is fine)
+      // Adding predicate ensures consistency
+      where.push(['=', '?op' as const, true] as unknown as DatalogQueryWhereClause);
     }
-    conditions.push('tx <= ?');
-    params.push(maxTx);
+    // If undefined, rely on CTE default (op = true for non-history queries)
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    // Build find clause to return raw datom fields
+    const find: Record<string, DatalogQueryFindVariable> = {
+      e: {t: 'identity' as const, c: '?e' as const},
+      a: {t: 'identity' as const, c: '?a' as const},
+      v: {t: 'identity' as const, c: '?v' as const},
+      tx: {t: 'identity' as const, c: '?tx' as const},
+      op: {t: 'identity' as const, c: '?op' as const},
+    };
 
-    const limitClause = options.limit ? 'LIMIT ?' : '';
-    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
-
-    const sql = `
-      SELECT DISTINCT ON (e, a)
-        e, a, v, tx, op
-      FROM ${this.tableName}
-      ${whereClause}
-      ORDER BY e, a, tx DESC
-    `;
-
-    const finalSql = `
-      WITH latest_datoms AS (${sql})
-      SELECT 
-        e,
-        a,
-        v,
-        tx,
-        op
-      FROM latest_datoms
-      WHERE op = true
-      ORDER BY
-        CASE 
-          WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
-          ELSE 0 
-        END,
-        a
-      ${limitClause}
-      ${offsetClause}
-    `.trim();
-
-    if (options.limit) {
-      params.push(options.limit);
-    }
-    if (options.offset !== undefined) {
-      params.push(options.offset);
+    // Set default ordering based on view type
+    // History queries: order by tx, e, a
+    // Other queries: order by numeric e, then a (handled by SQL CASE expression)
+    // Note: The actual SQL ordering with CASE for numeric e is handled in datalog-to-postgres-sql.ts
+    // via the CTE structure, but we add explicit ordering here for consistency
+    let orderBy: [DatalogQueryVariable, 'asc' | 'desc'][] | undefined;
+    if (viewConfig?.type === 'history') {
+      orderBy = [
+        ['?tx' as const, 'asc'],
+        ['?e' as const, 'asc'],
+        ['?a' as const, 'asc'],
+      ];
+    } else {
+      // For other queries, we rely on the CTE's internal ordering
+      // The final result ordering is handled by the SQL CASE expression in the CTE
+      // But we can add basic ordering here
+      orderBy = [
+        ['?e' as const, 'asc'],
+        ['?a' as const, 'asc'],
+      ];
     }
 
-    const rows = await this.sqlDb.query(finalSql, params);
-    return this._mapRowsToDatoms(rows);
+    return {
+      find,
+      where,
+      orderBy,
+      limit: options.limit,
+      offset: options.offset,
+    };
   }
 
-  private async _executeHistoryQuery(options: DatomsQuery): Promise<Datom[]> {
+  /**
+   * Unified query execution method that uses datalogToPostgresSQL for all non-speculative queries
+   */
+  private async _executeUnifiedQuery(
+    options: DatomsQuery,
+    viewConfig?: ViewConfig,
+  ): Promise<Datom[]> {
     await this._ensureInitialized();
 
-    if (options.tx !== undefined && options.txMax !== undefined) {
-      throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
-    }
+    // Convert DatomsQuery to DatalogQuery
+    const datalogQuery = this._datomsQueryToDatalogQuery(options, viewConfig);
 
-    const conditions: string[] = [];
-    const params: unknown[] = [];
+    // Generate SQL using existing infrastructure
+    const {sql, params} = datalogToPostgresSQL(datalogQuery, this.tableName, viewConfig);
 
-    // Build WHERE conditions
-    if (options.e !== undefined) {
-      conditions.push('e = ?');
-      params.push(String(options.e));
-    }
-    if (options.a !== undefined) {
-      conditions.push('a = ?');
-      params.push(String(options.a));
-    }
-    if (options.v !== undefined) {
-      let value = options.v;
-      if (value === undefined) {
-        value = '__UNDEFINED__';
-      }
-      conditions.push('v = ?::jsonb');
-      params.push(JSON.stringify(value));
-    }
-    if (options.tx !== undefined) {
-      conditions.push('tx = ?');
-      params.push(options.tx);
-    }
-    if (options.txMax !== undefined) {
-      conditions.push('tx <= ?');
-      params.push(options.txMax);
-    }
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    const limitClause = options.limit ? 'LIMIT ?' : '';
-    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
-
-    const sql = `
-      SELECT 
-        e,
-        a,
-        v,
-        tx,
-        op
-      FROM ${this.tableName}
-      ${whereClause}
-      ORDER BY tx ASC, e ASC, a ASC
-      ${limitClause}
-      ${offsetClause}
-    `.trim();
-
-    if (options.limit) {
-      params.push(options.limit);
-    }
-    if (options.offset !== undefined) {
-      params.push(options.offset);
-    }
-
+    // Execute query and map results
     const rows = await this.sqlDb.query(sql, params);
-    return this._mapRowsToDatoms(rows);
-  }
-
-  private async _executeSinceQuery(options: DatomsQuery, txId: TransactionId): Promise<Datom[]> {
-    await this._ensureInitialized();
-
-    const conditions: string[] = [];
-    const params: unknown[] = [];
-
-    // Build WHERE conditions
-    if (options.e !== undefined) {
-      conditions.push('e = ?');
-      params.push(String(options.e));
-    }
-    if (options.a !== undefined) {
-      conditions.push('a = ?');
-      params.push(String(options.a));
-    }
-    if (options.v !== undefined) {
-      let value = options.v;
-      if (value === undefined) {
-        value = '__UNDEFINED__';
-      }
-      conditions.push('v = ?::jsonb');
-      params.push(JSON.stringify(value));
-    }
-
-    // Filter to only datoms with tx > txId
-    conditions.push('tx > ?');
-    params.push(txId);
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    const limitClause = options.limit ? 'LIMIT ?' : '';
-    const offsetClause = options.offset !== undefined ? 'OFFSET ?' : '';
-
-    const sql = `
-      SELECT DISTINCT ON (e, a, v)
-        e, a, v, tx, op
-      FROM ${this.tableName}
-      ${whereClause}
-      ORDER BY e, a, v, tx DESC
-    `;
-
-    const finalSql = `
-      WITH latest_datoms AS (${sql})
-      SELECT 
-        e,
-        a,
-        v,
-        tx,
-        op
-      FROM latest_datoms
-      WHERE op = true
-      ORDER BY
-        CASE 
-          WHEN e ~ '^-{0,1}[0-9]+$' THEN e::BIGINT 
-          ELSE 0 
-        END,
-        a
-      ${limitClause}
-      ${offsetClause}
-    `.trim();
-
-    if (options.limit) {
-      params.push(options.limit);
-    }
-    if (options.offset !== undefined) {
-      params.push(options.offset);
-    }
-
-    const rows = await this.sqlDb.query(finalSql, params);
     return this._mapRowsToDatoms(rows);
   }
 
@@ -562,7 +381,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // For speculative queries, fetch base datoms and merge with speculative changes
-    const baseDatoms = await this._executeCurrentQuery({});
+    const baseDatoms = await this._executeUnifiedQuery({}, {type: 'current'});
 
     // Create a map of base datoms by (entity, attribute, value) for efficient lookup
     const baseMap = new Map<string, Datom>();
@@ -843,7 +662,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const txId = Number(row.last_tx);
 
     // Get all datoms for this transaction using history view
-    const historyResult = await this._executeHistoryQuery({tx: txId});
+    const historyResult = await this._executeUnifiedQuery({tx: txId}, {type: 'history'});
 
     return {
       txId,
@@ -889,19 +708,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     let result: Datom[];
 
-    if (viewConfig.type === 'current') {
-      result = await this._executeCurrentQuery(options);
-    } else if (viewConfig.type === 'asOf') {
-      result = await this._executeAsOfQuery(options, viewConfig.txId);
-    } else if (viewConfig.type === 'since') {
-      result = await this._executeSinceQuery(options, viewConfig.txId);
-    } else if (viewConfig.type === 'history') {
-      result = await this._executeHistoryQuery(options);
-    } else if (viewConfig.type === 'speculative') {
+    if (viewConfig.type === 'speculative') {
       result = await this._executeSpeculativeQuery(options, viewConfig.datoms);
     } else {
-      const _exhaustive: never = viewConfig;
-      throw new Error(`Unknown view config type: ${(_exhaustive as ViewConfig).type}`);
+      result = await this._executeUnifiedQuery(options, viewConfig);
     }
 
     return {
@@ -980,8 +790,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
       // Execute query using in-memory approach for speculative
       // This is the only place we use in-memory processing
-      const patternClauses: QueryClause[] = [];
-      const predicateClauses: QueryClause[] = [];
+      const patternClauses: DatalogQueryWhereClause[] = [];
+      const predicateClauses: DatalogQueryWhereClause[] = [];
       for (const clause of modifiedQuery.where) {
         if (isQueryPattern(clause)) {
           patternClauses.push(clause);

@@ -26,7 +26,7 @@ export type DatalogQueryFindVariable =
 /**
  * Basic query pattern
  */
-export type QueryPattern = {
+export type DatalogQueryWherePattern = {
   e: DatalogQueryVariable | EntityId | '_';
   a: DatalogQueryVariable | Attribute | '_';
   v?: DatalogQueryVariable | Value | '_';
@@ -37,37 +37,37 @@ export type QueryPattern = {
  * Predicate expression (as tuples)
  */
 export type QueryPredicate =
-  | ['>', DatalogQueryVariable, number]
-  | ['>=', DatalogQueryVariable, number]
-  | ['<', DatalogQueryVariable, number]
-  | ['=', DatalogQueryVariable, DatalogQueryVariable | Value]
-  | ['!=', DatalogQueryVariable, DatalogQueryVariable | Value]
-  | ['>=', DatalogQueryVariable, DatalogQueryVariable | Value]
-  | ['<=', DatalogQueryVariable, DatalogQueryVariable | Value]
-  | ['ground', DatalogQueryVariable, DatalogQueryVariable | Value]
-  | ['get-else', DatalogQueryVariable, DatalogQueryVariable | Value]
-  | ['missing?', DatalogQueryVariable, DatalogQueryVariable | Value]
-  | ['tuple', DatalogQueryVariable, DatalogQueryVariable | Value]
-  | ['untuple', DatalogQueryVariable, DatalogQueryVariable | Value];
+  | {t: '>'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: '>='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: '<'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: '='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: '!='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: '>='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: '<='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number};
+// | {t: 'ground', left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+// | {t: 'get-else', left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+// | {t: 'missing?', left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+// | {t: 'tuple', left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+// | {t: 'untuple', left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
 
 /**
  * Or clause
  */
 export type QueryOr = {
-  or: QueryClause[];
+  or: DatalogQueryWhereClause[];
 };
 
 /**
  * Not clause
  */
 export type QueryNot = {
-  not: QueryClause[];
+  not: DatalogQueryWhereClause[];
 };
 
 /**
  * All possible query clauses
  */
-export type QueryClause = QueryPattern | QueryOr | QueryNot;
+export type DatalogQueryWhereClause = DatalogQueryWherePattern | QueryOr | QueryNot;
 
 /**
  * A parsed datalog query
@@ -78,11 +78,13 @@ export interface DatalogQuery<
   /** Find clause - what variables to return */
   find: Record<TKey, DatalogQueryFindVariable>;
   /** Where clause - the query patterns */
-  where: QueryClause[];
+  where: DatalogQueryWhereClause[];
   /** Optional ordering */
   orderBy?: [variable: DatalogQueryVariable, direction: 'asc' | 'desc'][];
   /** Optional limit */
   limit?: number;
+  /** Optional offset */
+  offset?: number;
   /** Maximum number of results allowed (throws QueryResultSizeError if exceeded) */
   maxResultSize?: number;
   /** Optional context for the query */
