@@ -1,20 +1,20 @@
 /**
- * Internal database view interface for implementation details
+ * Internal datom database view interface for implementation details
  * Used internally by database views and implementations
  * Not part of the public API
  */
 
 import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog-query.js';
 import type {DatomDatabase} from '../datom-database.js';
-import type {DatabaseView, QueryResultEnvelope} from './database-view.js';
+import type {DatomDatabaseView, QueryResultEnvelope} from '../datom-database-view.js';
 import type {ViewConfig} from './view-config.js';
 
 /**
- * Database view that is configured with a view config
- * Used to create database views with specific configurations
+ * Datom database view that is configured with a view config
+ * Used to create datom database views with specific configurations
  * @internal
  */
-export class ConfiguredDatabaseView implements DatabaseView {
+export class ConfiguredDatomDatabaseView implements DatomDatabaseView {
   constructor(
     private db: DatomDatabase,
     private viewConfig: ViewConfig,

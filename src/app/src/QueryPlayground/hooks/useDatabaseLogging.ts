@@ -17,7 +17,7 @@ import type {
   ReadContext,
   WriteContext,
 } from '../../../../datom-database/hook/hook.js';
-import type {QueryResultEnvelope} from '../../../../datom-database/views/database-view.js';
+import type {QueryResultEnvelope} from '../../../../datom-database/datom-database-view.js';
 import type {TransactionId} from '../../../../datoms.js';
 import type {QueryEditorLog} from '../types.js';
 

@@ -6,7 +6,7 @@
 import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog-query.js';
 import type {Datom, TransactionId} from '../../datoms.js';
 import type {Transaction} from '../../types.js';
-import type {DatabaseView, QueryResult} from '../views/database-view.js';
+import type {DatomDatabaseView, QueryResult} from '../datom-database-view.js';
 
 export type Hook_ =
   | {
@@ -43,7 +43,7 @@ export type HookErrorWithName = {
  * Note: This is a generic type that gets resolved when used with DatomDatabase
  */
 export type ReadContext = {
-  db: DatabaseView;
+  db: DatomDatabaseView;
   query: DatalogQuery;
   [key: string]: unknown;
 };
@@ -54,7 +54,7 @@ export type ReadContext = {
  * Note: This is a generic type that gets resolved when used with DatomDatabase
  */
 export type WriteContext = {
-  db: DatabaseView;
+  db: DatomDatabaseView;
   txMeta?: Record<string, unknown>;
   [key: string]: unknown;
 };

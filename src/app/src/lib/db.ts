@@ -4,7 +4,7 @@
 
 import type {DatalogQuery} from '../../../datalog-query';
 import {HttpClientDatomDatabase} from '../../../datom-database/http-client/http-client-datom-database';
-import type {QueryResult} from '../../../datom-database/views/database-view';
+import type {QueryResult} from '../../../datom-database/datom-database-view';
 import {DATOMS_API_ENDPOINT} from '../shared/api';
 import {FetchHttpClient} from './http-client';
 

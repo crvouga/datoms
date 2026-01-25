@@ -1,6 +1,6 @@
-import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog-query.js';
-import type {Attribute, Value} from '../../datoms.js';
-import type {EntityId} from '../../entity-id.js';
+import type {DatalogQuery, DatalogQueryFindVariable} from '../datalog-query.js';
+import type {Attribute, Value} from '../datoms.js';
+import type {EntityId} from '../entity-id.js';
 
 // Maps find clause keys to possible result types
 export type QueryResultFromFind<TFind extends Record<string, DatalogQueryFindVariable>> = Array<{
@@ -21,7 +21,7 @@ export type QueryResultEnvelope<
 };
 
 // Database view interface for querying (read-only)
-export interface DatabaseView {
+export interface DatomDatabaseView {
   query<
     TFind extends Record<string, DatalogQueryFindVariable> = Record<
       string,

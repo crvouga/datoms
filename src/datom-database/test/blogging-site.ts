@@ -4,7 +4,7 @@ import type {DatomDatabase} from '../datom-database.js';
 import type {AfterRead, Hook} from '../hook/hook.js';
 import {HookValidator} from '../hook/validator.js';
 import {datomsQueryToDatalogQuery, queryResultsToDatoms} from '../shared/datoms-query-converter.js';
-import type {QueryResult} from '../views/database-view.js';
+import type {QueryResult} from '../datom-database-view.js';
 
 // Schema constants
 export const USER_TYPE = 'user/type';

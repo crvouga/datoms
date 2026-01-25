@@ -2,12 +2,12 @@ import type {Datom, DatomInput, TransactionId} from '../datoms.js';
 import type {EntityId} from '../entity-id.js';
 import type {Transaction} from '../types.js';
 import type {Hook} from './hook/hook.js';
-import type {DatabaseView} from './views/database-view.js';
+import type {DatomDatabaseView} from './datom-database-view.js';
 
 /**
  * Minimal Datom database API for querying, transacting, and speculative views.
  */
-export interface DatomDatabase extends DatabaseView {
+export interface DatomDatabase extends DatomDatabaseView {
   /** Initialize the database. */
   initialize(): Promise<void>;
   /** Register a database-level hook. */
@@ -19,11 +19,11 @@ export interface DatomDatabase extends DatabaseView {
     context?: Record<string, unknown>,
   ): Promise<TransactionId>;
   /** Read-only view at a transaction id. */
-  asOf(txId: TransactionId): DatabaseView;
+  asOf(txId: TransactionId): DatomDatabaseView;
   /** Read-only view of the full history. */
-  history(): DatabaseView;
+  history(): DatomDatabaseView;
   /** Read-only view of changes since a transaction id. */
-  since(txId: TransactionId): DatabaseView;
+  since(txId: TransactionId): DatomDatabaseView;
   /** Preview the effect of a transaction without committing it. */
   with(ops: DatomInput[]): Promise<WithResult>;
   /** Get the latest transaction data. */
@@ -33,8 +33,8 @@ export interface DatomDatabase extends DatabaseView {
 
 /** Result of a speculative transaction with .with() */
 export interface WithResult {
-  dbBefore: DatabaseView;
-  dbAfter: DatabaseView;
+  dbBefore: DatomDatabaseView;
+  dbAfter: DatomDatabaseView;
   txData: Datom[];
   tempIds: Record<string, EntityId>;
 }

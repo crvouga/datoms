@@ -7,7 +7,7 @@
 import type {DatalogQuery} from '../../datalog-query.js';
 import type {Datom, DatomInput, TransactionId} from '../../datoms.js';
 import type {Hook} from '../hook/hook.js';
-import type {QueryResult} from '../views/database-view.js';
+import type {QueryResult} from '../datom-database-view.js';
 import type {ViewConfig} from '../views/view-config.js';
 
 // Request types

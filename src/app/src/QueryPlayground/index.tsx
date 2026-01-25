@@ -4,7 +4,7 @@ import Editor from '@monaco-editor/react';
 import {db} from '../lib/db';
 import {ResizablePanels} from './ui/ResizablePanels';
 import type {DatalogQuery} from '../../../datalog-query';
-import type {QueryResultEnvelope} from '../../../datom-database/views/database-view';
+import type {QueryResultEnvelope} from '../../../datom-database/datom-database-view';
 
 // Monaco Editor theme configuration
 const MONACO_THEME: 'vs' | 'vs-dark' | 'hc-black' | 'hc-light' = 'hc-black';

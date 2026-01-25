@@ -21,8 +21,8 @@ import {
   type WriteContext,
   type WriteResult,
 } from '../hook/hook.js';
-import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
-import type {DatabaseView, QueryResult, QueryResultEnvelope} from '../views/database-view.js';
+import {ConfiguredDatomDatabaseView} from '../views/configured-datom-database-view.js';
+import type {DatomDatabaseView, QueryResult, QueryResultEnvelope} from '../datom-database-view.js';
 import type {ViewConfig} from '../views/view-config.js';
 import type {
   DeleteDatomsResponse,
@@ -195,16 +195,16 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     }
   }
 
-  asOf(txId: TransactionId): DatabaseView {
-    return new ConfiguredDatabaseView(this, {type: 'asOf', txId});
+  asOf(txId: TransactionId): DatomDatabaseView {
+    return new ConfiguredDatomDatabaseView(this, {type: 'asOf', txId});
   }
 
-  history(): DatabaseView {
-    return new ConfiguredDatabaseView(this, {type: 'history'});
+  history(): DatomDatabaseView {
+    return new ConfiguredDatomDatabaseView(this, {type: 'history'});
   }
 
-  since(txId: TransactionId): DatabaseView {
-    return new ConfiguredDatabaseView(this, {type: 'since', txId});
+  since(txId: TransactionId): DatomDatabaseView {
+    return new ConfiguredDatomDatabaseView(this, {type: 'since', txId});
   }
 
   async with(ops: DatomInput[]): Promise<WithResult> {
@@ -230,11 +230,11 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     }
 
     // Create dbBefore view (current state)
-    const dbBefore = new ConfiguredDatabaseView(this, {type: 'current'});
+    const dbBefore = new ConfiguredDatomDatabaseView(this, {type: 'current'});
 
     // Create dbAfter view (speculative state)
     // Server will handle speculative query execution
-    const dbAfter = new ConfiguredDatabaseView(this, {
+    const dbAfter = new ConfiguredDatomDatabaseView(this, {
       type: 'speculative',
       datoms: speculativeDatoms,
     });

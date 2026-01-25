@@ -10,8 +10,8 @@ import type {EntityId} from '../../entity-id.js';
 import type {Transaction} from '../../types.js';
 import type {Hook} from '../hook/hook.js';
 import type {DatomDatabase, WithResult} from '../datom-database.js';
-import type {QueryResultEnvelope} from '../views/database-view.js';
-import type {DatabaseView} from '../views/database-view.js';
+import type {QueryResultEnvelope} from '../datom-database-view.js';
+import type {DatomDatabaseView} from '../datom-database-view.js';
 
 export interface FileSystemDatomDatabaseOptions {
   /** Path to the CSV file for persistence (default: "datoms.csv") */
@@ -99,21 +99,21 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   /**
    * Create an as-of view (delegated to memory database)
    */
-  asOf(txId: TransactionId): DatabaseView {
+  asOf(txId: TransactionId): DatomDatabaseView {
     return this.db.asOf(txId);
   }
 
   /**
    * Create a history view (delegated to memory database)
    */
-  history(): DatabaseView {
+  history(): DatomDatabaseView {
     return this.db.history();
   }
 
   /**
    * Create a since view (delegated to memory database)
    */
-  since(txId: TransactionId): DatabaseView {
+  since(txId: TransactionId): DatomDatabaseView {
     return this.db.since(txId);
   }
 
