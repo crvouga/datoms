@@ -3,12 +3,15 @@
  * Accepts a SqlConnection interface for PostgreSQL-compatible databases
  */
 
-import type {
-  DatalogQuery,
-  DatalogQueryFindVariable,
-  DatalogQueryOrderByClause,
-  DatalogQueryWhereClause,
-  DatalogQueryWhereClauseMatch,
+import {
+  isQueryPattern,
+  isVariable,
+  stripQuestionMark,
+  type DatalogQuery,
+  type DatalogQueryFindVariable,
+  type DatalogQueryOrderByClause,
+  type DatalogQueryWhereClause,
+  type DatalogQueryWhereClauseMatch,
 } from '../../datalog-query.js';
 
 import {
@@ -36,7 +39,6 @@ import {
   type WriteContext,
   type WriteResult,
 } from '../hook/hook.js';
-import {isQueryPattern, isVariable, stripQuestionMark} from '../shared/datalog-helpers.js';
 import {ConfiguredDatomDatabaseView} from '../views/configured-datom-database-view.js';
 import type {DatomDatabaseView, QueryResult, QueryResultEnvelope} from '../datom-database-view.js';
 import type {DatomsQuery} from '../../datoms-query.js';

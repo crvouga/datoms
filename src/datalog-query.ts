@@ -103,3 +103,32 @@ export interface DatalogQuery<
   /** Optional view configuration */
   viewConfig?: ViewConfig;
 }
+
+/**
+ * Check if a value is a variable (starts with ?)
+ * @param value Value to check
+ * @returns True if the value is a Datalog variable
+ */
+export function isVariable(value: unknown): boolean {
+  return typeof value === 'string' && value.startsWith('?');
+}
+
+/**
+ * Type guard to check if a QueryClause is a QueryPattern
+ * @param clause Query clause to check
+ * @returns True if the clause is a QueryPattern
+ */
+export function isQueryPattern(
+  clause: DatalogQueryWhereClause,
+): clause is DatalogQueryWhereClauseMatch {
+  return clause.t === 'match';
+}
+
+/**
+ * Strip the question mark prefix from a variable name
+ * @param key Variable name (e.g., "?x" or "x")
+ * @returns Variable name without the question mark prefix (e.g., "x")
+ */
+export function stripQuestionMark(key: string): string {
+  return key.startsWith('?') ? key.slice(1) : key;
+}

@@ -10,7 +10,7 @@ import type {
 import type {Attribute, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {ViewConfig} from '../views/view-config.js';
-import {isQueryPattern, isVariable, stripQuestionMark} from '../shared/datalog-helpers.js';
+import {isQueryPattern, isVariable, stripQuestionMark} from '../../datalog-query.js';
 import {aggregationToSQL} from './aggregations/helpers.js';
 
 /**
