@@ -56,7 +56,7 @@ describe('datalogToPostgresSQL', () => {
         {t: 'match', e: '?movie/id', a: 'tmdb.movie/title', v: '?title'},
         {t: 'match', e: '?movie/id', a: 'tmdb.movie/popularity', v: '?popularity'},
       ],
-      orderBy: [['?popularity', 'desc']],
+      orderBy: [{t: 'desc', c: '?popularity'}],
       limit: 10,
     };
 
@@ -188,7 +188,7 @@ describe('datalogToPostgresSQL', () => {
     const query: DatalogQuery = {
       find: {x: {t: 'identity', c: '?x'}, name: {t: 'identity', c: '?name'}},
       where: [{t: 'match', e: '?x', a: 'name', v: '?name'}],
-      orderBy: [['?name', 'asc']],
+      orderBy: [{t: 'asc', c: '?name'}],
     };
 
     const result = datalogToPostgresSQL(query);

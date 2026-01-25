@@ -6,17 +6,17 @@
 import type {
   DatalogQuery,
   DatalogQueryFindVariable,
-  DatalogQueryVariable,
+  DatalogQueryOrderByClause,
   DatalogQueryWhereClause,
   DatalogQueryWhereClauseMatch,
 } from '../../datalog-query.js';
 
 import {
-  validateDatoms,
   type Attribute,
   type Datom,
   type DatomInput,
   type TransactionId,
+  validateDatoms,
   type Value,
 } from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
@@ -330,20 +330,20 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Other queries: order by numeric e, then a (handled by SQL CASE expression)
     // Note: The actual SQL ordering with CASE for numeric e is handled in datalog-to-postgres-sql.ts
     // via the CTE structure, but we add explicit ordering here for consistency
-    let orderBy: [DatalogQueryVariable, 'asc' | 'desc'][] | undefined;
+    let orderBy: DatalogQueryOrderByClause[] | undefined;
     if (viewConfig?.type === 'history') {
       orderBy = [
-        ['?tx' as const, 'asc'],
-        ['?e' as const, 'asc'],
-        ['?a' as const, 'asc'],
+        {t: 'asc', c: '?tx' as const},
+        {t: 'asc', c: '?e' as const},
+        {t: 'asc', c: '?a' as const},
       ];
     } else {
       // For other queries, we rely on the CTE's internal ordering
       // The final result ordering is handled by the SQL CASE expression in the CTE
       // But we can add basic ordering here
       orderBy = [
-        ['?e' as const, 'asc'],
-        ['?a' as const, 'asc'],
+        {t: 'asc', c: '?e' as const},
+        {t: 'asc', c: '?a' as const},
       ];
     }
 
@@ -911,7 +911,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       // Apply ordering
       if (modifiedQuery.orderBy) {
         projected.sort((a, b) => {
-          for (const [variable, direction] of modifiedQuery.orderBy ?? []) {
+          for (const orderBy of modifiedQuery.orderBy ?? []) {
+            const {c: variable, t: direction} = orderBy;
             const key = stripQuestionMark(variable);
             const aVal = a[key];
             const bVal = b[key];
@@ -958,7 +959,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Apply ordering if specified (SQL may not handle all cases)
     if (modifiedQuery.orderBy && finalResult.length > 0) {
       finalResult.sort((a, b) => {
-        for (const [variable, direction] of modifiedQuery.orderBy ?? []) {
+        for (const orderBy of modifiedQuery.orderBy ?? []) {
+          const {c: variable, t: direction} = orderBy;
           const outputKey =
             Object.keys(modifiedQuery.find).find(key => {
               const expr = modifiedQuery.find[key];

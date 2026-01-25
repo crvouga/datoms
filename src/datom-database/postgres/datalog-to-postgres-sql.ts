@@ -268,7 +268,8 @@ function _buildOrderByClause(query: DatalogQuery, variableToColumn: Map<string, 
   }
 
   const orderParts: string[] = [];
-  for (const [variable, direction] of query.orderBy) {
+  for (const orderBy of query.orderBy) {
+    const {c: variable, t: direction} = orderBy;
     const columnRef = variableToColumn.get(variable);
     if (columnRef) {
       const dir = direction.toUpperCase();

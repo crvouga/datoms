@@ -44,7 +44,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
           {t: 'match', e: '?id', a: 'tmdb.movie/title', v: '?title'},
           {t: 'match', e: '?id', a: 'tmdb.movie/popularity', v: '?popularity'},
         ],
-        orderBy: [['?popularity', 'desc']],
+        orderBy: [{t: 'desc', c: '?popularity'}],
         limit: limit,
       });
 
@@ -67,7 +67,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
           'movie/title': {t: 'identity', c: '?title'},
         },
         where: [{t: 'match', e: '?id', a: 'tmdb.movie/title', v: '?title'}],
-        orderBy: [['?title', 'asc']],
+        orderBy: [{t: 'asc', c: '?title'}],
         limit: limit,
       });
 
@@ -101,7 +101,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
           {t: 'match', e: '?id', a: 'tmdb.movie/vote_average', v: '?vote_average'},
           {t: 'match', e: '?id', a: 'tmdb.movie/vote_count', v: '?vote_count'},
         ],
-        orderBy: [['?vote_average', 'desc']],
+        orderBy: [{t: 'desc', c: '?vote_average'}],
         limit: limit,
       });
 
@@ -139,7 +139,7 @@ describe.each(FIXTURES)('Movie DB (%s)', (_name, createFixture) => {
           {t: 'match', e: '?id', a: 'tmdb.movie/vote_count', v: '?vote_count'},
           {t: 'match', e: '?id', a: 'tmdb.movie/vote_average', v: '?vote_average'},
         ],
-        orderBy: [['?vote_count', 'desc']],
+        orderBy: [{t: 'desc', c: '?vote_count'}],
         limit: limit,
       });
       expect(results).toBeDefined();

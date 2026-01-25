@@ -72,7 +72,13 @@ export type DatalogQueryWhereClauseNot = {
  */
 export type DatalogQueryWhereClause =
   | DatalogQueryWhereClauseMatch
-  | DatalogQueryWhereClausePredicate;
+  | DatalogQueryWhereClausePredicate
+  | DatalogQueryWhereClauseOr
+  | DatalogQueryWhereClauseNot;
+
+export type DatalogQueryOrderByClause =
+  | {t: 'asc'; c: DatalogQueryVariable}
+  | {t: 'desc'; c: DatalogQueryVariable};
 
 /**
  * A parsed datalog query
@@ -85,7 +91,7 @@ export interface DatalogQuery<
   /** Where clause - the query patterns */
   where: DatalogQueryWhereClause[];
   /** Optional ordering */
-  orderBy?: [variable: DatalogQueryVariable, direction: 'asc' | 'desc'][];
+  orderBy?: DatalogQueryOrderByClause[];
   /** Optional limit */
   limit?: number;
   /** Optional offset */
