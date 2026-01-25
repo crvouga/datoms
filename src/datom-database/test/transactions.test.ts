@@ -136,7 +136,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Query dbAfter should see speculative change
       const {data: results} = await withResult.dbAfter.query({
         find: {x: {t: 'identity', c: '?x'}},
-        where: [{e: '?x', a: 'name', v: '?y'}],
+        where: [{t: 'match', e: '?x', a: 'name', v: '?n'}],
       });
 
       expect(results).toHaveLength(3);
@@ -215,7 +215,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: nameResults} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'name', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
       });
       expect(nameResults[0]?.v).toBe('Alice');
 
@@ -223,7 +223,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const withResult = await db.with([{op: true, e: 1, a: 'age', v: 30}]);
       const {data: ageResults} = await withResult.dbAfter.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'age', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'age', v: '?v'}],
       });
       expect(ageResults[0]?.v).toBe(30);
     });
@@ -292,8 +292,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await withResult.dbAfter.query({
         find: {name: {t: 'identity', c: '?name'}},
         where: [
-          {e: '?e', a: 'name', v: '?name'},
-          {e: '?e', a: 'department', v: 'Engineering'},
+          {t: 'match', e: '?e', a: 'name', v: '?name'},
+          {t: 'match', e: '?e', a: 'department', v: 'Engineering'},
         ],
       });
       expect(results).toHaveLength(2);

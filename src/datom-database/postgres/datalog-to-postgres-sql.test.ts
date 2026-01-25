@@ -18,7 +18,7 @@ describe('datalogToPostgresSQL', () => {
   test('simple single pattern query', () => {
     const query: DatalogQuery = {
       find: {x: {t: 'identity', c: '?x'}, y: {t: 'identity', c: '?y'}},
-      where: [{e: '?x', a: 'name', v: '?y'}],
+      where: [{t: 'match', e: '?x', a: 'name', v: '?y'}],
     };
 
     const result = datalogToPostgresSQL(query);
@@ -52,9 +52,9 @@ describe('datalogToPostgresSQL', () => {
         'movie/popularity': {t: 'identity', c: '?popularity'},
       },
       where: [
-        {e: '?movie/id', a: 'tmdb.movie/id', v: '?movie/id'},
-        {e: '?movie/id', a: 'tmdb.movie/title', v: '?title'},
-        {e: '?movie/id', a: 'tmdb.movie/popularity', v: '?popularity'},
+        {t: 'match', e: '?movie/id', a: 'tmdb.movie/id', v: '?movie/id'},
+        {t: 'match', e: '?movie/id', a: 'tmdb.movie/title', v: '?title'},
+        {t: 'match', e: '?movie/id', a: 'tmdb.movie/popularity', v: '?popularity'},
       ],
       orderBy: [['?popularity', 'desc']],
       limit: 10,
@@ -130,7 +130,7 @@ describe('datalogToPostgresSQL', () => {
   test('query with constant values', () => {
     const query: DatalogQuery = {
       find: {name: {t: 'identity', c: '?name'}},
-      where: [{e: 1, a: 'name', v: '?name'}],
+      where: [{t: 'match', e: 1, a: 'name', v: '?name'}],
     };
 
     const result = datalogToPostgresSQL(query);
@@ -174,7 +174,7 @@ describe('datalogToPostgresSQL', () => {
   test('query with LIMIT clause', () => {
     const query: DatalogQuery = {
       find: {x: {t: 'identity', c: '?x'}},
-      where: [{e: '?x', a: 'name', v: '?y'}],
+      where: [{t: 'match', e: '?x', a: 'name', v: '?y'}],
       limit: 10,
     };
 
@@ -187,7 +187,7 @@ describe('datalogToPostgresSQL', () => {
   test('query with ORDER BY clause', () => {
     const query: DatalogQuery = {
       find: {x: {t: 'identity', c: '?x'}, name: {t: 'identity', c: '?name'}},
-      where: [{e: '?x', a: 'name', v: '?name'}],
+      where: [{t: 'match', e: '?x', a: 'name', v: '?name'}],
       orderBy: [['?name', 'asc']],
     };
 
@@ -200,7 +200,7 @@ describe('datalogToPostgresSQL', () => {
   test('query with empty find clause returns all variables', () => {
     const query: DatalogQuery = {
       find: {},
-      where: [{e: '?x', a: 'name', v: '?y'}],
+      where: [{t: 'match', e: '?x', a: 'name', v: '?y'}],
     };
 
     const result = datalogToPostgresSQL(query);
@@ -214,7 +214,7 @@ describe('datalogToPostgresSQL', () => {
     // TODO: Aggregation support needs investigation - currently not generating COUNT in SELECT
     const query: DatalogQuery = {
       find: {total: {t: 'count', c: '?age'}},
-      where: [{e: '?e', a: 'age', v: '?age'}],
+      where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
     };
 
     const result = datalogToPostgresSQL(query);
@@ -237,7 +237,7 @@ describe('datalogToPostgresSQL', () => {
   test('query with custom table name', () => {
     const query: DatalogQuery = {
       find: {x: {t: 'identity', c: '?x'}},
-      where: [{e: '?x', a: 'name', v: '?y'}],
+      where: [{t: 'match', e: '?x', a: 'name', v: '?y'}],
     };
 
     const result = datalogToPostgresSQL(query, 'custom_table');
@@ -248,7 +248,7 @@ describe('datalogToPostgresSQL', () => {
   test('query with asOf view config', () => {
     const query: DatalogQuery = {
       find: {x: {t: 'identity', c: '?x'}},
-      where: [{e: '?x', a: 'name', v: '?y'}],
+      where: [{t: 'match', e: '?x', a: 'name', v: '?y'}],
     };
 
     const viewConfig = {type: 'asOf' as const, txId: 100};
@@ -264,7 +264,7 @@ describe('datalogToPostgresSQL', () => {
   test('query with history view config', () => {
     const query: DatalogQuery = {
       find: {x: {t: 'identity', c: '?x'}, op: {t: 'identity', c: '?op'}},
-      where: [{e: '?x', a: 'name', v: '?y'}],
+      where: [{t: 'match', e: '?x', a: 'name', v: '?y'}],
     };
 
     const viewConfig = {type: 'history' as const};

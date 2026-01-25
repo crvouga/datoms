@@ -27,7 +27,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {sample: {t: 'sample', c: '?value', count: 2}},
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -49,7 +49,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       const query: DatalogQuery = {
         find: {sample: {t: 'sample', c: '?value', count: 1}},
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -67,7 +67,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {sample: {t: 'sample', c: '?value', count: 1}},
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -87,7 +87,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {sample: {t: 'sample', c: '?value', count: 5}},
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -110,7 +110,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {sample: {t: 'sample', c: '?value', count: 3}},
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -133,7 +133,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {sample: {t: 'sample', c: '?name', count: 2}},
-        where: [{e: '?e', a: 'name', v: '?name'}],
+        where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
       const {data: results} = await db.query(query);
@@ -160,8 +160,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query: DatalogQuery = {
         find: {sample: {t: 'sample', c: '?price', count: 2}},
         where: [
-          {e: '?e', a: 'type', v: 'product'},
-          {e: '?e', a: 'price', v: '?price'},
+          {t: 'match', e: '?e', a: 'type', v: 'product'},
+          {t: 'match', e: '?e', a: 'price', v: '?price'},
         ],
       };
 

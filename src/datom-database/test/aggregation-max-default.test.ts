@@ -27,7 +27,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query({
         find: {maximum: {t: 'max', c: '?age', count: 1}},
-        where: [{e: '?e', a: 'age', v: '?age'}],
+        where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
       });
       expect(results).toHaveLength(1);
       expect(results[0]?.maximum).toBe(30);
@@ -37,7 +37,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       const query: DatalogQuery = {
         find: {maximum: {t: 'max', c: '?age', count: 0}},
-        where: [{e: '?e', a: 'age', v: '?age'}],
+        where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
       };
 
       const {data: results} = await db.query(query);
@@ -52,7 +52,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {maximum: {t: 'max', c: '?price', count: 0}},
-        where: [{e: '?e', a: 'price', v: '?price'}],
+        where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       };
 
       const {data: results} = await db.query(query);
@@ -69,7 +69,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {maximum: {t: 'max', c: '?value', count: 100}},
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -87,8 +87,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query: DatalogQuery = {
         find: {maximum: {t: 'max', c: '?price', count: 0}},
         where: [
-          {e: '?e', a: 'type', v: 'service'},
-          {e: '?e', a: 'price', v: '?price'},
+          {t: 'match', e: '?e', a: 'type', v: 'service'},
+          {t: 'match', e: '?e', a: 'price', v: '?price'},
         ],
       };
 
@@ -107,7 +107,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {maximum: {t: 'max', c: '?name', count: 1}},
-        where: [{e: '?e', a: 'name', v: '?name'}],
+        where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
       const {data: results} = await db.query(query);
@@ -124,7 +124,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {maximum: {t: 'max', c: '?value', count: 1}},
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);

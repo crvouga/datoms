@@ -38,9 +38,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query({
         find: {from: {t: 'identity', c: '?from'}, to: {t: 'identity', c: '?to'}},
         where: [
-          {e: '?f', a: 'from', v: '?from'},
-          {e: '?f', a: 'to', v: '?to'},
-          {e: '?f', a: 'type', v: 'friendship'},
+          {t: 'match', e: '?f', a: 'from', v: '?from'},
+          {t: 'match', e: '?f', a: 'to', v: '?to'},
+          {t: 'match', e: '?f', a: 'type', v: 'friendship'},
         ],
       });
 
@@ -71,10 +71,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query: DatalogQuery = {
         find: {friendOfFriend: {t: 'identity', c: '?friendOfFriend'}},
         where: [
-          {e: '?f1', a: 'from', v: 1},
-          {e: '?f1', a: 'to', v: '?friend'},
-          {e: '?f2', a: 'from', v: '?friend'},
-          {e: '?f2', a: 'to', v: '?friendOfFriend'},
+          {t: 'match', e: '?f1', a: 'from', v: 1},
+          {t: 'match', e: '?f1', a: 'to', v: '?friend'},
+          {t: 'match', e: '?f2', a: 'from', v: '?friend'},
+          {t: 'match', e: '?f2', a: 'to', v: '?friendOfFriend'},
         ],
       };
 
@@ -106,9 +106,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           childName: {t: 'identity', c: '?childName'},
         },
         where: [
-          {e: '?parent', a: 'name', v: '?parentName'},
-          {e: '?parent', a: 'child', v: '?child'},
-          {e: '?child', a: 'name', v: '?childName'},
+          {t: 'match', e: '?parent', a: 'name', v: '?parentName'},
+          {t: 'match', e: '?parent', a: 'child', v: '?child'},
+          {t: 'match', e: '?child', a: 'name', v: '?childName'},
         ],
       };
 
@@ -145,10 +145,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           courseTitle: {t: 'identity', c: '?courseTitle'},
         },
         where: [
-          {e: '?enrollment', a: 'student', v: '?student'},
-          {e: '?enrollment', a: 'course', v: '?course'},
-          {e: '?student', a: 'name', v: '?studentName'},
-          {e: '?course', a: 'title', v: '?courseTitle'},
+          {t: 'match', e: '?enrollment', a: 'student', v: '?student'},
+          {t: 'match', e: '?enrollment', a: 'course', v: '?course'},
+          {t: 'match', e: '?student', a: 'name', v: '?studentName'},
+          {t: 'match', e: '?course', a: 'title', v: '?courseTitle'},
         ],
       });
       expect(results).toHaveLength(3);
@@ -169,7 +169,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {e: {t: 'identity', c: '?e'}, tag: {t: 'identity', c: '?tag'}},
-        where: [{e: '?e', a: 'tag', v: '?tag'}],
+        where: [{t: 'match', e: '?e', a: 'tag', v: '?tag'}],
       };
 
       const {data: results} = await db.query(query);

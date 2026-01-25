@@ -26,7 +26,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {x: {t: 'identity', c: '?x'}},
-        where: [{e: '?x', a: 'name', v: '?y'}],
+        where: [{t: 'match', e: '?x', a: 'name', v: '?y'}],
       };
 
       expect(query.find.x).toEqual({t: 'identity', c: '?x'});
@@ -60,7 +60,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {x: {t: 'identity', c: '?x'}},
-        where: [{e: '?x', a: 'type', v: 'person'}],
+        where: [{t: 'match', e: '?x', a: 'type', v: 'person'}],
       };
 
       const {data: results} = await db.query(query);
@@ -76,7 +76,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {x: {t: 'identity', c: '?x'}},
-        where: [{e: '?x', a: 'name', v: '?y'}],
+        where: [{t: 'match', e: '?x', a: 'name', v: '?y'}],
       };
 
       const {data: results} = await db.query(query);
@@ -94,7 +94,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {x: {t: 'identity', c: '?x'}, missing: {t: 'identity', c: '?missing'}},
-        where: [{e: '?x', a: 'name', v: '?y'}],
+        where: [{t: 'match', e: '?x', a: 'name', v: '?y'}],
       };
 
       const {data: results} = await db.query(query);

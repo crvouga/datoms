@@ -35,8 +35,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           count: {t: 'count', c: '?e'},
         },
         where: [
-          {e: '?e', a: 'name', v: '?name'},
-          {e: '?e', a: 'price', v: '?price'},
+          {t: 'match', e: '?e', a: 'name', v: '?name'},
+          {t: 'match', e: '?e', a: 'price', v: '?price'},
         ],
       };
 
@@ -66,8 +66,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           customerCount: {t: 'count-distinct', c: '?customer'},
         },
         where: [
-          {e: '?order', a: 'customer', v: '?customer'},
-          {e: '?customer', a: 'name', v: '?customerName'},
+          {t: 'match', e: '?order', a: 'customer', v: '?customer'},
+          {t: 'match', e: '?customer', a: 'name', v: '?customerName'},
         ],
       };
 
@@ -98,9 +98,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           maxPrice: {t: 'max', c: '?price', count: 1},
         },
         where: [
-          {e: '?e', a: 'type', v: 'product'},
-          {e: '?e', a: 'category', v: 'electronics'},
-          {e: '?e', a: 'price', v: '?price'},
+          {t: 'match', e: '?e', a: 'type', v: 'product'},
+          {t: 'match', e: '?e', a: 'category', v: 'electronics'},
+          {t: 'match', e: '?e', a: 'price', v: '?price'},
         ],
       };
 
@@ -131,9 +131,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           childAvg: {t: 'avg', c: '?childValue'},
         },
         where: [
-          {e: '?parent', a: 'name', v: 'Parent'},
-          {e: '?child', a: 'parent', v: '?parent'},
-          {e: '?child', a: 'value', v: '?childValue'},
+          {t: 'match', e: '?parent', a: 'name', v: 'Parent'},
+          {t: 'match', e: '?child', a: 'parent', v: '?parent'},
+          {t: 'match', e: '?child', a: 'value', v: '?childValue'},
         ],
       };
 
@@ -157,9 +157,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           count: {t: 'count', c: '?e'},
         },
         where: [
-          {e: '?e', a: 'name', v: '?name'},
-          {e: '?e', a: 'price', v: '?price'},
-          {e: '?e', a: 'category', v: 'electronics'}, // No matching category
+          {t: 'match', e: '?e', a: 'name', v: '?name'},
+          {t: 'match', e: '?e', a: 'price', v: '?price'},
+          {t: 'match', e: '?e', a: 'category', v: 'electronics'}, // No matching category
         ],
       };
 

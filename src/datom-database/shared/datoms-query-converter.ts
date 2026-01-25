@@ -7,7 +7,7 @@ import type {
   DatalogQuery,
   DatalogQueryFindVariable,
   DatalogQueryWhereClause,
-  DatalogQueryWherePattern,
+  DatalogQueryWhereClauseMatch,
 } from '../../datalog-query.js';
 import type {Attribute, Datom, TransactionId, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
@@ -24,7 +24,8 @@ export function datomsQueryToDatalogQuery(options: DatomsQuery): DatalogQuery {
   const where: DatalogQueryWhereClause[] = [];
 
   // Build the main query pattern
-  const pattern: DatalogQueryWherePattern = {
+  const pattern: DatalogQueryWhereClauseMatch = {
+    t: 'match',
     e: options.e !== undefined ? options.e : '?e',
     a: options.a !== undefined ? options.a : '?a',
     v: options.v !== undefined ? options.v : '?v',

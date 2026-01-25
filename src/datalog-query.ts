@@ -1,5 +1,5 @@
 /**
- * Datalog query interface and parser
+ * Datalog query
  */
 
 import type {ViewConfig} from './datom-database/views/view-config.js';
@@ -26,7 +26,8 @@ export type DatalogQueryFindVariable =
 /**
  * Basic query pattern
  */
-export type DatalogQueryWherePattern = {
+export type DatalogQueryWhereClauseMatch = {
+  t: 'match';
   e: DatalogQueryVariable | EntityId | '_';
   a: DatalogQueryVariable | Attribute | '_';
   v?: DatalogQueryVariable | Value | '_';
@@ -36,38 +37,42 @@ export type DatalogQueryWherePattern = {
 /**
  * Predicate expression (as tuples)
  */
-export type QueryPredicate =
+export type DatalogQueryWhereClausePredicate =
   | {t: '>'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
   | {t: '>='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
   | {t: '<'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
   | {t: '='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
   | {t: '!='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
   | {t: '>='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
-  | {t: '<='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number};
-// | {t: 'ground', left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
-// | {t: 'get-else', left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
-// | {t: 'missing?', left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
-// | {t: 'tuple', left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
-// | {t: 'untuple', left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: '<='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: 'ground'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: 'get-else'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: 'missing?'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: 'tuple'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: 'untuple'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number};
 
 /**
  * Or clause
  */
-export type QueryOr = {
-  or: DatalogQueryWhereClause[];
+export type DatalogQueryWhereClauseOr = {
+  t: 'or';
+  clauses: DatalogQueryWhereClause[];
 };
 
 /**
  * Not clause
  */
-export type QueryNot = {
-  not: DatalogQueryWhereClause[];
+export type DatalogQueryWhereClauseNot = {
+  t: 'not';
+  clauses: DatalogQueryWhereClause[];
 };
 
 /**
  * All possible query clauses
  */
-export type DatalogQueryWhereClause = DatalogQueryWherePattern | QueryOr | QueryNot;
+export type DatalogQueryWhereClause =
+  | DatalogQueryWhereClauseMatch
+  | DatalogQueryWhereClausePredicate;
 
 /**
  * A parsed datalog query
@@ -91,10 +96,4 @@ export interface DatalogQuery<
   context?: Record<string, unknown>;
   /** Optional view configuration */
   viewConfig?: ViewConfig;
-}
-
-export function datalog<TKey extends keyof Record<string, DatalogQueryFindVariable> = string>(
-  query: DatalogQuery<TKey>,
-): DatalogQuery<TKey> {
-  return query;
 }

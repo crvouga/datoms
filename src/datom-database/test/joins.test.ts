@@ -29,8 +29,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query: DatalogQuery = {
         find: {x: {t: 'identity', c: '?x'}, a: {t: 'identity', c: '?a'}},
         where: [
-          {e: '?x', a: 'name', v: '?n'},
-          {e: '?x', a: 'age', v: '?a'},
+          {t: 'match', e: '?x', a: 'name', v: '?n'},
+          {t: 'match', e: '?x', a: 'age', v: '?a'},
         ],
       };
 
@@ -71,10 +71,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           budget: {t: 'identity', c: '?budget'},
         },
         where: [
-          {e: '?emp', a: 'role', v: 'engineer'},
-          {e: '?emp', a: 'department', v: '?dept'},
-          {e: '?dept', a: 'name', v: 'Engineering'},
-          {e: '?dept', a: 'budget', v: '?budget'},
+          {t: 'match', e: '?emp', a: 'role', v: 'engineer'},
+          {t: 'match', e: '?emp', a: 'department', v: '?dept'},
+          {t: 'match', e: '?dept', a: 'name', v: 'Engineering'},
+          {t: 'match', e: '?dept', a: 'budget', v: '?budget'},
         ],
       };
 
@@ -105,9 +105,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query({
         find: {name: {t: 'identity', c: '?name'}},
         where: [
-          {e: '?e', a: 'age', v: 30},
-          {e: '?e', a: 'city', v: 'NYC'},
-          {e: '?e', a: 'name', v: '?name'},
+          {t: 'match', e: '?e', a: 'age', v: 30},
+          {t: 'match', e: '?e', a: 'city', v: 'NYC'},
+          {t: 'match', e: '?e', a: 'name', v: '?name'},
         ],
       });
       expect(results).toHaveLength(1);
@@ -137,8 +137,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           c: {t: 'identity', c: '?c'},
         },
         where: [
-          {e: '?a', a: 'connects', v: '?b'},
-          {e: '?b', a: 'connects', v: '?c'},
+          {t: 'match', e: '?a', a: 'connects', v: '?b'},
+          {t: 'match', e: '?b', a: 'connects', v: '?c'},
         ],
       };
 
@@ -160,8 +160,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query: DatalogQuery = {
         find: {name: {t: 'identity', c: '?name'}, age: {t: 'identity', c: '?age'}},
         where: [
-          {e: '?e', a: 'name', v: '?name'},
-          {e: '?e', a: 'age', v: '?age'},
+          {t: 'match', e: '?e', a: 'name', v: '?name'},
+          {t: 'match', e: '?e', a: 'age', v: '?age'},
         ],
       };
 
@@ -187,8 +187,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query: DatalogQuery = {
         find: {e: {t: 'identity', c: '?e'}},
         where: [
-          {e: '?e', a: 'name', v: 'Alice'},
-          {e: '?e', a: 'age', v: 25},
+          {t: 'match', e: '?e', a: 'name', v: 'Alice'},
+          {t: 'match', e: '?e', a: 'age', v: 25},
         ],
       };
 
@@ -215,9 +215,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           city: {t: 'identity', c: '?city'},
         },
         where: [
-          {e: '?e', a: 'name', v: '?name'},
-          {e: '?e', a: 'age', v: '?age'},
-          {e: '?e', a: 'city', v: '?city'},
+          {t: 'match', e: '?e', a: 'name', v: '?name'},
+          {t: 'match', e: '?e', a: 'age', v: '?age'},
+          {t: 'match', e: '?e', a: 'city', v: '?city'},
         ],
       };
 
@@ -246,9 +246,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query: DatalogQuery = {
         find: {name: {t: 'identity', c: '?name'}, dept: {t: 'identity', c: '?dept'}},
         where: [
-          {e: '?e', a: 'name', v: '?name'},
-          {e: '?j', a: 'employee', v: '?e'},
-          {e: '?j', a: 'department', v: '?dept'},
+          {t: 'match', e: '?e', a: 'name', v: '?name'},
+          {t: 'match', e: '?j', a: 'employee', v: '?e'},
+          {t: 'match', e: '?j', a: 'department', v: '?dept'},
         ],
       };
 

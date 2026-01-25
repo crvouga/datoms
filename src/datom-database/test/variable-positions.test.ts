@@ -27,7 +27,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
-        where: [{e: '?e', a: 'name', v: '?v'}],
+        where: [{t: 'match', e: '?e', a: 'name', v: '?v'}],
       };
 
       const {data: results} = await db.query(query);
@@ -49,7 +49,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {attr: {t: 'identity', c: '?attr'}, v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: '?attr', v: '?v'}],
+        where: [{t: 'match', e: 1, a: '?attr', v: '?v'}],
       };
 
       const {data: results} = await db.query(query);
@@ -75,7 +75,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           attr: {t: 'identity', c: '?attr'},
           v: {t: 'identity', c: '?v'},
         },
-        where: [{e: '?e', a: '?attr', v: '?v'}],
+        where: [{t: 'match', e: '?e', a: '?attr', v: '?v'}],
         limit: 100, // Required for all-variable queries to pass safety check
       };
 
@@ -103,8 +103,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, n: {t: 'identity', c: '?n'}},
         where: [
-          {e: '?e', a: 'name', v: '?n'},
-          {e: '?e', a: 'age', v: '?a'},
+          {t: 'match', e: '?e', a: 'name', v: '?n'},
+          {t: 'match', e: '?e', a: 'age', v: '?a'},
         ],
       });
       expect(results).toEqual([{e: 'user-1', n: 'Alice'}]);

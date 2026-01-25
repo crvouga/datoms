@@ -18,7 +18,7 @@ export class TransactionDb {
     // Step 1: Find the maximum transaction ID
     const maxTxResult = await this.db.query({
       find: {maxTx: {t: 'max', c: '?tx', count: 1}},
-      where: [{e: '?e', a: '?a', v: '?v', tx: '?tx'}],
+      where: [{t: 'match', e: '?e', a: '?a', v: '?v', tx: '?tx'}],
     });
 
     const maxTxId = maxTxResult.data[0]?.maxTx as TransactionId | undefined;
@@ -39,8 +39,8 @@ export class TransactionDb {
         op: {t: 'identity', c: '?op'},
       },
       where: [
-        {e: '?e', a: '?a', v: '?v', tx: '?tx'},
-        ['=', '?tx', maxTxId] as unknown as DatalogQueryWhereClause,
+        {t: 'match', e: '?e', a: '?a', v: '?v', tx: '?tx'},
+        {t: '=', left: '?tx', right: maxTxId},
       ],
     });
 

@@ -314,7 +314,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
           tx: {t: 'identity', c: '?tx'},
           op: {t: 'identity', c: '?op'},
         },
-        where: [{e: '?e', a: '?a', v: '?v'}],
+        where: [{t: 'match', e: '?e', a: '?a', v: '?v'}],
         limit: 1_000_000,
       };
       const {data: results} = await this.db.query(query);

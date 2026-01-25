@@ -8,6 +8,7 @@ import type {
   DatalogQueryFindVariable,
   DatalogQueryVariable,
   DatalogQueryWhereClause,
+  DatalogQueryWhereClauseMatch,
 } from '../../datalog-query.js';
 
 import {
@@ -269,7 +270,8 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     }
 
     // Build QueryPattern based on provided filters
-    const pattern: DatalogQueryWhereClause = {
+    const pattern: DatalogQueryWhereClauseMatch = {
+      t: 'match',
       e: options.e !== undefined ? options.e : '?e',
       a: options.a !== undefined ? options.a : '?a',
       v: options.v !== undefined ? options.v : '?v',

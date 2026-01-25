@@ -33,7 +33,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           min: {t: 'min', c: '?value', count: 1},
           count: {t: 'count', c: '?value'},
         },
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -59,7 +59,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           max: {t: 'max', c: '?value', count: 1},
           min: {t: 'min', c: '?value', count: 1},
         },
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -84,7 +84,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           avg: {t: 'avg', c: '?value'},
           max: {t: 'max', c: '?value', count: 1},
         },
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -109,7 +109,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           max: {t: 'max', c: '?value', count: 1},
           min: {t: 'min', c: '?value', count: 1},
         },
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -136,7 +136,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           count: {t: 'count', c: '?item'},
           distinct: {t: 'count-distinct', c: '?item'},
         },
-        where: [{e: '?e', a: 'item', v: '?item'}],
+        where: [{t: 'match', e: '?e', a: 'item', v: '?item'}],
       };
 
       const {data: results} = await db.query(query);
@@ -163,7 +163,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           max: {t: 'max', c: '?score', count: 1},
           count: {t: 'count', c: '?score'},
         },
-        where: [{e: '?e', a: 'score', v: '?score'}],
+        where: [{t: 'match', e: '?e', a: 'score', v: '?score'}],
       };
 
       const {data: results} = await db.query(query);
@@ -187,7 +187,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           variance: {t: 'variance', c: '?value'},
           stddev: {t: 'stddev', c: '?value'},
         },
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -208,7 +208,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         find: {
           median: {t: 'median', c: '?value'},
         },
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);
@@ -239,7 +239,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           min: {t: 'min', c: '?price', count: 1},
           count: {t: 'count', c: '?price'},
         },
-        where: [{e: '?e', a: 'price', v: '?price'}],
+        where: [{t: 'match', e: '?e', a: 'price', v: '?price'}],
       };
 
       const {data: results} = await db.query(query);

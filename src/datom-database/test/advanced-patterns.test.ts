@@ -30,7 +30,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {name: {t: 'identity', c: '?name'}},
-        where: [{e: '?e', a: 'name', v: '?name'}],
+        where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
       const {data: results} = await db.query(query);
@@ -66,7 +66,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Or test that we can query connections and verify self-connections exist
       const simpleQuery: DatalogQuery = {
         find: {from: {t: 'identity', c: '?from'}, to: {t: 'identity', c: '?to'}},
-        where: [{e: '?from', a: 'connects', v: '?to'}],
+        where: [{t: 'match', e: '?from', a: 'connects', v: '?to'}],
       };
 
       const {data: allResults} = await db.query(simpleQuery);
@@ -89,7 +89,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Find all next relationships
       const query: DatalogQuery = {
         find: {from: {t: 'identity', c: '?from'}, to: {t: 'identity', c: '?to'}},
-        where: [{e: '?from', a: 'next', v: '?to'}],
+        where: [{t: 'match', e: '?from', a: 'next', v: '?to'}],
       };
 
       const {data: results} = await db.query(query);
@@ -117,9 +117,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query: DatalogQuery = {
         find: {name: {t: 'identity', c: '?name'}, dept: {t: 'identity', c: '?dept'}},
         where: [
-          {e: '?e', a: 'name', v: '?name'},
-          {e: '?j', a: 'employee', v: '?e'},
-          {e: '?j', a: 'department', v: '?dept'},
+          {t: 'match', e: '?e', a: 'name', v: '?name'},
+          {t: 'match', e: '?j', a: 'employee', v: '?e'},
+          {t: 'match', e: '?j', a: 'department', v: '?dept'},
         ],
       };
 

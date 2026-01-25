@@ -27,7 +27,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {total: {t: 'count-distinct', c: '?name'}},
-        where: [{e: '?e', a: 'name', v: '?name'}],
+        where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
       const {data: results} = await db.query(query);
@@ -39,7 +39,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       const query: DatalogQuery = {
         find: {total: {t: 'count-distinct', c: '?name'}},
-        where: [{e: '?e', a: 'name', v: '?name'}],
+        where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
       const {data: results} = await db.query(query);
@@ -53,7 +53,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {total: {t: 'count-distinct', c: '?name'}},
-        where: [{e: '?e', a: 'name', v: '?name'}],
+        where: [{t: 'match', e: '?e', a: 'name', v: '?name'}],
       };
 
       const {data: results} = await db.query(query);
@@ -73,7 +73,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {total: {t: 'count-distinct', c: '?age'}},
-        where: [{e: '?e', a: 'age', v: '?age'}],
+        where: [{t: 'match', e: '?e', a: 'age', v: '?age'}],
       };
 
       const {data: results} = await db.query(query);
@@ -95,8 +95,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query: DatalogQuery = {
         find: {total: {t: 'count-distinct', c: '?city'}},
         where: [
-          {e: '?e', a: 'type', v: 'person'},
-          {e: '?e', a: 'city', v: '?city'},
+          {t: 'match', e: '?e', a: 'type', v: 'person'},
+          {t: 'match', e: '?e', a: 'city', v: '?city'},
         ],
       };
 
@@ -116,7 +116,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {total: {t: 'count-distinct', c: '?value'}},
-        where: [{e: '?e', a: 'value', v: '?value'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?value'}],
       };
 
       const {data: results} = await db.query(query);

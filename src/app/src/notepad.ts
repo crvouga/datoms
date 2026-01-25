@@ -11,21 +11,25 @@ export const notepad = async (db: DatomDatabase) => {
     },
     where: [
       {
+        t: 'match',
         e: '?config',
         a: 'tmdb.config/images.base_url',
         v: '?base_url',
       },
       {
+        t: 'match',
         e: '?config',
         a: 'tmdb.config/images.secure_base_url',
         v: '?secure_base_url',
       },
       {
+        t: 'match',
         e: '?config',
         a: 'tmdb.config/images.poster_sizes',
         v: '?poster_size',
       },
       {
+        t: 'match',
         e: '?config',
         a: 'tmdb.config/images.backdrop_sizes',
         v: '?backdrop_size',

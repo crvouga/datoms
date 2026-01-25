@@ -27,7 +27,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {e: {t: 'identity', c: '?e'}},
-        where: [{e: '?e', a: 'active', v: true}],
+        where: [{t: 'match', e: '?e', a: 'active', v: true}],
       };
 
       const {data: results} = await db.query(query);
@@ -46,7 +46,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {e: {t: 'identity', c: '?e'}},
-        where: [{e: '?e', a: 'middleName', v: null}],
+        where: [{t: 'match', e: '?e', a: 'middleName', v: null}],
       };
 
       const {data: results} = await db.query(query);
@@ -67,7 +67,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Instead, test that we can retrieve all optional values and filter in the query
       const query: DatalogQuery = {
         find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
-        where: [{e: '?e', a: 'optional', v: '?v'}],
+        where: [{t: 'match', e: '?e', a: 'optional', v: '?v'}],
       };
       const {data: results} = await db.query(query);
       expect(results.length).toBeGreaterThanOrEqual(2);
@@ -91,7 +91,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
-        where: [{e: '?e', a: 'data', v: '?v'}],
+        where: [{t: 'match', e: '?e', a: 'data', v: '?v'}],
       });
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Verify we can query across different types

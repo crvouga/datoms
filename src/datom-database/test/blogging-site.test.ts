@@ -57,9 +57,9 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           email: {t: 'identity', c: '?email'},
         },
         where: [
-          {e: '?e', a: USER_TYPE, v: USER_TYPE_ADMIN},
-          {e: '?e', a: USER_NAME, v: '?name'},
-          {e: '?e', a: USER_EMAIL, v: '?email'},
+          {t: 'match', e: '?e', a: USER_TYPE, v: USER_TYPE_ADMIN},
+          {t: 'match', e: '?e', a: USER_NAME, v: '?name'},
+          {t: 'match', e: '?e', a: USER_EMAIL, v: '?email'},
         ],
       });
 
@@ -83,8 +83,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, name: {t: 'identity', c: '?name'}},
         where: [
-          {e: '?e', a: USER_TYPE, v: USER_TYPE_AUTHOR},
-          {e: '?e', a: USER_NAME, v: '?name'},
+          {t: 'match', e: '?e', a: USER_TYPE, v: USER_TYPE_AUTHOR},
+          {t: 'match', e: '?e', a: USER_NAME, v: '?name'},
         ],
       });
 
@@ -107,8 +107,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, name: {t: 'identity', c: '?name'}},
         where: [
-          {e: '?e', a: USER_TYPE, v: USER_TYPE_READER},
-          {e: '?e', a: USER_NAME, v: '?name'},
+          {t: 'match', e: '?e', a: USER_TYPE, v: USER_TYPE_READER},
+          {t: 'match', e: '?e', a: USER_NAME, v: '?name'},
         ],
       });
 
@@ -150,8 +150,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           status: {t: 'identity', c: '?status'},
         },
         where: [
-          {e: '?e', a: POST_TITLE, v: '?title'},
-          {e: '?e', a: POST_STATUS, v: '?status'},
+          {t: 'match', e: '?e', a: POST_TITLE, v: '?title'},
+          {t: 'match', e: '?e', a: POST_STATUS, v: '?status'},
         ],
       });
 
@@ -197,8 +197,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, status: {t: 'identity', c: '?status'}},
         where: [
-          {e: '?e', a: POST_TITLE, v: 'My Post'},
-          {e: '?e', a: POST_STATUS, v: '?status'},
+          {t: 'match', e: '?e', a: POST_TITLE, v: 'My Post'},
+          {t: 'match', e: '?e', a: POST_STATUS, v: '?status'},
         ],
       });
       expect(results).toHaveLength(1);
@@ -248,8 +248,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           content: {t: 'identity', c: '?content'},
         },
         where: [
-          {e: '?e', a: POST_TITLE, v: '?title'},
-          {e: '?e', a: POST_CONTENT, v: '?content'},
+          {t: 'match', e: '?e', a: POST_TITLE, v: '?title'},
+          {t: 'match', e: '?e', a: POST_CONTENT, v: '?content'},
         ],
       });
 
@@ -295,8 +295,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           status: {t: 'identity', c: '?status'},
         },
         where: [
-          {e: '?e', a: POST_TITLE, v: '?title'},
-          {e: '?e', a: POST_STATUS, v: '?status'},
+          {t: 'match', e: '?e', a: POST_TITLE, v: '?title'},
+          {t: 'match', e: '?e', a: POST_STATUS, v: '?status'},
         ],
         context: {userId: authorId, userType: USER_TYPE_AUTHOR},
       });
@@ -344,7 +344,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Query as author 1 (should NOT see author 2's draft)
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, title: {t: 'identity', c: '?title'}},
-        where: [{e: '?e', a: POST_TITLE, v: '?title'}],
+        where: [{t: 'match', e: '?e', a: POST_TITLE, v: '?title'}],
         context: {userId: author1Id, userType: USER_TYPE_AUTHOR},
       });
 
@@ -389,7 +389,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Query as author 1 (should see author 2's published post)
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, title: {t: 'identity', c: '?title'}},
-        where: [{e: '?e', a: POST_TITLE, v: '?title'}],
+        where: [{t: 'match', e: '?e', a: POST_TITLE, v: '?title'}],
         context: {userId: author1Id, userType: USER_TYPE_AUTHOR},
       });
 
@@ -447,8 +447,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           status: {t: 'identity', c: '?status'},
         },
         where: [
-          {e: '?e', a: POST_TITLE, v: '?title'},
-          {e: '?e', a: POST_STATUS, v: '?status'},
+          {t: 'match', e: '?e', a: POST_TITLE, v: '?title'},
+          {t: 'match', e: '?e', a: POST_STATUS, v: '?status'},
         ],
         context: {userId: readerId, userType: USER_TYPE_READER},
       });
@@ -508,8 +508,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           status: {t: 'identity', c: '?status'},
         },
         where: [
-          {e: '?e', a: POST_TITLE, v: '?title'},
-          {e: '?e', a: POST_STATUS, v: '?status'},
+          {t: 'match', e: '?e', a: POST_TITLE, v: '?title'},
+          {t: 'match', e: '?e', a: POST_STATUS, v: '?status'},
         ],
         context: {userId: adminId, userType: USER_TYPE_ADMIN},
       });
@@ -551,7 +551,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, title: {t: 'identity', c: '?title'}},
-        where: [{e: '?e', a: POST_TITLE, v: '?title'}],
+        where: [{t: 'match', e: '?e', a: POST_TITLE, v: '?title'}],
       });
 
       expect(results).toHaveLength(1);
@@ -594,7 +594,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, title: {t: 'identity', c: '?title'}},
-        where: [{e: '?e', a: POST_TITLE, v: '?title'}],
+        where: [{t: 'match', e: '?e', a: POST_TITLE, v: '?title'}],
       });
 
       expect(results).toHaveLength(1);
@@ -616,8 +616,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, name: {t: 'identity', c: '?name'}},
         where: [
-          {e: '?e', a: TAG_NAME, v: '?name'},
-          {e: '?e', a: TAG_NAME, v: 'javascript'},
+          {t: 'match', e: '?e', a: TAG_NAME, v: '?name'},
+          {t: 'match', e: '?e', a: TAG_NAME, v: 'javascript'},
         ],
       });
 
@@ -672,9 +672,9 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           tagName: {t: 'identity', c: '?tagName'},
         },
         where: [
-          {e: '?e', a: POST_TITLE, v: '?title'},
-          {e: '?e', a: POST_TAG, v: '?tag'},
-          {e: '?tag', a: TAG_NAME, v: '?tagName'},
+          {t: 'match', e: '?e', a: POST_TITLE, v: '?title'},
+          {t: 'match', e: '?e', a: POST_TAG, v: '?tag'},
+          {t: 'match', e: '?tag', a: TAG_NAME, v: '?tagName'},
         ],
       });
 
@@ -725,8 +725,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, title: {t: 'identity', c: '?title'}},
         where: [
-          {e: '?e', a: POST_TITLE, v: '?title'},
-          {e: '?e', a: POST_TAG, v: 1},
+          {t: 'match', e: '?e', a: POST_TITLE, v: '?title'},
+          {t: 'match', e: '?e', a: POST_TAG, v: 1},
         ],
       });
 
@@ -796,11 +796,11 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
           tagName: {t: 'identity', c: '?tagName'},
         },
         where: [
-          {e: '?e', a: POST_TITLE, v: '?title'},
-          {e: '?e', a: POST_CONTENT, v: '?content'},
-          {e: '?e', a: POST_STATUS, v: '?status'},
-          {e: '?e', a: POST_TAG, v: '?tag'},
-          {e: '?tag', a: TAG_NAME, v: '?tagName'},
+          {t: 'match', e: '?e', a: POST_TITLE, v: '?title'},
+          {t: 'match', e: '?e', a: POST_CONTENT, v: '?content'},
+          {t: 'match', e: '?e', a: POST_STATUS, v: '?status'},
+          {t: 'match', e: '?e', a: POST_TAG, v: '?tag'},
+          {t: 'match', e: '?tag', a: TAG_NAME, v: '?tagName'},
         ],
       });
       expect(results.length).toBeGreaterThanOrEqual(2); // At least 2 results (one per tag)

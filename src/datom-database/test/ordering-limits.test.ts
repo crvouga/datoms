@@ -27,7 +27,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
-        where: [{e: '?e', a: 'score', v: '?s'}],
+        where: [{t: 'match', e: '?e', a: 'score', v: '?s'}],
         orderBy: [['?s', 'desc']],
         limit: 2,
       };
@@ -60,9 +60,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
           age: {t: 'identity', c: '?age'},
         },
         where: [
-          {e: '?person', a: 'name', v: '?name'},
-          {e: '?person', a: 'score', v: '?score'},
-          {e: '?person', a: 'age', v: '?age'},
+          {t: 'match', e: '?person', a: 'name', v: '?name'},
+          {t: 'match', e: '?person', a: 'score', v: '?score'},
+          {t: 'match', e: '?person', a: 'age', v: '?age'},
         ],
         orderBy: [
           ['?score', 'desc'],
@@ -89,7 +89,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
-        where: [{e: '?e', a: 'score', v: '?s'}],
+        where: [{t: 'match', e: '?e', a: 'score', v: '?s'}],
         limit: 0,
       };
 
@@ -109,7 +109,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
-        where: [{e: '?e', a: 'score', v: '?s'}],
+        where: [{t: 'match', e: '?e', a: 'score', v: '?s'}],
         limit: 10,
       });
       expect(results).toHaveLength(2);
@@ -126,7 +126,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query({
         find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
-        where: [{e: '?e', a: 'score', v: '?s'}],
+        where: [{t: 'match', e: '?e', a: 'score', v: '?s'}],
         orderBy: [['?s', 'desc']],
         limit: 2,
       });
@@ -150,8 +150,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const queryWithoutScoreInFind: DatalogQuery = {
         find: {name: {t: 'identity', c: '?name'}},
         where: [
-          {e: '?e', a: 'name', v: '?name'},
-          {e: '?e', a: 'score', v: '?score'},
+          {t: 'match', e: '?e', a: 'name', v: '?name'},
+          {t: 'match', e: '?e', a: 'score', v: '?score'},
         ],
         orderBy: [['?score', 'desc']],
       };
@@ -165,8 +165,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const queryWithScoreInFind: DatalogQuery = {
         find: {name: {t: 'identity', c: '?name'}, score: {t: 'identity', c: '?score'}},
         where: [
-          {e: '?e', a: 'name', v: '?name'},
-          {e: '?e', a: 'score', v: '?score'},
+          {t: 'match', e: '?e', a: 'name', v: '?name'},
+          {t: 'match', e: '?e', a: 'score', v: '?score'},
         ],
         orderBy: [['?score', 'desc']],
       };
@@ -190,7 +190,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {e: {t: 'identity', c: '?e'}, s: {t: 'identity', c: '?s'}},
-        where: [{e: '?e', a: 'score', v: '?s'}],
+        where: [{t: 'match', e: '?e', a: 'score', v: '?s'}],
         orderBy: [['?s', 'asc']],
       };
 
@@ -213,7 +213,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const query: DatalogQuery = {
         find: {e: {t: 'identity', c: '?e'}, v: {t: 'identity', c: '?v'}},
-        where: [{e: '?e', a: 'value', v: '?v'}],
+        where: [{t: 'match', e: '?e', a: 'value', v: '?v'}],
         orderBy: [['?v', 'asc']],
       };
 

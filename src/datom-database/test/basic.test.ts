@@ -86,13 +86,13 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: nameResults} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'name', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
       });
       expect(nameResults).toHaveLength(0);
 
       const {data: ageResults} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'age', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'age', v: '?v'}],
       });
       expect(ageResults[0]?.v).toBe(30);
     });
@@ -125,7 +125,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: nameResults} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'name', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
       });
       expect(nameResults[0]?.v).toBe('Alice');
     });
@@ -248,7 +248,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: statusResults} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'status', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'status', v: '?v'}],
       });
       expect(statusResults[0]?.v).toBe('active');
     });
@@ -290,7 +290,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Should see new value in dbAfter
       const {data: statusResults} = await withResult.dbAfter.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'status', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'status', v: '?v'}],
       });
       expect(statusResults[0]?.v).toBe('active');
 
@@ -308,7 +308,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Should be committed
       const {data: finalStatusResults} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'status', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'status', v: '?v'}],
       });
       expect(finalStatusResults[0]?.v).toBe('active');
     });
@@ -320,7 +320,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     const {data: nameResults} = await db.query({
       find: {v: {t: 'identity', c: '?v'}},
-      where: [{e: 1, a: 'name', v: '?v'}],
+      where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
     });
     expect(nameResults[0]?.v).toBe('Alice');
   });
@@ -330,7 +330,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       const {data: results} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'nonexistent', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'nonexistent', v: '?v'}],
       });
       expect(results).toHaveLength(0);
     });
@@ -341,7 +341,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: results} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'name', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
       });
       expect(results[0]?.v).toBe('Alice');
     });
@@ -444,7 +444,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: nameResults} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'name', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
       });
       expect(nameResults[0]?.v).toBe('Alice');
 
@@ -511,15 +511,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const {data: status1Results} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'status', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'status', v: '?v'}],
       });
       const {data: status2Results} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 2, a: 'status', v: '?v'}],
+        where: [{t: 'match', e: 2, a: 'status', v: '?v'}],
       });
       const {data: name1Results} = await db.query({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{e: 1, a: 'name', v: '?v'}],
+        where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
       });
 
       expect(status1Results[0]?.v).toBe('pending');
