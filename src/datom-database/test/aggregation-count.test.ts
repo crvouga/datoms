@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
-import {datalog, type DatalogQuery} from '../../datalog.js';
+import {datalog, type DatalogQuery} from '../../datalog-query.js';
 import {FIXTURES} from './fixtures/fixtures.js';
 import type {Fixture} from './fixtures/fixture.js';
 

@@ -8,7 +8,7 @@ import type {
   DatalogQueryFindVariable,
   DatalogQueryVariable,
   DatalogQueryWhereClause,
-} from '../../datalog.js';
+} from '../../datalog-query.js';
 
 import {
   validateDatoms,

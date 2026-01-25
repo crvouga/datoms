@@ -8,7 +8,7 @@ import type {
   DatalogQueryFindVariable,
   DatalogQueryWhereClause,
   DatalogQueryWherePattern,
-} from '../../datalog.js';
+} from '../../datalog-query.js';
 import type {Attribute, Datom, TransactionId, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {DatomsQuery, QueryResult} from '../views/database-view.js';

@@ -6,7 +6,7 @@ import type {
   DatalogQuery,
   DatalogQueryFindVariable,
   DatalogQueryWhereClause,
-} from '../../datalog.js';
+} from '../../datalog-query.js';
 import type {Attribute, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {ViewConfig} from '../views/view-config.js';

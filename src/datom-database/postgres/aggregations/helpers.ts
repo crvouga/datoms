@@ -2,7 +2,7 @@
  * PostgreSQL SQL helper functions
  */
 
-import type {DatalogQueryFindVariable} from '../../../datalog.js';
+import type {DatalogQueryFindVariable} from '../../../datalog-query.js';
 import type {SQLAggregationResult} from './types.js';
 
 /**

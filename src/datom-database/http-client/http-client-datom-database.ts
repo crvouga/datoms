@@ -4,7 +4,7 @@
  * Pure transport layer - all query logic handled server-side
  */
 
-import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog.js';
+import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog-query.js';
 import type {Datom, DatomInput, TransactionId} from '../../datoms.js';
 import type {HttpClient} from '../../http-client/http-client.js';
 import type {Transaction} from '../../types.js';

@@ -4,7 +4,7 @@
  * Not part of the public API
  */
 
-import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog.js';
+import type {DatalogQuery, DatalogQueryFindVariable} from '../../datalog-query.js';
 import type {DatomDatabase} from '../datom-database.js';
 import type {DatabaseView, QueryResultEnvelope} from './database-view.js';
 import type {ViewConfig} from './view-config.js';

@@ -1,6 +1,6 @@
 import {describe, expect, test} from 'bun:test';
 import {format} from 'sql-formatter';
-import type {DatalogQuery} from '../../datalog.js';
+import type {DatalogQuery} from '../../datalog-query.js';
 import {datalogToPostgresSQL} from './datalog-to-postgres-sql.js';
 
 /**

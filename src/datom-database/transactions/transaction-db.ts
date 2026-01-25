@@ -1,4 +1,4 @@
-import type {DatalogQueryWhereClause} from '../../datalog.js';
+import type {DatalogQueryWhereClause} from '../../datalog-query.js';
 import type {Datom, TransactionId} from '../../datoms.js';
 import type {Transaction} from '../../types.js';
 import type {DatomDatabase} from '../datom-database.js';
