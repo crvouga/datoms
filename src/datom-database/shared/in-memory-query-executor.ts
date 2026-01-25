@@ -4,7 +4,7 @@
  */
 
 import type {Datom} from '../../datoms.js';
-import type {DatomsQuery} from '../views/database-view.js';
+import type {DatomsQuery} from '../views/datoms-query.js';
 
 /**
  * Execute a query on an array of datoms

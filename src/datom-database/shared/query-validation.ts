@@ -2,7 +2,7 @@
  * Shared query validation utilities
  */
 
-import type {DatomsQuery} from '../views/database-view.js';
+import type {DatomsQuery} from '../views/datoms-query.js';
 import {QuerySafetyError} from '../hook/hook.js';
 
 /**

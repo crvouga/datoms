@@ -10,7 +10,7 @@ import type {EntityId} from '../../entity-id.js';
 import type {Transaction} from '../../types.js';
 import type {Hook} from '../hook/hook.js';
 import type {DatomDatabase, WithResult} from '../datom-database.js';
-import type {DatomsQuery, QueryResultEnvelope} from '../views/database-view.js';
+import type {QueryResultEnvelope} from '../views/database-view.js';
 import type {DatabaseView} from '../views/database-view.js';
 
 export interface FileSystemDatomDatabaseOptions {

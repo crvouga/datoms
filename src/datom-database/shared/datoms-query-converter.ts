@@ -11,7 +11,8 @@ import type {
 } from '../../datalog-query.js';
 import type {Attribute, Datom, TransactionId, Value} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
-import type {DatomsQuery, QueryResult} from '../views/database-view.js';
+import type {QueryResult} from '../views/database-view.js';
+import type {DatomsQuery} from '../views/datoms-query.js';
 
 /**
  * Convert DatomsQuery to DatalogQuery

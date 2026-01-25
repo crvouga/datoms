@@ -38,12 +38,8 @@ import {
 } from '../hook/hook.js';
 import {isQueryPattern, isVariable, stripQuestionMark} from '../shared/datalog-helpers.js';
 import {ConfiguredDatabaseView} from '../views/configured-database-view.js';
-import type {
-  DatabaseView,
-  DatomsQuery,
-  QueryResult,
-  QueryResultEnvelope,
-} from '../views/database-view.js';
+import type {DatabaseView, QueryResult, QueryResultEnvelope} from '../views/database-view.js';
+import type {DatomsQuery} from '../views/datoms-query.js';
 import type {ViewConfig} from '../views/view-config.js';
 import {datalogToPostgresSQL} from './datalog-to-postgres-sql.js';
 
