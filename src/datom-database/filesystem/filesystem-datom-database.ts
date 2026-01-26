@@ -249,13 +249,9 @@ export class FileSystemDatomDatabase implements DatomDatabase {
   }
 
   /**
-   * Parse entity ID from string (supports number and string)
+   * Parse entity ID from string
    */
   private _parseEntityId(str: string): EntityId {
-    const num = Number.parseFloat(str);
-    if (!Number.isNaN(num) && Number.isFinite(num) && str.trim() === String(num)) {
-      return num;
-    }
     return str;
   }
 

@@ -21,27 +21,27 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should execute successful transaction', async () => {
       const {db} = f;
 
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       // Use with() to see what the transaction would look like
-      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: '1'});
       const {data: results1} = await db.read(query1);
-      const initial = queryResultsToDatoms(results1, {e: 1});
+      const initial = queryResultsToDatoms(results1, {e: '1'});
       expect(initial).toHaveLength(1);
 
-      const withResult = await db.with([{op: true, e: 1, a: 'status', v: 'pending'}]);
-      const query2 = datomsQueryToDatalogQuery({e: 1});
+      const withResult = await db.with([{op: true, e: '1', a: 'status', v: 'pending'}]);
+      const query2 = datomsQueryToDatalogQuery({e: '1'});
       const {data: results2} = await withResult.dbAfter.read(query2);
-      const updated = queryResultsToDatoms(results2, {e: 1});
+      const updated = queryResultsToDatoms(results2, {e: '1'});
       expect(updated).toHaveLength(2);
 
       // Now commit the changes
-      await db.write([{op: true, e: 1, a: 'status', v: 'pending'}]);
+      await db.write([{op: true, e: '1', a: 'status', v: 'pending'}]);
 
       // Verify changes are committed
-      const query3 = datomsQueryToDatalogQuery({e: 1});
+      const query3 = datomsQueryToDatalogQuery({e: '1'});
       const {data: results3} = await db.read(query3);
-      const final = queryResultsToDatoms(results3, {e: 1});
+      const final = queryResultsToDatoms(results3, {e: '1'});
       expect(final).toHaveLength(2);
       const values = final.map(d => d.v);
       expect(values).toContain('Alice');
@@ -51,21 +51,21 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should not commit changes when using with()', async () => {
       const {db} = f;
 
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       // Use with() to see what the transaction would look like
-      const withResult = await db.with([{op: true, e: 1, a: 'status', v: 'pending'}]);
+      const withResult = await db.with([{op: true, e: '1', a: 'status', v: 'pending'}]);
 
       // Query dbAfter to see speculative state
-      const query4 = datomsQueryToDatalogQuery({e: 1});
+      const query4 = datomsQueryToDatalogQuery({e: '1'});
       const {data: results4} = await withResult.dbAfter.read(query4);
-      const speculative = queryResultsToDatoms(results4, {e: 1});
+      const speculative = queryResultsToDatoms(results4, {e: '1'});
       expect(speculative).toHaveLength(2);
 
       // But actual database should not be changed (with() doesn't commit)
-      const query5 = datomsQueryToDatalogQuery({e: 1});
+      const query5 = datomsQueryToDatalogQuery({e: '1'});
       const {data: results5} = await db.read(query5);
-      const final = queryResultsToDatoms(results5, {e: 1});
+      const final = queryResultsToDatoms(results5, {e: '1'});
       expect(final).toHaveLength(1);
       expect(final[0]?.v).toBe('Alice');
     });
@@ -73,21 +73,21 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should see speculative changes with with()', async () => {
       const {db} = f;
 
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       // Query before adding
-      const query6 = datomsQueryToDatalogQuery({e: 1});
+      const query6 = datomsQueryToDatalogQuery({e: '1'});
       const {data: results6} = await db.read(query6);
-      const before = queryResultsToDatoms(results6, {e: 1});
+      const before = queryResultsToDatoms(results6, {e: '1'});
       expect(before).toHaveLength(1);
 
       // Use with() to see what adding would look like
-      const withResult = await db.with([{op: true, e: 1, a: 'age', v: 30}]);
+      const withResult = await db.with([{op: true, e: '1', a: 'age', v: 30}]);
 
       // Query dbAfter - should see speculative change
-      const query7 = datomsQueryToDatalogQuery({e: 1});
+      const query7 = datomsQueryToDatalogQuery({e: '1'});
       const {data: results7} = await withResult.dbAfter.read(query7);
-      const after = queryResultsToDatoms(results7, {e: 1});
+      const after = queryResultsToDatoms(results7, {e: '1'});
       expect(after).toHaveLength(2);
       const values = after.map(d => d.v);
       expect(values).toContain('Alice');
@@ -98,27 +98,27 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
 
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 1, a: 'age', v: 30},
+        {op: true, e: '1', a: 'name', v: 'Alice'},
+        {op: true, e: '1', a: 'age', v: 30},
       ]);
 
       // Use with() to see what retraction would look like
-      const withResult = await db.with([{op: false, e: 1, a: 'age', v: 30}]);
+      const withResult = await db.with([{op: false, e: '1', a: 'age', v: 30}]);
 
       // Query dbAfter should not see sub datom
-      const query8 = datomsQueryToDatalogQuery({e: 1});
+      const query8 = datomsQueryToDatalogQuery({e: '1'});
       const {data: results8} = await withResult.dbAfter.read(query8);
-      const result = queryResultsToDatoms(results8, {e: 1});
+      const result = queryResultsToDatoms(results8, {e: '1'});
       expect(result).toHaveLength(1);
       expect(result[0]?.v).toBe('Alice');
 
       // Now commit the retraction
-      await db.write([{op: false, e: 1, a: 'age', v: 30}]);
+      await db.write([{op: false, e: '1', a: 'age', v: 30}]);
 
       // Verify retraction is committed
-      const query9 = datomsQueryToDatalogQuery({e: 1});
+      const query9 = datomsQueryToDatalogQuery({e: '1'});
       const {data: results9} = await db.read(query9);
-      const final = queryResultsToDatoms(results9, {e: 1});
+      const final = queryResultsToDatoms(results9, {e: '1'});
       expect(final).toHaveLength(1);
       expect(final[0]?.v).toBe('Alice');
     });
@@ -127,12 +127,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
 
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 2, a: 'name', v: 'Bob'},
+        {op: true, e: '1', a: 'name', v: 'Alice'},
+        {op: true, e: '2', a: 'name', v: 'Bob'},
       ]);
 
       // Use with() to see what adding would look like
-      const withResult = await db.with([{op: true, e: 3, a: 'name', v: 'Charlie'}]);
+      const withResult = await db.with([{op: true, e: '3', a: 'name', v: 'Charlie'}]);
 
       // Query dbAfter should see speculative change
       const found = await withResult.dbAfter.read({
@@ -142,7 +142,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results = found.data;
       expect(results).toHaveLength(3);
       const entities = results.map(r => r.x).sort();
-      expect(entities).toEqual([1, 2, 3]);
+      expect(entities).toEqual(['1', '2', '3']);
     });
 
     test('should handle multiple operations with transact()', async () => {
@@ -150,32 +150,32 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // First add initial data
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 1, a: 'age', v: 30},
+        {op: true, e: '1', a: 'name', v: 'Alice'},
+        {op: true, e: '1', a: 'age', v: 30},
       ]);
 
       // Then update in a single transaction: sub old age, add new age, add Bob
       await db.write([
-        {op: true, e: 1, a: 'age', v: 31},
-        {op: true, e: 2, a: 'name', v: 'Bob'},
-        {op: false, e: 1, a: 'age', v: 30},
+        {op: true, e: '1', a: 'age', v: 31},
+        {op: true, e: '2', a: 'name', v: 'Bob'},
+        {op: false, e: '1', a: 'age', v: 30},
       ]);
 
       // Verify all operations were applied
-      const query1 = datomsQueryToDatalogQuery({e: 1});
+      const query1 = datomsQueryToDatalogQuery({e: '1'});
       const found1 = await db.read(query1);
       const results1 = found1.data;
-      const alice = queryResultsToDatoms(results1, {e: 1});
+      const alice = queryResultsToDatoms(results1, {e: '1'});
       expect(alice).toHaveLength(2);
       const aliceValues = alice.map(d => d.v);
       expect(aliceValues).toContain('Alice');
       expect(aliceValues).toContain(31);
       expect(aliceValues).not.toContain(30);
 
-      const query2 = datomsQueryToDatalogQuery({e: 2});
+      const query2 = datomsQueryToDatalogQuery({e: '2'});
       const found2 = await db.read(query2);
       const results2 = found2.data;
-      const bob = queryResultsToDatoms(results2, {e: 2});
+      const bob = queryResultsToDatoms(results2, {e: '2'});
       expect(bob).toHaveLength(1);
       expect(bob[0]?.v).toBe('Bob');
     });
@@ -183,54 +183,54 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should not commit changes when using with()', async () => {
       const {db} = f;
 
-      await db.write([{op: true, e: 1, a: 'name', v: 'Initial'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Initial'}]);
 
       // Use with() to see what the transaction would look like
       const withResult = await db.with([
-        {op: true, e: 1, a: 'status', v: 'pending'},
-        {op: true, e: 2, a: 'name', v: 'New'},
-        {op: false, e: 1, a: 'name', v: 'Initial'},
+        {op: true, e: '1', a: 'status', v: 'pending'},
+        {op: true, e: '2', a: 'name', v: 'New'},
+        {op: false, e: '1', a: 'name', v: 'Initial'},
       ]);
 
       // Query dbAfter to see speculative state
-      const query10 = datomsQueryToDatalogQuery({e: 1});
+      const query10 = datomsQueryToDatalogQuery({e: '1'});
       const found10 = await withResult.dbAfter.read(query10);
       const results10 = found10.data;
-      const speculative = queryResultsToDatoms(results10, {e: 1});
+      const speculative = queryResultsToDatoms(results10, {e: '1'});
       expect(speculative.length).toBeGreaterThan(0);
 
       // But actual database should not be changed (with() doesn't commit)
-      const query11 = datomsQueryToDatalogQuery({e: 1});
+      const query11 = datomsQueryToDatalogQuery({e: '1'});
       const found11 = await db.read(query11);
       const results11 = found11.data;
-      const result = queryResultsToDatoms(results11, {e: 1});
+      const result = queryResultsToDatoms(results11, {e: '1'});
       expect(result).toHaveLength(1);
       expect(result[0]?.v).toBe('Initial');
 
-      const query2 = datomsQueryToDatalogQuery({e: 2});
+      const query2 = datomsQueryToDatalogQuery({e: '2'});
       const found2 = await db.read(query2);
       const results2 = found2.data;
-      const entity2 = queryResultsToDatoms(results2, {e: 2});
+      const entity2 = queryResultsToDatoms(results2, {e: '2'});
       expect(entity2).toHaveLength(0);
     });
 
     test('should handle query with with()', async () => {
       const {db} = f;
 
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       const foundName = await db.read({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{t: 'match', e: 1, a: 'name', v: '?v'}],
+        where: [{t: 'match', e: '1', a: 'name', v: '?v'}],
       });
       const nameResults = foundName.data;
       expect(nameResults[0]?.v).toBe('Alice');
 
       // Use with() to see what adding age would look like
-      const withResult = await db.with([{op: true, e: 1, a: 'age', v: 30}]);
+      const withResult = await db.with([{op: true, e: '1', a: 'age', v: 30}]);
       const found = await withResult.dbAfter.read({
         find: {v: {t: 'identity', c: '?v'}},
-        where: [{t: 'match', e: 1, a: 'age', v: '?v'}],
+        where: [{t: 'match', e: '1', a: 'age', v: '?v'}],
       });
       const ageResults = found.data;
       expect(ageResults[0]?.v).toBe(30);
@@ -239,45 +239,45 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle datoms query with with()', async () => {
       const {db} = f;
 
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
-      const query1 = datomsQueryToDatalogQuery({e: 1, op: true});
+      const query1 = datomsQueryToDatalogQuery({e: '1', op: true});
       const found1 = await db.read(query1);
       const results1 = found1.data;
-      let entity = queryResultsToDatoms(results1, {e: 1, op: true});
+      let entity = queryResultsToDatoms(results1, {e: '1', op: true});
       expect(entity).toHaveLength(1);
 
       // Use with() to see what adding age would look like
-      const withResult = await db.with([{op: true, e: 1, a: 'age', v: 30}]);
-      const query2 = datomsQueryToDatalogQuery({e: 1, op: true});
+      const withResult = await db.with([{op: true, e: '1', a: 'age', v: 30}]);
+      const query2 = datomsQueryToDatalogQuery({e: '1', op: true});
       const {data: results2} = await withResult.dbAfter.read(query2);
-      entity = queryResultsToDatoms(results2, {e: 1, op: true});
+      entity = queryResultsToDatoms(results2, {e: '1', op: true});
       expect(entity).toHaveLength(2);
     });
 
     test('should handle hasFact with with()', async () => {
       const {db} = f;
 
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       const query = datomsQueryToDatalogQuery({
-        e: 1,
+        e: '1',
         a: 'name',
         v: 'Alice',
       });
       const {data: nameResults} = await db.read(query);
-      const nameDatoms = queryResultsToDatoms(nameResults, {e: 1, a: 'name', v: 'Alice'});
+      const nameDatoms = queryResultsToDatoms(nameResults, {e: '1', a: 'name', v: 'Alice'});
       expect(nameDatoms.length).toBeGreaterThan(0);
 
       // Use with() to see what adding status would look like
-      const withResult = await db.with([{op: true, e: 1, a: 'status', v: 'active'}]);
+      const withResult = await db.with([{op: true, e: '1', a: 'status', v: 'active'}]);
       const queryStatus = datomsQueryToDatalogQuery({
-        e: 1,
+        e: '1',
         a: 'status',
         v: 'active',
       });
       const {data: statusResults} = await withResult.dbAfter.read(queryStatus);
-      const statusDatoms = queryResultsToDatoms(statusResults, {e: 1, a: 'status', v: 'active'});
+      const statusDatoms = queryResultsToDatoms(statusResults, {e: '1', a: 'status', v: 'active'});
       expect(statusDatoms.length).toBeGreaterThan(0);
     });
 
@@ -285,16 +285,16 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
 
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 1, a: 'department', v: 'Engineering'},
-        {op: true, e: 2, a: 'name', v: 'Bob'},
-        {op: true, e: 2, a: 'department', v: 'Sales'},
+        {op: true, e: '1', a: 'name', v: 'Alice'},
+        {op: true, e: '1', a: 'department', v: 'Engineering'},
+        {op: true, e: '2', a: 'name', v: 'Bob'},
+        {op: true, e: '2', a: 'department', v: 'Sales'},
       ]);
 
       // Use with() to see what adding new employee would look like
       const withResult = await db.with([
-        {op: true, e: 3, a: 'name', v: 'Charlie'},
-        {op: true, e: 3, a: 'department', v: 'Engineering'},
+        {op: true, e: '3', a: 'name', v: 'Charlie'},
+        {op: true, e: '3', a: 'department', v: 'Engineering'},
       ]);
 
       // Query dbAfter should see speculative change
@@ -322,12 +322,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should return latest transaction ID after adding datoms', async () => {
       const {db} = f;
-      const tx1 = await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      const tx1 = await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
       const latestTx = await db._getLatestTransaction();
       expect(latestTx.txId).toBe(tx1);
       expect(latestTx.datoms.length).toBeGreaterThan(0);
 
-      const tx2 = await db.write([{op: true, e: 2, a: 'name', v: 'Bob'}]);
+      const tx2 = await db.write([{op: true, e: '2', a: 'name', v: 'Bob'}]);
       const latestTx2 = await db._getLatestTransaction();
       expect(latestTx2.txId).toBe(tx2);
       expect(latestTx2.txId).toBeGreaterThan(tx1);
@@ -335,18 +335,18 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should return latest transaction after false', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
-      const tx2 = await db.write([{op: false, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
+      const tx2 = await db.write([{op: false, e: '1', a: 'name', v: 'Alice'}]);
       const latestTx = await db._getLatestTransaction();
       expect(latestTx.txId).toBe(tx2);
     });
 
     test('should return latest transaction after transact', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
       const tx2 = await db.write([
-        {op: true, e: 2, a: 'name', v: 'Bob'},
-        {op: false, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: '2', a: 'name', v: 'Bob'},
+        {op: false, e: '1', a: 'name', v: 'Alice'},
       ]);
       const latestTx = await db._getLatestTransaction();
       expect(latestTx.txId).toBe(tx2);
@@ -354,11 +354,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should work with transact()', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
       const beforeTx = await db._getLatestTransaction();
 
       // Use transact() to commit changes
-      const txId = await db.write([{op: true, e: 2, a: 'name', v: 'Bob'}]);
+      const txId = await db.write([{op: true, e: '2', a: 'name', v: 'Bob'}]);
       expect(txId).toBeGreaterThan(beforeTx.txId);
 
       // After commit, latest should be updated
@@ -371,23 +371,23 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
   describe('With Result', () => {
     test('should return dbBefore and dbAfter', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
-      const withResult = await db.with([{op: true, e: 1, a: 'age', v: 30}]);
+      const withResult = await db.with([{op: true, e: '1', a: 'age', v: 30}]);
 
       // dbBefore should show current state
-      const queryBefore = datomsQueryToDatalogQuery({e: 1});
+      const queryBefore = datomsQueryToDatalogQuery({e: '1'});
       const foundBefore = await withResult.dbBefore.read(queryBefore);
       const resultsBefore = foundBefore.data;
-      const before = queryResultsToDatoms(resultsBefore, {e: 1});
+      const before = queryResultsToDatoms(resultsBefore, {e: '1'});
       expect(before).toHaveLength(1);
       expect(before[0]?.v).toBe('Alice');
 
       // dbAfter should show speculative state
-      const query = datomsQueryToDatalogQuery({e: 1});
+      const query = datomsQueryToDatalogQuery({e: '1'});
       const found = await withResult.dbAfter.read(query);
       const results = found.data;
-      const after = queryResultsToDatoms(results, {e: 1});
+      const after = queryResultsToDatoms(results, {e: '1'});
       expect(after).toHaveLength(2);
       const values = after.map(d => d.v);
       expect(values).toContain('Alice');
@@ -396,28 +396,28 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should return txData', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       const withResult = await db.with([
-        {op: true, e: 1, a: 'age', v: 30},
-        {op: false, e: 1, a: 'name', v: 'Alice'},
+        {op: true, e: '1', a: 'age', v: 30},
+        {op: false, e: '1', a: 'name', v: 'Alice'},
       ]);
 
       // txData should contain the datoms that would be applied
       expect(withResult.txData.length).toBeGreaterThan(0);
       const hasAdd = withResult.txData.some(
-        d => d.e === 1 && d.a === 'age' && d.v === 30 && d.op === true,
+        d => d.e === '1' && d.a === 'age' && d.v === 30 && d.op === true,
       );
       expect(hasAdd).toBe(true);
       const hassub = withResult.txData.some(
-        d => d.e === 1 && d.a === 'name' && d.v === 'Alice' && d.op === false,
+        d => d.e === '1' && d.a === 'name' && d.v === 'Alice' && d.op === false,
       );
       expect(hassub).toBe(true);
     });
 
     test('should return tempIds (empty for now)', async () => {
       const {db} = f;
-      const withResult = await db.with([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      const withResult = await db.with([{op: true, e: '1', a: 'name', v: 'Alice'}]);
       expect(withResult.tempIds).toEqual({});
     });
   });

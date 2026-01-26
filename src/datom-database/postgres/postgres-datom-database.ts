@@ -393,7 +393,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       baseMap.set(key, datom);
     }
 
-    // Apply speculative datoms (falses remove, trues add/update)
+    // Apply speculative datoms (retractions remove, trues add/update)
     for (const speculativeDatom of speculativeDatoms) {
       const key = `${String(speculativeDatom.e)}|${String(speculativeDatom.a)}|${JSON.stringify(speculativeDatom.v)}`;
       if (speculativeDatom.op === false) {
@@ -437,12 +437,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
    */
   private _mapRowsToDatoms(rows: DatabaseRow[]): Datom[] {
     return rows.map((row: DatabaseRow) => {
-      let entity: EntityId = row.e as EntityId;
-      if (typeof entity === 'string') {
-        if (/^-?\d+$/.test(entity)) {
-          entity = Number.parseInt(entity, 10);
-        }
-      }
+      const entity: EntityId = String(row.e);
 
       // PostgreSQL JSONB returns as parsed object, but connection adapter may stringify it
       let parsedValue: unknown = row.v;
@@ -528,35 +523,137 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       }
     }
 
+    // Build a map of which output keys come from 'v' column (values that can be EntityIds)
+    const keysFromValueColumn = new Set<string>();
+    if (findKeys.length > 0) {
+      // Build variable mapping to determine which variables come from 'v'
+      const variableToColumn = new Map<string, string>();
+      for (let i = 0; i < query.where.length; i++) {
+        const clause = query.where[i];
+        if (clause && typeof clause === 'object' && 't' in clause && clause.t === 'match') {
+          const {e: entityVal, a: attributeVal, v: valueVal} = clause;
+          const alias = `d${i}_active`;
+          if (typeof entityVal === 'string' && entityVal.startsWith('?')) {
+            variableToColumn.set(entityVal, `${alias}.e`);
+          }
+          if (typeof attributeVal === 'string' && attributeVal.startsWith('?')) {
+            variableToColumn.set(attributeVal, `${alias}.a`);
+          }
+          if (typeof valueVal === 'string' && valueVal.startsWith('?')) {
+            variableToColumn.set(valueVal, `${alias}.v`);
+          }
+        }
+      }
+
+      // Check which find keys map to variables from 'v' column
+      // Exclude the standard 'v' field - we only want to mark relationship fields like 'from' and 'to'
+      // that are explicitly EntityId references from the 'v' column
+      for (const [outputKey, expr] of Object.entries(query.find)) {
+        // Skip the standard 'v' field - it can contain both EntityIds and regular values
+        if (outputKey === 'v') {
+          continue;
+        }
+        let varName: string | undefined;
+        if (
+          typeof expr === 'object' &&
+          expr !== null &&
+          't' in expr &&
+          'c' in expr &&
+          expr.t === 'identity'
+        ) {
+          varName = expr.c;
+        } else if (typeof expr === 'string') {
+          varName = expr;
+        }
+        if (varName && variableToColumn.get(varName)?.endsWith('.v')) {
+          keysFromValueColumn.add(outputKey);
+        }
+      }
+    } else {
+      // Empty find clause - check if key corresponds to a variable from 'v'
+      for (const clause of query.where) {
+        if (clause && typeof clause === 'object' && 't' in clause && clause.t === 'match') {
+          const {v: valueVal} = clause;
+          if (typeof valueVal === 'string' && valueVal.startsWith('?')) {
+            const keyName = valueVal.slice(1); // Remove '?' prefix
+            keysFromValueColumn.add(keyName);
+          }
+        }
+      }
+    }
+
     // Convert SQL results back to QueryResult format
     const results: Record<string, Value | Attribute>[] = rows.map((row: DatabaseRow) => {
       const result: Record<string, Value | Attribute> = {};
       for (const key of Object.keys(row)) {
         let value: unknown = row[key];
+        // Entity IDs ('e' field) and values from 'v' column must remain as strings
+        // Values from 'v' can be EntityIds, so we preserve them as strings to be safe
+        const isEntityId = key.toLowerCase() === 'e';
+        const isFromValueColumn = keysFromValueColumn.has(key);
+
+        // Track if value was originally a JSON string (EntityId) vs JSON number
+        let wasJsonString = false;
+
         // PostgreSQL stores values as JSONB, so parse them
         if (typeof value === 'string') {
-          if (/^-?\d+$/.test(value)) {
+          // For values from 'v' column that are numeric strings, check if they were JSON strings
+          if (isFromValueColumn && /^-?\d+$/.test(value)) {
+            // This is a numeric string from 'v' column - could be an EntityId
+            // Check if it's a JSON string (like "1") vs JSON number (like 1)
+            // If JSON.parse returns a string, it was definitely a JSON string (EntityId)
+            // If JSON.parse returns a number, it was a JSON number (regular numeric value)
+            try {
+              const parsed = JSON.parse(value);
+              if (typeof parsed === 'string') {
+                // It was a JSON string (EntityId like "1")
+                value = parsed;
+                wasJsonString = true;
+              } else {
+                // It was a JSON number (like 30)
+                value = parsed;
+                wasJsonString = false;
+              }
+            } catch {
+              // Not valid JSON, treat as plain string (might be EntityId)
+              wasJsonString = true;
+            }
+          } else if (!isEntityId && !isFromValueColumn && /^-?\d+$/.test(value)) {
+            // Not from 'v' column and not entity ID - safe to convert to number
             const num = Number.parseInt(value, 10);
             if (!Number.isNaN(num)) {
               value = num;
             } else {
               try {
                 value = JSON.parse(value);
+                wasJsonString = typeof value === 'string';
               } catch {
                 // Not valid JSON, keep as string
+                wasJsonString = true;
               }
             }
           } else {
+            // Try JSON parsing for other cases
             try {
-              value = JSON.parse(value);
+              const parsed = JSON.parse(value);
+              value = parsed;
+              wasJsonString = typeof parsed === 'string';
             } catch {
               // Not valid JSON, keep as string
+              wasJsonString = true;
             }
           }
+        } else if (typeof value === 'number') {
+          // Value came as number from database - definitely not a string EntityId
+          // Keep it as a number (was stored as JSON number)
+          wasJsonString = false;
+        } else {
+          // For other types (boolean, object, etc.), not a string EntityId
+          wasJsonString = false;
         }
-        // For aggregation results, handle numeric strings specially
+        // For aggregation results, handle numeric strings specially (but not entity IDs or values from 'v')
         let finalValue = value;
-        if (typeof value === 'string') {
+        if (!isEntityId && !isFromValueColumn && typeof value === 'string') {
           if (/^-?\d+$/.test(value)) {
             const num = Number.parseInt(value, 10);
             if (!Number.isNaN(num)) {
@@ -568,6 +665,47 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
               finalValue = num;
             }
           }
+        }
+        // Ensure entity IDs remain as strings
+        if (isEntityId) {
+          if (typeof finalValue === 'number') {
+            finalValue = String(finalValue);
+          } else if (typeof finalValue !== 'string') {
+            finalValue = String(finalValue);
+          }
+        }
+        // For values from 'v' column (excluding the standard 'v' field):
+        // Convert to string if it was originally a JSON string (EntityId)
+        // Also check field name as fallback - fields like 'from', 'to' are typically EntityIds
+        // If it was stored as a JSON number (like age: 30), keep it as a number
+        // This preserves EntityIds (stored as JSON strings) while keeping numeric values as numbers
+        // Check if field name suggests it's an EntityId reference
+        // Common patterns: from, to, parent, child, entityId, or fields ending in Id/_id
+        // Also check for relationship-related words like friend, owner, author, etc.
+        // Exclude fields that end in 'Name' as those are typically string values, not EntityIds
+        const isLikelyEntityIdField =
+          (key === 'from' ||
+            key === 'to' ||
+            key === 'parent' ||
+            key === 'child' ||
+            key === 'entityId' ||
+            key.endsWith('Id') ||
+            key.endsWith('_id') ||
+            (key.includes('friend') && !key.endsWith('Name')) ||
+            (key.includes('owner') && !key.endsWith('Name')) ||
+            (key.includes('author') && !key.endsWith('Name')) ||
+            (key.includes('user') && !key.endsWith('Name'))) &&
+          !key.endsWith('Name');
+        if (
+          isFromValueColumn &&
+          typeof finalValue === 'number' &&
+          Number.isInteger(finalValue) &&
+          (wasJsonString || isLikelyEntityIdField)
+        ) {
+          // It was stored as a JSON string EntityId (like "1") but JSON.parse converted it to number
+          // Or it's a field that's typically an EntityId reference
+          // Convert back to string since EntityIds are always strings
+          finalValue = String(finalValue);
         }
         result[key] = this._reviveValue(finalValue) as Value | Attribute;
       }

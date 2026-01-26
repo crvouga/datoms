@@ -7,24 +7,23 @@
 /**
  * A unique identifier for an entity
  */
-export type EntityId = number | string;
+export type EntityId = string;
 
 /**
  * Validate an EntityId value
- * Checks that the EntityId is a valid type (number or string)
+ * Checks that the EntityId is a valid type (string)
  * @param entityId EntityId to validate
  * @returns True if valid
  * @throws Error if invalid
  * @example
- * validateEntityId(123); // OK
  * validateEntityId("user-123"); // OK
  * validateEntityId(null); // Throws error
  */
 export function validateEntityId(entityId: unknown): entityId is EntityId {
-  if (typeof entityId === 'number' || typeof entityId === 'string') {
+  if (typeof entityId === 'string') {
     return true;
   }
-  throw new Error(`Invalid EntityId type: expected number or string, got ${typeof entityId}`);
+  throw new Error(`Invalid EntityId type: expected string, got ${typeof entityId}`);
 }
 
 /**
@@ -39,16 +38,10 @@ export function serializeEntityId(entityId: EntityId): string {
 
 /**
  * Deserialize a string to an EntityId
- * Attempts to parse numeric strings as numbers, otherwise returns as string
  * @param serialized Serialized string representation
- * @returns Deserialized EntityId
+ * @returns Deserialized EntityId (same string)
  * @internal
  */
 export function deserializeEntityId(serialized: string): EntityId {
-  // Try to parse as number first
-  const num = Number(serialized);
-  if (!Number.isNaN(num) && Number.isFinite(num) && String(num) === serialized) {
-    return num;
-  }
   return serialized;
 }

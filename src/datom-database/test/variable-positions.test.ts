@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle variable in entity position', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 2, a: 'name', v: 'Bob'},
-        {op: true, e: 3, a: 'age', v: 30},
+        {op: true, e: '1', a: 'name', v: 'Alice'},
+        {op: true, e: '2', a: 'name', v: 'Bob'},
+        {op: true, e: '3', a: 'age', v: 30},
       ]);
 
       const query: DatalogQuery = {
@@ -34,7 +34,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results = found.data;
       expect(results).toHaveLength(2);
       const entities = results.map(r => r.e).sort();
-      expect(entities).toEqual([1, 2]);
+      expect(entities).toEqual(['1', '2']);
       const values = results.map(r => r.v).sort();
       expect(values).toEqual(['Alice', 'Bob']);
     });
@@ -42,15 +42,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle variable in attribute position', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 1, a: 'age', v: 30},
-        {op: true, e: 2, a: 'name', v: 'Bob'},
-        {op: true, e: 2, a: 'city', v: 'NYC'},
+        {op: true, e: '1', a: 'name', v: 'Alice'},
+        {op: true, e: '1', a: 'age', v: 30},
+        {op: true, e: '2', a: 'name', v: 'Bob'},
+        {op: true, e: '2', a: 'city', v: 'NYC'},
       ]);
 
       const query: DatalogQuery = {
         find: {attr: {t: 'identity', c: '?attr'}, v: {t: 'identity', c: '?v'}},
-        where: [{t: 'match', e: 1, a: '?attr', v: '?v'}],
+        where: [{t: 'match', e: '1', a: '?attr', v: '?v'}],
       };
 
       const found = await db.read(query);
@@ -65,10 +65,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle all positions as variables', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 1, a: 'age', v: 30},
-        {op: true, e: 2, a: 'name', v: 'Bob'},
-        {op: true, e: 2, a: 'age', v: 25},
+        {op: true, e: '1', a: 'name', v: 'Alice'},
+        {op: true, e: '1', a: 'age', v: 30},
+        {op: true, e: '2', a: 'name', v: 'Bob'},
+        {op: true, e: '2', a: 'age', v: 25},
       ]);
 
       const query: DatalogQuery = {
@@ -90,10 +90,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         a: r.attr,
         v: r.v,
       }));
-      expect(combinations).toContainEqual({e: 1, a: 'name', v: 'Alice'});
-      expect(combinations).toContainEqual({e: 1, a: 'age', v: 30});
-      expect(combinations).toContainEqual({e: 2, a: 'name', v: 'Bob'});
-      expect(combinations).toContainEqual({e: 2, a: 'age', v: 25});
+      expect(combinations).toContainEqual({e: '1', a: 'name', v: 'Alice'});
+      expect(combinations).toContainEqual({e: '1', a: 'age', v: 30});
+      expect(combinations).toContainEqual({e: '2', a: 'name', v: 'Bob'});
+      expect(combinations).toContainEqual({e: '2', a: 'age', v: 25});
     });
 
     test('should handle string entity IDs', async () => {

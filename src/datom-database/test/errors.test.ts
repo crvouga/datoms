@@ -26,7 +26,7 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
   describe('QuerySafetyError', () => {
     test('should throw QuerySafetyError for query without filters or limits', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       try {
         const query = datomsQueryToDatalogQuery({});
@@ -43,7 +43,7 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
 
     test('should throw QuerySafetyError for history query without filters or limits', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       try {
         const query = datomsQueryToDatalogQuery({});
@@ -61,11 +61,11 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
   describe('TransactionConflictError', () => {
     test('should throw TransactionConflictError when optimistic lock fails', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
       void (await db._getLatestTransaction());
 
       // First transaction updates the database
-      await db.write([{op: true, e: 2, a: 'name', v: 'Bob'}]);
+      await db.write([{op: true, e: '2', a: 'name', v: 'Bob'}]);
 
       // Note: Optimistic locking is not supported with with() or transact()
       // This test is removed as it tested transaction() callback behavior
@@ -77,16 +77,16 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
   describe('QueryTimeoutError', () => {
     test('should throw QueryTimeoutError when query exceeds timeout', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       try {
         // Use a very short timeout that will definitely be exceeded
-        const query1 = datomsQueryToDatalogQuery({e: 1, timeoutMs: 1});
+        const query1 = datomsQueryToDatalogQuery({e: '1', timeoutMs: 1});
         await db.read(query1);
         // If query completes too fast, add a delay to ensure timeout
         await new Promise(resolve => setTimeout(resolve, 10));
         // Re-query with timeout
-        const query = datomsQueryToDatalogQuery({e: 1, timeoutMs: 1});
+        const query = datomsQueryToDatalogQuery({e: '1', timeoutMs: 1});
         await db.read(query);
         // If we get here, the timeout didn't trigger (query was too fast)
         // This is acceptable - timeout is best-effort
@@ -108,7 +108,7 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
       const {db} = f;
       // Add multiple datoms
       for (let i = 1; i <= 10; i++) {
-        await db.write([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.write([{op: true, e: String(i), a: 'tag', v: `tag-${i}`}]);
       }
 
       try {
@@ -128,17 +128,17 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
 
     test('should not throw when result is within maxResultSize', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       const query = datomsQueryToDatalogQuery({
-        e: 1,
+        e: '1',
         maxResultSize: 10,
       });
       const results = await db.read(query);
       // Verify queryResults has data
       expect(results.data.length).toBeGreaterThan(0);
       const datoms = queryResultsToDatoms(results.data, {
-        e: 1,
+        e: '1',
         maxResultSize: 10,
       });
       // The query should return the datom we just added

@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate variance of numeric values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 10},
-        {op: true, e: 2, a: 'value', v: 20},
-        {op: true, e: 3, a: 'value', v: 30},
+        {op: true, e: '1', a: 'value', v: 10},
+        {op: true, e: '2', a: 'value', v: 20},
+        {op: true, e: '3', a: 'value', v: 30},
       ]);
 
       const query: DatalogQuery = {
@@ -52,7 +52,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should return 0 or null for single value', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'value', v: 10}]);
+      await db.write([{op: true, e: '1', a: 'value', v: 10}]);
 
       const query: DatalogQuery = {
         find: {variance: {t: 'variance', c: '?value'}},
@@ -73,9 +73,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate variance with identical values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 10},
-        {op: true, e: 2, a: 'value', v: 10},
-        {op: true, e: 3, a: 'value', v: 10},
+        {op: true, e: '1', a: 'value', v: 10},
+        {op: true, e: '2', a: 'value', v: 10},
+        {op: true, e: '3', a: 'value', v: 10},
       ]);
 
       const query: DatalogQuery = {
@@ -93,9 +93,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate variance with negative numbers', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: -10},
-        {op: true, e: 2, a: 'value', v: 0},
-        {op: true, e: 3, a: 'value', v: 10},
+        {op: true, e: '1', a: 'value', v: -10},
+        {op: true, e: '2', a: 'value', v: 0},
+        {op: true, e: '3', a: 'value', v: 10},
       ]);
 
       const query: DatalogQuery = {
@@ -113,9 +113,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate variance with decimal numbers', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 10.5},
-        {op: true, e: 2, a: 'value', v: 20.5},
-        {op: true, e: 3, a: 'value', v: 30.5},
+        {op: true, e: '1', a: 'value', v: 10.5},
+        {op: true, e: '2', a: 'value', v: 20.5},
+        {op: true, e: '3', a: 'value', v: 30.5},
       ]);
 
       const query: DatalogQuery = {
@@ -133,14 +133,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate variance with filters', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'type', v: 'group1'},
-        {op: true, e: 1, a: 'score', v: 80},
-        {op: true, e: 2, a: 'type', v: 'group1'},
-        {op: true, e: 2, a: 'score', v: 90},
-        {op: true, e: 3, a: 'type', v: 'group1'},
-        {op: true, e: 3, a: 'score', v: 100},
-        {op: true, e: 4, a: 'type', v: 'group2'},
-        {op: true, e: 4, a: 'score', v: 50},
+        {op: true, e: '1', a: 'type', v: 'group1'},
+        {op: true, e: '1', a: 'score', v: 80},
+        {op: true, e: '2', a: 'type', v: 'group1'},
+        {op: true, e: '2', a: 'score', v: 90},
+        {op: true, e: '3', a: 'type', v: 'group1'},
+        {op: true, e: '3', a: 'score', v: 100},
+        {op: true, e: '4', a: 'type', v: 'group2'},
+        {op: true, e: '4', a: 'score', v: 50},
       ]);
 
       const query: DatalogQuery = {
@@ -161,11 +161,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should calculate variance with larger dataset', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 1},
-        {op: true, e: 2, a: 'value', v: 2},
-        {op: true, e: 3, a: 'value', v: 3},
-        {op: true, e: 4, a: 'value', v: 4},
-        {op: true, e: 5, a: 'value', v: 5},
+        {op: true, e: '1', a: 'value', v: 1},
+        {op: true, e: '2', a: 'value', v: 2},
+        {op: true, e: '3', a: 'value', v: 3},
+        {op: true, e: '4', a: 'value', v: 4},
+        {op: true, e: '5', a: 'value', v: 5},
       ]);
 
       const query: DatalogQuery = {

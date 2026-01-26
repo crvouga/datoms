@@ -130,7 +130,7 @@ describe('datalogToPostgresSQL', () => {
   test('query with constant values', () => {
     const query: DatalogQuery = {
       find: {name: {t: 'identity', c: '?name'}},
-      where: [{t: 'match', e: 1, a: 'name', v: '?name'}],
+      where: [{t: 'match', e: '1', a: 'name', v: '?name'}],
     };
 
     const result = datalogToPostgresSQL(query);

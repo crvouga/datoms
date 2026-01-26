@@ -18,21 +18,19 @@ export type Attribute = string;
  * **Supported Types:**
  * - Primitives: `string`, `number`, `boolean`
  * - Nullability: `null`, `undefined` (for optional attributes)
- * - References: `EntityId` (number | string) for entity relationships
+ * - References: `EntityId` (string) for entity relationships
  *
  * **Note:** `EntityId` is included here to allow referencing other entities as values.
- * Since `EntityId` can be `number | string`, numeric entity IDs overlap with
- * the `number` type, which is intentional and handled correctly by TypeScript.
  *
  * @example
  * // Valid values in datoms:
- * { e: 1, a: "name", v: "Alice", op: true }                    // string
- * { e: 1, a: "age", v: 30, op: true }                          // number
- * { e: 1, a: "active", v: true, op: true }                      // boolean
- * { e: 1, a: "middleName", v: null, op: true }                 // null
- * { e: 1, a: "optional", v: undefined, op: true }              // undefined
- * { e: 1, a: "parent", v: 42, op: true }                       // EntityId (number)
- * { e: 1, a: "owner", v: "user-123", op: true }               // EntityId (string)
+ * { e: "1", a: "name", v: "Alice", op: true }                    // string
+ * { e: "1", a: "age", v: 30, op: true }                          // number
+ * { e: "1", a: "active", v: true, op: true }                      // boolean
+ * { e: "1", a: "middleName", v: null, op: true }                 // null
+ * { e: "1", a: "optional", v: undefined, op: true }              // undefined
+ * { e: "1", a: "parent", v: "42", op: true }                     // EntityId (string)
+ * { e: "1", a: "owner", v: "user-123", op: true }                // EntityId (string)
  */
 export type Value = string | number | boolean | null | undefined | EntityId;
 

@@ -43,7 +43,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       await db.write(
         datoms({
-          entityId: 1,
+          entityId: '1',
           [USER_TYPE]: USER_TYPE_ADMIN,
           [USER_NAME]: 'Admin User',
           'user/email': 'admin@example.com',
@@ -73,7 +73,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       await db.write(
         datoms({
-          entityId: 2,
+          entityId: '2',
           [USER_TYPE]: USER_TYPE_AUTHOR,
           [USER_NAME]: 'Author User',
           'user/email': 'author@example.com',
@@ -97,7 +97,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       await db.write(
         datoms({
-          entityId: 3,
+          entityId: '3',
           [USER_TYPE]: USER_TYPE_READER,
           [USER_NAME]: 'Reader User',
           [USER_EMAIL]: 'reader@example.com',
@@ -124,7 +124,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create author
       await db.write(
         datoms({
-          entityId: 1,
+          entityId: '1',
           [USER_TYPE]: USER_TYPE_AUTHOR,
           [USER_NAME]: 'Author',
         }),
@@ -134,7 +134,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const now = new Date().toISOString();
       await db.write(
         datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TITLE]: 'My First Post',
           [POST_CONTENT]: 'This is the content',
           [POST_STATUS]: POST_STATUS_DRAFT,
@@ -166,7 +166,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create author
       await db.write(
         datoms({
-          entityId: 1,
+          entityId: '1',
           [USER_TYPE]: USER_TYPE_AUTHOR,
           [USER_NAME]: 'Author',
         }),
@@ -175,7 +175,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create draft post
       await db.write(
         datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TITLE]: 'My Post',
           [POST_CONTENT]: 'Content',
           [POST_STATUS]: POST_STATUS_DRAFT,
@@ -186,9 +186,9 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Publish the post
       const now = new Date().toISOString();
       await db.write([
-        {op: false, e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT},
+        {op: false, e: '100', a: POST_STATUS, v: POST_STATUS_DRAFT},
         ...datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_STATUS]: POST_STATUS_PUBLISHED,
           [POST_UPDATED_AT]: now,
         }),
@@ -212,7 +212,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create author
       await db.write(
         datoms({
-          entityId: 1,
+          entityId: '1',
           [USER_TYPE]: USER_TYPE_AUTHOR,
           [USER_NAME]: 'Author',
         }),
@@ -221,7 +221,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create post
       await db.write(
         datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TITLE]: 'Original Title',
           [POST_CONTENT]: 'Original Content',
           [POST_STATUS]: POST_STATUS_DRAFT,
@@ -232,10 +232,10 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Edit the post
       const now = new Date().toISOString();
       await db.write([
-        {op: false, e: 100, a: POST_TITLE, v: 'Original Title'},
-        {op: false, e: 100, a: POST_CONTENT, v: 'Original Content'},
+        {op: false, e: '100', a: POST_TITLE, v: 'Original Title'},
+        {op: false, e: '100', a: POST_CONTENT, v: 'Original Content'},
         ...datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TITLE]: 'Updated Title',
           [POST_CONTENT]: 'Updated Content',
           [POST_UPDATED_AT]: now,
@@ -265,7 +265,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {db} = f;
 
       // Create author
-      const authorId = 1;
+      const authorId = '1';
       await db.write(
         datoms({
           entityId: authorId,
@@ -277,7 +277,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create draft post by this author
       await db.write(
         datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TITLE]: 'Draft Post',
           [POST_CONTENT]: 'Content',
           [POST_STATUS]: POST_STATUS_DRAFT,
@@ -291,13 +291,13 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Query as the author
       const found = await db.read({
         find: {
-          e: {t: 'identity', c: '?e'},
+          id: {t: 'identity', c: '?id'},
           title: {t: 'identity', c: '?title'},
           status: {t: 'identity', c: '?status'},
         },
         where: [
-          {t: 'match', e: '?e', a: POST_TITLE, v: '?title'},
-          {t: 'match', e: '?e', a: POST_STATUS, v: '?status'},
+          {t: 'match', e: '?id', a: POST_TITLE, v: '?title'},
+          {t: 'match', e: '?id', a: POST_STATUS, v: '?status'},
         ],
         context: {userId: authorId, userType: USER_TYPE_AUTHOR},
       });
@@ -311,8 +311,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {db} = f;
 
       // Create two authors
-      const author1Id = 1;
-      const author2Id = 2;
+      const author1Id = '1';
+      const author2Id = '2';
       await db.write(
         datoms(
           {
@@ -331,7 +331,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create draft post by author 2
       await db.write(
         datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TITLE]: "Author 2's Draft",
           [POST_CONTENT]: 'Content',
           [POST_STATUS]: POST_STATUS_DRAFT,
@@ -344,8 +344,14 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Query as author 1 (should NOT see author 2's draft)
       const found = await db.read({
-        find: {e: {t: 'identity', c: '?e'}, title: {t: 'identity', c: '?title'}},
-        where: [{t: 'match', e: '?e', a: POST_TITLE, v: '?title'}],
+        find: {
+          e: {t: 'identity', c: '?e'},
+          title: {t: 'identity', c: '?title'},
+        },
+        where: [
+          //
+          {t: 'match', e: '?e', a: POST_TITLE, v: '?title'},
+        ],
         context: {userId: author1Id, userType: USER_TYPE_AUTHOR},
       });
       const results = found.data;
@@ -356,8 +362,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {db} = f;
 
       // Create two authors
-      const author1Id = 1;
-      const author2Id = 2;
+      const author1Id = '1';
+      const author2Id = '2';
       await db.write(
         datoms(
           {
@@ -376,7 +382,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create published post by author 2
       await db.write(
         datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TITLE]: 'Published Post',
           [POST_CONTENT]: 'Content',
           [POST_STATUS]: POST_STATUS_PUBLISHED,
@@ -402,8 +408,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {db} = f;
 
       // Create author and reader
-      const authorId = 1;
-      const readerId = 2;
+      const authorId = '1';
+      const readerId = '2';
       await db.write(
         datoms(
           {
@@ -423,13 +429,13 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       await db.write(
         datoms(
           {
-            entityId: 100,
+            entityId: '100',
             [POST_TITLE]: 'Draft Post',
             [POST_STATUS]: POST_STATUS_DRAFT,
             [POST_AUTHOR]: authorId,
           },
           {
-            entityId: 101,
+            entityId: '101',
             [POST_TITLE]: 'Published Post',
             [POST_STATUS]: POST_STATUS_PUBLISHED,
             [POST_AUTHOR]: authorId,
@@ -463,8 +469,8 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {db} = f;
 
       // Create admin and author
-      const adminId = 1;
-      const authorId = 2;
+      const adminId = '1';
+      const authorId = '2';
       await db.write(
         datoms(
           {
@@ -484,13 +490,13 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       await db.write(
         datoms(
           {
-            entityId: 100,
+            entityId: '100',
             [POST_TITLE]: 'Draft Post',
             [POST_STATUS]: POST_STATUS_DRAFT,
             [POST_AUTHOR]: authorId,
           },
           {
-            entityId: 101,
+            entityId: '101',
             [POST_TITLE]: 'Published Post',
             [POST_STATUS]: POST_STATUS_PUBLISHED,
             [POST_AUTHOR]: authorId,
@@ -531,7 +537,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       await expect(
         db.write(
           datoms({
-            entityId: 100,
+            entityId: '100',
             [POST_CONTENT]: 'Content',
             [POST_STATUS]: POST_STATUS_DRAFT,
             [POST_AUTHOR]: 1,
@@ -542,7 +548,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create post with all required fields (should succeed)
       await db.write(
         datoms({
-          entityId: 101,
+          entityId: '101',
           [POST_TITLE]: 'Valid Post',
           [POST_CONTENT]: 'Content',
           [POST_STATUS]: POST_STATUS_DRAFT,
@@ -568,7 +574,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       await expect(
         db.write(
           datoms({
-            entityId: 100,
+            entityId: '100',
             [POST_TITLE]: 'Post',
             [POST_AUTHOR]: 999,
           }),
@@ -578,7 +584,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create author first
       await db.write(
         datoms({
-          entityId: 1,
+          entityId: '1',
           [USER_TYPE]: USER_TYPE_AUTHOR,
           [USER_NAME]: 'Author',
         }),
@@ -587,7 +593,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Now create post (should succeed)
       await db.write(
         datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TITLE]: 'Post',
           [POST_AUTHOR]: 1,
         }),
@@ -608,9 +614,9 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       await db.write(
         datoms(
-          {entityId: 1, [TAG_NAME]: 'javascript'},
-          {entityId: 2, [TAG_NAME]: 'typescript'},
-          {entityId: 3, [TAG_NAME]: 'database'},
+          {entityId: '1', [TAG_NAME]: 'javascript'},
+          {entityId: '2', [TAG_NAME]: 'typescript'},
+          {entityId: '3', [TAG_NAME]: 'database'},
         ),
       );
 
@@ -632,7 +638,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create author
       await db.write(
         datoms({
-          entityId: 1,
+          entityId: '1',
           [USER_TYPE]: USER_TYPE_AUTHOR,
           [USER_NAME]: 'Author',
         }),
@@ -641,7 +647,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create post
       await db.write(
         datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TITLE]: 'My Post',
           [POST_STATUS]: POST_STATUS_PUBLISHED,
           [POST_AUTHOR]: 1,
@@ -650,17 +656,20 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Create tags
       await db.write(
-        datoms({entityId: 1, [TAG_NAME]: 'javascript'}, {entityId: 2, [TAG_NAME]: 'typescript'}),
+        datoms(
+          {entityId: '1', [TAG_NAME]: 'javascript'},
+          {entityId: '2', [TAG_NAME]: 'typescript'},
+        ),
       );
 
       // Associate tags with post
       await db.write([
         ...datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TAG]: 1,
         }),
         ...datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TAG]: 2,
         }),
       ]);
@@ -691,7 +700,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create author
       await db.write(
         datoms({
-          entityId: 1,
+          entityId: '1',
           [USER_TYPE]: USER_TYPE_AUTHOR,
           [USER_NAME]: 'Author',
         }),
@@ -699,21 +708,24 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Create tags
       await db.write(
-        datoms({entityId: 1, [TAG_NAME]: 'javascript'}, {entityId: 2, [TAG_NAME]: 'typescript'}),
+        datoms(
+          {entityId: '1', [TAG_NAME]: 'javascript'},
+          {entityId: '2', [TAG_NAME]: 'typescript'},
+        ),
       );
 
       // Create posts
       await db.write(
         datoms(
           {
-            entityId: 100,
+            entityId: '100',
             [POST_TITLE]: 'JS Post',
             [POST_STATUS]: POST_STATUS_PUBLISHED,
             [POST_AUTHOR]: 1,
             [POST_TAG]: 1,
           },
           {
-            entityId: 101,
+            entityId: '101',
             [POST_TITLE]: 'TS Post',
             [POST_STATUS]: POST_STATUS_PUBLISHED,
             [POST_AUTHOR]: 1,
@@ -741,7 +753,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       const {db} = f;
 
       // Create author
-      const authorId = 1;
+      const authorId = '1';
       await db.write(
         datoms({
           entityId: authorId,
@@ -753,7 +765,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       // Create draft post
       await db.write(
         datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_TITLE]: 'My Blog Post',
           [POST_CONTENT]: 'Initial content',
           [POST_STATUS]: POST_STATUS_DRAFT,
@@ -763,26 +775,26 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
 
       // Edit post
       await db.write([
-        {op: false, e: 100, a: POST_CONTENT, v: 'Initial content'},
+        {op: false, e: '100', a: POST_CONTENT, v: 'Initial content'},
         ...datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_CONTENT]: 'Updated content',
         }),
       ]);
 
       // Create tags
       await db.write(
-        datoms({entityId: 1, [TAG_NAME]: 'javascript'}, {entityId: 2, [TAG_NAME]: 'tutorial'}),
+        datoms({entityId: '1', [TAG_NAME]: 'javascript'}, {entityId: '2', [TAG_NAME]: 'tutorial'}),
       );
 
       // Add tags to post
-      await db.write(datoms({entityId: 100, [POST_TAG]: 1}, {entityId: 100, [POST_TAG]: 2}));
+      await db.write(datoms({entityId: '100', [POST_TAG]: 1}, {entityId: '100', [POST_TAG]: 2}));
 
       // Publish post
       await db.write([
-        {op: false, e: 100, a: POST_STATUS, v: POST_STATUS_DRAFT},
+        {op: false, e: '100', a: POST_STATUS, v: POST_STATUS_DRAFT},
         datoms({
-          entityId: 100,
+          entityId: '100',
           [POST_STATUS]: POST_STATUS_PUBLISHED,
         }),
       ]);

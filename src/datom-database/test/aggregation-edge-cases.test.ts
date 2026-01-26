@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle aggregations with all zero values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 0},
-        {op: true, e: 2, a: 'value', v: 0},
-        {op: true, e: 3, a: 'value', v: 0},
+        {op: true, e: '1', a: 'value', v: 0},
+        {op: true, e: '2', a: 'value', v: 0},
+        {op: true, e: '3', a: 'value', v: 0},
       ]);
 
       const query: DatalogQuery = {
@@ -50,8 +50,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {db} = f;
       const largeNumber = Number.MAX_SAFE_INTEGER - 1000;
       await db.write([
-        {op: true, e: 1, a: 'value', v: largeNumber},
-        {op: true, e: 2, a: 'value', v: 1000},
+        {op: true, e: '1', a: 'value', v: largeNumber},
+        {op: true, e: '2', a: 'value', v: 1000},
       ]);
 
       const query: DatalogQuery = {
@@ -75,9 +75,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle aggregations with very small numbers', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 0.0000001},
-        {op: true, e: 2, a: 'value', v: 0.0000002},
-        {op: true, e: 3, a: 'value', v: 0.0000003},
+        {op: true, e: '1', a: 'value', v: 0.0000001},
+        {op: true, e: '2', a: 'value', v: 0.0000002},
+        {op: true, e: '3', a: 'value', v: 0.0000003},
       ]);
 
       const query: DatalogQuery = {
@@ -100,9 +100,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle aggregations with mixed positive and negative values summing to zero', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 100},
-        {op: true, e: 2, a: 'value', v: -50},
-        {op: true, e: 3, a: 'value', v: -50},
+        {op: true, e: '1', a: 'value', v: 100},
+        {op: true, e: '2', a: 'value', v: -50},
+        {op: true, e: '3', a: 'value', v: -50},
       ]);
 
       const query: DatalogQuery = {
@@ -127,13 +127,13 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle count with retractions', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'item', v: 'A'},
-        {op: true, e: 2, a: 'item', v: 'B'},
-        {op: true, e: 3, a: 'item', v: 'C'},
+        {op: true, e: '1', a: 'item', v: 'A'},
+        {op: true, e: '2', a: 'item', v: 'B'},
+        {op: true, e: '3', a: 'item', v: 'C'},
       ]);
 
       // false one item
-      await db.write([{op: false, e: 2, a: 'item', v: 'B'}]);
+      await db.write([{op: false, e: '2', a: 'item', v: 'B'}]);
 
       const query: DatalogQuery = {
         find: {
@@ -153,13 +153,13 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle aggregations with updates (true over existing)', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'score', v: 50},
-        {op: true, e: 2, a: 'score', v: 60},
-        {op: true, e: 3, a: 'score', v: 70},
+        {op: true, e: '1', a: 'score', v: 50},
+        {op: true, e: '2', a: 'score', v: 60},
+        {op: true, e: '3', a: 'score', v: 70},
       ]);
 
       // Update entity 1's score (true adds a new value, doesn't replace)
-      await db.write([{op: true, e: 1, a: 'score', v: 90}]);
+      await db.write([{op: true, e: '1', a: 'score', v: 90}]);
 
       const query: DatalogQuery = {
         find: {
@@ -184,8 +184,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle variance and stddev with two identical values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 10},
-        {op: true, e: 2, a: 'value', v: 10},
+        {op: true, e: '1', a: 'value', v: 10},
+        {op: true, e: '2', a: 'value', v: 10},
       ]);
 
       const query: DatalogQuery = {
@@ -207,8 +207,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle median with two values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 10},
-        {op: true, e: 2, a: 'value', v: 20},
+        {op: true, e: '1', a: 'value', v: 10},
+        {op: true, e: '2', a: 'value', v: 20},
       ]);
 
       const query: DatalogQuery = {
@@ -228,15 +228,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle aggregations with single value after retractions', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'price', v: 100},
-        {op: true, e: 2, a: 'price', v: 200},
-        {op: true, e: 3, a: 'price', v: 300},
+        {op: true, e: '1', a: 'price', v: 100},
+        {op: true, e: '2', a: 'price', v: 200},
+        {op: true, e: '3', a: 'price', v: 300},
       ]);
 
       // false two values
       await db.write([
-        {op: false, e: 1, a: 'price', v: 100},
-        {op: false, e: 3, a: 'price', v: 300},
+        {op: false, e: '1', a: 'price', v: 100},
+        {op: false, e: '3', a: 'price', v: 300},
       ]);
 
       const query: DatalogQuery = {

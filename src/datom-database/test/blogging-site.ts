@@ -46,7 +46,7 @@ export const POST_ACCESS_CONTROL: AfterRead = {
   name: 'post-access-control',
   async execute(results, ctx) {
     const {db, query} = ctx;
-    const userId = query.context?.userId as number | undefined;
+    const userId = query.context?.userId as EntityId | undefined;
     const userType = query.context?.userType as string | undefined;
 
     // If no user context, block all posts
@@ -78,14 +78,14 @@ export const POST_ACCESS_CONTROL: AfterRead = {
 
     // Fetch author and status information for all posts
     // (author is never in query results, status might be missing)
-    const postAuthorMap = new Map<EntityId, number>();
+    const postAuthorMap = new Map<EntityId, EntityId>();
     for (const postId of postEntities) {
       // Fetch author
       const queryAuthor = datomsQueryToDatalogQuery({e: postId, a: POST_AUTHOR});
       const {data: resultsAuthor} = await db.read(queryAuthor);
       const authorDatoms = queryResultsToDatoms(resultsAuthor, {e: postId, a: POST_AUTHOR});
       if (authorDatoms.length > 0) {
-        const author = authorDatoms[0]?.v as number | undefined;
+        const author = authorDatoms[0]?.v as EntityId | undefined;
         if (author !== undefined) {
           postAuthorMap.set(postId, author);
         }
@@ -158,7 +158,7 @@ export const POST_VALIDATOR: Hook = {
     const validator = new HookValidator();
 
     // Find all post entities being created/updated
-    const postEntities = new Set<number>();
+    const postEntities = new Set<EntityId>();
     for (const datom of tx.datoms) {
       if (
         datom.a === POST_TITLE ||
@@ -166,7 +166,7 @@ export const POST_VALIDATOR: Hook = {
         datom.a === POST_STATUS ||
         datom.a === POST_AUTHOR
       ) {
-        postEntities.add(datom.e as number);
+        postEntities.add(datom.e as EntityId);
       }
     }
 
@@ -234,7 +234,7 @@ export const AUTHOR_VALIDATOR: Hook = {
     // Find all post author assignments
     for (const datom of tx.datoms) {
       if (datom.a === POST_AUTHOR && datom.op === true) {
-        const authorId = datom.v as number;
+        const authorId = datom.v as EntityId;
         const query = datomsQueryToDatalogQuery({e: authorId});
         const found = await db.read(query);
         const results = found.data;

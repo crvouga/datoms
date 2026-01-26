@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should support ordering and limits', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'score', v: 100},
-        {op: true, e: 2, a: 'score', v: 400},
-        {op: true, e: 3, a: 'score', v: 250},
+        {op: true, e: '1', a: 'score', v: 100},
+        {op: true, e: '2', a: 'score', v: 400},
+        {op: true, e: '3', a: 'score', v: 250},
       ]);
 
       const query: DatalogQuery = {
@@ -42,15 +42,15 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle queries with ordering on multiple variables', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 1, a: 'score', v: 100},
-        {op: true, e: 1, a: 'age', v: 30},
-        {op: true, e: 2, a: 'name', v: 'Bob'},
-        {op: true, e: 2, a: 'score', v: 100},
-        {op: true, e: 2, a: 'age', v: 25},
-        {op: true, e: 3, a: 'name', v: 'Charlie'},
-        {op: true, e: 3, a: 'score', v: 200},
-        {op: true, e: 3, a: 'age', v: 30},
+        {op: true, e: '1', a: 'name', v: 'Alice'},
+        {op: true, e: '1', a: 'score', v: 100},
+        {op: true, e: '1', a: 'age', v: 30},
+        {op: true, e: '2', a: 'name', v: 'Bob'},
+        {op: true, e: '2', a: 'score', v: 100},
+        {op: true, e: '2', a: 'age', v: 25},
+        {op: true, e: '3', a: 'name', v: 'Charlie'},
+        {op: true, e: '3', a: 'score', v: 200},
+        {op: true, e: '3', a: 'age', v: 30},
       ]);
 
       // Find all people, ordered by score (desc) then age (asc)
@@ -84,9 +84,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle limit 0', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'score', v: 100},
-        {op: true, e: 2, a: 'score', v: 200},
-        {op: true, e: 3, a: 'score', v: 300},
+        {op: true, e: '1', a: 'score', v: 100},
+        {op: true, e: '2', a: 'score', v: 200},
+        {op: true, e: '3', a: 'score', v: 300},
       ]);
 
       const query: DatalogQuery = {
@@ -106,8 +106,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle limit larger than results', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'score', v: 100},
-        {op: true, e: 2, a: 'score', v: 200},
+        {op: true, e: '1', a: 'score', v: 100},
+        {op: true, e: '2', a: 'score', v: 200},
       ]);
 
       const found = await db.read({
@@ -122,10 +122,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle limit with ordering', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'score', v: 100},
-        {op: true, e: 2, a: 'score', v: 400},
-        {op: true, e: 3, a: 'score', v: 250},
-        {op: true, e: 4, a: 'score', v: 300},
+        {op: true, e: '1', a: 'score', v: 100},
+        {op: true, e: '2', a: 'score', v: 400},
+        {op: true, e: '3', a: 'score', v: 250},
+        {op: true, e: '4', a: 'score', v: 300},
       ]);
 
       const found = await db.read({
@@ -143,10 +143,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle ordering on variable not in find', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 1, a: 'score', v: 100},
-        {op: true, e: 2, a: 'name', v: 'Bob'},
-        {op: true, e: 2, a: 'score', v: 200},
+        {op: true, e: '1', a: 'name', v: 'Alice'},
+        {op: true, e: '1', a: 'score', v: 100},
+        {op: true, e: '2', a: 'name', v: 'Bob'},
+        {op: true, e: '2', a: 'score', v: 200},
       ]);
 
       // Note: Current implementation orders AFTER projection, so ordering by variables
@@ -187,10 +187,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle ordering with null values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'score', v: 100},
-        {op: true, e: 2, a: 'score', v: null},
-        {op: true, e: 3, a: 'score', v: 200},
-        {op: true, e: 4, a: 'score', v: null},
+        {op: true, e: '1', a: 'score', v: 100},
+        {op: true, e: '2', a: 'score', v: null},
+        {op: true, e: '3', a: 'score', v: 200},
+        {op: true, e: '4', a: 'score', v: null},
       ]);
 
       const query: DatalogQuery = {
@@ -211,10 +211,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should handle ordering with mixed types', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 'zebra'},
-        {op: true, e: 2, a: 'value', v: 100},
-        {op: true, e: 3, a: 'value', v: 'apple'},
-        {op: true, e: 4, a: 'value', v: 50},
+        {op: true, e: '1', a: 'value', v: 'zebra'},
+        {op: true, e: '2', a: 'value', v: 100},
+        {op: true, e: '3', a: 'value', v: 'apple'},
+        {op: true, e: '4', a: 'value', v: 50},
       ]);
 
       const query: DatalogQuery = {

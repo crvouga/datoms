@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should return a sample of N values from the set', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 10},
-        {op: true, e: 2, a: 'value', v: 20},
-        {op: true, e: 3, a: 'value', v: 30},
+        {op: true, e: '1', a: 'value', v: 10},
+        {op: true, e: '2', a: 'value', v: 20},
+        {op: true, e: '3', a: 'value', v: 30},
       ]);
 
       const query: DatalogQuery = {
@@ -62,9 +62,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should return single value when N=1', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 10},
-        {op: true, e: 2, a: 'value', v: 20},
-        {op: true, e: 3, a: 'value', v: 30},
+        {op: true, e: '1', a: 'value', v: 10},
+        {op: true, e: '2', a: 'value', v: 20},
+        {op: true, e: '3', a: 'value', v: 30},
       ]);
 
       const query: DatalogQuery = {
@@ -84,8 +84,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should return all values when N >= total', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 10},
-        {op: true, e: 2, a: 'value', v: 20},
+        {op: true, e: '1', a: 'value', v: 10},
+        {op: true, e: '2', a: 'value', v: 20},
       ]);
 
       const query: DatalogQuery = {
@@ -105,11 +105,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should return array of N values without duplicates', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 10},
-        {op: true, e: 2, a: 'value', v: 20},
-        {op: true, e: 3, a: 'value', v: 30},
-        {op: true, e: 4, a: 'value', v: 40},
-        {op: true, e: 5, a: 'value', v: 50},
+        {op: true, e: '1', a: 'value', v: 10},
+        {op: true, e: '2', a: 'value', v: 20},
+        {op: true, e: '3', a: 'value', v: 30},
+        {op: true, e: '4', a: 'value', v: 40},
+        {op: true, e: '5', a: 'value', v: 50},
       ]);
 
       const query: DatalogQuery = {
@@ -131,9 +131,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should work with string values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 2, a: 'name', v: 'Bob'},
-        {op: true, e: 3, a: 'name', v: 'Charlie'},
+        {op: true, e: '1', a: 'name', v: 'Alice'},
+        {op: true, e: '2', a: 'name', v: 'Bob'},
+        {op: true, e: '3', a: 'name', v: 'Charlie'},
       ]);
 
       const query: DatalogQuery = {
@@ -155,12 +155,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should work with filters', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'type', v: 'product'},
-        {op: true, e: 1, a: 'price', v: 100},
-        {op: true, e: 2, a: 'type', v: 'product'},
-        {op: true, e: 2, a: 'price', v: 200},
-        {op: true, e: 3, a: 'type', v: 'service'},
-        {op: true, e: 3, a: 'price', v: 50},
+        {op: true, e: '1', a: 'type', v: 'product'},
+        {op: true, e: '1', a: 'price', v: 100},
+        {op: true, e: '2', a: 'type', v: 'product'},
+        {op: true, e: '2', a: 'price', v: 200},
+        {op: true, e: '3', a: 'type', v: 'service'},
+        {op: true, e: '3', a: 'price', v: 50},
       ]);
 
       const query: DatalogQuery = {

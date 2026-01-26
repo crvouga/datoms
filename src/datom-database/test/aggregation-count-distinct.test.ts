@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should count distinct values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Alice'},
-        {op: true, e: 2, a: 'name', v: 'Bob'},
-        {op: true, e: 3, a: 'name', v: 'Alice'},
+        {op: true, e: '1', a: 'name', v: 'Alice'},
+        {op: true, e: '2', a: 'name', v: 'Bob'},
+        {op: true, e: '3', a: 'name', v: 'Alice'},
       ]);
 
       const query: DatalogQuery = {
@@ -51,7 +51,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should count distinct single value', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       const query: DatalogQuery = {
         find: {total: {t: 'count-distinct', c: '?name'}},
@@ -67,11 +67,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should count distinct numeric values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'age', v: 25},
-        {op: true, e: 2, a: 'age', v: 30},
-        {op: true, e: 3, a: 'age', v: 25},
-        {op: true, e: 4, a: 'age', v: 30},
-        {op: true, e: 5, a: 'age', v: 35},
+        {op: true, e: '1', a: 'age', v: 25},
+        {op: true, e: '2', a: 'age', v: 30},
+        {op: true, e: '3', a: 'age', v: 25},
+        {op: true, e: '4', a: 'age', v: 30},
+        {op: true, e: '5', a: 'age', v: 35},
       ]);
 
       const query: DatalogQuery = {
@@ -88,12 +88,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should count distinct with filters', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'type', v: 'person'},
-        {op: true, e: 1, a: 'city', v: 'NYC'},
-        {op: true, e: 2, a: 'type', v: 'person'},
-        {op: true, e: 2, a: 'city', v: 'LA'},
-        {op: true, e: 3, a: 'type', v: 'person'},
-        {op: true, e: 3, a: 'city', v: 'NYC'},
+        {op: true, e: '1', a: 'type', v: 'person'},
+        {op: true, e: '1', a: 'city', v: 'NYC'},
+        {op: true, e: '2', a: 'type', v: 'person'},
+        {op: true, e: '2', a: 'city', v: 'LA'},
+        {op: true, e: '3', a: 'type', v: 'person'},
+        {op: true, e: '3', a: 'city', v: 'NYC'},
       ]);
 
       const query: DatalogQuery = {
@@ -113,10 +113,10 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should count distinct different data types', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 42},
-        {op: true, e: 2, a: 'value', v: 'test'},
-        {op: true, e: 3, a: 'value', v: 42},
-        {op: true, e: 4, a: 'value', v: true},
+        {op: true, e: '1', a: 'value', v: 42},
+        {op: true, e: '2', a: 'value', v: 'test'},
+        {op: true, e: '3', a: 'value', v: 42},
+        {op: true, e: '4', a: 'value', v: true},
       ]);
 
       const query: DatalogQuery = {

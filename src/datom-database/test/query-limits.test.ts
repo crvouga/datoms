@@ -22,7 +22,7 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
     test('should allow queries within limit', async () => {
       const {db} = f;
       for (let i = 1; i <= 5; i++) {
-        await db.write([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.write([{op: true, e: String(i), a: 'tag', v: `tag-${i}`}]);
       }
 
       const query = datomsQueryToDatalogQuery({
@@ -41,7 +41,7 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
       const {db} = f;
       // Add more datoms than the limit
       for (let i = 1; i <= 10; i++) {
-        await db.write([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.write([{op: true, e: String(i), a: 'tag', v: `tag-${i}`}]);
       }
 
       try {
@@ -60,7 +60,7 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
     test('should work with limit option', async () => {
       const {db} = f;
       for (let i = 1; i <= 10; i++) {
-        await db.write([{op: true, e: i, a: 'tag', v: `tag-${i}`}]);
+        await db.write([{op: true, e: String(i), a: 'tag', v: `tag-${i}`}]);
       }
 
       // limit should be applied first, then maxResultSize check
@@ -80,15 +80,15 @@ describe.each(FIXTURES)('Query Result Size Limits (%s)', (_name, createFixture) 
 
     test('should work with filters', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       const query = datomsQueryToDatalogQuery({
-        e: 1,
+        e: '1',
         maxResultSize: 10,
       });
       const {data: queryResults} = await db.read(query);
       const results = queryResultsToDatoms(queryResults, {
-        e: 1,
+        e: '1',
         maxResultSize: 10,
       });
       expect(results.length).toBeLessThanOrEqual(10);

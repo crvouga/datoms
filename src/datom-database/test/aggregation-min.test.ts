@@ -20,9 +20,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should find minimum numeric value', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'age', v: 25},
-        {op: true, e: 2, a: 'age', v: 30},
-        {op: true, e: 3, a: 'age', v: 20},
+        {op: true, e: '1', a: 'age', v: 25},
+        {op: true, e: '2', a: 'age', v: 30},
+        {op: true, e: '3', a: 'age', v: 20},
       ]);
 
       const query: DatalogQuery = {
@@ -51,7 +51,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should find minimum of single value', async () => {
       const {db} = f;
-      await db.write([{op: true, e: 1, a: 'price', v: 100}]);
+      await db.write([{op: true, e: '1', a: 'price', v: 100}]);
 
       const query: DatalogQuery = {
         find: {minimum: {t: 'min', c: '?price', count: 1}},
@@ -67,9 +67,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should find minimum with negative numbers', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 10},
-        {op: true, e: 2, a: 'value', v: -5},
-        {op: true, e: 3, a: 'value', v: 3},
+        {op: true, e: '1', a: 'value', v: 10},
+        {op: true, e: '2', a: 'value', v: -5},
+        {op: true, e: '3', a: 'value', v: 3},
       ]);
 
       const query: DatalogQuery = {
@@ -86,9 +86,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should find minimum decimal numbers', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'price', v: 10.5},
-        {op: true, e: 2, a: 'price', v: 5.25},
-        {op: true, e: 3, a: 'price', v: 15.75},
+        {op: true, e: '1', a: 'price', v: 10.5},
+        {op: true, e: '2', a: 'price', v: 5.25},
+        {op: true, e: '3', a: 'price', v: 15.75},
       ]);
 
       const query: DatalogQuery = {
@@ -105,9 +105,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should find minimum string values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'name', v: 'Charlie'},
-        {op: true, e: 2, a: 'name', v: 'Alice'},
-        {op: true, e: 3, a: 'name', v: 'Bob'},
+        {op: true, e: '1', a: 'name', v: 'Charlie'},
+        {op: true, e: '2', a: 'name', v: 'Alice'},
+        {op: true, e: '3', a: 'name', v: 'Bob'},
       ]);
 
       const query: DatalogQuery = {
@@ -124,12 +124,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should find minimum with filters', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'type', v: 'product'},
-        {op: true, e: 1, a: 'price', v: 100},
-        {op: true, e: 2, a: 'type', v: 'product'},
-        {op: true, e: 2, a: 'price', v: 50},
-        {op: true, e: 3, a: 'type', v: 'service'},
-        {op: true, e: 3, a: 'price', v: 25},
+        {op: true, e: '1', a: 'type', v: 'product'},
+        {op: true, e: '1', a: 'price', v: 100},
+        {op: true, e: '2', a: 'type', v: 'product'},
+        {op: true, e: '2', a: 'price', v: 50},
+        {op: true, e: '3', a: 'type', v: 'service'},
+        {op: true, e: '3', a: 'price', v: 25},
       ]);
 
       const query: DatalogQuery = {
@@ -149,9 +149,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should find minimum with duplicate values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 10},
-        {op: true, e: 2, a: 'value', v: 10},
-        {op: true, e: 3, a: 'value', v: 20},
+        {op: true, e: '1', a: 'value', v: 10},
+        {op: true, e: '2', a: 'value', v: 10},
+        {op: true, e: '3', a: 'value', v: 20},
       ]);
 
       const query: DatalogQuery = {
@@ -168,9 +168,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should find minimum with zero values', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'value', v: 0},
-        {op: true, e: 2, a: 'value', v: 10},
-        {op: true, e: 3, a: 'value', v: 5},
+        {op: true, e: '1', a: 'value', v: 0},
+        {op: true, e: '2', a: 'value', v: 10},
+        {op: true, e: '3', a: 'value', v: 5},
       ]);
 
       const query: DatalogQuery = {
@@ -187,12 +187,12 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     test('should find minimum after updates', async () => {
       const {db} = f;
       await db.write([
-        {op: true, e: 1, a: 'price', v: 100},
-        {op: true, e: 2, a: 'price', v: 200},
+        {op: true, e: '1', a: 'price', v: 100},
+        {op: true, e: '2', a: 'price', v: 200},
       ]);
 
       // Update to a lower value
-      await db.write([{op: true, e: 2, a: 'price', v: 50}]);
+      await db.write([{op: true, e: '2', a: 'price', v: 50}]);
 
       const query: DatalogQuery = {
         find: {minimum: {t: 'min', c: '?price', count: 1}},
