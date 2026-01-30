@@ -553,18 +553,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         if (outputKey === 'v') {
           continue;
         }
-        let varName: string | undefined;
-        if (
-          typeof expr === 'object' &&
-          expr !== null &&
-          't' in expr &&
-          'c' in expr &&
-          expr.t === 'identity'
-        ) {
-          varName = expr.c;
-        } else if (typeof expr === 'string') {
-          varName = expr;
-        }
+        const varName: string | undefined = expr.c;
         if (varName && variableToColumn.get(varName)?.endsWith('.v')) {
           keysFromValueColumn.add(outputKey);
         }
