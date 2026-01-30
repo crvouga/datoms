@@ -1011,26 +1011,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       // Project results
       const projected: QueryResult<TFind> = results.map(row => {
         const result: Record<string, Value | Attribute> = {};
-        for (const outputKey of Object.keys(modifiedQuery.find)) {
-          const expr = modifiedQuery.find[outputKey];
-          let varName: string | undefined;
-          if (Array.isArray(expr) && expr.length === 1 && typeof expr[0] === 'string') {
-            varName = expr[0];
-          } else if (typeof expr === 'string') {
-            varName = expr;
-          } else if (
-            typeof expr === 'object' &&
-            expr !== null &&
-            't' in expr &&
-            'c' in expr &&
-            expr.t === 'identity' &&
-            typeof expr.c === 'string'
-          ) {
-            // Handle structured find format: {t: 'identity', c: '?x'}
-            varName = expr.c;
-          }
+        for (const [outputKey, expr] of Object.entries(modifiedQuery.find)) {
+          const varName: string | undefined = expr?.c;
           if (varName && varName in row) {
-            result[outputKey] = row[varName];
+            result[outputKey] = row[varName] as Value | Attribute;
           }
         }
         return result as QueryResult<TFind>[number];
