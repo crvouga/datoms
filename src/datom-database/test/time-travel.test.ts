@@ -870,9 +870,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
     test('should handle asOf queries with future transaction IDs', async () => {
       const {db} = f;
-      await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
-      await db.write([{op: true, e: '1', a: 'age', v: 30}]);
-      const tx3 = await db.write([{op: true, e: '2', a: 'name', v: 'Bob'}]);
+      await db.write([{op: true, e: '1', a: 'user/name', v: 'Alice'}]);
+      await db.write([{op: true, e: '1', a: 'user/age', v: 30}]);
+      const tx3 = await db.write([{op: true, e: '2', a: 'user/name', v: 'Bob'}]);
 
       // Get the latest transaction ID
       const latestTx = await db._getLatestTransaction();
@@ -892,8 +892,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const atLatest = queryResultsToDatoms(resultsLatest, {e: '1'});
       expect(atLatest.length).toBeGreaterThanOrEqual(2);
       const attributesAtLatest = atLatest.map(d => d.a);
-      expect(attributesAtLatest).toContain('name');
-      expect(attributesAtLatest).toContain('age');
+      expect(attributesAtLatest).toContain('user/name');
+      expect(attributesAtLatest).toContain('user/age');
 
       // Query asOf with a future transaction ID (larger than latest)
       // Should return current state (all datoms have tx <= futureTx)
@@ -904,8 +904,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const atFuture = queryResultsToDatoms(resultsFuture, {e: '1'});
       expect(atFuture.length).toBeGreaterThanOrEqual(2);
       const attributesAtFuture = atFuture.map(d => d.a);
-      expect(attributesAtFuture).toContain('name');
-      expect(attributesAtFuture).toContain('age');
+      expect(attributesAtFuture).toContain('user/name');
+      expect(attributesAtFuture).toContain('user/age');
 
       // Verify that asOf(futureTx) returns the same as current state
       expect(atFuture.length).toBe(atLatest.length);
@@ -915,15 +915,18 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Query asOf with future transaction ID using datalog query
       const {data: queryAtFuture} = await db.asOf(futureTx).read({
-        find: {name: {t: 'identity', c: '?name'}, age: {t: 'identity', c: '?age'}},
+        find: {
+          name: {t: 'identity', c: '?name'},
+          age: {t: 'identity', c: '?age'},
+        },
         where: [
-          {t: 'match', e: '1', a: 'name', v: '?name'},
-          {t: 'match', e: '1', a: 'age', v: '?age'},
+          {t: 'match', e: '1', a: 'user/name', v: '?name'},
+          {t: 'match', e: '1', a: 'user/age', v: '?age'},
         ],
       });
       expect(queryAtFuture.length).toBeGreaterThanOrEqual(1);
       expect(queryAtFuture[0]?.name).toBe('Alice');
-      expect(queryAtFuture[0]?.age).toBe(30);
+      expect(queryAtFuture[0]?.age).toBe('30');
     });
   });
 });

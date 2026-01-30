@@ -38,8 +38,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results = found.data;
       expect(results).toHaveLength(2);
       const ages = results.map(r => r.a);
-      expect(ages).toContain(30);
-      expect(ages).toContain(40);
+      expect(ages).toContain('30');
+      expect(ages).toContain('40');
     });
 
     test('should handle complex joins with multiple entities and attributes', async () => {
@@ -230,7 +230,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(results).toHaveLength(2);
       const alice = results.find(r => r.name === 'Alice');
       expect(alice).toBeDefined();
-      expect(alice?.age).toBe(30);
+      expect(alice?.age).toBe('30');
       expect(alice?.city).toBe('NYC');
     });
 

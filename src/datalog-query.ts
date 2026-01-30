@@ -41,10 +41,10 @@ export type DatalogQueryWhereClausePredicate =
   | {t: '>'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
   | {t: '>='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
   | {t: '<'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
-  | {t: '='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
-  | {t: '!='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
   | {t: '>='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
   | {t: '<='; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
+  | {t: '='; left: DatalogQueryVariable | Value; right: DatalogQueryVariable | Value}
+  | {t: '!='; left: DatalogQueryVariable | Value; right: DatalogQueryVariable | Value}
   | {t: 'ground'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
   | {t: 'get-else'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}
   | {t: 'missing?'; left: DatalogQueryVariable | number; right: DatalogQueryVariable | number}

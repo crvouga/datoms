@@ -41,7 +41,7 @@ import {
 } from '../hook/hook.js';
 import {ConfiguredDatomDatabaseView} from '../configured-datom-database-view.js';
 import type {DatomDatabaseView, QueryResult, QueryResultEnvelope} from '../datom-database-view.js';
-import type {DatomsQuery} from '../../datoms-query.js';
+import {datomsQueryToDatalogQuery, type DatomsQuery} from '../../datoms-query.js';
 import type {DatomDatabaseViewConfig} from '../datom-database-view-config.js';
 import {datalogToPostgresSQL} from './datalog-to-postgres-sql.js';
 
@@ -259,102 +259,35 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   }
 
   /**
-   * Convert DatomsQuery options to DatalogQuery format for unified SQL generation
+   * Convert DatomsQuery to DatalogQuery, adding viewConfig-specific predicates
    */
   private _datomsQueryToDatalogQuery(
     options: DatomsQuery,
     viewConfig?: DatomDatabaseViewConfig,
   ): DatalogQuery {
-    // Validate mutually exclusive parameters
-    if (options.tx !== undefined && options.txMax !== undefined) {
-      throw new Error('Cannot specify both tx and txMax parameters - they are mutually exclusive');
+    // Use the existing utility function
+    const query = datomsQueryToDatalogQuery({...options, viewConfig});
+
+    // Add op predicate if explicitly specified (CTE handles default op=true)
+    if (options.op === false || options.op === true) {
+      query.where.push({t: '=', left: '?op', right: options.op});
     }
 
-    // Build QueryPattern based on provided filters
-    const pattern: DatalogQueryWhereClauseMatch = {
-      t: 'match',
-      e: options.e !== undefined ? options.e : '?e',
-      a: options.a !== undefined ? options.a : '?a',
-      v: options.v !== undefined ? options.v : '?v',
-    };
-
-    // Build WHERE clause predicates for tx/txMax/op filters
-    const where: DatalogQueryWhereClause[] = [pattern];
-
-    // Handle tx/txMax filtering
-    // For asOf queries, _buildWhereConditions already adds tx <= viewConfig.txId
-    // We only add predicates if user's constraints are more restrictive
-    if (viewConfig?.type === 'asOf') {
-      // For asOf, viewConfig.txId is already applied as upper bound
-      // Add user's tx/txMax only if more restrictive
-      if (options.tx !== undefined) {
-        // If user specifies exact tx, use it (it will be ANDed with tx <= viewConfig.txId)
-        where.push(['=', '?tx' as const, options.tx] as unknown as DatalogQueryWhereClause);
-      } else if (options.txMax !== undefined && options.txMax < viewConfig.txId) {
-        // If user's txMax is more restrictive, add it
-        where.push(['<=', '?tx' as const, options.txMax] as unknown as DatalogQueryWhereClause);
-      }
-      // Otherwise, rely on viewConfig.txId from _buildWhereConditions
-    } else {
-      // For non-asOf queries, use options directly
-      if (options.tx !== undefined) {
-        where.push(['=', '?tx' as const, options.tx] as unknown as DatalogQueryWhereClause);
-      }
-      if (options.txMax !== undefined) {
-        where.push(['<=', '?tx' as const, options.txMax] as unknown as DatalogQueryWhereClause);
-      }
-    }
-
-    // Handle op filtering: if undefined or true, default to true (handled by CTE)
-    // If explicitly false, add predicate to filter to false
-    // If explicitly true, we can add predicate or rely on CTE default
-    if (options.op === false) {
-      where.push(['=', '?op' as const, false] as unknown as DatalogQueryWhereClause);
-    } else if (options.op === true) {
-      // Explicitly true - can add predicate or rely on CTE default (CTE default is fine)
-      // Adding predicate ensures consistency
-      where.push(['=', '?op' as const, true] as unknown as DatalogQueryWhereClause);
-    }
-    // If undefined, rely on CTE default (op = true for non-history queries)
-
-    // Build find clause to return raw datom fields
-    const find: Record<string, DatalogQueryFindVariable> = {
-      e: {t: 'identity' as const, c: '?e' as const},
-      a: {t: 'identity' as const, c: '?a' as const},
-      v: {t: 'identity' as const, c: '?v' as const},
-      tx: {t: 'identity' as const, c: '?tx' as const},
-      op: {t: 'identity' as const, c: '?op' as const},
-    };
-
-    // Set default ordering based on view type
-    // History queries: order by tx, e, a
-    // Other queries: order by numeric e, then a (handled by SQL CASE expression)
-    // Note: The actual SQL ordering with CASE for numeric e is handled in datalog-to-postgres-sql.ts
-    // via the CTE structure, but we add explicit ordering here for consistency
-    let orderBy: DatalogQueryOrderByClause[] | undefined;
+    // Add ordering based on view type
     if (viewConfig?.type === 'history') {
-      orderBy = [
-        {t: 'asc', c: '?tx' as const},
-        {t: 'asc', c: '?e' as const},
-        {t: 'asc', c: '?a' as const},
+      query.orderBy = [
+        {t: 'asc', c: '?tx'},
+        {t: 'asc', c: '?e'},
+        {t: 'asc', c: '?a'},
       ];
-    } else {
-      // For other queries, we rely on the CTE's internal ordering
-      // The final result ordering is handled by the SQL CASE expression in the CTE
-      // But we can add basic ordering here
-      orderBy = [
-        {t: 'asc', c: '?e' as const},
-        {t: 'asc', c: '?a' as const},
+    } else if (!query.orderBy) {
+      query.orderBy = [
+        {t: 'asc', c: '?e'},
+        {t: 'asc', c: '?a'},
       ];
     }
 
-    return {
-      find,
-      where,
-      orderBy,
-      limit: options.limit,
-      offset: options.offset,
-    };
+    return query;
   }
 
   /**
@@ -460,22 +393,85 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     });
   }
 
-  private _reviveValue(value: unknown): unknown {
-    if (typeof value === 'string') {
-      if (value === '__UNDEFINED__') {
-        return undefined;
+  /**
+   * Parse a database row value, handling JSONB parsing and EntityId detection
+   */
+  private _parseRowValue(
+    raw: unknown,
+    isEntityId: boolean,
+    isFromValueColumn: boolean,
+  ): Value | Attribute {
+    let value: unknown = raw;
+    let wasJsonString = false;
+
+    // Parse JSONB values
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        // Track if the parsed value was originally a JSON string (EntityId)
+        if (typeof parsed === 'string') {
+          wasJsonString = true;
+        }
+        value = parsed;
+      } catch {
+        // Not JSON, keep as string (likely an EntityId)
+        wasJsonString = true;
+        value = raw;
+      }
+    } else if (typeof raw === 'number') {
+      // Value came as number from PostgreSQL JSONB - was stored as JSON number, not EntityId
+      wasJsonString = false;
+    }
+
+    // Convert numeric strings to numbers (except EntityIds and values from 'v' column)
+    if (!isEntityId && !isFromValueColumn && typeof value === 'string') {
+      if (/^-?\d+$/.test(value)) {
+        const num = Number.parseInt(value, 10);
+        if (!Number.isNaN(num)) {
+          value = num;
+        }
+      } else if (/^-?\d*\.\d+$/.test(value)) {
+        const num = Number.parseFloat(value);
+        if (!Number.isNaN(num)) {
+          value = num;
+        }
       }
     }
-    if (value === null) {
-      return null;
+
+    // Ensure EntityIds remain as strings
+    if (isEntityId) {
+      return String(value);
     }
-    if (value === undefined) {
+
+    // For values from 'v' column that are EntityId references (like 'from', 'to'):
+    // Convert integers to strings if they were originally JSON strings (EntityIds)
+    // This distinguishes EntityIds (stored as JSON strings like "1") from numeric values (stored as JSON numbers like 30)
+    // Note: PostgreSQL JSONB may return EntityIds stored as JSON strings as numbers, so we check wasJsonString
+    // However, if wasJsonString is false but the value is a small positive integer (< 1000), it might still be an EntityId
+    // that PostgreSQL normalized. We convert small integers to be safe, but preserve larger numbers as they're likely numeric values.
+    if (
+      isFromValueColumn &&
+      typeof value === 'number' &&
+      Number.isInteger(value) &&
+      (wasJsonString || (value >= 0 && value < 1000))
+    ) {
+      return String(value);
+    }
+
+    return this._reviveValue(value) as Value | Attribute;
+  }
+
+  private _reviveValue(value: unknown): unknown {
+    if (typeof value === 'string' && value === '__UNDEFINED__') {
       return undefined;
+    }
+    if (value === null || value === undefined) {
+      return value;
     }
     if (Array.isArray(value)) {
       return value.map(v => this._reviveValue(v));
     }
-    if (typeof value === 'object' && value !== null) {
+    if (typeof value === 'object') {
       const revived: Record<string, unknown> = {};
       const valueObj = value as Record<string, unknown>;
       for (const key in valueObj) {
@@ -530,17 +526,17 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       const variableToColumn = new Map<string, string>();
       for (let i = 0; i < query.where.length; i++) {
         const clause = query.where[i];
-        if (clause && typeof clause === 'object' && 't' in clause && clause.t === 'match') {
+        if (clause && isQueryPattern(clause)) {
           const {e: entityVal, a: attributeVal, v: valueVal} = clause;
           const alias = `d${i}_active`;
-          if (typeof entityVal === 'string' && entityVal.startsWith('?')) {
+          if (isVariable(entityVal)) {
             variableToColumn.set(entityVal, `${alias}.e`);
           }
-          if (typeof attributeVal === 'string' && attributeVal.startsWith('?')) {
+          if (isVariable(attributeVal)) {
             variableToColumn.set(attributeVal, `${alias}.a`);
           }
-          if (typeof valueVal === 'string' && valueVal.startsWith('?')) {
-            variableToColumn.set(valueVal, `${alias}.v`);
+          if (valueVal !== undefined && isVariable(valueVal)) {
+            variableToColumn.set(valueVal as string, `${alias}.v`);
           }
         }
       }
@@ -561,11 +557,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     } else {
       // Empty find clause - check if key corresponds to a variable from 'v'
       for (const clause of query.where) {
-        if (clause && typeof clause === 'object' && 't' in clause && clause.t === 'match') {
+        if (clause && isQueryPattern(clause)) {
           const {v: valueVal} = clause;
-          if (typeof valueVal === 'string' && valueVal.startsWith('?')) {
-            const keyName = valueVal.slice(1); // Remove '?' prefix
-            keysFromValueColumn.add(keyName);
+          if (valueVal !== undefined && isVariable(valueVal)) {
+            keysFromValueColumn.add(stripQuestionMark(valueVal as string));
           }
         }
       }
@@ -575,128 +570,10 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const results: Record<string, Value | Attribute>[] = rows.map((row: DatabaseRow) => {
       const result: Record<string, Value | Attribute> = {};
       for (const key of Object.keys(row)) {
-        let value: unknown = row[key];
-        // Entity IDs ('e' field) and values from 'v' column must remain as strings
-        // Values from 'v' can be EntityIds, so we preserve them as strings to be safe
         const isEntityId = key.toLowerCase() === 'e';
         const isFromValueColumn = keysFromValueColumn.has(key);
-
-        // Track if value was originally a JSON string (EntityId) vs JSON number
-        let wasJsonString = false;
-
-        // PostgreSQL stores values as JSONB, so parse them
-        if (typeof value === 'string') {
-          // For values from 'v' column that are numeric strings, check if they were JSON strings
-          if (isFromValueColumn && /^-?\d+$/.test(value)) {
-            // This is a numeric string from 'v' column - could be an EntityId
-            // Check if it's a JSON string (like "1") vs JSON number (like 1)
-            // If JSON.parse returns a string, it was definitely a JSON string (EntityId)
-            // If JSON.parse returns a number, it was a JSON number (regular numeric value)
-            try {
-              const parsed = JSON.parse(value);
-              if (typeof parsed === 'string') {
-                // It was a JSON string (EntityId like "1")
-                value = parsed;
-                wasJsonString = true;
-              } else {
-                // It was a JSON number (like 30)
-                value = parsed;
-                wasJsonString = false;
-              }
-            } catch {
-              // Not valid JSON, treat as plain string (might be EntityId)
-              wasJsonString = true;
-            }
-          } else if (!isEntityId && !isFromValueColumn && /^-?\d+$/.test(value)) {
-            // Not from 'v' column and not entity ID - safe to convert to number
-            const num = Number.parseInt(value, 10);
-            if (!Number.isNaN(num)) {
-              value = num;
-            } else {
-              try {
-                value = JSON.parse(value);
-                wasJsonString = typeof value === 'string';
-              } catch {
-                // Not valid JSON, keep as string
-                wasJsonString = true;
-              }
-            }
-          } else {
-            // Try JSON parsing for other cases
-            try {
-              const parsed = JSON.parse(value);
-              value = parsed;
-              wasJsonString = typeof parsed === 'string';
-            } catch {
-              // Not valid JSON, keep as string
-              wasJsonString = true;
-            }
-          }
-        } else if (typeof value === 'number') {
-          // Value came as number from database - definitely not a string EntityId
-          // Keep it as a number (was stored as JSON number)
-          wasJsonString = false;
-        } else {
-          // For other types (boolean, object, etc.), not a string EntityId
-          wasJsonString = false;
-        }
-        // For aggregation results, handle numeric strings specially (but not entity IDs or values from 'v')
-        let finalValue = value;
-        if (!isEntityId && !isFromValueColumn && typeof value === 'string') {
-          if (/^-?\d+$/.test(value)) {
-            const num = Number.parseInt(value, 10);
-            if (!Number.isNaN(num)) {
-              finalValue = num;
-            }
-          } else if (/^-?\d*\.\d+$/.test(value)) {
-            const num = Number.parseFloat(value);
-            if (!Number.isNaN(num)) {
-              finalValue = num;
-            }
-          }
-        }
-        // Ensure entity IDs remain as strings
-        if (isEntityId) {
-          if (typeof finalValue === 'number') {
-            finalValue = String(finalValue);
-          } else if (typeof finalValue !== 'string') {
-            finalValue = String(finalValue);
-          }
-        }
-        // For values from 'v' column (excluding the standard 'v' field):
-        // Convert to string if it was originally a JSON string (EntityId)
-        // Also check field name as fallback - fields like 'from', 'to' are typically EntityIds
-        // If it was stored as a JSON number (like age: 30), keep it as a number
-        // This preserves EntityIds (stored as JSON strings) while keeping numeric values as numbers
-        // Check if field name suggests it's an EntityId reference
-        // Common patterns: from, to, parent, child, entityId, or fields ending in Id/_id
-        // Also check for relationship-related words like friend, owner, author, etc.
-        // Exclude fields that end in 'Name' as those are typically string values, not EntityIds
-        const isLikelyEntityIdField =
-          (key === 'from' ||
-            key === 'to' ||
-            key === 'parent' ||
-            key === 'child' ||
-            key === 'entityId' ||
-            key.endsWith('Id') ||
-            key.endsWith('_id') ||
-            (key.includes('friend') && !key.endsWith('Name')) ||
-            (key.includes('owner') && !key.endsWith('Name')) ||
-            (key.includes('author') && !key.endsWith('Name')) ||
-            (key.includes('user') && !key.endsWith('Name'))) &&
-          !key.endsWith('Name');
-        if (
-          isFromValueColumn &&
-          typeof finalValue === 'number' &&
-          Number.isInteger(finalValue) &&
-          (wasJsonString || isLikelyEntityIdField)
-        ) {
-          // It was stored as a JSON string EntityId (like "1") but JSON.parse converted it to number
-          // Or it's a field that's typically an EntityId reference
-          // Convert back to string since EntityIds are always strings
-          finalValue = String(finalValue);
-        }
-        result[key] = this._reviveValue(finalValue) as Value | Attribute;
+        const parsed = this._parseRowValue(row[key], isEntityId, isFromValueColumn);
+        result[key] = parsed;
       }
       return result;
     });
@@ -920,7 +797,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
       // Execute query using in-memory approach for speculative
       // This is the only place we use in-memory processing
-      const patternClauses: DatalogQueryWhereClause[] = [];
+      const patternClauses: DatalogQueryWhereClauseMatch[] = [];
       const predicateClauses: DatalogQueryWhereClause[] = [];
       for (const clause of modifiedQuery.where) {
         if (isQueryPattern(clause)) {
@@ -940,9 +817,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
       for (let i = 0; i < patternClauses.length; i++) {
         const clause = patternClauses[i];
-        if (!clause || !isQueryPattern(clause)) {
-          continue;
-        }
+        if (!clause) continue;
         const {e: entityVal, a: attributeVal, v: valueVal} = clause;
 
         // Filter datoms matching this clause
@@ -997,13 +872,15 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       for (const predicate of predicateClauses) {
         if (Array.isArray(predicate) && predicate.length === 3) {
           const [op, varName, value] = predicate;
-          if (op === '=' && typeof varName === 'string' && varName.startsWith('?')) {
-            results = results.filter(row => row[varName] === value);
-          } else if (op === '<=' && typeof varName === 'string' && varName.startsWith('?')) {
-            results = results.filter(row => {
-              const rowValue = row[varName];
-              return rowValue !== undefined && rowValue !== null && rowValue <= value;
-            });
+          if (typeof varName === 'string' && varName.startsWith('?')) {
+            if (op === '=') {
+              results = results.filter(row => row[varName] === value);
+            } else if (op === '<=') {
+              results = results.filter(row => {
+                const rowValue = row[varName];
+                return rowValue !== undefined && rowValue !== null && rowValue <= value;
+              });
+            }
           }
         }
       }
