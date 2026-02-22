@@ -28,16 +28,41 @@ export {
   type FileSystemDatomDatabaseOptions,
 } from './filesystem/filesystem-datom-database.js';
 export {HttpClientDatomDatabase} from './http-client/http-client-datom-database.js';
+export {HttpClientDatomDatabaseServerComponent} from './http-client/http-client-datom-database-server-component.js';
 export {PostgreSQLDatomDatabase} from './postgres/postgres-datom-database.js';
+export {DestroyRetentionPolicy} from './retention-policy/index.js';
 
 // SQL connection adapter
 export type {SQLDatabase} from '../sql-database/sql-database.js';
+export {PgSQLDatabase} from '../sql-database/sql-database-pg.js';
+
+// HTTP client (for app use)
+export {FetchHttpClient, type HttpClient} from '../http-client/http-client.js';
 
 // Datalog query types
-export type {DatalogQuery, DatalogQueryWhereClause as QueryClause} from '../datalog-query.js';
+export type {
+  DatalogQuery,
+  DatalogQueryFindVariable,
+  DatalogQueryWhereClause as QueryClause,
+} from '../datalog-query.js';
+
+// Query result types
+export type {QueryResult, QueryResultEnvelope} from './datom-database-view.js';
 
 // WithResult type (for speculative transactions)
 export type {WithResult} from './datom-database.js';
 
 export {HookEngine} from './hook/hook.js';
 export {HookValidator} from './hook/validator.js';
+export type {
+  AfterRead,
+  AfterReadResult,
+  AfterWrite,
+  BeforeRead,
+  BeforeReadResult,
+  BeforeWrite,
+  BeforeWriteResult,
+  Hook,
+  ReadContext,
+  WriteContext,
+} from './hook/hook.js';

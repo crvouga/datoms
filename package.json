@@ -1,28 +1,20 @@
 {
-  "name": "datoms",
+  "name": "datoms-monorepo",
   "version": "0.1.0",
   "private": true,
   "keywords": [],
   "license": "MIT",
   "author": "",
   "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "build": "tsc",
-    "check": "bun run check:quick && bun test --bail && bun test:e2e && echo '✅ Checks passed'",
-    "check:fast": "bun run check:quick && bun test:fast --bail && echo '✅ Fast checks passed'",
-    "check:quick": "bun format && bun typecheck && bun lint && bun cir-deps && echo '✅ Quick checks passed'",
-    "cir-deps": "madge --circular src/index.ts && madge --circular src/app/src/server.ts",
-    "cloc": "bun x cloc src",
-    "docker": "bun docker:down && bun docker:up",
+    "build": "bun run --cwd packages/datoms build",
+    "check": "bun run check:quick && bun test --bail && bun run test:e2e && echo '✅ Checks passed'",
+    "check:fast": "bun run check:quick && bun run test:fast --bail && echo '✅ Fast checks passed'",
+    "check:quick": "bun run format && bun run typecheck && bun run lint && bun run cir-deps && echo '✅ Quick checks passed'",
+    "cir-deps": "madge --circular packages/datoms/src/index.ts && madge --circular apps/movie-finder/src/server.ts",
+    "cloc": "bun x cloc packages apps",
+    "docker": "bun run docker:down && bun run docker:up",
     "docker:destroy": "docker-compose down -v",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
@@ -30,32 +22,17 @@
     "docker:up": "docker-compose up -d",
     "format": "bun x sort-package-json && biome format --write .",
     "format:check": "biome format --diagnostic-level=error .",
-    "kp": "bun x kill-port 8080",
+    "kp": "bun x kill-port 3847",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
-    "prepublishOnly": "npm run build",
-    "preview": "docker build --no-cache -t datoms-preview -f Dockerfile . && docker run --name datoms-preview --rm --env-file .env -p 8080:8080 datoms-preview",
+    "preview": "docker build --no-cache -t datoms-preview -f Dockerfile . && docker run --name datoms-preview --rm --env-file .env -p 3847:3847 datoms-preview",
     "psql": "psql postgresql://postgres:postgres@localhost:25534/postgres",
-    "server": "bun --watch src/app/src/server.ts",
+    "server": "bun run --cwd apps/movie-finder server",
     "test": "bun test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:fast": "FAST_TESTS=true bun test",
-    "typecheck": "bun x tsgo --noEmit"
-  },
-  "dependencies": {
-    "@babel/standalone": "^7.25.0",
-    "@electric-sql/pglite": "^0.2.0",
-    "@monaco-editor/react": "^4.6.0",
-    "@typescript/native-preview": "^7.0.0-dev.20260119.1",
-    "bun-plugin-tailwind": "^0.1.2",
-    "pg": "^8.11.3",
-    "pino": "^9.0.0",
-    "react": "^19",
-    "react-dom": "^19",
-    "react-resizable-panels": "^2.1.0",
-    "sql-formatter": "^15.1.2",
-    "tailwindcss": "^4.1.11"
+    "typecheck": "bun run --cwd packages/datoms typecheck && bun run --cwd apps/movie-finder typecheck"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -64,14 +41,9 @@
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^9.2.6",
     "@semantic-release/npm": "^11.0.2",
-    "@types/bun": "latest",
-    "@types/pg": "^8.10.9",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
     "madge": "^8.0.0",
     "playwright": "^1.48.0",
     "semantic-release": "^23.0.0",
     "typescript": "^5.3.0"
-  },
-  "packageManager": "pnpm@10.28.0+sha512.05df71d1421f21399e053fde567cea34d446fa02c76571441bfc1c7956e98e363088982d940465fd34480d4d90a0668bc12362f8aa88000a64e83d0b0e47be48"
+  }
 }

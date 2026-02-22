@@ -1,11 +1,13 @@
 import {serve} from 'bun';
-import {HttpClientDatomDatabaseServerComponent} from '../../datom-database/http-client/http-client-datom-database-server-component';
-import {PostgreSQLDatomDatabase} from '../../datom-database/index';
-import {DestroyRetentionPolicy} from '../../datom-database/retention-policy';
-import {PgSQLDatabase} from '../../sql-database/sql-database-pg';
-import type {Logger} from '../../types';
+import {
+  DestroyRetentionPolicy,
+  FetchHttpClient,
+  HttpClientDatomDatabaseServerComponent,
+  PgSQLDatabase,
+  PostgreSQLDatomDatabase,
+  type Logger,
+} from 'datoms';
 import index from './index.html';
-import {FetchHttpClient} from './lib/http-client';
 import {createLogger} from './lib/logger';
 import {notepad} from './notepad';
 import {DATOMS_API_ENDPOINT} from './shared/api';
@@ -14,7 +16,7 @@ import {TmdbLoader} from './tmdb/tmdb-loader';
 
 async function main() {
   const logger = createLogger();
-  const port = Number.parseInt(process.env.PORT || '3000', 10);
+  const port = Number.parseInt(process.env.PORT || '3847', 10);
 
   const databaseUrl = process.env.DATABASE_URL?.trim();
   if (!databaseUrl) throw new Error('DATABASE_URL is not set');

@@ -4,20 +4,6 @@
   "workspaces": {
     "": {
       "name": "datoms",
-      "dependencies": {
-        "@babel/standalone": "^7.25.0",
-        "@electric-sql/pglite": "^0.2.0",
-        "@monaco-editor/react": "^4.6.0",
-        "@typescript/native-preview": "^7.0.0-dev.20260119.1",
-        "bun-plugin-tailwind": "^0.1.2",
-        "pg": "^8.11.3",
-        "pino": "^9.0.0",
-        "react": "^19",
-        "react-dom": "^19",
-        "react-resizable-panels": "^2.1.0",
-        "sql-formatter": "^15.1.2",
-        "tailwindcss": "^4.1.11",
-      },
       "devDependencies": {
         "@biomejs/biome": "^1.9.4",
         "@playwright/test": "^1.48.0",
@@ -25,13 +11,44 @@
         "@semantic-release/git": "^10.0.1",
         "@semantic-release/github": "^9.2.6",
         "@semantic-release/npm": "^11.0.2",
-        "@types/bun": "latest",
-        "@types/pg": "^8.10.9",
-        "@types/react": "^19",
-        "@types/react-dom": "^19",
         "madge": "^8.0.0",
         "playwright": "^1.48.0",
         "semantic-release": "^23.0.0",
+        "typescript": "^5.3.0",
+      },
+    },
+    "apps/movie-finder": {
+      "name": "movie-finder",
+      "version": "0.1.0",
+      "dependencies": {
+        "@babel/standalone": "^7.25.0",
+        "@monaco-editor/react": "^4.6.0",
+        "@typescript/native-preview": "^7.0.0-dev.20260119.1",
+        "bun-plugin-tailwind": "^0.1.2",
+        "datoms": "workspace:*",
+        "pino": "^9.0.0",
+        "react": "^19",
+        "react-dom": "^19",
+        "react-resizable-panels": "^2.1.0",
+        "tailwindcss": "^4.1.11",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+      },
+    },
+    "packages/datoms": {
+      "name": "datoms",
+      "version": "0.1.0",
+      "dependencies": {
+        "pg": "^8.11.3",
+        "sql-formatter": "^15.1.2",
+      },
+      "devDependencies": {
+        "@electric-sql/pglite": "^0.2.0",
+        "@types/bun": "latest",
+        "@types/pg": "^8.10.9",
         "typescript": "^5.3.0",
       },
     },
@@ -167,7 +184,7 @@
 
     "@ts-graphviz/core": ["@ts-graphviz/core@2.0.7", "", { "dependencies": { "@ts-graphviz/ast": "^2.0.7", "@ts-graphviz/common": "^2.1.5" } }, "sha512-w071DSzP94YfN6XiWhOxnLpYT3uqtxJBDYdh6Jdjzt+Ce6DNspJsPQgpC7rbts/B8tEkq0LHoYuIF/O5Jh5rPg=="],
 
-    "@types/bun": ["@types/bun@1.3.6", "", { "dependencies": { "bun-types": "1.3.6" } }, "sha512-uWCv6FO/8LcpREhenN1d1b6fcspAB+cefwD7uti8C8VffIv0Um08TKMn98FynpTiU38+y2dUO55T11NgDt8VAA=="],
+    "@types/bun": ["@types/bun@1.3.9", "", { "dependencies": { "bun-types": "1.3.9" } }, "sha512-KQ571yULOdWJiMH+RIWIOZ7B2RXQGpL1YQrBtLIV3FqDcCu6FsbFUBwhdKUlCKUpS3PJDsHlJ1QKlpxoVR+xtw=="],
 
     "@types/node": ["@types/node@25.0.9", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-/rpCXHlCWeqClNBwUhDcusJxXYDjZTyE8v5oTO7WbL8eij2nKhUeU89/6xgjU7N4/Vh3He0BtyhJdQbDyhiXAw=="],
 
@@ -263,7 +280,7 @@
 
     "bun-plugin-tailwind": ["bun-plugin-tailwind@0.1.2", "", { "peerDependencies": { "bun": ">=1.0.0" } }, "sha512-41jNC1tZRSK3s1o7pTNrLuQG8kL/0vR/JgiTmZAJ1eHwe0w5j6HFPKeqEk0WAD13jfrUC7+ULuewFBBCoADPpg=="],
 
-    "bun-types": ["bun-types@1.3.6", "", { "dependencies": { "@types/node": "*" } }, "sha512-OlFwHcnNV99r//9v5IIOgQ9Uk37gZqrNMCcqEaExdkVq3Avwqok1bJFmvGMCkCE0FqzdY8VMOZpfpR3lwI+CsQ=="],
+    "bun-types": ["bun-types@1.3.9", "", { "dependencies": { "@types/node": "*" } }, "sha512-+UBWWOakIP4Tswh0Bt0QD0alpTY8cb5hvgiYeWCMet9YukHbzuruIEeXC2D7nMJPB12kbh8C7XJykSexEqGKJg=="],
 
     "callsites": ["callsites@3.1.0", "", {}, "sha512-P8BjAsXvZS+VIDUI11hHCQEv74YT67YUi5JJFNWIqL235sBmjX4+qx9Muvls5ivyNENctx46xQLQ3aTuE7ssaQ=="],
 
@@ -318,6 +335,8 @@
     "crypto-random-string": ["crypto-random-string@4.0.0", "", { "dependencies": { "type-fest": "^1.0.1" } }, "sha512-x8dy3RnvYdlUcPOjkEHqozhiwzKNSq7GcPuXFbnyMOCHxX8V3OgIg/pYuabl2sbUPfIJaeAQB7PMOK8DFIdoRA=="],
 
     "csstype": ["csstype@3.2.3", "", {}, "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="],
+
+    "datoms": ["datoms@workspace:packages/datoms"],
 
     "debug": ["debug@4.4.3", "", { "dependencies": { "ms": "^2.1.3" } }, "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="],
 
@@ -594,6 +613,8 @@
     "monaco-editor": ["monaco-editor@0.55.1", "", { "dependencies": { "dompurify": "3.2.7", "marked": "14.0.0" } }, "sha512-jz4x+TJNFHwHtwuV9vA9rMujcZRb0CEilTEwG2rRSpe/A7Jdkuj8xPKttCgOh+v/lkHy7HsZ64oj+q3xoAFl9A=="],
 
     "moo": ["moo@0.5.2", "", {}, "sha512-iSAJLHYKnX41mKcJKjqvnAN9sf0LMDTXDEvFv+ffuRR9a1MIuXLjMNL6EsnDHSkKLTWNqQQ5uo61P4EbU4NU+Q=="],
+
+    "movie-finder": ["movie-finder@workspace:apps/movie-finder"],
 
     "ms": ["ms@2.1.3", "", {}, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
 

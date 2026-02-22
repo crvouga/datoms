@@ -41,7 +41,7 @@ jobs:
         run: bun install
 
       - name: Type check
-        run: bunx tsc --noEmit
+        run: bun run typecheck
 
   format:
     runs-on: ubuntu-latest

@@ -1,5 +1,4 @@
-import type {DatomDatabase, DatomInput, Logger} from '../../../datom-database';
-import {datoms, value} from '../../../datoms';
+import {datoms, value, type DatomDatabase, type DatomInput, type Logger} from 'datoms';
 import {mapKeys} from '../lib/map-keys';
 import {tmdbNamespace} from './tmdb';
 import type {TmdbClient} from './tmdb-client';

@@ -1,6 +1,6 @@
 import Editor from '@monaco-editor/react';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import type {DatalogQuery} from '../../../datom-database/index';
+import type {DatalogQuery} from 'datoms';
 import type {QueryEditorLog} from './types';
 
 const MONACO_THEME: 'vs' | 'vs-dark' | 'hc-black' | 'hc-light' = 'hc-black';

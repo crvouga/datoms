@@ -1,5 +1,5 @@
 import pino from 'pino';
-import type {Logger} from '../../../types';
+import type {Logger} from 'datoms';
 
 /**
  * Creates a Pino-based logger that implements the Logger interface.

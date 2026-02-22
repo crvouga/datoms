@@ -1,6 +1,6 @@
 import {describe, expect, test} from 'bun:test';
+import {FetchHttpClient} from 'datoms';
 import {createTmdbClient} from './index';
-import {FetchHttpClient} from '../../lib/http-client';
 
 describe('TmdbClient', () => {
   try {

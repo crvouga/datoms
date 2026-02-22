@@ -1,4 +1,4 @@
-import type {DatomDatabase} from '../../datom-database';
+import type {DatomDatabase} from 'datoms';
 
 export const notepad = async (db: DatomDatabase) => {
   // Query to get image configuration specifically

@@ -1,4 +1,4 @@
-import type {HttpClient} from '../../lib/http-client';
+import type {HttpClient} from 'datoms';
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 

@@ -11,12 +11,14 @@ RUN bun install --frozen-lockfile
 COPY . .
 
 ARG NODE_ENV=production
-ARG PORT=8080
+ARG PORT=3847
 
 ENV NODE_ENV=${NODE_ENV}
 ENV PORT=${PORT}
 
 EXPOSE ${PORT}
 
-CMD ["bun", "run", "src/app/src/server.ts"]
+RUN bun run build
+
+CMD ["bun", "run", "server", "--cwd", "apps/movie-finder"]
 

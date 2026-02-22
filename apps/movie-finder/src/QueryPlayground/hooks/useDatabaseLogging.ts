@@ -7,18 +7,19 @@
  * minimally to capture actual results while using hooks for the logging infrastructure.
  */
 
-import type {DatalogQuery, DatalogQueryFindVariable} from '../../../../datalog-query.js';
-import type {DatomDatabase} from '../../../../datom-database/datom-database.js';
 import type {
   AfterRead,
   AfterWrite,
   BeforeRead,
   BeforeWrite,
+  DatalogQuery,
+  DatalogQueryFindVariable,
+  DatomDatabase,
+  QueryResultEnvelope,
   ReadContext,
+  TransactionId,
   WriteContext,
-} from '../../../../datom-database/hook/hook.js';
-import type {QueryResultEnvelope} from '../../../../datom-database/datom-database-view.js';
-import type {TransactionId} from '../../../../datoms.js';
+} from 'datoms';
 import type {QueryEditorLog} from '../types.js';
 
 /**
