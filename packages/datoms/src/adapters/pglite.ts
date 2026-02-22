@@ -1,16 +1,14 @@
 /**
  * PostgreSQL connection implementation using PGLite (embedded PostgreSQL)
- *
- * NOTE: This is a test-only implementation. It depends on the `@electric-sql/pglite` library
- * and should not be included in the main library bundle.
+ * Server-only adapter. Import from "datoms/adapters/pglite".
  */
 
 import {PGlite} from '@electric-sql/pglite';
-import type {SQLDatabase, SQLDatabaseTransaction} from './sql-database.js';
-import type {DatabaseRow, SQLParams} from './types.js';
+import type {SQLDatabase, SQLDatabaseTransaction} from '../sql-database/sql-database.js';
+import type {DatabaseRow, SQLParams} from '../sql-database/types.js';
 
 /**
- * PGLite connection wrapper that implements SqlConnection interface
+ * PGLite connection wrapper that implements SQLDatabase interface
  */
 export class PGLiteSQLDatabase implements SQLDatabase {
   private db: PGlite;

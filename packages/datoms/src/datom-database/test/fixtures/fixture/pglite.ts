@@ -1,5 +1,5 @@
+import {PGLiteSQLDatabase} from 'datoms/adapters/pglite';
 import type {Fixture} from '../fixture.js';
-import {PGLiteSQLDatabase} from '../../../../sql-database/sql-database-pglite.js';
 import {PostgreSQLDatomDatabase} from '../../../postgres/postgres-datom-database.js';
 
 export const createPGLiteFixture = async (): Promise<Fixture> => {

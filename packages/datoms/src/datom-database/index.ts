@@ -32,9 +32,9 @@ export {HttpClientDatomDatabaseServerComponent} from './http-client/http-client-
 export {PostgreSQLDatomDatabase} from './postgres/postgres-datom-database.js';
 export {DestroyRetentionPolicy} from './retention-policy/index.js';
 
-// SQL connection adapter
-export type {SQLDatabase} from '../sql-database/sql-database.js';
-export {PgSQLDatabase} from '../sql-database/sql-database-pg.js';
+// SQL connection adapter (types for adapter implementers)
+export type {SQLDatabase, SQLDatabaseTransaction} from '../sql-database/sql-database.js';
+export type {DatabaseRow, SQLParams} from '../sql-database/types.js';
 
 // HTTP client (for app use)
 export {FetchHttpClient, type HttpClient} from '../http-client/http-client.js';

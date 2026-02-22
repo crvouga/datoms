@@ -34,7 +34,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'cd apps/movie-finder && bun run server',
+    command: 'cd apps/movie-finder && bun run preview',
     url: 'http://localhost:3847',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,

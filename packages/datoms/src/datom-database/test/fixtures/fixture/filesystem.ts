@@ -1,6 +1,6 @@
+import {PgSQLDatabase} from 'datoms/adapters/pg';
 import {FileSystemDatomDatabase} from '../../../filesystem/filesystem-datom-database.js';
 import type {Fixture} from '../fixture.js';
-import {PgSQLDatabase} from '../../../../sql-database/sql-database-pg.js';
 import {PostgreSQLDatomDatabase} from '../../../postgres/postgres-datom-database.js';
 
 const TEST_DATABASE_URL: string = 'postgresql://postgres:postgres@localhost:25533/postgres';

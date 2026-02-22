@@ -41,11 +41,15 @@ export class HttpClientDatomDatabase implements DatomDatabase {
   public readonly hooks: HookEngine;
   private initialized = false;
   private currentViewConfig: DatomDatabaseViewConfig = {type: 'current'};
+  private httpClient: HttpClient;
+  private endpoint: string;
 
-  constructor(
-    private readonly httpClient: HttpClient,
-    private readonly endpoint: string,
-  ) {
+  constructor(params: {
+    httpClient: HttpClient;
+    endpoint: string;
+  }) {
+    this.httpClient = params.httpClient;
+    this.endpoint = params.endpoint;
     this.hooks = new HookEngine();
   }
 

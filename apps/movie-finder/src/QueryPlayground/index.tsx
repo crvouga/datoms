@@ -15,17 +15,60 @@ const STORAGE_KEY_QUERY_JSON = 'query-editor-json-query';
 const DEFAULT_QUERY_JSON = JSON.stringify(
   {
     find: {
-      'movie/id': ['?movie/id'],
-      'movie/title': ['?title'],
-      'movie/popularity': ['?popularity'],
+      'movie/id': {
+        t: 'identity',
+        c: '?e',
+      },
+      'movie/title': {
+        t: 'identity',
+        c: '?title',
+      },
+      'movie/popularity': {
+        t: 'identity',
+        c: '?popularity',
+      },
+      'movie/description': {
+        t: 'identity',
+        c: '?description',
+      },
+      'movie/overview': {
+        t: 'identity',
+        c: '?overview',
+      },
     },
     where: [
-      {e: '?movie/id', a: 'tmdb.movie/id', v: '?movie/id'},
-      {e: '?movie/id', a: 'tmdb.movie/title', v: '?title'},
-      {e: '?movie/id', a: 'tmdb.movie/popularity', v: '?popularity'},
+      {
+        t: 'match',
+        e: '?e',
+        a: 'tmdb.movie/id',
+        v: '?id',
+      },
+      {
+        t: 'match',
+        e: '?e',
+        a: 'tmdb.movie/title',
+        v: '?title',
+      },
+      {
+        t: 'match',
+        e: '?e',
+        a: 'tmdb.movie/popularity',
+        v: '?popularity',
+      },
+      {
+        t: 'match',
+        e: '?e',
+        a: 'tmdb.movie/overview',
+        v: '?description',
+      },
     ],
-    orderBy: [['?popularity', 'desc']],
-    limit: 10,
+    order: [
+      {
+        t: 'desc',
+        c: '?popularity',
+      },
+    ],
+    limit: 1000,
   },
   null,
   2,

@@ -4,15 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bun build src/frontend.tsx --outdir=dist --minify",
+    "build:client": "vite build",
+    "client": "vite",
     "server": "bun --env-file=../../.env --watch src/server.ts",
+    "preview": "bun run build:client && bun run server",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@babel/standalone": "^7.25.0",
     "@monaco-editor/react": "^4.6.0",
     "@typescript/native-preview": "^7.0.0-dev.20260119.1",
-    "bun-plugin-tailwind": "^0.1.2",
     "datoms": "workspace:*",
     "pino": "^9.0.0",
     "react": "^19",
@@ -21,8 +22,11 @@
     "tailwindcss": "^4.1.11"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
     "@types/bun": "latest",
     "@types/react": "^19",
-    "@types/react-dom": "^19"
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.3"
   }
 }

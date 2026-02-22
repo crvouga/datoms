@@ -1,18 +1,64 @@
-import {serve} from 'bun';
+import { serve } from 'bun';
 import {
   DestroyRetentionPolicy,
   FetchHttpClient,
   HttpClientDatomDatabaseServerComponent,
-  PgSQLDatabase,
   PostgreSQLDatomDatabase,
   type Logger,
 } from 'datoms';
-import index from './index.html';
-import {createLogger} from './lib/logger';
-import {notepad} from './notepad';
-import {DATOMS_API_ENDPOINT} from './shared/api';
-import {createTmdbClient} from './tmdb/tmdb-client';
-import {TmdbLoader} from './tmdb/tmdb-loader';
+import { PgSQLDatabase } from 'datoms/adapters/pg';
+import path from 'node:path';
+import { createLogger } from './lib/logger';
+import { notepad } from './notepad';
+import { DATOMS_API_ENDPOINT } from './shared/api';
+import { createTmdbClient } from './tmdb/tmdb-client';
+import { TmdbLoader } from './tmdb/tmdb-loader';
+
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+};
+
+function getContentType(pathname: string): string {
+  const ext = path.extname(pathname);
+  return MIME_TYPES[ext] ?? 'application/octet-stream';
+}
+
+async function serveStaticOrSpa(req: Request, distDir: string): Promise<Response> {
+  const url = new URL(req.url);
+  const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
+  const requestedPath = pathname.replace(/^\//, '');
+  const safePath = path.resolve(distDir, requestedPath);
+  const distResolved = path.resolve(distDir);
+  if (!safePath.startsWith(distResolved + path.sep) && safePath !== distResolved) {
+    return new Response('Forbidden', {status: 403});
+  }
+  const file = Bun.file(safePath);
+  if (await file.exists()) {
+    return new Response(file, {
+      headers: {'Content-Type': getContentType(pathname)},
+    });
+  }
+  const indexFile = Bun.file(path.join(distDir, 'index.html'));
+  if (await indexFile.exists()) {
+    return new Response(indexFile, {
+      headers: {'Content-Type': 'text/html'},
+    });
+  }
+  return new Response('Client not built. Run `bun run build:client` first.', {
+    status: 404,
+    headers: {'Content-Type': 'text/plain'},
+  });
+}
 
 async function main() {
   const logger = createLogger();
@@ -46,10 +92,11 @@ async function main() {
 
   tmdbLoader.start();
 
+  const distDir = path.join(import.meta.dir, '..', 'dist');
+
   const server = serve({
     port,
     routes: {
-      '/*': index,
       '/notepad': {
         async GET() {
           return Response.json(await notepad(db));
@@ -60,10 +107,7 @@ async function main() {
           return dbServerComponent.handleRequest(req);
         },
       },
-    },
-    development: process.env.NODE_ENV !== 'production' && {
-      hmr: true,
-      console: true,
+      '/*': async req => serveStaticOrSpa(req, distDir),
     },
   });
 

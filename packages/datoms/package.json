@@ -7,6 +7,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./adapters/pg": {
+      "types": "./dist/adapters/pg.d.ts",
+      "import": "./dist/adapters/pg.js"
+    },
+    "./adapters/pglite": {
+      "types": "./dist/adapters/pglite.d.ts",
+      "import": "./dist/adapters/pglite.js"
     }
   },
   "main": "./dist/index.js",
@@ -18,13 +26,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "pg": "^8.11.3",
-    "sql-formatter": "^15.1.2"
+    "@electric-sql/pglite": "^0.2.0",
+    "pg": "^8.11.3"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.2.0",
     "@types/bun": "latest",
     "@types/pg": "^8.10.9",
+    "sql-formatter": "^15.1.2",
     "typescript": "^5.3.0"
   }
 }
