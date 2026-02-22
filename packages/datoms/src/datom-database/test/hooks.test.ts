@@ -109,8 +109,8 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       db.hook(hook);
       await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
-      // Wait a bit for async after-write hooks
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait for async after-write hooks (longer in CI for reliability)
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(called).toBe(true);
     });
@@ -688,8 +688,8 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       void (await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]));
 
-      // Wait for async after-write hooks
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait for async after-write hooks (longer in CI for reliability)
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(called).toBe(true);
       expect(receivedTx).toBeDefined();
@@ -720,8 +720,8 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
         // Transaction should succeed even if after-write hook fails
         void (await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]));
 
-        // Wait for async after-write hooks to complete
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        // Wait for async after-write hooks to complete (longer in CI for reliability)
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Verify transaction succeeded
         const query = datomsQueryToDatalogQuery({e: '1'});
@@ -761,8 +761,8 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
 
       await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
-      // Wait for async after-write hooks
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait for async after-write hooks (longer in CI for reliability)
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(executionOrder.length).toBeGreaterThanOrEqual(2);
     });
@@ -788,8 +788,8 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
         {source: 'client', ip: '127.0.0.1'},
       );
 
-      // Wait for async after-write hooks
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait for async after-write hooks (longer in CI for reliability)
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(receivedContext).toBeDefined();
       expect((receivedContext?.txMeta as {userId?: string})?.userId).toBe('alice');
