@@ -12,8 +12,12 @@ export const createHttpClientFixture = async (): Promise<Fixture> => {
   const endpoint = '/api/datom-database';
   const server = serve({
     port: 0, // Let OS assign an available port
-    routes: {
-      [endpoint]: (request) => transportServerComponent.handleRequest(request),
+    fetch(request) {
+      const url = new URL(request.url);
+      if (url.pathname === endpoint) {
+        return transportServerComponent.handleRequest(request);
+      }
+      return new Response('Not Found', {status: 404});
     },
   });
   // Extract the actual port from the server URL
