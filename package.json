@@ -35,7 +35,7 @@
     "lint:fix": "biome lint --write .",
     "prepublishOnly": "npm run build",
     "preview": "docker build --no-cache -t datoms-preview -f Dockerfile . && docker run --name datoms-preview --rm --env-file .env -p 8080:8080 datoms-preview",
-    "psql": "psql postgresql://postgres:postgres@localhost:5434/postgres",
+    "psql": "psql postgresql://postgres:postgres@localhost:25534/postgres",
     "server": "bun --watch src/app/src/server.ts",
     "test": "bun test",
     "test:e2e": "playwright test",
