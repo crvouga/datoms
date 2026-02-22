@@ -18,6 +18,7 @@ ENV PORT=${PORT}
 
 EXPOSE ${PORT}
 
+# Build datoms package + movie-finder frontend (Vite) + serve from Bun server
 RUN bun run build
 
 CMD ["bun", "run", "server", "--cwd", "apps/movie-finder"]

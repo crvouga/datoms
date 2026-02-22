@@ -1,6 +1,7 @@
 {
   "cSpell.words": [
     "Aggs",
+    "bunfig",
     "bunx",
     "cloc",
     "ctes",
@@ -26,7 +27,8 @@
     "typesafe",
     "undeduplicated",
     "untuple",
-    "upserts"
+    "upserts",
+    "Vite"
   ],
   "editor.formatOnPaste": false,
   "editor.formatOnSave": false,
