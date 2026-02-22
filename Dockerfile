@@ -1,10 +1,12 @@
-FROM oven/bun:1-alpine
+FROM oven/bun:1.3.4-alpine
 
 RUN apk add --no-cache curl
 
 WORKDIR /app
 
 COPY package.json bun.lock bunfig.toml ./
+COPY packages/datoms/package.json packages/datoms/
+COPY apps/movie-finder/package.json apps/movie-finder/
 
 RUN bun install --frozen-lockfile
 
