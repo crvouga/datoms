@@ -71,7 +71,7 @@ jobs:
       - name: Set up Docker Compose
         run: |
           docker compose --version
-          docker compose up -d
+          docker compose up -d --wait
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
@@ -80,6 +80,9 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+
+      - name: Build datoms
+        run: bun run --cwd packages/datoms build
 
       - name: Run tests
         run: bun test
@@ -93,7 +96,7 @@ jobs:
       - name: Set up Docker Compose
         run: |
           docker compose --version
-          docker compose up -d postgres-app
+          docker compose up -d --wait postgres-app
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
