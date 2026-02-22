@@ -1,4 +1,4 @@
-import { serve } from 'bun';
+import {serve} from 'bun';
 import {
   DestroyRetentionPolicy,
   FetchHttpClient,
@@ -6,13 +6,13 @@ import {
   PostgreSQLDatomDatabase,
   type Logger,
 } from 'datoms';
-import { PgSQLDatabase } from 'datoms/adapters/pg';
+import {PgSQLDatabase} from 'datoms/adapters/pg';
 import path from 'node:path';
-import { createLogger } from './lib/logger';
-import { notepad } from './notepad';
-import { DATOMS_API_ENDPOINT } from './shared/api';
-import { createTmdbClient } from './tmdb/tmdb-client';
-import { TmdbLoader } from './tmdb/tmdb-loader';
+import {createLogger} from './lib/logger';
+import {notepad} from './notepad';
+import {DATOMS_API_ENDPOINT} from './shared/api';
+import {createTmdbClient} from './tmdb/tmdb-client';
+import {TmdbLoader} from './tmdb/tmdb-loader';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',

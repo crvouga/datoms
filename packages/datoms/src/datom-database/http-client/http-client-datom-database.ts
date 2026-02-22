@@ -44,12 +44,9 @@ export class HttpClientDatomDatabase implements DatomDatabase {
   private httpClient: HttpClient;
   private endpoint: string;
 
-  constructor(params: {
-    httpClient: HttpClient;
-    endpoint: string;
-  }) {
-    this.httpClient = params.httpClient;
-    this.endpoint = params.endpoint;
+  constructor(httpClient: HttpClient, endpoint: string) {
+    this.httpClient = httpClient;
+    this.endpoint = endpoint;
     this.hooks = new HookEngine();
   }
 
