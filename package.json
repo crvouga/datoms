@@ -15,7 +15,7 @@
     "cir-deps": "madge --circular packages/datoms/src/index.ts && madge --circular apps/movie-finder/src/server.ts",
     "client": "bun run --cwd apps/movie-finder client",
     "cloc": "bun x cloc packages apps",
-    "dev": "bun x concurrently \"bun run client --cwd apps/movie-finder\" \"bun run server --cwd apps/movie-finder\"",
+    "dev": "bun x concurrently \"bun run client\" \"bun run server\"",
     "docker": "bun run docker:down && bun run docker:up",
     "docker:destroy": "docker-compose down -v",
     "docker:down": "docker-compose down",

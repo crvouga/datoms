@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build:client": "vite build",
-    "client": "vite",
+    "client": "vite --open",
     "server": "bun --env-file=../../.env --watch src/server.ts",
     "preview": "bun run build:client && bun run server",
     "typecheck": "tsc --noEmit"
