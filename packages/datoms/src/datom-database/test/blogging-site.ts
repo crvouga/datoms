@@ -172,7 +172,7 @@ export const POST_VALIDATOR: Hook = {
 
     // Validate each post entity
     for (const postId of postEntities) {
-      const postDatoms = tx.datoms.filter(d => d.e === postId);
+      const postDatoms = tx.datoms.filter((d) => d.e === postId);
       const postRecord = records(postDatoms)[0] || {};
       const hasTitle = POST_TITLE in postRecord;
       const hasAuthor = POST_AUTHOR in postRecord;
@@ -196,19 +196,19 @@ export const POST_VALIDATOR: Hook = {
         finalHasTitle,
         'Post must have a title',
         'MISSING_TITLE',
-        postDatoms.find(d => d.e === postId),
+        postDatoms.find((d) => d.e === postId),
       );
       validator.true(
         finalHasAuthor,
         'Post must have an author',
         'MISSING_AUTHOR',
-        postDatoms.find(d => d.e === postId),
+        postDatoms.find((d) => d.e === postId),
       );
       validator.true(
         finalHasStatus,
         'Post must have a status',
         'MISSING_STATUS',
-        postDatoms.find(d => d.e === postId),
+        postDatoms.find((d) => d.e === postId),
       );
     }
 

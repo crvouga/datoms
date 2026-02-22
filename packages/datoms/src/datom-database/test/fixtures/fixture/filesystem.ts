@@ -3,7 +3,7 @@ import {FileSystemDatomDatabase} from '../../../filesystem/filesystem-datom-data
 import type {Fixture} from '../fixture.js';
 import {PostgreSQLDatomDatabase} from '../../../postgres/postgres-datom-database.js';
 
-const TEST_DATABASE_URL: string = 'postgresql://postgres:postgres@localhost:25533/postgres';
+const TEST_DATABASE_URL = 'postgresql://postgres:postgres@localhost:25533/postgres';
 
 export const createFileSystemFixture = async (filePath: string): Promise<Fixture> => {
   // Create a dedicated Postgres instance with a unique table name for this fixture

@@ -64,12 +64,12 @@ export function useKeyboardShortcut({
       }
 
       // Get the non-modifier key(s) from the keys array
-      const nonModKeys = keys.filter(key => key !== 'mod');
+      const nonModKeys = keys.filter((key) => key !== 'mod');
 
       // Check if the pressed key matches any of the non-modifier keys
       // Normalize key comparison (case-insensitive for letter keys)
       const pressedKey = event.key;
-      const keyMatches = nonModKeys.some(key => {
+      const keyMatches = nonModKeys.some((key) => {
         // Case-insensitive comparison for letter keys
         if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
           return pressedKey.toLowerCase() === key.toLowerCase();

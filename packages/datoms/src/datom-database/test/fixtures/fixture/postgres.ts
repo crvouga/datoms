@@ -2,7 +2,7 @@ import {PgSQLDatabase} from 'datoms/adapters/pg';
 import type {Fixture} from '../fixture.js';
 import {PostgreSQLDatomDatabase} from '../../../postgres/postgres-datom-database.js';
 
-const TEST_DATABASE_URL: string = 'postgresql://postgres:postgres@localhost:25533/postgres';
+const TEST_DATABASE_URL = 'postgresql://postgres:postgres@localhost:25533/postgres';
 
 export const createPostgresFixture = async (): Promise<Fixture> => {
   const sqlDb = new PgSQLDatabase(TEST_DATABASE_URL);

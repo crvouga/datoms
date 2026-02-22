@@ -156,7 +156,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
 
       // Read CSV content
       const content = await file.text();
-      const lines = content.split('\n').filter(line => line.trim() !== '');
+      const lines = content.split('\n').filter((line) => line.trim() !== '');
 
       if (lines.length === 0) {
         return [];
@@ -314,7 +314,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
         limit: 1_000_000,
       };
       const found = await this.db.read(query);
-      const allDatoms = found.data.map(r => ({
+      const allDatoms = found.data.map((r) => ({
         e: r.e as EntityId,
         a: r.a as Attribute,
         v: r.v as Value,
@@ -333,7 +333,7 @@ export class FileSystemDatomDatabase implements DatomDatabase {
       const header = 'e,a,v,tx,op';
 
       // Convert datoms to CSV rows, escaping quotes and commas properly
-      const rows = allDatoms.map(datom => {
+      const rows = allDatoms.map((datom) => {
         return [
           this._csvEscape(datom.e),
           this._csvEscape(datom.a),

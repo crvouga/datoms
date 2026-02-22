@@ -45,7 +45,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
       const results = found.data;
       expect(results).toHaveLength(2);
-      const friendships = results.map(r => [r.from, r.to]);
+      const friendships = results.map((r) => [r.from, r.to]);
       expect(friendships).toContainEqual(['1', '2']);
       expect(friendships).toContainEqual(['2', '3']);
     });
@@ -79,7 +79,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
       const results = found.data;
       expect(results).toHaveLength(2);
-      const friendOfFriends = results.map(r => r.friendOfFriend).sort();
+      const friendOfFriends = results.map((r) => r.friendOfFriend).sort();
       expect(friendOfFriends).toEqual(['3', '4']);
     });
 
@@ -112,7 +112,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
       const results = found.data;
       expect(results).toHaveLength(3);
-      const relationships = results.map(r => [r.parentName, r.childName]);
+      const relationships = results.map((r) => [r.parentName, r.childName]);
       expect(relationships).toContainEqual(['Alice', 'Bob']);
       expect(relationships).toContainEqual(['Alice', 'Charlie']);
       expect(relationships).toContainEqual(['Bob', 'Diana']);
@@ -174,8 +174,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results = found.data;
       expect(results).toHaveLength(4);
       const entity1Tags = results
-        .filter(r => r.e === '1')
-        .map(r => r.tag)
+        .filter((r) => r.e === '1')
+        .map((r) => r.tag)
         .sort();
       expect(entity1Tags).toEqual(['blue', 'green', 'red']);
     });

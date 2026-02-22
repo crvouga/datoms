@@ -52,7 +52,7 @@ export function Button({
     <button
       onClick={onClick}
       disabled={isDisabled}
-      type={type}
+      type={type === 'submit' ? 'submit' : type === 'reset' ? 'reset' : 'button'}
       className={`
         flex items-center gap-2
         ${variantStyles[variant]}

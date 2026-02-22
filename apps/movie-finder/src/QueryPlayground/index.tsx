@@ -79,7 +79,7 @@ export function QueryPlayground() {
   const [result, setResult] = useState<QueryResultEnvelope | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are not available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Monaco editor types are not available
   const editorRef = useRef<any>(null);
 
   // Load query from localStorage on mount
@@ -186,7 +186,7 @@ export function QueryPlayground() {
                   height="100%"
                   defaultLanguage="json"
                   value={queryJson}
-                  onChange={value => setQueryJson(value || '')}
+                  onChange={(value) => setQueryJson(value || '')}
                   theme={MONACO_THEME}
                   onMount={(editor, monaco) => {
                     editorRef.current = editor;

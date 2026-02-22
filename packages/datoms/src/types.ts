@@ -256,7 +256,7 @@ export class TestLogger implements Logger {
   }
 
   getLogsByLevel(level: 'debug' | 'info' | 'warn' | 'error') {
-    return this.logs.filter(log => log.level === level);
+    return this.logs.filter((log) => log.level === level);
   }
 }
 

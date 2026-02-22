@@ -1,4 +1,3 @@
-import type {DatalogQueryWhereClause} from '../../datalog-query.js';
 import type {Datom, TransactionId} from '../../datoms.js';
 import type {EntityId} from '../../entity-id.js';
 import type {Transaction} from '../../types.js';
@@ -46,7 +45,7 @@ export class TransactionDb {
     });
 
     // Convert query results to Datom format
-    const datoms: Datom[] = datomsResult.data.map(row => ({
+    const datoms: Datom[] = datomsResult.data.map((row) => ({
       e: String(row.e) as EntityId,
       a: row.a as string,
       v: row.v,

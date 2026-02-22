@@ -18,7 +18,7 @@ export interface UseFontSizeOptions {
   /**
    * Reference to the Monaco editor instance
    */
-  // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are not available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Monaco editor types are not available
   editorRef: React.RefObject<any>;
 }
 
@@ -75,7 +75,7 @@ export function useFontSize({
 
   // Font size adjustment functions
   const increaseFontSize = () => {
-    setFontSize(prev => {
+    setFontSize((prev) => {
       const newSize = Math.min(prev + FONT_SIZE_STEP, MAX_FONT_SIZE);
       if (storageKey) {
         try {
@@ -89,7 +89,7 @@ export function useFontSize({
   };
 
   const decreaseFontSize = () => {
-    setFontSize(prev => {
+    setFontSize((prev) => {
       const newSize = Math.max(prev - FONT_SIZE_STEP, MIN_FONT_SIZE);
       if (storageKey) {
         try {

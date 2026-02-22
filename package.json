@@ -6,7 +6,10 @@
   "license": "MIT",
   "author": "",
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "build": "bun run --cwd packages/datoms build && bun run --cwd apps/movie-finder build:client",
     "check": "bun run check:quick && bun test --bail && bun run test:e2e && echo '✅ Checks passed'",
@@ -22,11 +25,11 @@
     "docker:logs": "docker-compose logs -f",
     "docker:ps": "docker-compose ps",
     "docker:up": "docker-compose up -d",
-    "format": "bun x sort-package-json && biome format --write .",
-    "format:check": "biome format --diagnostic-level=error .",
+    "format": "bun x sort-package-json && prettier --write .",
+    "format:check": "prettier --check .",
     "kp": "bun x kill-port 3847",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --write .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "docker build --no-cache -t datoms-preview -f Dockerfile . && docker run --name datoms-preview --rm --env-file .env -p 3847:3847 datoms-preview",
     "psql": "psql postgresql://postgres:postgres@localhost:25534/postgres",
     "server": "bun run --cwd apps/movie-finder server",
@@ -37,15 +40,23 @@
     "typecheck": "bun run --cwd packages/datoms build && bun run --cwd packages/datoms typecheck && bun run --cwd apps/movie-finder typecheck"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.48.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^9.2.6",
     "@semantic-release/npm": "^11.0.2",
+    "eslint": "9",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "madge": "^8.0.0",
     "playwright": "^1.48.0",
+    "prettier": "^3.8.1",
     "semantic-release": "^23.0.0",
-    "typescript": "^5.3.0"
-  }
+    "typescript": "^5.3.0",
+    "typescript-eslint": "^8.56.0"
+  },
+  "packageManager": "pnpm@10.28.1+sha512.7d7dbbca9e99447b7c3bf7a73286afaaf6be99251eb9498baefa7d406892f67b879adb3a1d7e687fc4ccc1a388c7175fbaae567a26ab44d1067b54fcb0d6a316"
 }

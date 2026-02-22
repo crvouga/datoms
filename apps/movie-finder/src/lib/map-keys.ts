@@ -36,7 +36,7 @@ export function mapKeys<T extends Record<string, unknown>>(
   }
 
   if (Array.isArray(input)) {
-    return input.map(item => {
+    return input.map((item) => {
       if (item == null || typeof item !== 'object') {
         return item;
       }

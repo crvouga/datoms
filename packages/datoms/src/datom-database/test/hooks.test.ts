@@ -36,7 +36,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: BeforeRead = {
         type: 'beforeRead',
         name: 'test-hook',
-        execute: async query => {
+        execute: async (query) => {
           called = true;
           return {query};
         },
@@ -60,7 +60,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: AfterRead = {
         type: 'afterRead',
         name: 'test-hook',
-        execute: async results => {
+        execute: async (results) => {
           called = true;
           return {results};
         },
@@ -82,7 +82,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: BeforeWrite = {
         type: 'beforeWrite',
         name: 'test-hook',
-        execute: async tx => {
+        execute: async (tx) => {
           called = true;
           return {tx};
         },
@@ -110,7 +110,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       // Wait a bit for async after-write hooks
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(called).toBe(true);
     });
@@ -128,7 +128,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: BeforeRead = {
         type: 'beforeRead',
         name: 'modify-query',
-        execute: async query => {
+        execute: async (query) => {
           // Modify query to only find entity 1
           return {
             query: {
@@ -182,7 +182,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook1: BeforeRead = {
         type: 'beforeRead',
         name: 'first',
-        execute: async query => {
+        execute: async (query) => {
           firstCalled = true;
           return {query, stopProcessing: true};
         },
@@ -191,7 +191,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook2: BeforeRead = {
         type: 'beforeRead',
         name: 'second',
-        execute: async query => {
+        execute: async (query) => {
           secondCalled = true;
           return {query};
         },
@@ -251,9 +251,9 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: AfterRead = {
         type: 'afterRead',
         name: 'filter-results',
-        execute: async results => {
+        execute: async (results) => {
           // Filter to only return results with value "Alice"
-          return {results: results.filter(r => r.v === 'Alice')};
+          return {results: results.filter((r) => r.v === 'Alice')};
         },
       };
 
@@ -265,7 +265,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       });
       const results = found.data;
       expect(results).toHaveLength(2);
-      expect(results.every(r => r.v === 'Alice')).toBe(true);
+      expect(results.every((r) => r.v === 'Alice')).toBe(true);
     });
 
     test('should filter datoms results', async () => {
@@ -280,9 +280,9 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: AfterRead = {
         type: 'afterRead',
         name: 'filter-results',
-        execute: async results => {
+        execute: async (results) => {
           // Filter to only return results with value "Alice"
-          return {results: results.filter(r => (r as {v?: unknown}).v === 'Alice')};
+          return {results: results.filter((r) => (r as {v?: unknown}).v === 'Alice')};
         },
       };
 
@@ -294,7 +294,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       });
       const results = found.data;
       expect(results).toHaveLength(2);
-      expect(results.every(r => (r as {v?: unknown}).v === 'Alice')).toBe(true);
+      expect(results.every((r) => (r as {v?: unknown}).v === 'Alice')).toBe(true);
     });
 
     test('should transform query results', async () => {
@@ -305,10 +305,10 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: AfterRead = {
         type: 'afterRead',
         name: 'transform-results',
-        execute: async results => {
+        execute: async (results) => {
           // Transform query results
           return {
-            results: results.map(r => ({
+            results: results.map((r) => ({
               ...r,
               // Hook can modify query results
             })),
@@ -338,16 +338,16 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook1: AfterRead = {
         type: 'afterRead',
         name: 'filter-1',
-        execute: async results => {
-          return {results: results.filter(r => r.e !== '3')};
+        execute: async (results) => {
+          return {results: results.filter((r) => r.e !== '3')};
         },
       };
 
       const hook2: AfterRead = {
         type: 'afterRead',
         name: 'filter-2',
-        execute: async results => {
-          return {results: results.filter(r => r.v !== 'Bob')};
+        execute: async (results) => {
+          return {results: results.filter((r) => r.v !== 'Bob')};
         },
       };
 
@@ -372,7 +372,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: BeforeRead = {
         type: 'beforeRead',
         name: 'test-hook',
-        execute: async query => {
+        execute: async (query) => {
           called = true;
           return {query};
         },
@@ -400,7 +400,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: AfterRead = {
         type: 'afterRead',
         name: 'test-hook',
-        execute: async results => {
+        execute: async (results) => {
           called = true;
           return {results};
         },
@@ -430,7 +430,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: BeforeRead = {
         type: 'beforeRead',
         name: 'modify-query',
-        execute: async query => {
+        execute: async (query) => {
           // Modify query to only return entity 1
           return {
             query: {
@@ -490,7 +490,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: BeforeWrite = {
         type: 'beforeWrite',
         name: 'validate-email',
-        execute: async tx => {
+        execute: async (tx) => {
           const validator = new HookValidator();
           for (const datom of tx.datoms) {
             if (datom.a === 'email') {
@@ -523,9 +523,9 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: BeforeWrite = {
         type: 'beforeWrite',
         name: 'add-timestamp',
-        execute: async tx => {
+        execute: async (tx) => {
           // Add a timestamp to all datoms
-          const modifiedDatoms = tx.datoms.map(d => ({
+          const modifiedDatoms = tx.datoms.map((d) => ({
             ...d,
             // Note: We can't modify tx directly, but we can add new datoms
           }));
@@ -556,7 +556,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const found = await db.read(query);
       const results = found.data;
       const datoms = queryResultsToDatoms(results, {e: '1'});
-      const hasTimestamp = datoms.some(d => d.a === 'updatedAt');
+      const hasTimestamp = datoms.some((d) => d.a === 'updatedAt');
       expect(hasTimestamp).toBe(true);
     });
 
@@ -569,7 +569,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook1: BeforeWrite = {
         type: 'beforeWrite',
         name: 'first',
-        execute: async tx => {
+        execute: async (tx) => {
           firstCalled = true;
           return {tx, stopProcessing: true};
         },
@@ -578,7 +578,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook2: BeforeWrite = {
         type: 'beforeWrite',
         name: 'second',
-        execute: async tx => {
+        execute: async (tx) => {
           secondCalled = true;
           return {tx};
         },
@@ -629,7 +629,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook1: BeforeWrite = {
         type: 'beforeWrite',
         name: 'validator-1',
-        execute: async tx => {
+        execute: async (tx) => {
           const validator = new HookValidator();
           validator.true(tx.datoms.length > 0, 'No datoms in transaction', 'EMPTY_TX');
           return {tx, errors: validator.getErrors()};
@@ -639,7 +639,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook2: BeforeWrite = {
         type: 'beforeWrite',
         name: 'validator-2',
-        execute: async tx => {
+        execute: async (tx) => {
           const validator = new HookValidator();
           for (const datom of tx.datoms) {
             if (datom.a === 'age') {
@@ -678,7 +678,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: AfterWrite = {
         type: 'afterWrite',
         name: 'side-effect',
-        execute: async result => {
+        execute: async (result) => {
           called = true;
           receivedTx = result;
         },
@@ -689,7 +689,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       void (await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]));
 
       // Wait for async after-write hooks
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(called).toBe(true);
       expect(receivedTx).toBeDefined();
@@ -721,7 +721,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
         void (await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]));
 
         // Wait for async after-write hooks to complete
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
         // Verify transaction succeeded
         const query = datomsQueryToDatalogQuery({e: '1'});
@@ -762,7 +762,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       await db.write([{op: true, e: '1', a: 'name', v: 'Alice'}]);
 
       // Wait for async after-write hooks
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(executionOrder.length).toBeGreaterThanOrEqual(2);
     });
@@ -789,7 +789,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       );
 
       // Wait for async after-write hooks
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(receivedContext).toBeDefined();
       expect((receivedContext?.txMeta as {userId?: string})?.userId).toBe('alice');
@@ -854,7 +854,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const readHook: BeforeRead = {
         type: 'beforeRead',
         name: 'read-logger',
-        execute: async query => {
+        execute: async (query) => {
           readCalled = true;
           return {query};
         },
@@ -863,7 +863,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const writeHook: BeforeWrite = {
         type: 'beforeWrite',
         name: 'write-logger',
-        execute: async tx => {
+        execute: async (tx) => {
           writeCalled = true;
           return {tx};
         },
@@ -888,7 +888,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: BeforeWrite = {
         type: 'beforeWrite',
         name: 'error-test',
-        execute: async tx => {
+        execute: async (tx) => {
           return {
             tx,
             errors: [
@@ -931,7 +931,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook1: BeforeWrite = {
         type: 'beforeWrite',
         name: 'first',
-        execute: async tx => {
+        execute: async (tx) => {
           executionOrder.push('first');
           return {tx};
         },
@@ -940,7 +940,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook2: BeforeWrite = {
         type: 'beforeWrite',
         name: 'second',
-        execute: async tx => {
+        execute: async (tx) => {
           executionOrder.push('second');
           return {tx};
         },
@@ -949,7 +949,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook3: BeforeWrite = {
         type: 'beforeWrite',
         name: 'third',
-        execute: async tx => {
+        execute: async (tx) => {
           executionOrder.push('third');
           return {tx};
         },
@@ -971,7 +971,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: BeforeWrite = {
         type: 'beforeWrite',
         name: 'empty-tx-handler',
-        execute: async tx => {
+        execute: async (tx) => {
           called = true;
           expect(tx.datoms).toHaveLength(0);
           return {tx};
@@ -995,9 +995,9 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const hook: BeforeWrite = {
         type: 'beforeWrite',
         name: 'sub-handler',
-        execute: async tx => {
+        execute: async (tx) => {
           called = true;
-          const subs = tx.datoms.filter(d => d.op === false);
+          const subs = tx.datoms.filter((d) => d.op === false);
           expect(subs.length).toBeGreaterThan(0);
           return {tx};
         },
@@ -1029,7 +1029,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const queryBeforeHook: BeforeRead = {
         type: 'beforeRead',
         name: 'query-before',
-        execute: async query => {
+        execute: async (query) => {
           queryBeforeReadCalled = true;
           return {query};
         },
@@ -1038,7 +1038,7 @@ describe.each(FIXTURES)('Hook Functionality (%s)', (_name, createFixture) => {
       const queryAfterHook: AfterRead = {
         type: 'afterRead',
         name: 'query-after',
-        execute: async results => {
+        execute: async (results) => {
           queryAfterReadCalled = true;
           return {results};
         },

@@ -70,7 +70,7 @@ export function ResizablePanels({
         if (
           Array.isArray(sizes) &&
           sizes.length === defaultSizes.length &&
-          sizes.every(s => typeof s === 'number' && s > 0 && s < 100)
+          sizes.every((s) => typeof s === 'number' && s > 0 && s < 100)
         ) {
           return sizes;
         }

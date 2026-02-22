@@ -220,7 +220,7 @@ export function DbCallLogItem({log, isExpanded, onToggle}: DbCallLogItemProps) {
         <div className="border-t border-gray-700 bg-gray-900/50">
           {/* Tabs */}
           <div className="flex border-b border-gray-700 overflow-x-auto">
-            {availableTabs.map(tab => (
+            {availableTabs.map((tab) => (
               <button
                 type="button"
                 key={tab}

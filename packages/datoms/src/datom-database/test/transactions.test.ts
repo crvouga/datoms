@@ -43,7 +43,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results3} = await db.read(query3);
       const final = queryResultsToDatoms(results3, {e: '1'});
       expect(final).toHaveLength(2);
-      const values = final.map(d => d.v);
+      const values = final.map((d) => d.v);
       expect(values).toContain('Alice');
       expect(values).toContain('pending');
     });
@@ -89,7 +89,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results7} = await withResult.dbAfter.read(query7);
       const after = queryResultsToDatoms(results7, {e: '1'});
       expect(after).toHaveLength(2);
-      const values = after.map(d => d.v);
+      const values = after.map((d) => d.v);
       expect(values).toContain('Alice');
       expect(values).toContain(30);
     });
@@ -141,7 +141,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
       const results = found.data;
       expect(results).toHaveLength(3);
-      const entities = results.map(r => r.x).sort();
+      const entities = results.map((r) => r.x).sort();
       expect(entities).toEqual(['1', '2', '3']);
     });
 
@@ -167,7 +167,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results1 = found1.data;
       const alice = queryResultsToDatoms(results1, {e: '1'});
       expect(alice).toHaveLength(2);
-      const aliceValues = alice.map(d => d.v);
+      const aliceValues = alice.map((d) => d.v);
       expect(aliceValues).toContain('Alice');
       expect(aliceValues).toContain(31);
       expect(aliceValues).not.toContain(30);
@@ -307,7 +307,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
       const results = found.data;
       expect(results).toHaveLength(2);
-      const names = results.map(r => r.name).sort();
+      const names = results.map((r) => r.name).sort();
       expect(names).toEqual(['Alice', 'Charlie']);
     });
   });
@@ -389,7 +389,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results = found.data;
       const after = queryResultsToDatoms(results, {e: '1'});
       expect(after).toHaveLength(2);
-      const values = after.map(d => d.v);
+      const values = after.map((d) => d.v);
       expect(values).toContain('Alice');
       expect(values).toContain(30);
     });
@@ -406,11 +406,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // txData should contain the datoms that would be applied
       expect(withResult.txData.length).toBeGreaterThan(0);
       const hasAdd = withResult.txData.some(
-        d => d.e === '1' && d.a === 'age' && d.v === 30 && d.op === true,
+        (d) => d.e === '1' && d.a === 'age' && d.v === 30 && d.op === true,
       );
       expect(hasAdd).toBe(true);
       const hassub = withResult.txData.some(
-        d => d.e === '1' && d.a === 'name' && d.v === 'Alice' && d.op === false,
+        (d) => d.e === '1' && d.a === 'name' && d.v === 'Alice' && d.op === false,
       );
       expect(hassub).toBe(true);
     });

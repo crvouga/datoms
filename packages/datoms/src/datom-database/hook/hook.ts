@@ -511,8 +511,8 @@ export class HookEngine {
    */
   async runAfterWrite(result: WriteResult, ctx: WriteContext): Promise<void> {
     await Promise.allSettled(
-      this.afterWrite.map(hook =>
-        hook.execute(result, ctx).catch(err => {
+      this.afterWrite.map((hook) =>
+        hook.execute(result, ctx).catch((err) => {
           console.error(`After-write hook "${hook.name}" failed:`, err);
         }),
       ),

@@ -9,7 +9,7 @@ export interface MonacoEditorWrapperProps {
   wordWrap: 'on' | 'off';
   tabSize: number;
   editorOptions: Record<string, unknown>;
-  // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are not available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Monaco editor types are not available
   onMount: (editor: any, monaco: any) => void;
 }
 

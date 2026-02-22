@@ -522,7 +522,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       });
       const results = found.data;
       expect(results).toHaveLength(2);
-      const titles = results.map(r => r.title).sort();
+      const titles = results.map((r) => r.title).sort();
       expect(titles).toEqual(['Draft Post', 'Published Post']);
     });
   });
@@ -689,7 +689,7 @@ describe.each(FIXTURES)('Blogging Site (%s)', (_name, createFixture) => {
       });
       const results = found.data;
       expect(results.length).toBeGreaterThanOrEqual(2);
-      const tagNames = results.map(r => r.tagName).sort();
+      const tagNames = results.map((r) => r.tagName).sort();
       expect(tagNames).toContain('javascript');
       expect(tagNames).toContain('typescript');
     });

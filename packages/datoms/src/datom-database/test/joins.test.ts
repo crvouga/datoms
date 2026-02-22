@@ -37,7 +37,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const found = await db.read(query);
       const results = found.data;
       expect(results).toHaveLength(2);
-      const ages = results.map(r => r.a);
+      const ages = results.map((r) => r.a);
       expect(ages).toContain('30');
       expect(ages).toContain('40');
     });
@@ -82,7 +82,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const found = await db.read(query);
       const results = found.data;
       expect(results).toHaveLength(2); // Alice and Charlie are engineers
-      const engineers = results.map(r => r.emp).sort();
+      const engineers = results.map((r) => r.emp).sort();
       expect(engineers).toEqual([1, 3]);
       // Both should be in Engineering with budget 100000
       for (const r of results) {
@@ -148,7 +148,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const found = await db.read(query);
       const results = found.data;
       expect(results).toHaveLength(2); // 1->2->3 and 2->3->4
-      const paths = results.map(r => [String(r.a), String(r.b), String(r.c)]);
+      const paths = results.map((r) => [String(r.a), String(r.b), String(r.c)]);
       expect(paths).toContainEqual(['1', '2', '3']);
       expect(paths).toContainEqual(['2', '3', '4']);
     });
@@ -228,7 +228,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const found = await db.read(query);
       const results = found.data;
       expect(results).toHaveLength(2);
-      const alice = results.find(r => r.name === 'Alice');
+      const alice = results.find((r) => r.name === 'Alice');
       expect(alice).toBeDefined();
       expect(alice?.age).toBe('30');
       expect(alice?.city).toBe('NYC');
@@ -260,7 +260,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
       const results = found.data;
       expect(results).toHaveLength(2);
-      const alice = results.find(r => r.name === 'Alice');
+      const alice = results.find((r) => r.name === 'Alice');
       expect(alice).toBeDefined();
       expect(alice?.dept).toBe('Engineering');
     });

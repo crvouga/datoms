@@ -142,7 +142,7 @@ describe('datoms', () => {
 
     test('should handle record with numeric keys', () => {
       const result = datoms(
-        {e: r => r.entityId},
+        {e: (r) => r.entityId},
         {
           entityId: '1',
           '0': 'zero',
@@ -157,7 +157,7 @@ describe('datoms', () => {
 
     test('should handle record with special characters in keys', () => {
       const result = datoms(
-        {e: r => r.entityId},
+        {e: (r) => r.entityId},
         {
           entityId: '1',
           'user/name': 'Alice',
@@ -175,7 +175,7 @@ describe('datoms', () => {
     test('should preserve entityId in datoms', () => {
       const result = datoms(
         {
-          e: r => r.entityId,
+          e: (r) => r.entityId,
         },
         {
           entityId: '1',
@@ -193,7 +193,7 @@ describe('datoms', () => {
 
   describe('type safety', () => {
     test('should return DatomInput[] type', () => {
-      const result = datoms({e: r => r.entityId}, {entityId: '1', name: 'Alice'});
+      const result = datoms({e: (r) => r.entityId}, {entityId: '1', name: 'Alice'});
       const first = result[0];
       expect(first).toBeDefined();
       expect(first?.e).toBeDefined();
@@ -378,7 +378,7 @@ describe('records', () => {
   describe('round-trip conversion', () => {
     test('should convert records to datoms and back', () => {
       const original = {entityId: '1', name: 'Alice', age: 30};
-      const datomsArray = datoms({e: r => String(r.entityId)}, original);
+      const datomsArray = datoms({e: (r) => String(r.entityId)}, original);
       const reconstructed = records(datomsArray);
 
       expect(reconstructed).toHaveLength(1);
@@ -395,7 +395,7 @@ describe('records', () => {
         {entityId: '1', name: 'Alice'},
         {entityId: '2', name: 'Bob'},
       ];
-      const datomsArray = datoms({e: r => String(r.entityId)}, original);
+      const datomsArray = datoms({e: (r) => String(r.entityId)}, original);
       const reconstructed = records(datomsArray);
 
       expect(reconstructed).toHaveLength(2);

@@ -33,9 +33,9 @@ export function TypeScriptEditor({
   tabSize = 2,
   editorOptions = {},
 }: TypeScriptEditorProps) {
-  // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are not available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Monaco editor types are not available
   const editorRef = useRef<any>(null);
-  // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are not available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Monaco editor types are not available
   const monacoRef = useRef<any>(null);
 
   // Initialize code from localStorage if available
@@ -119,7 +119,7 @@ export function TypeScriptEditor({
       <LatencyDisplay latency={latency} />
       <MonacoEditorWrapper
         code={code}
-        onChange={value => setCode(value || '')}
+        onChange={(value) => setCode(value || '')}
         theme={theme}
         fontSize={fontSize}
         lineHeight={calculatedLineHeight}

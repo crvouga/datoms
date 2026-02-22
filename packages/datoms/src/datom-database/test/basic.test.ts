@@ -37,7 +37,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
     const results = found.data;
     const entity = queryResultsToDatoms(results, {e: '1', op: true});
     expect(entity).toHaveLength(2);
-    const values = entity.map(d => d.v);
+    const values = entity.map((d) => d.v);
     expect(values).toContain('Alice');
     expect(values).toContain(30);
   });
@@ -81,7 +81,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results = found.data;
       const nameDatoms = queryResultsToDatoms(results, {e: '1', a: 'name'});
       await db.write(
-        nameDatoms.map(d => ({
+        nameDatoms.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -115,7 +115,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results1} = await db.read(query1);
       const tagDatoms = queryResultsToDatoms(results1, {e: '1', a: 'tag'});
       await db.write(
-        tagDatoms.map(d => ({
+        tagDatoms.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -151,7 +151,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         a: 'nonexistent',
       });
       const tx = await db.write(
-        nonexistentDatoms.map(d => ({
+        nonexistentDatoms.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -175,7 +175,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Use with() to see what retraction would look like
       const withResult = await db.with(
-        tagDatoms.map(d => ({
+        tagDatoms.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -198,7 +198,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Now commit the retraction
       await db.write(
-        tagDatoms.map(d => ({
+        tagDatoms.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -228,7 +228,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results1 = found1.data;
       const tag1Datoms = queryResultsToDatoms(results1, {e: '1', a: 'tag'});
       await db.write(
-        tag1Datoms.map(d => ({
+        tag1Datoms.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -247,7 +247,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results2 = found2.data;
       const tags2 = queryResultsToDatoms(results2, {e: '2', a: 'tag'});
       expect(tags2).toHaveLength(2);
-      const values2 = tags2.map(d => d.v);
+      const values2 = tags2.map((d) => d.v);
       expect(values2).toContain('red');
       expect(values2).toContain('green');
     });
@@ -277,7 +277,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results = found.data;
       const tags = queryResultsToDatoms(results, {e: '1', a: 'tag'});
       expect(tags).toHaveLength(2);
-      const values = tags.map(d => d.v);
+      const values = tags.map((d) => d.v);
       expect(values).toContain('red');
       expect(values).toContain('blue');
     });
@@ -293,7 +293,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Use with() to see what the upsert would look like
       const withResult = await db.with([
-        ...existing.map(d => ({
+        ...existing.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -312,7 +312,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Now commit the changes
       await db.write([
-        ...existing.map(d => ({
+        ...existing.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -585,7 +585,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results2 = found2.data;
       const existing1 = queryResultsToDatoms(results2, {e: '1', a: 'status'});
       await db.write([
-        ...existing1.map(d => ({
+        ...existing1.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -605,7 +605,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results4 = found4.data;
       const statusDatoms = queryResultsToDatoms(results4, {e: '1', a: 'status'});
       await db.write(
-        statusDatoms.map(d => ({
+        statusDatoms.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -646,7 +646,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results = found.data;
       const nameDatoms = queryResultsToDatoms(results, {e: '1', a: 'name'});
       const tx2 = await db.write(
-        nameDatoms.map(d => ({
+        nameDatoms.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,

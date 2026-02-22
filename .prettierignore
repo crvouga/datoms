@@ -1,0 +1,6 @@
+dist
+node_modules
+**/*.js
+**/__tests__/**
+**/tests/**
+bun.lock

@@ -107,7 +107,7 @@ async function main() {
           return dbServerComponent.handleRequest(req);
         },
       },
-      '/*': async req => serveStaticOrSpa(req, distDir),
+      '/*': async (req) => serveStaticOrSpa(req, distDir),
     },
   });
 
@@ -142,7 +142,7 @@ async function safeStop(
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   createLogger().error('Uncaught error', {error: getErrorMsg(err)});
   process.exit(1);
 });

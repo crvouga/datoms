@@ -7,7 +7,6 @@ export const KeyboardShortcut = ({keys}: {keys: string[]}) => {
   return (
     <span className="flex items-center gap-1 text-xs text-gray-400">
       {keys.map((key, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: keys array is static and order never changes
         <span key={`${key}-${index}`} className="flex items-center gap-1">
           {index > 0 && <span className="text-gray-500">+</span>}
           {key === 'mod' ? (

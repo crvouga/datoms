@@ -9,7 +9,6 @@ import {
   stripQuestionMark,
   type DatalogQuery,
   type DatalogQueryFindVariable,
-  type DatalogQueryOrderByClause,
   type DatalogQueryWhereClause,
   type DatalogQueryWhereClauseMatch,
 } from '../../datalog-query.js';
@@ -55,13 +54,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   private sqlDb: SQLDatabase;
   private tableName: string;
 
-  constructor({
-    sqlDb,
-    tableName = 'datoms',
-  }: {
-    sqlDb: SQLDatabase;
-    tableName?: string;
-  }) {
+  constructor({sqlDb, tableName = 'datoms'}: {sqlDb: SQLDatabase; tableName?: string}) {
     this.hooks = new HookEngine();
     this.sqlDb = sqlDb;
     this.tableName = tableName || 'datoms';
@@ -70,7 +63,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    await this.sqlDb.transaction(async tx => {
+    await this.sqlDb.transaction(async (tx) => {
       // 1. Create datoms table
       const createTableSql = `
         CREATE TABLE IF NOT EXISTS ${this.tableName} (
@@ -125,7 +118,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     const txResult = await this._getNextTransactionId();
     const tx = txResult.txId;
 
-    await this.sqlDb.transaction(async transaction => {
+    await this.sqlDb.transaction(async (transaction) => {
       await this._writeDatomsInternal(datoms, tx, transaction);
     });
 
@@ -173,7 +166,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
     // Combine all datoms from the modified transaction
     const finalTx = beforeResult.tx;
-    const allFinalDatoms = finalTx.datoms.map(d => ({
+    const allFinalDatoms = finalTx.datoms.map((d) => ({
       e: d.e,
       a: d.a,
       v: d.v,
@@ -186,12 +179,12 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Create write result for after-write hooks
     const writeResult: WriteResult = {
       txId: committedTxId,
-      datoms: finalTx.datoms.map(d => ({...d, tx: committedTxId})),
+      datoms: finalTx.datoms.map((d) => ({...d, tx: committedTxId})),
       timestamp: Date.now(),
     };
 
     // Run after-write hooks (fire and forget)
-    this.hooks.runAfterWrite(writeResult, ctx).catch(err => {
+    this.hooks.runAfterWrite(writeResult, ctx).catch((err) => {
       console.error('After-write hook failed:', err);
     });
 
@@ -342,21 +335,21 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // Apply filters from options
     let results = mergedDatoms;
     if (options.e !== undefined) {
-      results = results.filter(d => d.e === options.e);
+      results = results.filter((d) => d.e === options.e);
     }
     if (options.a !== undefined) {
-      results = results.filter(d => d.a === options.a);
+      results = results.filter((d) => d.a === options.a);
     }
     if (options.v !== undefined) {
-      results = results.filter(d => d.v === options.v);
+      results = results.filter((d) => d.v === options.v);
     }
     if (options.tx !== undefined) {
-      results = results.filter(d => d.tx === options.tx);
+      results = results.filter((d) => d.tx === options.tx);
     }
     if (options.op !== undefined) {
-      results = results.filter(d => d.op === options.op);
+      results = results.filter((d) => d.op === options.op);
     } else {
-      results = results.filter(d => d.op === true);
+      results = results.filter((d) => d.op === true);
     }
 
     // Apply pagination
@@ -469,7 +462,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       return value;
     }
     if (Array.isArray(value)) {
-      return value.map(v => this._reviveValue(v));
+      return value.map((v) => this._reviveValue(v));
     }
     if (typeof value === 'object') {
       const revived: Record<string, unknown> = {};
@@ -509,7 +502,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     // When we have aggregations only (no GROUP BY), we should get exactly 1 row
     // If we get multiple rows, something is wrong with the SQL
     const findKeys = Object.keys(query.find);
-    const hasAggregations = Object.values(query.find).some(e => e.t !== 'identity');
+    const hasAggregations = Object.values(query.find).some((e) => e.t !== 'identity');
     if (hasAggregations && rows.length > 1) {
       // Take only the first row - aggregations without GROUP BY should return 1 row
       const firstRow = rows[0];
@@ -579,7 +572,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
     });
 
     // Map results - they already have output keys as keys (from SQL aliases)
-    const finalResults = results.map(row => {
+    const finalResults = results.map((row) => {
       const projected: Record<string, Value | Attribute> = {};
       if (findKeys.length === 0) {
         // Empty find clause - return all columns (already have variable names without ? prefix)
@@ -596,7 +589,9 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
             projected[outputKey] = row[outputKey];
           } else {
             // Try case-insensitive match
-            const matchingKey = rowKeys.find(key => key.toLowerCase() === outputKey.toLowerCase());
+            const matchingKey = rowKeys.find(
+              (key) => key.toLowerCase() === outputKey.toLowerCase(),
+            );
             if (matchingKey !== undefined) {
               projected[outputKey] = row[matchingKey];
             } else {
@@ -646,7 +641,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         ON CONFLICT DO NOTHING
       `.trim();
 
-      const params = batch.flatMap(d => {
+      const params = batch.flatMap((d) => {
         let value = d.v;
         if (value === undefined) {
           value = '__UNDEFINED__';
@@ -822,13 +817,13 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
 
         // Filter datoms matching this clause
         const clauseResults = allDatoms
-          .filter(datom => {
+          .filter((datom) => {
             if (!isVariable(entityVal) && datom.e !== entityVal) return false;
             if (!isVariable(attributeVal) && datom.a !== attributeVal) return false;
             if (!isVariable(valueVal) && datom.v !== valueVal) return false;
             return true;
           })
-          .map(datom => {
+          .map((datom) => {
             const result: Record<string, Value | Attribute> = {};
             if (isVariable(entityVal)) {
               result[entityVal as string] = datom.e;
@@ -874,9 +869,9 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
           const [op, varName, value] = predicate;
           if (typeof varName === 'string' && varName.startsWith('?')) {
             if (op === '=') {
-              results = results.filter(row => row[varName] === value);
+              results = results.filter((row) => row[varName] === value);
             } else if (op === '<=') {
-              results = results.filter(row => {
+              results = results.filter((row) => {
                 const rowValue = row[varName];
                 return rowValue !== undefined && rowValue !== null && rowValue <= value;
               });
@@ -886,7 +881,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
       }
 
       // Project results
-      const projected: QueryResult<TFind> = results.map(row => {
+      const projected: QueryResult<TFind> = results.map((row) => {
         const result: Record<string, Value | Attribute> = {};
         for (const [outputKey, expr] of Object.entries(modifiedQuery.find)) {
           const varName: string | undefined = expr?.c;
@@ -951,7 +946,7 @@ export class PostgreSQLDatomDatabase implements DatomDatabase {
         for (const orderBy of modifiedQuery.orderBy ?? []) {
           const {c: variable, t: direction} = orderBy;
           const outputKey =
-            Object.keys(modifiedQuery.find).find(key => {
+            Object.keys(modifiedQuery.find).find((key) => {
               const expr = modifiedQuery.find[key];
               if (typeof expr === 'string') {
                 return expr === variable;

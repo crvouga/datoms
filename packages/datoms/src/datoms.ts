@@ -218,8 +218,8 @@ export function datoms<T extends Record<string, unknown>>(
     // Template function API
     const template = first as {e: (r: T) => EntityId; op?: boolean};
     const records = rest;
-    return records.flatMap(r =>
-      (Array.isArray(r) ? r : [r]).flatMap(r => {
+    return records.flatMap((r) =>
+      (Array.isArray(r) ? r : [r]).flatMap((r) => {
         if (r == null) return [];
         if (typeof r !== 'object') return [];
         const datoms: DatomInput[] = [];
@@ -237,8 +237,8 @@ export function datoms<T extends Record<string, unknown>>(
   }
   // entityId API - first argument is a record or array
   const records = [first, ...rest];
-  return records.flatMap(r =>
-    (Array.isArray(r) ? r : [r]).flatMap(r => {
+  return records.flatMap((r) =>
+    (Array.isArray(r) ? r : [r]).flatMap((r) => {
       if (r == null) return [];
       if (typeof r !== 'object') return [];
       if (!('entityId' in r)) {
@@ -332,7 +332,7 @@ export function datoms<T extends Record<string, unknown>>(
  */
 export const records = (...datoms: (DatomInput | DatomInput[])[]): Record<Attribute, Value>[] => {
   // Flattens all arguments (which can be records or arrays of them) into a flat array of records
-  const flatRecords: DatomInput[] = datoms.flatMap(item => (Array.isArray(item) ? item : [item]));
+  const flatRecords: DatomInput[] = datoms.flatMap((item) => (Array.isArray(item) ? item : [item]));
 
   // Convert each datom to a plain object mapping attribute to value (grouped by entity)
   const entityMap = new Map<EntityId, Record<Attribute, Value>>();
@@ -341,7 +341,7 @@ export const records = (...datoms: (DatomInput | DatomInput[])[]): Record<Attrib
     if (!entityMap.has(datom.e)) {
       entityMap.set(datom.e, {});
     }
-    // biome-ignore lint/style/noNonNullAssertion: entityMap.get is guaranteed to return a value after set
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- entityMap.get is guaranteed to return a value after set
     const record = entityMap.get(datom.e)!;
     record[datom.a] = datom.v;
   }

@@ -33,9 +33,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const found = await db.read(query);
       const results = found.data;
       expect(results).toHaveLength(2);
-      const entities = results.map(r => r.e).sort();
+      const entities = results.map((r) => r.e).sort();
       expect(entities).toEqual(['1', '2']);
-      const values = results.map(r => r.v).sort();
+      const values = results.map((r) => r.v).sort();
       expect(values).toEqual(['Alice', 'Bob']);
     });
 
@@ -56,9 +56,9 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const found = await db.read(query);
       const results = found.data;
       expect(results).toHaveLength(2);
-      const attrs = results.map(r => r.attr).sort();
+      const attrs = results.map((r) => r.attr).sort();
       expect(attrs).toEqual(['age', 'name']);
-      const values = results.map(r => r.v).sort();
+      const values = results.map((r) => r.v).sort();
       expect(values).toEqual([30, 'Alice']);
     });
 
@@ -85,7 +85,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results = found.data;
       expect(results).toHaveLength(4);
       // Verify we get all entity-attribute-value combinations
-      const combinations = results.map(r => ({
+      const combinations = results.map((r) => ({
         e: r.e,
         a: r.attr,
         v: r.v,

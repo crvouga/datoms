@@ -13,7 +13,7 @@ export const createHttpClientFixture = async (): Promise<Fixture> => {
   const server = serve({
     port: 0, // Let OS assign an available port
     routes: {
-      [endpoint]: request => transportServerComponent.handleRequest(request),
+      [endpoint]: (request) => transportServerComponent.handleRequest(request),
     },
   });
   // Extract the actual port from the server URL

@@ -39,7 +39,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results2} = await db.asOf(tx2).read(query2);
       const atTx2 = queryResultsToDatoms(results2, {e: '1'});
       expect(atTx2).toHaveLength(2);
-      const valuesAtTx2 = atTx2.map(d => d.v).sort();
+      const valuesAtTx2 = atTx2.map((d) => d.v).sort();
       expect(valuesAtTx2).toContain('Alice');
       expect(valuesAtTx2).toContain(30);
 
@@ -48,7 +48,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results3} = await db.asOf(tx3).read(query3);
       const atTx3 = queryResultsToDatoms(results3, {e: '1'});
       expect(atTx3).toHaveLength(2);
-      const nameAtTx3 = atTx3.find(d => d.a === 'name');
+      const nameAtTx3 = atTx3.find((d) => d.a === 'name');
       expect(nameAtTx3?.v).toBe('Alice Updated');
     });
 
@@ -91,7 +91,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
       expect(history.length).toBeGreaterThanOrEqual(2);
       // Should include both the original and updated name
-      const names = history.map(d => d.v);
+      const names = history.map((d) => d.v);
       expect(names).toContain('Alice');
       expect(names).toContain('Alice Updated');
     });
@@ -144,7 +144,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const found1 = await db.asOf(tx1).read(queryAtTx1);
       const resultsAtTx1 = found1.data;
       expect(resultsAtTx1).toHaveLength(2);
-      const namesAtTx1 = resultsAtTx1.map(r => r.name).sort();
+      const namesAtTx1 = resultsAtTx1.map((r) => r.name).sort();
       expect(namesAtTx1).toEqual(['Alice', 'Bob']);
 
       // Query at tx2 - should see all three
@@ -155,7 +155,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const found2 = await db.asOf(tx2).read(queryAtTx2);
       const resultsAtTx2 = found2.data;
       expect(resultsAtTx2).toHaveLength(3);
-      const namesAtTx2 = resultsAtTx2.map(r => r.name).sort();
+      const namesAtTx2 = resultsAtTx2.map((r) => r.name).sort();
       expect(namesAtTx2).toEqual(['Alice', 'Bob', 'Charlie']);
     });
 
@@ -258,7 +258,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results2 = found2.data;
       const entityDatoms = queryResultsToDatoms(results2, {e: '1'});
       const tx = await db.write(
-        entityDatoms.map(d => ({
+        entityDatoms.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -291,7 +291,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Use with() to see what retraction would look like
       const withResult = await db.with(
-        entityDatoms.map(d => ({
+        entityDatoms.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -312,7 +312,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       // Now commit the retraction
       await db.write(
-        entityDatoms.map(d => ({
+        entityDatoms.map((d) => ({
           op: false,
           e: d.e,
           a: d.a,
@@ -405,11 +405,11 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       expect(history.length).toBeGreaterThanOrEqual(3);
 
       // History should include all changes, ordered by transaction
-      const txs = history.map(d => d.tx);
+      const txs = history.map((d) => d.tx);
       expect(txs).toEqual([...txs].sort((a, b) => a - b));
 
       // Should include retractions
-      const retractions = history.filter(d => d.op === false);
+      const retractions = history.filter((d) => d.op === false);
       expect(retractions.length).toBeGreaterThan(0);
     });
 
@@ -452,7 +452,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const query2 = datomsQueryToDatalogQuery({limit: 100});
       const {data: results2} = await db.since(tx2).read(query2);
       const sinceTx2 = queryResultsToDatoms(results2, {limit: 100});
-      const entitiesSinceTx2 = new Set(sinceTx2.map(d => d.e));
+      const entitiesSinceTx2 = new Set(sinceTx2.map((d) => d.e));
       expect(entitiesSinceTx2.has('2')).toBe(true); // Bob
       expect(entitiesSinceTx2.has('1')).toBe(true); // Updated name
 
@@ -478,7 +478,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results = found.data;
       const sinceTx1 = queryResultsToDatoms(results, {e: '1'});
       // Should only see email (age was sub, so it's filtered out)
-      const attributes = sinceTx1.map(d => d.a);
+      const attributes = sinceTx1.map((d) => d.a);
       expect(attributes).toContain('email');
       // Age should not be present (it was sub)
       expect(attributes).not.toContain('age');
@@ -501,7 +501,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const found = await db.since(tx1).read(querySinceTx1);
       const resultsSinceTx1 = found.data;
       expect(resultsSinceTx1.length).toBeGreaterThanOrEqual(2);
-      const namesSinceTx1 = resultsSinceTx1.map(r => r.name).sort();
+      const namesSinceTx1 = resultsSinceTx1.map((r) => r.name).sort();
       expect(namesSinceTx1).toContain('Charlie');
       expect(namesSinceTx1).toContain('David');
       // Should not include Alice or Bob (they were add before tx1)
@@ -511,7 +511,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       // Query changes since tx2
       const foundSinceTx2 = await db.since(tx2).read(querySinceTx1);
       const resultsSinceTx2 = foundSinceTx2.data;
-      const namesSinceTx2 = resultsSinceTx2.map(r => r.name).sort();
+      const namesSinceTx2 = resultsSinceTx2.map((r) => r.name).sort();
       expect(namesSinceTx2).toContain('David');
       expect(namesSinceTx2).not.toContain('Charlie');
     });
@@ -529,7 +529,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results1 = found1.data;
       const sinceTx1Entity1 = queryResultsToDatoms(results1, {e: '1'});
       expect(sinceTx1Entity1.length).toBeGreaterThanOrEqual(2);
-      const attributes = sinceTx1Entity1.map(d => d.a);
+      const attributes = sinceTx1Entity1.map((d) => d.a);
       expect(attributes).toContain('age');
       expect(attributes).toContain('name');
 
@@ -706,21 +706,21 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const {data: results2} = await db.asOf(tx2).read(query2);
       const atTx2 = queryResultsToDatoms(results2, {e: '1', a: 'tag'});
       expect(atTx2.length).toBeGreaterThanOrEqual(1);
-      const valuesAtTx2 = atTx2.map(d => d.v);
+      const valuesAtTx2 = atTx2.map((d) => d.v);
       expect(valuesAtTx2).toContain('blue');
 
       // Query at tx3 - should see green (latest value at tx3)
       const query3 = datomsQueryToDatalogQuery({e: '1', a: 'tag'});
       const {data: results3} = await db.asOf(tx3).read(query3);
       const atTx3 = queryResultsToDatoms(results3, {e: '1', a: 'tag'});
-      const valuesAtTx3 = atTx3.map(d => d.v);
+      const valuesAtTx3 = atTx3.map((d) => d.v);
       expect(valuesAtTx3).toContain('green');
 
       // Query at tx4 - should see green (latest add value before or at tx4)
       const query4 = datomsQueryToDatalogQuery({e: '1', a: 'tag'});
       const {data: results4} = await db.asOf(tx4).read(query4);
       const atTx4 = queryResultsToDatoms(results4, {e: '1', a: 'tag'});
-      const valuesAtTx4 = atTx4.map(d => d.v);
+      const valuesAtTx4 = atTx4.map((d) => d.v);
       if (valuesAtTx4.length > 0) {
         expect(valuesAtTx4).toContain('green');
         expect(valuesAtTx4).not.toContain('blue');
@@ -743,7 +743,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         e: '1',
         a: 'tag',
       });
-      const valuesSinceTx2 = sinceTx2.map(d => d.v);
+      const valuesSinceTx2 = sinceTx2.map((d) => d.v);
       expect(valuesSinceTx2).toContain('green');
 
       // Use history to see all values at tx2 (including sub ones)
@@ -757,8 +757,8 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
         a: 'tag',
       });
       const historyValuesAtTx2 = historyAtTx2
-        .filter(d => d.tx <= tx2 && d.op === true)
-        .map(d => d.v);
+        .filter((d) => d.tx <= tx2 && d.op === true)
+        .map((d) => d.v);
       expect(historyValuesAtTx2).toContain('red');
       expect(historyValuesAtTx2).toContain('blue');
     });
@@ -847,7 +847,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const found2 = await db.since(tx2).read(query2);
       const results2 = found2.data;
       const sinceTx2 = queryResultsToDatoms(results2, {a: 'status'});
-      const entitiesSinceTx2 = new Set(sinceTx2.map(d => d.e));
+      const entitiesSinceTx2 = new Set(sinceTx2.map((d) => d.e));
       expect(entitiesSinceTx2.has('1')).toBe(true); // Entity 1 changed
       expect(entitiesSinceTx2.has('3')).toBe(false); // Entity 3 didn't change after tx2
 
@@ -864,7 +864,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       });
       // Should see failed (completed was sub, so filtered out)
       expect(sinceTx3.length).toBeGreaterThanOrEqual(1);
-      const values = sinceTx3.map(d => d.v);
+      const values = sinceTx3.map((d) => d.v);
       expect(values).toContain('failed');
     });
 
@@ -891,7 +891,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const resultsLatest = foundLatest.data;
       const atLatest = queryResultsToDatoms(resultsLatest, {e: '1'});
       expect(atLatest.length).toBeGreaterThanOrEqual(2);
-      const attributesAtLatest = atLatest.map(d => d.a);
+      const attributesAtLatest = atLatest.map((d) => d.a);
       expect(attributesAtLatest).toContain('user/name');
       expect(attributesAtLatest).toContain('user/age');
 
@@ -903,14 +903,14 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const resultsFuture = foundFuture.data;
       const atFuture = queryResultsToDatoms(resultsFuture, {e: '1'});
       expect(atFuture.length).toBeGreaterThanOrEqual(2);
-      const attributesAtFuture = atFuture.map(d => d.a);
+      const attributesAtFuture = atFuture.map((d) => d.a);
       expect(attributesAtFuture).toContain('user/name');
       expect(attributesAtFuture).toContain('user/age');
 
       // Verify that asOf(futureTx) returns the same as current state
       expect(atFuture.length).toBe(atLatest.length);
-      const valuesAtFuture = atFuture.map(d => d.v).sort();
-      const valuesAtLatest = atLatest.map(d => d.v).sort();
+      const valuesAtFuture = atFuture.map((d) => d.v).sort();
+      const valuesAtLatest = atLatest.map((d) => d.v).sort();
       expect(valuesAtFuture).toEqual(valuesAtLatest);
 
       // Query asOf with future transaction ID using datalog query

@@ -84,7 +84,7 @@ describe.each(FIXTURES)('Custom Errors (%s)', (_name, createFixture) => {
         const query1 = datomsQueryToDatalogQuery({e: '1', timeoutMs: 1});
         await db.read(query1);
         // If query completes too fast, add a delay to ensure timeout
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
         // Re-query with timeout
         const query = datomsQueryToDatalogQuery({e: '1', timeoutMs: 1});
         await db.read(query);

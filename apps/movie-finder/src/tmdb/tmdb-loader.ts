@@ -15,12 +15,12 @@ export class TmdbLoader {
   async start(): Promise<void> {
     this.shouldStop = false;
     this.logger.info('Starting TMDB loader');
-    this.loadConfiguration().catch(error => {
+    this.loadConfiguration().catch((error) => {
       this.logger.error('TMDB configuration loader failed', {
         error: this.formatError(error),
       });
     });
-    this.discoverMovies().catch(error => {
+    this.discoverMovies().catch((error) => {
       this.logger.error('TMDB loader failed', {
         error: this.formatError(error),
       });
@@ -50,7 +50,7 @@ export class TmdbLoader {
         {
           e: () => tmdbNamespace('config', 'config'),
         },
-        [mapKeys(config, key => tmdbNamespace('config', key))],
+        [mapKeys(config, (key) => tmdbNamespace('config', key))],
       ).flatMap((datom): DatomInput[] => {
         // Handle nested image configuration
         if (datom.a === 'tmdb.config/images' && typeof datom.v === 'object' && datom.v !== null) {
@@ -97,9 +97,9 @@ export class TmdbLoader {
     if (countries) {
       const countryDatoms = datoms(
         {
-          e: c => tmdbNamespace('country', c.iso_3166_1?.toString() ?? ''),
+          e: (c) => tmdbNamespace('country', c.iso_3166_1?.toString() ?? ''),
         },
-        countries.map(c => mapKeys(c, key => tmdbNamespace('country', key))),
+        countries.map((c) => mapKeys(c, (key) => tmdbNamespace('country', key))),
       );
       await this.db.write(countryDatoms, {createdBy: 'tmdb-loader'});
     }
@@ -109,9 +109,9 @@ export class TmdbLoader {
     if (languages) {
       const languageDatoms = datoms(
         {
-          e: l => tmdbNamespace('language', l.iso_639_1?.toString() ?? ''),
+          e: (l) => tmdbNamespace('language', l.iso_639_1?.toString() ?? ''),
         },
-        languages.map(l => mapKeys(l, key => tmdbNamespace('language', key))),
+        languages.map((l) => mapKeys(l, (key) => tmdbNamespace('language', key))),
       );
       await this.db.write(languageDatoms, {createdBy: 'tmdb-loader'});
     }
@@ -133,7 +133,7 @@ export class TmdbLoader {
     // Load timezones
     const timezones = await this.tmdbClient.getTimezones();
     if (timezones) {
-      const timezoneDatoms = timezones.flatMap(tz => {
+      const timezoneDatoms = timezones.flatMap((tz) => {
         if (!tz) return [];
         const entityId = tmdbNamespace('country', tz.iso_3166_1?.toString() ?? '');
         return (tz.zones ?? []).map(
@@ -172,11 +172,11 @@ export class TmdbLoader {
       totalPages = response?.total_pages ?? 0;
 
       const movies =
-        response?.results?.map(m => mapKeys(m, key => tmdbNamespace('movie', key))) ?? [];
+        response?.results?.map((m) => mapKeys(m, (key) => tmdbNamespace('movie', key))) ?? [];
 
       const movieDatoms = datoms(
         {
-          e: m => tmdbNamespace('movie', m['tmdb.movie/id']?.toString() ?? ''),
+          e: (m) => tmdbNamespace('movie', m['tmdb.movie/id']?.toString() ?? ''),
         },
         movies,
       ).flatMap((datom): DatomInput[] => {
@@ -211,6 +211,6 @@ export class TmdbLoader {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

@@ -16,7 +16,7 @@ export interface UseCodeStorageReturn {
 function aggressivelyCleanWhitespace(code: string): string {
   return code
     .split('\n')
-    .map(line => line.replace(/\s+$/, '')) // Remove trailing whitespace from each line
+    .map((line) => line.replace(/\s+$/, '')) // Remove trailing whitespace from each line
     .join('\n')
     .replace(/\n{2,}/g, '\n') // Replace 2+ consecutive newlines with single newline (very aggressive)
     .replace(/^\n+/, '') // Remove leading blank lines
@@ -38,7 +38,7 @@ export function useCodeStorage(
   storageKey: string | undefined,
   code: string,
   _defaultValue: string,
-  // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are not available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Monaco editor types are not available
   editorRef: RefObject<any>,
   setCode: (code: string) => void,
 ): UseCodeStorageReturn {

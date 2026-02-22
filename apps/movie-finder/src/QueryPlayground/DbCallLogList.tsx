@@ -37,7 +37,7 @@ export function DbCallLogList({logs, onClear}: DbCallLogListProps) {
   }, [expandedIds]);
 
   const toggleExpanded = (id: number) => {
-    setExpandedIds(prev => {
+    setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -75,7 +75,7 @@ export function DbCallLogList({logs, onClear}: DbCallLogListProps) {
       </div>
       <div className="flex-1 overflow-auto">
         <div className="divide-y divide-gray-700">
-          {logs.map(log => (
+          {logs.map((log) => (
             <DbCallLogItem
               key={log.id}
               log={log}

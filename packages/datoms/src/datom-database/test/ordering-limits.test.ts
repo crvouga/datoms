@@ -203,7 +203,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
       const results = found.data;
       expect(results.length).toBeGreaterThanOrEqual(2);
       // Null values should be handled (sorted first or last depending on implementation)
-      const scores = results.map(r => r.s);
+      const scores = results.map((r) => r.s);
       expect(scores).toContain('100');
       expect(scores).toContain('200');
     });

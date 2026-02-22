@@ -67,7 +67,7 @@ describe.each(FIXTURES)('DatomDatabase (%s)', (_name, createFixture) => {
 
       const found = await db.read(query);
       const results = found.data;
-      expect(results.map(r => r.x).sort()).toEqual([1, 3]);
+      expect(results.map((r) => r.x).sort()).toEqual([1, 3]);
     });
 
     test('should handle empty find clause', async () => {

@@ -9,7 +9,7 @@ import type {TypeDefinition} from '../types';
  * @param typeDefinitions - Type definitions to add to Monaco's IntelliSense
  */
 export function useMonacoConfig(
-  // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are not available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Monaco editor types are not available
   monacoRef: RefObject<any>,
   typeDefinitions: TypeDefinition[],
 ): void {
@@ -33,7 +33,7 @@ export function useMonacoConfig(
 
       // Add extra libs for better IntelliSense
       monaco.languages.typescript.typescriptDefaults.setExtraLibs(
-        typeDefinitions.map(def => ({
+        typeDefinitions.map((def) => ({
           content: def.content,
           filePath: def.filePath,
         })),

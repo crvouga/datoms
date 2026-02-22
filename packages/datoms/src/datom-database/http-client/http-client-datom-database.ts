@@ -95,7 +95,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     const txId = Number(latestTx.txId) + 1;
 
     // Convert ops to datoms for transaction object
-    const datoms: Datom[] = flatOps.map(op => ({
+    const datoms: Datom[] = flatOps.map((op) => ({
       e: op.e,
       a: op.a,
       v: op.v,
@@ -119,7 +119,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
 
     // Use the modified transaction from hooks
     const finalTx = beforeResult.tx;
-    const finalOps = finalTx.datoms.map(d => ({
+    const finalOps = finalTx.datoms.map((d) => ({
       e: d.e,
       a: d.a,
       v: d.v,
@@ -137,12 +137,12 @@ export class HttpClientDatomDatabase implements DatomDatabase {
       // Create write result for after-write hooks
       const writeResult: WriteResult = {
         txId: response.txId,
-        datoms: finalTx.datoms.map(d => ({...d, tx: response.txId})),
+        datoms: finalTx.datoms.map((d) => ({...d, tx: response.txId})),
         timestamp: Date.now(),
       };
 
       // Run after-write hooks locally (fire and forget, don't block)
-      this.hooks.runAfterWrite(writeResult, ctx).catch(err => {
+      this.hooks.runAfterWrite(writeResult, ctx).catch((err) => {
         console.error('After-write hook failed:', err);
       });
 
@@ -212,7 +212,7 @@ export class HttpClientDatomDatabase implements DatomDatabase {
     await this._ensureInitialized();
 
     // Get the next transaction ID for speculative datoms
-    // biome-ignore lint/style/noNonNullAssertion: txId is guaranteed to exist for latest transaction
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- txId is guaranteed to exist for latest transaction
     const speculativeTxId = (await this._getLatestTransaction()).txId! + 1;
 
     // Process operations in sequence, creating speculative datoms directly

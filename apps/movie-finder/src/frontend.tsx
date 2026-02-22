@@ -11,7 +11,7 @@ import {App} from './App';
 
 function start() {
   console.log('Starting frontend...');
-  // biome-ignore lint/style/noNonNullAssertion: root element is guaranteed to exist in index.html
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- root element is guaranteed to exist in index.html
   const root = createRoot(document.getElementById('root')!);
   console.log('Root created');
   root.render(<App />);

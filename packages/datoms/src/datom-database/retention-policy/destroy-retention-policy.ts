@@ -74,7 +74,7 @@ export class DestroyRetentionPolicy implements RetentionPolicy {
     if (this.config.intervalMs) {
       // Use interval-based scheduling
       this.intervalId = setInterval(() => {
-        this.execute().catch(err => {
+        this.execute().catch((err) => {
           const errorMessage = err instanceof Error ? err.message : String(err);
           this.logger?.error('Destroy retention policy execution failed', {
             event: 'retention_policy_execution_error',

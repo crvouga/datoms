@@ -33,7 +33,7 @@ export function datalogToPostgresSQL(
 
   // Check if there's an op predicate that would override default filtering
   const hasOpPredicate = predicateClauses.some(
-    p => Array.isArray(p) && p.length === 3 && p[1] === '?op',
+    (p) => Array.isArray(p) && p.length === 3 && p[1] === '?op',
   );
 
   // Build CTEs for each pattern clause with deduplication using DISTINCT ON
@@ -250,7 +250,7 @@ function _buildWhereClause(
  * Build GROUP BY clause if we have aggregations
  */
 function _buildGroupByClause(query: DatalogQuery, groupByColumns: string[]): string {
-  const hasAggregations = Object.values(query.find).some(e => e.t !== 'identity');
+  const hasAggregations = Object.values(query.find).some((e) => e.t !== 'identity');
 
   if (hasAggregations && groupByColumns.length > 0) {
     return `GROUP BY ${groupByColumns.join(', ')}`;

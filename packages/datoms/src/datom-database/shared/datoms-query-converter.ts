@@ -21,7 +21,7 @@ export function queryResultsToDatoms<TFind extends Record<string, DatalogQueryFi
   // When pattern has literal values (e.g., e: 1), the query executor may not include
   // the variable in results, so we use the literal value from options as fallback
   let datoms = results
-    .map(result => ({
+    .map((result) => ({
       // Use literal value from options if result field is missing (happens when pattern has literal)
       e: (result.e as EntityId | undefined) ?? (options?.e as EntityId | undefined),
       a: (result.a as Attribute | undefined) ?? (options?.a as Attribute | undefined),
@@ -30,7 +30,7 @@ export function queryResultsToDatoms<TFind extends Record<string, DatalogQueryFi
       // op defaults to true if not present (for backward compatibility)
       op: (result.op as boolean | undefined) ?? true,
     }))
-    .filter(datom => {
+    .filter((datom) => {
       // e is required - filter out if still missing after fallback
       return datom.e != null;
     });
@@ -39,7 +39,7 @@ export function queryResultsToDatoms<TFind extends Record<string, DatalogQueryFi
   // When op is not specified, include both added and retracted datoms
   // This allows history queries to include retractions
   if (options?.op !== undefined) {
-    datoms = datoms.filter(d => d.op === options.op);
+    datoms = datoms.filter((d) => d.op === options.op);
   }
   // If op is not specified, don't filter - include all datoms
 
